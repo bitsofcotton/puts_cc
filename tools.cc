@@ -1,5 +1,6 @@
 #include "lword.hh"
 #include "corpushl.hh"
+#include "file2eigen.hh"
 #include <string>
 #include <iostream>
 #include <fstream>
@@ -9,7 +10,7 @@ void usage() {
 }
 
 int main(int argc, const char* argv[]) {
-  if(argc < 1) {
+  if(argc < 2) {
     usage();
     return - 1;
   }
@@ -46,12 +47,11 @@ int main(int argc, const char* argv[]) {
       while(getline(input2, line)) wordsbuf += line + '\n';
       input2.close();
       
-      stat.init(wordsbuf.c_str(), 120);
+      stat.init(wordsbuf.c_str(), 0, 120);
       const std::vector<std::string>& words(stat.getWords());
       Eigen::Matrix<Eigen::Matrix<double, Eigen::Dynamic, 1>, Eigen::Dynamic, Eigen::Dynamic> corpus(stat.compute(input.c_str()));
-      for(int i = 0; i < corpus.rows(); i ++)
-        for(int j = 0; j < corpus.cols(); j ++)
-          std::cout << words[i] << " - " << words[j] << " : " << corpus(i, j).transpose() << std::endl;
+      std::cout << words << std::endl;
+      std::cout << corpus << std::endl;
     }
   }
   return 0;

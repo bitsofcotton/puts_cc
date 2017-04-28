@@ -151,8 +151,9 @@ template <typename T> void lword<T>::makeBigram(const T* input) {
   for(auto itr = map.begin(); itr != map.end(); ++ itr) {
     gram_t<T> work;
     work.str = new T[3];
-    for(int i = 0; i < 3; i ++)
+    for(int i = 0; i < 2; i ++)
       work.str[i] = itr->first[i];
+    work.str[2] = '\0';
     for(auto itr2 = itr->second.begin(); itr2 != itr->second.end(); ++ itr2) {
       work.ptr0.push_back(*itr2 - 1);
       work.ptr1.push_back(*itr2);
@@ -181,8 +182,8 @@ template <typename T> void lword<T>::constructNwords() {
         T key2[i + 2];
         for(int j = 1; j < i + 1; j ++)
           key2[j - 1] = key[j];
-        key2[i]     = *itr2;
-        key2[i + 1] = '\0';
+        key2[i]       = *itr2;
+        key2[i + 1]   = '\0';
         if(!isin(key2, dicts[i - 1]))
           continue;
         T workkey[i + 3];
@@ -231,11 +232,14 @@ template <typename T> void lword<T>::constructNwords() {
       gram_t<T> before(find(itr->first.c_str(), dicts[i - 1]));
       gram_t<T> after;
       after.str = before.str;
-      int k = 0, itridx = itr->second[0];
       for(int j = 0; j < before.ptr0.size(); j ++) {
-        if(k < itr->second.size())
-          itridx = itr->second[k ++];
-        if(itridx <= j && k < itr->second.size())
+        bool flag = false;
+        for(auto itr2 = dmap[itr->first].begin(); itr2 != dmap[itr->first].end(); ++ itr2)
+          if(*itr2 == j) {
+            flag = true;
+            break;
+          }
+        if(flag)
           continue;
         after.ptr0.push_back(before.ptr0[j]);
         after.ptr1.push_back(before.ptr1[j]);
@@ -245,10 +249,11 @@ template <typename T> void lword<T>::constructNwords() {
     // construct next stage.
     vector<gram_t<T> > workv;
     for(auto itr = map0.begin(); itr != map0.end(); ++ itr) {
-      gram_t<T> work;
-      work.str = new T[i + 2];
+      gram_t<T>   work;
+      work.str = new T[i + 3];
       for(int j = 0; j < i + 2; j ++)
         work.str[j] = itr->first[j];
+      work.str[i + 2] = '\0';
       const vector<int>& ptr0orig(itr->second);
       const vector<int>& ptr1orig(map1[itr->first]);
       for(int j = 0; j < ptr0orig.size(); j ++) {

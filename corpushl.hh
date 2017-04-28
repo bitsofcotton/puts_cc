@@ -20,7 +20,7 @@ public:
   ~corpushl();
   
   int  isin(const std::string& key);
-  void init(const U* words, const int& nthresh);
+  void init(const U* words, const int& nthresh, const int& Nthresh);
   const Tensor                    compute(const U* input);
   const std::vector<std::string>& getWords();
 private:
@@ -30,6 +30,7 @@ private:
   std::vector<std::vector<int> > ptrs;
   Tensor                         corpus;
   int                            nthresh;
+  int                            Nthresh;
    
   void getWordPtrs(const U* input);
   void corpusEach();
@@ -44,7 +45,7 @@ template <typename T, typename U> corpushl<T,U>::~corpushl() {
   ;
 }
 
-template <typename T, typename U> void corpushl<T,U>::init(const U* words, const int& nthresh) {
+template <typename T, typename U> void corpushl<T,U>::init(const U* words, const int& nthresh, const int& Nthresh) {
   std::string buf;
   bool        flag = false;
   for(int i = 0; words[i]; i ++) {
@@ -64,6 +65,7 @@ template <typename T, typename U> void corpushl<T,U>::init(const U* words, const
       buf += words[i];
   }
   this->nthresh = nthresh;
+  this->Nthresh = Nthresh;
 }
 
 template <typename T, typename U> int corpushl<T,U>::isin(const std::string& key) {
@@ -129,19 +131,20 @@ template <typename T, typename U> void corpushl<T,U>::corpusEach() {
         if(!ptrs[k].size())
           continue;
         int ctru = 0;
+        int ctrv = 0;
         for(auto itr = ptrs[k].begin(); itr != ptrs[k].end(); ++ itr) {
           while(ctru < ptrs[i].size() && ptrs[i][ctru] < *itr) ctru ++;
           if(ctru >= ptrs[i].size())
             continue;
-          int ctrv = 0;
           while(ctrv < ptrs[j].size() && ptrs[j][ctrv] < *itr) ctrv ++;
+          if(ptrs[j][ctrv] < *itr)
+            break;
           T work(0);
-          T buf = std::abs(*itr - ptrs[i][ctru]);
-          if(buf > nthresh)
-            work += buf * buf;
-          buf = std::abs(*itr - ptrs[j][ctrv]);
-          if(buf > nthresh)
-            work += buf * buf;
+          const T buf0(log(std::abs(*itr - ptrs[i][ctru])));
+          const T buf1(log(std::abs(*itr - ptrs[j][ctrv])));
+          if(nthresh < buf0 && buf0 < Nthresh &&
+             nthresh < buf1 && buf1 < Nthresh)
+            work += buf0 * buf0 + buf1 * buf1;
           corpus(i, j)[k] += sqrt(work);
         }
       }
