@@ -6,9 +6,7 @@
 #include <vector>
 #include <iterator>
 #include <iostream>
-
-bool partial_compare(const std::string& x0, const std::string& x1);
-bool partial_compare_equal(const std::string& x0, const std::string& x1);
+#include "corpus.hh"
 
 template <typename T, typename U> class corpushl {
 public:
@@ -17,23 +15,25 @@ public:
   typedef Eigen::Matrix<Vec, Eigen::Dynamic, Eigen::Dynamic> Tensor;
   
   corpushl();
+  corpushl(const corpus<T, U>&   obj);
+  corpushl(const corpushl<T, U>& obj);
   ~corpushl();
   
-  int  isin(const std::string& key);
-  void init(const U* words, const int& nthresh, const int& Nthresh);
-  const Tensor                    compute(const U* input);
-  const std::vector<std::string>& getWords();
+  const corpushl<T, U>            cast(const std::vector<std::string>& words) const;
+  const corpushl<T, U>&           operator += (const corpushl<T, U>& other);
+  const corpushl<T, U>            operator +  (const corpushl<T, U>& other);
+  const corpushl<T, U>&           operator =  (const corpushl<T, U>& other);
+  const corpushl<T, U>            withDetail(const std::string& word, const corpushl<T, U>& other);
+  const T                         distanceInUnion(const corpushl<T, U>& other) const;
+  const std::string               toc(const std::vector<corpushl<T, U> >& base);
+  const std::string               optToc();
+  const std::vector<std::string>& getWords() const;
+  const Tensor&                   getCorpus() const;
 private:
-  std::vector<std::string>       words0;
-  std::vector<std::string>       words;
-  std::vector<std::vector<int> > ptrs0;
-  std::vector<std::vector<int> > ptrs;
-  Tensor                         corpus;
-  int                            nthresh;
-  int                            Nthresh;
+  std::vector<std::string>        words;
+  Tensor                          corpust;
    
-  void getWordPtrs(const U* input);
-  void corpusEach();
+  std::vector<std::string> gatherWords(const std::vector<std::string>& in0, const std::vector<std::string>& in1, std::vector<int>& ridx0, std::vector<int>& ridx1);
 };
 
 template <typename T, typename U> corpushl<T,U>::corpushl() {
@@ -45,112 +45,195 @@ template <typename T, typename U> corpushl<T,U>::~corpushl() {
   ;
 }
 
-template <typename T, typename U> void corpushl<T,U>::init(const U* words, const int& nthresh, const int& Nthresh) {
-  std::string buf;
-  bool        flag = false;
-  for(int i = 0; words[i]; i ++) {
-    if(words[i] == ',' || words[i] == '\n') {
-      if(buf.size()) {
-        this->words0.push_back(buf);
-        this->ptrs0.push_back(std::vector<int>());
-      }
-      buf = std::string();
-      if(words[i] == ',')
-        flag = true;
+template <typename T, typename U> corpushl<T,U>::corpushl(const corpus<T, U>& obj) {
+  words   = std::vector<std::string>(obj.getWords());
+  corpust = Tensor(obj.getCorpus());
+}
+
+template <typename T, typename U> corpushl<T,U>::corpushl(const corpushl<T, U>& obj) {
+  words   = std::vector<std::string>(obj.words);
+  corpust = Tensor(obj.corpust);
+}
+
+template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::cast(const std::vector<std::string>& words) const {
+  corpushl<T, U> result;
+  std::vector<std::string> sword;
+  std::sort(sword.begin(), sword.end());
+  std::vector<int>         idxs;
+  for(int i = 0; i < sword.size(); i ++) {
+    auto p(std::equal_range(words.begin(), words.end(), sword[i]));
+    if(*p.first == sword[i]) {
+      idxs.push_back(std::distance(words.begin(), p.first));
+      result.words.push_back(*p.first);
+    }
+  }
+  result.corpust = Tensor(idxs.size(), idxs.size());
+  for(int i = 0; i < idxs.size(); i ++)
+    for(int j = 0; j < idxs.size(); j ++)
+      result.corpust(i, j) = corpust(i, j);
+  return result;
+}
+
+template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator = (const corpushl<T, U>& other) {
+  words   = std::vector<std::string>(other.words);
+  corpust = Tensor(other.corpust);
+  return *this;
+}
+
+template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator += (const corpushl<T, U>& other) {
+  return *this = *this + other;
+}
+
+template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator + (const corpushl<T, U>& other) {
+  corpushl<T, U> result;
+  std::vector<int> ridx0, ridx1;
+  result.words   = gatherWords(words, other.words, ridx0, ridx1);
+  result.corpust = Tensor(result.words.size(), result.words.size());
+  std::cout << other.words.size();
+  for(int i = 0; i < result.corpust.rows(); i ++) {
+    std::cerr << "operator + processing row: " << i << " / " << result.corpust.rows() << std::endl;
+    for(int j = 0; j < result.corpust.cols(); j ++) {
+      result.corpust(i, j) = Vec(result.words.size());
+      if(!((0 <= ridx0[i] && 0 <= ridx0[j]) || (0 <= ridx1[i] && 0 <= ridx1[j])))
+        for(int k = 0; k < result.corpust(i, j).size(); k ++)
+          result.corpust(i, j)[k] = 0;
       else
-        flag = false;
+        for(int k = 0; k < result.corpust(i, j).size(); k ++) {
+          if(!((0 <= ridx0[i] && 0 <= ridx0[j] && 0 <= ridx0[k]) ||
+               (0 <= ridx1[i] && 0 <= ridx1[j] && 0 <= ridx1[k])) ) {
+            result.corpust(i, j)[k] = 0.;
+            continue;
+          }
+          if(0 <= ridx0[i] && 0 <= ridx0[j] && 0 <= ridx0[k])
+            result.corpust(i, j)[k] += corpust(ridx0[i], ridx0[j])[ridx0[k]];
+          if(0 <= ridx1[i] && 0 <= ridx1[j] && 0 <= ridx1[k])
+            result.corpust(i, j)[k] += other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
+        }
+    }
+  }
+  return result;
+}
+
+template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetail(const std::string& word, const corpushl<T, U>& other) {
+  auto itr(std::equal_range(words.begin(), words.end(), word).first);
+  if(*itr != word)
+    return *this;
+  corpushl<T, U>   result;
+  std::vector<int> ridx0, ridx1;
+  std::vector<std::string> workwords(gatherWords(words, other.words, ridx0, ridx1));
+  result.corpust = Tensor(workwords.size() - 1, workwords.size() - 1);
+  for(int i = 0; i < result.corpust.rows(); i ++)
+    for(int j = 0; j < result.corpust.cols(); j ++)
+      result.corpust(i, j) = Vec(workwords.size() - 1);
+  std::vector<int> ridx2;
+  int eidx = - 1;
+  for(int i = 0, ii = 0; i < workwords.size(); i ++) {
+    if(workwords[i] == word) {
+      ridx2.push_back(- 1);
+      eidx = i;
       continue;
     }
-    if(!flag)
-      buf += words[i];
+    ridx2.push_back(ii ++);
   }
-  this->nthresh = nthresh;
-  this->Nthresh = Nthresh;
+  for(int i = 0; i < workwords.size(); i ++) {
+    std::cerr << "withDetail 1/3 : " << i << "/" << workwords.size() << std::endl;
+    if(ridx2[i] < 0)
+      continue;
+    result.words.push_back(workwords[i]);
+    for(int j = 0; j < workwords.size(); j ++)
+      if(ridx2[j] >= 0) {
+        for(int k = 0; k < workwords.size(); k ++)
+          if(ridx2[k] >= 0 && ridx0[k] >= 0 && ridx0[i] >= 0 && ridx0[j] >= 0)
+            result.corpust(ridx2[i], ridx2[j])[ridx2[k]] += corpust(ridx0[i], ridx0[j])[ridx0[k]];
+      }
+  }
+  for(int i = 0; i < workwords.size(); i ++) if(ridx0[i] >= 0) {
+    std::cerr << "withDetail 2/3 : " << i << "/" << workwords.size() << std::endl;
+    for(int j = 0; j < workwords.size(); j ++) if(ridx0[j] >= 0)
+      for(int i1 = 0; i1 < workwords.size(); i1 ++) if(ridx1[i1] >= 0 && ridx2[i1] >= 0)
+        for(int j1 = 0; j1 < workwords.size(); j1 ++) if(ridx1[j1] >= 0 && ridx2[j1] >= 0)
+          for(int k = 0, kk = 0; k < workwords.size(); k ++) {
+            if(ridx1[k] >= 0 && ridx2[k] >= 0)
+              // XXX confirm me.
+              result.corpust(ridx2[i1], ridx2[j1])[ridx2[k]] += corpust(ridx0[i], ridx0[j])[ridx0[eidx]] * other.corpust(ridx1[i1], ridx1[j1])[ridx1[k]];
+          }
+  }
+  for(int i = 0; i < workwords.size(); i ++) if(ridx1[i] >= 0 && ridx2[i] >= 0) {
+    std::cerr << "withDetail 3/3 : " << i << "/" << workwords.size() << std::endl;
+    for(int j = 0; j < workwords.size(); j ++) if(ridx1[j] >= 0 && ridx2[j] >= 0)
+      for(int k = 0; k < workwords.size(); k ++) if(ridx1[k] < 0 && ridx2[k] >= 0 && ridx0[k] >= 0)
+        result.corpust(ridx2[i], ridx2[j])[ridx2[k]] += corpust(ridx0[eidx], ridx0[eidx])[ridx0[k]];
+        // XXX fixme or not.
+        // * other.corpust(ridx1[i], ridx1[j])[ridx1[k]] * corpust(ridx0[eidx], ridx0[eidx])[ridx0[k]];
+  }
+  return result;
 }
 
-template <typename T, typename U> int corpushl<T,U>::isin(const std::string& key) {
-  return 0;
+template <typename T, typename U> const T corpushl<T, U>::distanceInUnion(const corpushl<T, U>& other) const {
+  T res(0);
+  std::vector<int> ridx0, ridx1;
+  std::vector<std::string> drop(gatherWords(words, other.words, ridx0, ridx1));
+  for(int i = 0; i < drop.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0)
+    for(int j = 0; j < drop.size(); j ++) if(ridx0[j] >= 0 && ridx1[j] >= 0)
+      for(int k = 0; k < drop.size(); k ++) if(ridx0[i] >= 0 && ridx1[k] >= 0)
+        res += corpust(ridx0[i], ridx0[j])[ridx0[k]] * other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
+  return res;
 }
 
-template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dynamic, 1>, Eigen::Dynamic, Eigen::Dynamic> corpushl<T,U>::compute(const U* input) {
-  std::cerr << "Getting word pointers." << std::endl;
-  getWordPtrs(input);
-  std::cerr << "Corpus..." << std::endl;
-  corpusEach();
-  return corpus;
+template <typename T, typename U> const std::string corpushl<T, U>::toc(const std::vector<corpushl<T, U> >& base) {
+  std::string result;
+  for(int i = 0; i < base.size(); i ++) {
+    // stub.
+    ;
+  }
+  return result;
 }
 
-template <typename T, typename U> const std::vector<std::string>& corpushl<T,U>::getWords() {
+template <typename T, typename U> const std::string corpushl<T, U>::optToc() {
+  std::string result;
+  // optimize corpust to make minimized toc.
+  // stub.
+  return result;
+}
+
+template <typename T, typename U> std::vector<std::string> corpushl<T, U>::gatherWords(const std::vector<std::string>& in0, const std::vector<std::string>& in1, std::vector<int>& ridx0, std::vector<int>& ridx1) {
+  std::vector<std::string> sin0(in0), sin1(in1), result;
+  std::sort(sin0.begin(), sin0.end());
+  std::sort(sin1.begin(), sin1.end());
+  ridx0 = std::vector<int>();
+  ridx1 = std::vector<int>();
+  int rbufsize(in0.size() + in1.size() + 1);
+  for(int i = 0; i < rbufsize; i ++)
+    ridx0.push_back(- 1);
+  for(int i = 0; i < rbufsize; i ++)
+    ridx1.push_back(- 1);
+  int j = 0;
+  for(int i = 0; i < sin0.size(); i ++) {
+    for(; j < sin1.size(); j ++) {
+      if(sin0[i] == sin1[j]) {
+        ridx1[result.size() - 1] = std::distance(in1.begin(), std::equal_range(in1.begin(), in1.end(), sin1[j]).first);
+        continue;
+      } else if(sin0[i] < sin1[j])
+        break;
+      result.push_back(std::string(sin1[j]));
+      ridx1[result.size() - 1] = std::distance(in1.begin(), std::equal_range(in1.begin(), in1.end(), sin1[j]).first);
+    }
+    result.push_back(std::string(sin0[i]));
+    ridx0[result.size() - 1] = std::distance(in0.begin(), std::equal_range(in0.begin(), in0.end(), sin0[i]).first);
+  }
+  for(; j < sin1.size(); j ++) {
+    result.push_back(std::string(sin1[j]));
+    ridx1[result.size() - 1] = std::distance(in1.begin(), std::equal_range(in1.begin(), in1.end(), sin1[j]).first);
+  }
+  return result;
+}
+
+template <typename T, typename U> const std::vector<std::string>& corpushl<T, U>::getWords() const {
   return words;
 }
 
-template <typename T, typename U> void corpushl<T,U>::getWordPtrs(const U* input) {
-  std::sort(words0.begin(), words0.end());
-  std::string work;
-  for(int i = 0; input[i]; i ++) {
-    work += input[i];
-    if(std::binary_search(words0.begin(), words0.end(), work, partial_compare)) {
-      auto p = std::equal_range(words0.begin(), words0.end(), work, partial_compare);
-      bool match = false;
-      for(auto pp = p.first; pp != p.second; ++ pp) {
-        if(work == *pp) {
-          ptrs0[std::distance(words0.begin(), pp)].push_back(i);
-          match = false;
-          break;
-        } else if(partial_compare_equal(work, *pp))
-          match = true;
-      }
-      if(match)
-        continue;
-    }
-    i -= work.size() - 1;
-    work = std::string();
-  }
-  for(auto itr = words0.begin(); itr != words0.end(); ++ itr) {
-    const int idx = std::distance(words0.begin(), itr);
-    if(ptrs0[idx].size()) {
-      words.push_back(*itr);
-      ptrs.push_back(ptrs0[idx]);
-    }
-  }
-  std::cerr << words.size() << " words used." << std::endl;
-  return;
-}
-
-template <typename T, typename U> void corpushl<T,U>::corpusEach() {
-  corpus = Tensor(words.size(), words.size());
-  for(int i = 0; i < words.size(); i ++) {
-    std::cerr << "Corpushing row : " << i << std::endl;
-    if(!ptrs[i].size())
-      continue;
-    for(int j = 0; j < words.size(); j ++) {
-      if(!ptrs[j].size())
-        continue;
-      corpus(i, j) = Vec(words.size());
-      for(int k = 0; k < words.size(); k ++) {
-        if(!ptrs[k].size())
-          continue;
-        int ctru = 0;
-        int ctrv = 0;
-        for(auto itr = ptrs[k].begin(); itr != ptrs[k].end(); ++ itr) {
-          while(ctru < ptrs[i].size() && ptrs[i][ctru] < *itr) ctru ++;
-          if(ctru >= ptrs[i].size())
-            continue;
-          while(ctrv < ptrs[j].size() && ptrs[j][ctrv] < *itr) ctrv ++;
-          if(ptrs[j][ctrv] < *itr)
-            break;
-          T work(0);
-          const T buf0(log(std::abs(*itr - ptrs[i][ctru])));
-          const T buf1(log(std::abs(*itr - ptrs[j][ctrv])));
-          if(nthresh < buf0 && buf0 < Nthresh &&
-             nthresh < buf1 && buf1 < Nthresh)
-            work += buf0 * buf0 + buf1 * buf1;
-          corpus(i, j)[k] += sqrt(work);
-        }
-      }
-    }
-  }
-  return;
+template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dynamic, 1>, Eigen::Dynamic, Eigen::Dynamic>& corpushl<T, U>::getCorpus() const {
+  return corpust;
 }
 
 #define _CORPUS_HL_

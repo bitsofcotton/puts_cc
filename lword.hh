@@ -134,8 +134,6 @@ template <typename T> const std::vector<word_t<T> >& lword<T>::compute(const T* 
 template <typename T> void lword<T>::makeBigram(const T* input) {
   std::map<T, T> map0;
   std::map<std::string, vector<int> > map;
-  // dicts.insert();
-  // dictsptrs.insert();
   for(int i = 1; input[i]; i ++) {
     T work[3];
     work[0] = input[i - 1];
@@ -271,7 +269,100 @@ template <typename T> void lword<T>::constructNwords() {
 }
 
 template <typename T> void lword<T>::bondLast() {
-  
+  bool loopf = true;
+  int  count = 0;
+  while(loopf) {
+    loopf = false;
+    count ++;
+    for(int i = 0; i < dicts.size(); i ++) {
+      std::cerr << "bondLast: " << i << "/" << dicts.size() << " @ " << count << std::endl;
+      for(auto itr = dicts[i].begin(); itr != dicts[i].end(); ++ itr)
+        for(int j = 0; j < dicts.size(); j ++) {
+          if(i + j + 1 >= loop)
+            continue;
+          for(auto itr2 = dicts[j].begin();  itr2 != dicts[j].end(); ++ itr2) {
+            std::vector<int> ptr0;
+            std::vector<int> ptr1;
+            if(!itr->str || itr2->str)
+              continue;
+            if(itr->str[i + 1] == itr2->str[0]) {
+              for(int ii = 0; ii < itr->ptr0.size(); ii ++)
+                for(int jj = 0; jj < itr2->ptr0.size(); jj ++)
+                  if(itr->ptr1[ii] == itr2->ptr0[jj]) {
+                    ptr0.push_back(itr->ptr0[ii]);
+                    ptr1.push_back(itr2->ptr1[jj]);
+                  }
+              const int diff(std::min(itr->ptr0.size(), itr2->ptr0.size()) - ptr0.size());
+              const int diffM(std::max(itr->ptr0.size(), itr2->ptr0.size()) - ptr0.size());
+              if(0 < diff && diffM < mthresh)
+                continue;
+              if(ptr0.size() < Mthresh)
+                continue;
+              // insert longer word.
+              T key2[i + j + 3];
+              for(int ii = 0; ii <= i; ii ++)
+                key2[ii] = itr->str[ii];
+              for(int jj = 0; jj <= j; jj ++)
+                key2[i + 1 + jj] = itr2->str[jj];
+              key2[i + j + 2] = '\0';
+              if(!isin(key2, dicts[i + j])) {
+                gram_t<T> work;
+                work.str = new T[i + j + 1];
+                for(int jj = 0; jj < i + j + 1; jj ++)
+                  work.str[jj] = key2[jj];
+                work.ptr0 = ptr0;
+                work.ptr1 = ptr1;
+                dicts[i + j].push_back(work);
+              } else {
+                gram_t<T> work(find(key2, dicts[i + j + 1]));
+                int k = 0;
+                for(int jj = 0; jj < work.ptr0.size(); jj ++)
+                  for(; k < ptr0.size() && (jj == work.ptr0.size() - 1 || ptr0[k] <= work.ptr0[jj]); k ++)
+                    if(work.ptr0[jj] <= ptr0[k] && (jj == work.ptr0.size() - 1 || ptr0[k] <= work.ptr0[jj + 1])) {
+                      work.ptr0.insert(work.ptr0.begin() + jj, ptr0[k]);
+                      work.ptr1.insert(work.ptr1.begin() + jj, ptr1[k]);
+                    }
+                assign(key2, dicts[i + j + 1], work);
+              }
+              // delete.
+              std::vector<int> i0ptr0;
+              std::vector<int> i0ptr1;
+              std::vector<int> i1ptr0;
+              std::vector<int> i1ptr1;
+              for(int ii = 0; ii < itr->ptr0.size(); ii ++) {
+                bool flag = false;
+                for(auto itr3 = ptr0.begin(); itr3 != ptr0.end(); ++ itr3)
+                  if(itr->ptr0[ii] == *itr3) {
+                    flag = true;
+                    break;
+                  }
+                if(!flag) {
+                  i0ptr0.push_back(itr->ptr0[ii]);
+                  i0ptr1.push_back(itr->ptr1[ii]);
+                }
+              }
+              itr->ptr0 = i0ptr0;
+              itr->ptr1 = i0ptr1;
+              for(int ii = 0; ii < itr2->ptr0.size(); ii ++) {
+                bool flag = false;
+                for(auto itr3 = ptr1.begin(); itr3 != ptr1.end(); ++ itr3)
+                  if(itr2->ptr1[ii] == *itr3) {
+                    flag = true;
+                    break;
+                  }
+                if(!flag) {
+                  i1ptr0.push_back(itr2->ptr0[ii]);
+                  i1ptr1.push_back(itr2->ptr1[ii]);
+                }
+              }
+              itr2->ptr0 = i1ptr0;
+              itr2->ptr1 = i1ptr1;
+              loopf = true;
+            }
+          }
+        }
+    }
+  }
   return;
 }
 
