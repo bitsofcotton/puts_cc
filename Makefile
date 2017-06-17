@@ -9,7 +9,7 @@ LDFLAGS=        -lstdc++
 CLEANFILES= *.o *.dSYM tools
 
 all:    tools
-tools:  corpushl.o tools.o
+tools:  corpus.o tools.o
 
 clean:
         @rm -rf ${CLEANFILES}
