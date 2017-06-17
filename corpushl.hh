@@ -21,19 +21,27 @@ public:
   
   const corpushl<T, U>            cast(const std::vector<std::string>& words) const;
   const corpushl<T, U>&           operator += (const corpushl<T, U>& other);
-  const corpushl<T, U>            operator +  (const corpushl<T, U>& other);
+  const corpushl<T, U>&           operator -= (const corpushl<T, U>& other);
+  const corpushl<T, U>            operator +  (const corpushl<T, U>& other) const;
+  const corpushl<T, U>            operator -  () const;
+  const corpushl<T, U>            operator -  (const corpushl<T, U>& other) const;
   const corpushl<T, U>&           operator =  (const corpushl<T, U>& other);
   const corpushl<T, U>            withDetail(const std::string& word, const corpushl<T, U>& other);
   const T                         distanceInUnion(const corpushl<T, U>& other) const;
-  const std::string               toc(const std::vector<corpushl<T, U> >& base);
+  const corpushl<T, U>            match2relPseudo(const corpushl<T, U>& other) const;
+  const std::string               toc(const std::vector<corpushl<T, U> >& base) const;
+  const std::vector<T>            prej(const std::vector<corpushl<T, U> >& prejs) const;
+  const T                         culturalConflicts(const corpushl<T, U>& base) const;
   const std::string               optToc();
   const std::vector<std::string>& getWords() const;
   const Tensor&                   getCorpus() const;
+  const std::string               summary(const std::vector<int>& idxs, const std::vector<std::string>& words, const std::vector<corpushl<T, U> >& meanings, const T& thresh) const;
+  const corpushl<T, U>&           abbrev(const std::string word, const corpushl<T, U>& mean);
 private:
   std::vector<std::string>        words;
   Tensor                          corpust;
    
-  std::vector<std::string> gatherWords(const std::vector<std::string>& in0, const std::vector<std::string>& in1, std::vector<int>& ridx0, std::vector<int>& ridx1);
+  std::vector<std::string> gatherWords(const std::vector<std::string>& in0, const std::vector<std::string>& in1, std::vector<int>& ridx0, std::vector<int>& ridx1) const;
 };
 
 template <typename T, typename U> corpushl<T,U>::corpushl() {
@@ -84,7 +92,11 @@ template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator
   return *this = *this + other;
 }
 
-template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator + (const corpushl<T, U>& other) {
+template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator -= (const corpushl<T, U>& other) {
+  return *this = *this - other;
+}
+
+template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator + (const corpushl<T, U>& other) const {
   corpushl<T, U> result;
   std::vector<int> ridx0, ridx1;
   result.words   = gatherWords(words, other.words, ridx0, ridx1);
@@ -112,6 +124,16 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
     }
   }
   return result;
+}
+
+template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator - () const {
+  corpushl<T, U> result(*this);
+  result.corpust = - result.corpust;
+  return result;
+}
+
+template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator - (const corpushl<T, U>& other) const {
+  return (*this) + (- other);
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetail(const std::string& word, const corpushl<T, U>& other) {
@@ -163,7 +185,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
     for(int j = 0; j < workwords.size(); j ++) if(ridx1[j] >= 0 && ridx2[j] >= 0)
       for(int k = 0; k < workwords.size(); k ++) if(ridx1[k] < 0 && ridx2[k] >= 0 && ridx0[k] >= 0)
         result.corpust(ridx2[i], ridx2[j])[ridx2[k]] += corpust(ridx0[eidx], ridx0[eidx])[ridx0[k]];
-        // XXX fixme or not.
+        // XXX confirm me :
         // * other.corpust(ridx1[i], ridx1[j])[ridx1[k]] * corpust(ridx0[eidx], ridx0[eidx])[ridx0[k]];
   }
   return result;
@@ -173,6 +195,7 @@ template <typename T, typename U> const T corpushl<T, U>::distanceInUnion(const 
   T res(0);
   std::vector<int> ridx0, ridx1;
   std::vector<std::string> drop(gatherWords(words, other.words, ridx0, ridx1));
+  // XXX : only counts certain tables.
   for(int i = 0; i < drop.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0)
     for(int j = 0; j < drop.size(); j ++) if(ridx0[j] >= 0 && ridx1[j] >= 0)
       for(int k = 0; k < drop.size(); k ++) if(ridx0[i] >= 0 && ridx1[k] >= 0)
@@ -180,12 +203,25 @@ template <typename T, typename U> const T corpushl<T, U>::distanceInUnion(const 
   return res;
 }
 
-template <typename T, typename U> const std::string corpushl<T, U>::toc(const std::vector<corpushl<T, U> >& base) {
+template <typename T, typename U> const std::string corpushl<T, U>::toc(const std::vector<corpushl<T, U> >& base) const {
   std::string result;
   for(int i = 0; i < base.size(); i ++) {
-    // stub.
-    ;
+    corpushl<T, U> work(*this);
+    for(int j = 0; j < nloop; j ++) {
+      // XXX confirm me: remains ignored or collect.
+      corpushl<T, U> buf(work.match2relPseudo(base[i]));
+      result += summary(buf);
+      work   -= buf;
+    }
   }
+  return result;
+}
+
+template <typename T, typename U> const std::vector<T> corpushl<T, U>::prej(const std::vector<corpushl<T, U> >& prejs) const {
+  std::vector<T> result;
+  for(int i = 0; i < prejs.size(); i ++)
+    // XXX confirm me: need some other counting methods?
+    result.push_back(distanceInUnion(match2relPseudo(prejs[i])));
   return result;
 }
 
@@ -196,7 +232,11 @@ template <typename T, typename U> const std::string corpushl<T, U>::optToc() {
   return result;
 }
 
-template <typename T, typename U> std::vector<std::string> corpushl<T, U>::gatherWords(const std::vector<std::string>& in0, const std::vector<std::string>& in1, std::vector<int>& ridx0, std::vector<int>& ridx1) {
+template <typename T, typename U> const std::string corpushl<T, U>::summary(const std::vector<int>& idxs, const std::vector<std::string>& words, const std::vector<corpushl<T, U> >& meanings) const {
+  
+}
+
+template <typename T, typename U> std::vector<std::string> corpushl<T, U>::gatherWords(const std::vector<std::string>& in0, const std::vector<std::string>& in1, std::vector<int>& ridx0, std::vector<int>& ridx1) const {
   std::vector<std::string> sin0(in0), sin1(in1), result;
   std::sort(sin0.begin(), sin0.end());
   std::sort(sin1.begin(), sin1.end());
