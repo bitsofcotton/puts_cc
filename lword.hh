@@ -51,6 +51,7 @@ private:
   void makeBigram(const T* input);
   void constructNwords();
   void bondLast();
+  void balanceBonded();
   void makeWords();
   
   bool       isin(const T* key, const vector<gram_t<T> >& dict);
@@ -90,7 +91,7 @@ template <typename T> int cmpwrap(const gram_t<T>& x0, const gram_t<T>& x1) {
 }
 
 template <typename T> int wordcmp(const word_t<T>& x0, const word_t<T>& x1) {
-  return x0.count < x1.count || std::strcmp(x0.str, x1.str) < 0;
+  return (x0.count < x1.count) || (x0.count == x1.count && std::strcmp(x0.str, x1.str) < 0);
 }
 
 template <typename T> bool lword<T>::isin(const T* key, const vector<gram_t<T> >& dict) {
@@ -126,6 +127,8 @@ template <typename T> const std::vector<word_t<T> >& lword<T>::compute(const T* 
   constructNwords();
   cerr << "gathering unknown words..." << endl;
   bondLast();
+  cerr << "balancing bonded word tables..." << endl;
+  balanceBonded();
   cerr << "making word tables..." << endl;
   makeWords();
   return words;
@@ -366,10 +369,174 @@ template <typename T> void lword<T>::bondLast() {
   return;
 }
 
+template <typename T> void lword<T>::balanceBonded() {
+  int  count = 0;
+  bool loopf = true;
+  while(loopf) {
+    loopf = false;
+    count ++;
+    for(int i = 0; i < dicts.size(); i ++) {
+      std::cerr << "balance: " << i << "/" << dicts.size() << " @ " << count << std::endl;
+      std::map<T, int> wstat;
+      std::map<T, int> wstat2;
+      for(auto itr = dicts[i].begin(); itr != dicts[i].end(); ++ itr) {
+        for(int j = 0; j < dicts.size(); j ++)
+          for(auto itr2 = dicts[j].begin(); itr2 != dicts[j].end(); ++ itr2) {
+            if(itr->str[i + 1] == itr2->str[0]) {
+              wstat[itr2->str[1]] = 0;
+              for(auto litr = itr->ptr1.begin(); litr != itr->ptr1.end(); ++ litr)
+                for(auto litr2 = itr2->ptr0.begin(); litr2 != itr2->ptr0.end(); ++ litr2)
+                  if(*litr == *litr2)
+                    wstat[itr2->str[1]] ++;
+            }
+            if(itr->str[0] == itr2->str[j + 1]) {
+              wstat2[itr->str[1]] = 0;
+              for(auto litr = itr->ptr0.begin(); litr != itr->ptr0.end(); ++ litr)
+                for(auto litr2 = itr2->ptr1.begin(); litr2 != itr2->ptr1.end(); ++ litr2)
+                  if(*litr == *litr2)
+                    wstat2[itr2->str[j]] ++;
+            }
+          }
+        int stat(0), stat2(0);
+        T   str(0),  str2(0);
+        for(auto itr2 = wstat.begin(); itr2 != wstat.end(); ++ itr2)
+          if(stat < itr2->second) {
+            str  = itr2->first;
+            stat = itr2->second;
+          }
+        for(auto itr2 = wstat2.begin(); itr2 != wstat2.end(); ++ itr2)
+          if(stat < itr2->second) {
+            str2  = itr2->first;
+            stat2 = itr2->second;
+          }
+        for(int j = 0; j < dicts.size(); j ++)
+          for(auto itr2 = dicts[j].begin(); itr2 != dicts[j].end(); ++ itr2) {
+            if(j >= 1 && itr->ptr0.size() <= stat && itr->str[i + 1] == itr2->str[0] && itr2->str[1] == str) {
+              T key[j + 2];
+              for(int k = 0; k < j + 1; k ++)
+                key[k] = itr2->str[k + 1];
+              key[j + 1] = '\0';
+              gram_t<T> work;
+              if(isin(key, dicts[j - 1]))
+                work = find(key, dicts[j - 1]);
+              else {
+                work.str = new T[j + 2];
+                for(int k = 0; k < j + 2; k ++)
+                  work.str[k] = key[k];
+              }
+              if(itr->ptr1.size() > 0) {
+                std::vector<int> rptr;
+                for(auto litr = itr->ptr1.begin(); litr != itr->ptr1.end(); ++ litr)
+                  for(int iitr2 = 0; iitr2 < itr2->ptr0.size(); iitr2 ++)
+                    if(*litr == itr2->ptr0[iitr2]) {
+                      rptr.push_back(*litr);
+                      work.ptr0.push_back(itr2->ptr0[iitr2] + 1);
+                      work.ptr1.push_back(itr2->ptr1[iitr2]);
+                      itr2->ptr0.erase(itr2->ptr0.begin() + iitr2);
+                      itr2->ptr1.erase(itr2->ptr1.begin() + iitr2);
+                      loopf = true;
+                      break;
+                    }
+                for(int k = 0, l = 0; k < rptr.size(); k ++)
+                  if(itr->ptr1[l ++] == rptr[k])
+                    itr->ptr1[l - 1] ++;
+              }
+              assign(work.str, dicts[j - 1], work);
+            }
+            if(j >= 1 && itr->ptr0.size() <= stat2 && itr->str[0] == itr2->str[j + 1] && itr2->str[j] == str2) {
+              T key[j + 2];
+              for(int k = 0; k < j + 1; k ++)
+                key[k] = itr->str[k];
+              key[j + 1] = '\0';
+              gram_t<T> work;
+              if(isin(key, dicts[j - 1]))
+                work = find(key, dicts[j - 1]);
+              else {
+                work.str = new T[j + 2];
+                for(int k = 0; k < j + 2; k ++)
+                  work.str[k] = key[k];
+              }
+              if(itr2->ptr1.size() > 0) {
+                std::vector<int> rptr;
+                for(auto litr = itr2->ptr1.begin(); litr != itr2->ptr1.end(); ++ litr)
+                  for(int iitr2 = 0; iitr2 < itr->ptr0.size(); iitr2 ++)
+                    if(*litr == itr->ptr0[iitr2]) {
+                      rptr.push_back(*litr);
+                      work.ptr0.push_back(itr->ptr0[iitr2] + 1);
+                      work.ptr1.push_back(itr->ptr1[iitr2]);
+                      itr->ptr0.erase(itr->ptr0.begin() + iitr2);
+                      itr->ptr1.erase(itr->ptr1.begin() + iitr2);
+                      loopf = true;
+                      break;
+                    }
+                for(int k = 0, l = 0; k < rptr.size(); k ++)
+                  if(itr2->ptr1[l ++] == rptr[k])
+                    itr->ptr0[l - 1] --;
+              }
+              assign(work.str, dicts[j - 1], work);
+            }
+          }
+        if(itr->ptr0.size() <= stat && itr->ptr0.size() <= stat2 && i + 2 < dicts.size()) {
+          T bstr[i + 4];
+          bstr[0] = str2;
+          for(int k = 0; k < i + 1; k ++)
+            bstr[k + 1] = itr->str[k];
+          bstr[i + 2] = str;
+          bstr[i + 3] = '\0';
+          if(isin(bstr, dicts[i + 2])) {
+            gram_t<T>& work(find(bstr, dicts[i + 2]));
+            for(int i = 0; i < itr->ptr0.size(); i ++) {
+              work.ptr0.push_back(itr->ptr0[i]);
+              work.ptr1.push_back(itr->ptr1[i]);
+            }
+          } else {
+            gram_t<T> work(*itr);
+            work.str = new T[i + 4];
+            for(int k = 0; k < i + 4; k ++)
+              work.str[k] = bstr[k];
+            dicts[i + 2].push_back(work);
+          }
+          delete[] itr->str;
+          dicts[i].erase(itr);
+          break;
+        } else if((itr->ptr0.size() <= stat || itr->ptr0.size() <= stat2) && i + 1 < dicts.size()) {
+          T bstr[i + 3];
+          if(itr->ptr0.size() <= stat) {
+            for(int k = 0; k < i + 1; k ++)
+              bstr[k] = itr->str[k];
+            bstr[i + 1] = str;
+            bstr[i + 2] = '\0';
+          } else {
+            bstr[0] = str2;
+            for(int k = 0; k < i + 1; k ++)
+              bstr[k + 1] = itr->str[k];
+            bstr[i + 2] = '\0';
+          }
+          if(isin(bstr, dicts[i + 1])) {
+            gram_t<T>& work(find(bstr, dicts[i + 1]));
+            for(int i = 0; i < itr->ptr0.size(); i ++) {
+              work.ptr0.push_back(itr->ptr0[i]);
+              work.ptr1.push_back(itr->ptr1[i]);
+            }
+          } else {
+            gram_t<T> work(*itr);
+            work.str = new T[i + 3];
+            for(int k = 0; k < i + 3; k ++)
+              work.str[k] = bstr[k];
+            dicts[i + 1].push_back(work);
+          }
+          delete[] itr->str;
+          dicts[i].erase(itr);
+          break;
+        }
+      }
+    }
+  }
+  return;
+}
+
 template <typename T> void lword<T>::makeWords() {
-  // for(auto itr = dicts.begin(); itr != dicts.end(); ++ itr) {
-  for(int idx = 1; idx < dicts.size(); idx ++) {
-    const vector<gram_t<T> >* itr(&dicts[idx]);
+  for(auto itr = dicts.begin(); itr != dicts.end(); ++ itr) {
     for(auto itr2 = itr->begin(); itr2 != itr->end(); ++ itr2) {
       word_t<T> work;
       work.str   = itr2->str;

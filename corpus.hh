@@ -33,6 +33,7 @@ private:
   Tensor                         corpust;
   int                            nthresh;
   int                            Nthresh;
+  T                              Midx;
    
   void getWordPtrs(const U* input);
   void corpusEach();
@@ -69,6 +70,8 @@ template <typename T, typename U> void corpus<T,U>::init(const U* words, const i
   }
   this->nthresh = nthresh;
   this->Nthresh = Nthresh;
+  this->Midx    = 1;
+  return;
 }
 
 template <typename T, typename U> int corpus<T,U>::isin(const std::string& key) {
@@ -114,6 +117,7 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) 
         if(work == *pp) {
           ptrs0[std::distance(words0.begin(), pp)].push_back(i);
           match = false;
+          Midx  = T(i);
           break;
         } else if(partial_compare_equal(work, *pp))
           match = true;
@@ -146,6 +150,8 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
       if(!ptrs[j].size())
         continue;
       corpust(i, j) = Vec(words.size());
+      for(int k = 0; k < corpust(i, j).size(); k ++)
+        corpust(i, j)[k] = 0;
       for(int k = 0; k < words.size(); k ++) {
         if(!ptrs[k].size())
           continue;
@@ -164,7 +170,8 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
           if(nthresh < buf0 && buf0 < Nthresh &&
              nthresh < buf1 && buf1 < Nthresh)
             work += buf0 * buf0 + buf1 * buf1;
-          corpust(i, j)[k] += sqrt(work);
+          // XXX fixme:
+          corpust(i, j)[k] += sqrt(work) / Midx;
         }
       }
     }
