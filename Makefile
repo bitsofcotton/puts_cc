@@ -1,16 +1,18 @@
 # gcc.
-CXX=    g++
+CXX=	g++
 
 # compiler flags.
-#CXXFLAGS=     -Ofast -mavx
-CXXFLAGS=      -O2 -g2 -mavx
-LDFLAGS=        -lstdc++
+CXXFLAGS=	-I/usr/local/include/eigen3
+#CXXFLAGS+=	-Ofast
+CXXFLAGS+=	-O2 -g2
+CXXFLAGS+=	-std=c++14
+LDFLAGS=	-lstdc++
 
 CLEANFILES= *.o *.dSYM tools
 
-all:    tools
-tools:  corpus.o tools.o
+all:	tools
+tools:	corpus.o tools.o
 
 clean:
-        @rm -rf ${CLEANFILES}
+	@rm -rf ${CLEANFILES}
 

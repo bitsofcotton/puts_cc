@@ -68,12 +68,12 @@ template <typename T, typename U> corpushl<T,U>::corpushl(const corpushl<T, U>& 
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::cast(const std::vector<std::string>& words) const {
+  std::cerr << "cast 0/1" << std::endl;
   corpushl<T, U> result;
   std::vector<std::string> sword;
   std::sort(sword.begin(), sword.end());
   std::vector<int>         idxs;
   for(int i = 0; i < sword.size(); i ++) {
-    std::cerr << "casting..." << i << "/" << sword.size() << std::endl;
     auto p(std::equal_range(words.begin(), words.end(), sword[i]));
     if(*p.first == sword[i]) {
       idxs.push_back(std::distance(words.begin(), p.first));
@@ -83,7 +83,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::cast(cons
   result.corpust = Tensor(idxs.size(), idxs.size());
   for(int i = 0; i < idxs.size(); i ++)
     for(int j = 0; j < idxs.size(); j ++)
-      result.corpust(i, j) = corpust(i, j);
+      result.corpust(i, j) = corpust(idxs[i], idxs[j]);
   return result;
 }
 
@@ -113,8 +113,8 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
   std::vector<int> ridx0, ridx1;
   result.words   = gatherWords(words, other.words, ridx0, ridx1);
   result.corpust = Tensor(result.words.size(), result.words.size());
+  std::cerr << "operator +" << std::endl;
   for(int i = 0; i < result.corpust.rows(); i ++) {
-    std::cerr << "operator + processing row: " << i << " / " << result.corpust.rows() << std::endl;
     for(int j = 0; j < result.corpust.cols(); j ++) {
       result.corpust(i, j) = Vec(result.words.size());
       if(!((0 <= ridx0[i] && 0 <= ridx0[j]) || (0 <= ridx1[i] && 0 <= ridx1[j])))
@@ -154,6 +154,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetail(const std::string& word, const corpushl<T, U>& other) {
+  std::cerr << "withDetail 1/3" << std::endl;
   if(words.size() <= 0)
     return *this;
   auto itr(std::equal_range(words.begin(), words.end(), word).first);
@@ -187,10 +188,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
     }
     ridx2.push_back(ii ++);
   }
-  for(int i = 0; i < workwords.size(); i ++) {
-    std::cerr << "withDetail 1/3 : " << i << "/" << workwords.size() << std::endl;
-    if(ridx2[i] < 0)
-      continue;
+  for(int i = 0; i < workwords.size(); i ++) if(ridx2[i] >= 0) {
     result.words.push_back(workwords[i]);
     // Sum-up detailed word into result pool without definition itself.
     for(int j = 0; j < workwords.size(); j ++)
@@ -200,11 +198,10 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
             result.corpust(ridx2[i], ridx2[j])[ridx2[k]] += other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
       }
   }
-  for(int i = 0; i < workwords.size(); i ++) if(ridx0[i] >= 0) {
+  for(int i = 0; i < workwords.size(); i ++) if(ridx0[i] >= 0 && eidx != i) {
     std::cerr << "withDetail 2/3 : " << i << "/" << workwords.size() << std::endl;
     // Sum-up words defined in both given and detail pool without definition itself.
-    for(int j = 0; j < workwords.size(); j ++) if(ridx0[j] >= 0 &&
-                                                  !(eidx == i && eidx == j))
+    for(int j = 0; j < workwords.size(); j ++) if(ridx0[j] >= 0 && eidx != j)
       for(int i1 = 0; i1 < workwords.size(); i1 ++) if(ridx1[i1] >= 0 && ridx2[i1] >= 0)
         for(int j1 = 0; j1 < workwords.size(); j1 ++) if(ridx1[j1] >= 0 && ridx2[j1] >= 0)
           for(int k = 0; k < workwords.size(); k ++) {
@@ -213,8 +210,8 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
               result.corpust(ridx2[i1], ridx2[j1])[ridx2[k]] += corpust(ridx0[i], ridx0[j])[ridx0[eidx]] * other.corpust(ridx1[i1], ridx1[j1])[ridx1[k]];
           }
   }
+  std::cerr << "withDetail 3/3" << std::endl;
   for(int i = 0; i < workwords.size(); i ++) if(ridx1[i] >= 0 && ridx2[i] >= 0) {
-    std::cerr << "withDetail 3/3 : " << i << "/" << workwords.size() << std::endl;
     // Sum-up definition itself.
     for(int j = 0; j < workwords.size(); j ++) if(ridx1[j] >= 0 && ridx2[j] >= 0)
       for(int k = 0; k < workwords.size(); k ++) if(ridx1[k] < 0 && ridx2[k] >= 0 && ridx0[k] >= 0)
@@ -225,60 +222,38 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
   return result;
 }
 
-// XXX fixme: algorithm is very obscure.
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2relPseudo(const corpushl<T, U>& other) const {
+  std::cerr << "match2relPseudo : 0/2" << std::endl;
   corpushl<T, U> result(*this);
   std::vector<int> ridx0, ridx1;
   std::vector<std::string> words(gatherWords(result.words, other.words, ridx0, ridx1));
-  Tensor mul(result.corpust.rows(), result.corpust.cols());
+  Tensor mul(result.corpust);
   for(int i = 0; i < mul.rows(); i ++)
-    for(int j = 0; j < mul.cols(); j ++) {
-      mul(i, j) = Vec(mul.rows());
-      for(int k = 0; k < mul(i, j).size(); k ++)
-        mul(i, j)[k] = 0;
-    }
-  for(int i = 0; i < words.size(); i ++) if(ridx1[i] >= 0)
-    for(int j = 0; j < words.size(); j ++) if(ridx1[j] >= 0)
-      for(int k = 0; k < words.size(); k ++) if(ridx1[k] >= 0)
-        if(other.corpust(ridx1[i], ridx1[j])[ridx1[k]] != T(0)) {
-          for(int ii = 0; ii < words.size(); ii ++) if(ridx0[ii] >= 0)
-            for(int jj = 0; jj < words.size(); jj ++) if(ridx0[jj] >= 0) {
-              mul(ridx1[i], ridx0[ii])[ridx0[jj]] += 1.;
-              mul(ridx0[ii], ridx1[j])[ridx0[jj]] += 1.;
-              mul(ridx0[ii], ridx0[jj])[ridx1[k]] += 1.;
-            }
-        }
-/*
-  for(int i = 0; i < words.size(); i ++) if(ridx0[i] >= 0) {
-    std::cerr << "match2relPseudo " << i << "/" << words.size() << std::endl;
-    for(int j = 0; j < words.size(); j ++) if(ridx0[j] >= 0) {
-      if(ridx1[i] >= 0)
-        for(int k = 0; k < words.size(); k ++) if(ridx0[k] >= 0 && ridx1[k] >= 0)
-          for(int kk = 0; kk < words.size(); kk ++) {
-            if(ridx0[kk] >= 0 && ridx1[kk])
-              mul(ridx0[i], ridx0[kk])[ridx0[k]] += 1. + other.corpust(ridx1[i], ridx1[kk])[ridx1[k]];
-            else if(ridx0[kk] >= 0)
-              mul(ridx0[i], ridx0[kk])[ridx0[k]] += 1.;
-          }
-      if(ridx1[j] >= 0)
-        for(int k = 0; k < words.size(); k ++) if(ridx0[k] >= 0 && ridx1[k] >= 0)
-          for(int kk = 0; kk < words.size(); kk ++) {
-            if(ridx0[kk] >= 0 && ridx1[kk])
-              mul(ridx0[kk], ridx0[j])[ridx0[k]] += 1. + other.corpust(ridx1[kk], ridx1[j])[ridx1[k]];
-            else if(ridx0[kk] >= 0)
-              mul(ridx0[kk], ridx0[j])[ridx0[k]] += 1.;
-          }
-    }
+    for(int j = 0; j < mul.cols(); j ++)
+      mul(i, j) *= T(0);
+  for(int i = 0; i < words.size(); i ++) if(ridx1[i] >= 0 && ridx0[i] >= 0)
+    for(int j = 0; j < words.size(); j ++) if(ridx0[j] >= 0)
+      for(int k = 0; k < words.size(); k ++) if(ridx0[k] >= 0) {
+        mul(ridx0[i], ridx0[j])[ridx0[k]] += 1.;
+        mul(ridx0[j], ridx0[k])[ridx0[i]] += 1.;
+        mul(ridx0[k], ridx0[i])[ridx0[j]] += 1.;
+      }
+  T norm2(0);
+  for(int i = 0; i < words.size(); i ++) if(ridx0[i] >= 0)
+    for(int j = 0; j < words.size(); j ++) if(ridx0[j] >= 0)
+      norm2 += mul(ridx0[i], ridx0[j]).dot(mul(ridx0[i], ridx0[j]));
+  norm2 = std::sqrt(norm2);
+  std::cerr << "match2relPseudo : 1/2" << std::endl;
+  if(norm2 == T(0)) {
+    for(int i = 0; i < result.corpust.rows(); i ++)
+      for(int j = 0; j < result.corpust.cols(); j ++)
+        result.corpust(i, j) *= T(0);
+    return result;
   }
-  T summs(0), summs2(0);
   for(int i = 0; i < result.corpust.rows(); i ++)
     for(int j = 0; j < result.corpust.cols(); j ++)
-      for(int k = 0; k < result.corpust(i, j).size(); k ++) {
-        result.corpust(i, j)[k] *= mul(i, j)[k];
-        summs += mul(i, j)[k] * mul(i, j)[k];
-      }
-  std::cout << summs << ", " << summs2 << std::endl;
-*/
+      for(int k = 0; k < result.corpust(i, j).size(); k ++)
+        result.corpust(i, j)[k] *= mul(i, j)[k] / norm2;
   return result;
 }
 
@@ -288,7 +263,6 @@ template <typename T, typename U> const T corpushl<T, U>::distanceInUnion(const 
   std::vector<std::string> drop(gatherWords(words, other.words, ridx0, ridx1));
   // XXX : only counts certain tables.
   for(int i = 0; i < drop.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0) {
-    std::cerr << "distanceInUnion " << i << "/" << drop.size() << std::endl;
     for(int j = 0; j < drop.size(); j ++) if(ridx0[j] >= 0 && ridx1[j] >= 0)
       for(int k = 0; k < drop.size(); k ++) if(ridx0[i] >= 0 && ridx1[k] >= 0)
         res += corpust(ridx0[i], ridx0[j])[ridx0[k]] * other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
@@ -301,9 +275,9 @@ template <typename T, typename U> const std::string corpushl<T, U>::toc(const st
   corpushl<T, U> work0(*this);
   for(int i = 0; i < base.size(); i ++) {
     corpushl<T, U> work(this->match2relPseudo(base[i]));
-    result += words[i] + std::string(" : ") + work.summary0(1.) + std::string("\n");
+    result += words[i] + std::string(" : ") + work.summary0(.1) + std::string("\n");
   }
-  result += work0.summary0(1.);
+  result += work0.summary0(0.);
   return result;
 }
 
@@ -329,6 +303,7 @@ template <typename T, typename U> const T corpushl<T, U>::culturalConflicts(cons
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::conflictPart() {
   corpushl<T, U> result;
   // search conflict parts.
+  // dictionary base of the word 'NOT' is needed.
   return;
 }
 
@@ -387,7 +362,6 @@ template <typename T, typename U> const std::string corpushl<T, U>::summary0(con
   return result;
 }
 
-// XXX: ideally, invert of withDetail, but this is not.
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(const std::string word, const corpushl<T, U>& mean) {
   std::cerr << "abbrev 0/2" << std::endl;
   corpushl<T, U>   work(this->match2relPseudo(mean));
@@ -454,12 +428,12 @@ template <typename T, typename U> std::vector<std::string> corpushl<T, U>::gathe
     for(; j < sin1.size(); j ++) {
       if(sin0[i] == sin1[j])
         ridx1[result.size()] = std::distance(in1.begin(), std::equal_range(in1.begin(), in1.end(), sin1[j]).first);
-      // XXX fixme : order.
-      else if(sin0[i] < sin1[j]) {
+      else if(sin0[i] > sin1[j]) {
         result.push_back(std::string(sin1[j]));
         ridx1[result.size() - 1] = std::distance(in1.begin(), std::equal_range(in1.begin(), in1.end(), sin1[j]).first);
         continue;
-      }
+      } else
+        j --;
       j ++;
       break;
     }

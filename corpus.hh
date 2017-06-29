@@ -131,7 +131,6 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) 
   for(auto itr = words0.begin(); itr != words0.end(); ++ itr) {
     const int idx = std::distance(words0.begin(), itr);
     if(ptrs0[idx].size()) {
-      // XXX fixme: + '\0' or not.
       words.push_back(*itr);
       ptrs.push_back(ptrs0[idx]);
     }
