@@ -35,7 +35,7 @@ int main(int argc, const char* argv[]) {
       lword<char> stat;
       stat.init(120, 2, 2);
       std::vector<word_t<char> > words(stat.compute(input.c_str()));
-      for(auto itr = words.begin(); itr != words.end(); ++ itr) {
+      for(std::vector<word_t<char> >::iterator itr = words.begin(); itr != words.end(); ++ itr) {
         std::cout << itr->str << ", ";
         std::cout << itr->count << std::endl;
       }

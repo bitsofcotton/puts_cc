@@ -43,6 +43,14 @@ private:
   std::vector<T>                        dict0;
   std::vector<std::vector<gram_t<T> > > dicts;
   std::vector<word_t<T> >               words;
+  typedef typename std::vector<T>::iterator          vTitr;
+  typedef typename std::vector<gram_t<T> >::iterator vgTitr;
+  typedef typename std::vector<word_t<T> >::iterator vwTitr;
+  typedef  std::vector<int>::iterator        viitr;
+  typedef typename std::vector<std::vector<gram_t<T> > >::iterator vvgTitr;
+  typedef typename std::map<T, T>::iterator   mTTitr;
+  typedef typename std::map<T, int>::iterator mTiitr;
+  typedef  std::map<std::string, std::vector<int> >::iterator msviitr;
   
   int loop;
   int mthresh;
@@ -64,15 +72,15 @@ template <typename T> lword<T>::lword() {
 }
 
 template <typename T> lword<T>::~lword() {
-  for(auto itr = dicts.begin(); itr != dicts.end(); ++ itr)
-    for(auto itr2 = itr->begin(); itr2 != itr->end(); ++ itr2)
+  for(vvgTitr itr = dicts.begin(); itr != dicts.end(); ++ itr)
+    for(vgTitr itr2 = itr->begin(); itr2 != itr->end(); ++ itr2)
       if(itr2->str) {
         delete[] itr2->str;
         itr2->str = 0;
       }
   // Already freed.
 /*
-  for(auto itr = words.begin(); itr != words.end(); ++ itr)
+  for(vsitr itr = words.begin(); itr != words.end(); ++ itr)
     if(itr->str) {
       delete[] itr->str;
       itr->str = 0;
@@ -107,14 +115,14 @@ template <typename T> gram_t<T>& lword<T>::find(const T* key, vector<gram_t<T> >
   }
   gram_t<T> key0;
   key0.str = const_cast<T*>(key);
-  auto p = std::equal_range(dict.begin(), dict.end(), key0, cmpwrap<T>);
+  std::pair<vgTitr, vgTitr> p = std::equal_range(dict.begin(), dict.end(), key0, cmpwrap<T>);
   return *(p.first);
 }
 
 template <typename T> void lword<T>::assign(const T* key, vector<gram_t<T> >& dict, const gram_t<T>& val) {
   gram_t<T> key0;
   key0.str = const_cast<T*>(key);
-  auto p = std::equal_range(dict.begin(), dict.end(), key0, cmpwrap<T>);
+  std::pair<vgTitr, vgTitr> p = std::equal_range(dict.begin(), dict.end(), key0, cmpwrap<T>);
   p.first->ptr0 = val.ptr0;
   p.first->ptr1 = val.ptr1;
   return;
@@ -145,17 +153,17 @@ template <typename T> void lword<T>::makeBigram(const T* input) {
     map[std::string(work)].push_back(i);
     map0[input[i]] = input[i];
   }
-  for(auto itr = map0.begin(); itr != map0.end(); ++ itr)
+  for(mTTitr itr = map0.begin(); itr != map0.end(); ++ itr)
     dict0.push_back(itr->first);
   std::sort(dict0.begin(), dict0.end());
   std::vector<gram_t<T> > buf;
-  for(auto itr = map.begin(); itr != map.end(); ++ itr) {
+  for(std::map<std::string, vector<int> >::iterator itr = map.begin(); itr != map.end(); ++ itr) {
     gram_t<T> work;
     work.str = new T[3];
     for(int i = 0; i < 2; i ++)
       work.str[i] = itr->first[i];
     work.str[2] = '\0';
-    for(auto itr2 = itr->second.begin(); itr2 != itr->second.end(); ++ itr2) {
+    for(viitr itr2 = itr->second.begin(); itr2 != itr->second.end(); ++ itr2) {
       work.ptr0.push_back(*itr2 - 1);
       work.ptr1.push_back(*itr2);
     }
@@ -172,14 +180,14 @@ template <typename T> void lword<T>::constructNwords() {
     std::map<std::string, vector<int> > map0;
     std::map<std::string, vector<int> > map1;
     std::map<std::string, vector<int> > dmap;
-    for(auto itr = dicts[i - 1].begin(); itr != dicts[i - 1].end(); ++ itr) {
+    for(vgTitr itr = dicts[i - 1].begin(); itr != dicts[i - 1].end(); ++ itr) {
       const T* key = itr->str;
       if(!isin(key, dicts[i - 1])) {
         std::cerr << "Something odd has occurred." << std::endl;
         continue;
       }
       gram_t<T> idxkey(find(key, dicts[i - 1]));
-      for(auto itr2 = dict0.begin(); itr2 != dict0.end(); ++ itr2) {
+      for(vTitr itr2 = dict0.begin(); itr2 != dict0.end(); ++ itr2) {
         T key2[i + 2];
         for(int j = 1; j < i + 1; j ++)
           key2[j - 1] = key[j];
@@ -224,7 +232,7 @@ template <typename T> void lword<T>::constructNwords() {
       }
     }
     // delete this stage garbage.
-    for(auto itr = dmap.begin(); itr != dmap.end(); ++ itr) {
+    for(msviitr itr = dmap.begin(); itr != dmap.end(); ++ itr) {
       std::sort(itr->second.begin(), itr->second.end());
       if(!isin(itr->first.c_str(), dicts[i - 1])) {
         std::cerr << "Something odd has occured." << std::endl;
@@ -235,7 +243,7 @@ template <typename T> void lword<T>::constructNwords() {
       after.str = before.str;
       for(int j = 0; j < before.ptr0.size(); j ++) {
         bool flag = false;
-        for(auto itr2 = dmap[itr->first].begin(); itr2 != dmap[itr->first].end(); ++ itr2)
+        for(viitr itr2 = dmap[itr->first].begin(); itr2 != dmap[itr->first].end(); ++ itr2)
           if(*itr2 == j) {
             flag = true;
             break;
@@ -249,7 +257,7 @@ template <typename T> void lword<T>::constructNwords() {
     }
     // construct next stage.
     vector<gram_t<T> > workv;
-    for(auto itr = map0.begin(); itr != map0.end(); ++ itr) {
+    for(msviitr itr = map0.begin(); itr != map0.end(); ++ itr) {
       gram_t<T>   work;
       work.str = new T[i + 3];
       for(int j = 0; j < i + 2; j ++)
@@ -279,11 +287,11 @@ template <typename T> void lword<T>::bondLast() {
     count ++;
     for(int i = 0; i < dicts.size(); i ++) {
       std::cerr << "bondLast: " << i << "/" << dicts.size() << " @ " << count << std::endl;
-      for(auto itr = dicts[i].begin(); itr != dicts[i].end(); ++ itr)
+      for(vgTitr itr = dicts[i].begin(); itr != dicts[i].end(); ++ itr)
         for(int j = 0; j < dicts.size(); j ++) {
           if(i + j + 1 >= loop)
             continue;
-          for(auto itr2 = dicts[j].begin();  itr2 != dicts[j].end(); ++ itr2) {
+          for(vgTitr itr2 = dicts[j].begin();  itr2 != dicts[j].end(); ++ itr2) {
             std::vector<int> ptr0;
             std::vector<int> ptr1;
             if(!itr->str || itr2->str)
@@ -334,7 +342,7 @@ template <typename T> void lword<T>::bondLast() {
               std::vector<int> i1ptr1;
               for(int ii = 0; ii < itr->ptr0.size(); ii ++) {
                 bool flag = false;
-                for(auto itr3 = ptr0.begin(); itr3 != ptr0.end(); ++ itr3)
+                for(viitr itr3 = ptr0.begin(); itr3 != ptr0.end(); ++ itr3)
                   if(itr->ptr0[ii] == *itr3) {
                     flag = true;
                     break;
@@ -348,7 +356,7 @@ template <typename T> void lword<T>::bondLast() {
               itr->ptr1 = i0ptr1;
               for(int ii = 0; ii < itr2->ptr0.size(); ii ++) {
                 bool flag = false;
-                for(auto itr3 = ptr1.begin(); itr3 != ptr1.end(); ++ itr3)
+                for(viitr itr3 = ptr1.begin(); itr3 != ptr1.end(); ++ itr3)
                   if(itr2->ptr1[ii] == *itr3) {
                     flag = true;
                     break;
@@ -379,38 +387,38 @@ template <typename T> void lword<T>::balanceBonded() {
       std::cerr << "balance: " << i << "/" << dicts.size() << " @ " << count << std::endl;
       std::map<T, int> wstat;
       std::map<T, int> wstat2;
-      for(auto itr = dicts[i].begin(); itr != dicts[i].end(); ++ itr) {
+      for(vgTitr itr = dicts[i].begin(); itr != dicts[i].end(); ++ itr) {
         for(int j = 0; j < dicts.size(); j ++)
-          for(auto itr2 = dicts[j].begin(); itr2 != dicts[j].end(); ++ itr2) {
+          for(vgTitr itr2 = dicts[j].begin(); itr2 != dicts[j].end(); ++ itr2) {
             if(itr->str[i + 1] == itr2->str[0]) {
               wstat[itr2->str[1]] = 0;
-              for(auto litr = itr->ptr1.begin(); litr != itr->ptr1.end(); ++ litr)
-                for(auto litr2 = itr2->ptr0.begin(); litr2 != itr2->ptr0.end(); ++ litr2)
+              for(viitr litr = itr->ptr1.begin(); litr != itr->ptr1.end(); ++ litr)
+                for(viitr litr2 = itr2->ptr0.begin(); litr2 != itr2->ptr0.end(); ++ litr2)
                   if(*litr == *litr2)
                     wstat[itr2->str[1]] ++;
             }
             if(itr->str[0] == itr2->str[j + 1]) {
               wstat2[itr->str[1]] = 0;
-              for(auto litr = itr->ptr0.begin(); litr != itr->ptr0.end(); ++ litr)
-                for(auto litr2 = itr2->ptr1.begin(); litr2 != itr2->ptr1.end(); ++ litr2)
+              for(viitr litr = itr->ptr0.begin(); litr != itr->ptr0.end(); ++ litr)
+                for(viitr litr2 = itr2->ptr1.begin(); litr2 != itr2->ptr1.end(); ++ litr2)
                   if(*litr == *litr2)
                     wstat2[itr2->str[j]] ++;
             }
           }
         int stat(0), stat2(0);
         T   str(0),  str2(0);
-        for(auto itr2 = wstat.begin(); itr2 != wstat.end(); ++ itr2)
+        for(mTiitr itr2 = wstat.begin(); itr2 != wstat.end(); ++ itr2)
           if(stat < itr2->second) {
             str  = itr2->first;
             stat = itr2->second;
           }
-        for(auto itr2 = wstat2.begin(); itr2 != wstat2.end(); ++ itr2)
+        for(mTiitr itr2 = wstat2.begin(); itr2 != wstat2.end(); ++ itr2)
           if(stat < itr2->second) {
             str2  = itr2->first;
             stat2 = itr2->second;
           }
         for(int j = 0; j < dicts.size(); j ++)
-          for(auto itr2 = dicts[j].begin(); itr2 != dicts[j].end(); ++ itr2) {
+          for(vgTitr itr2 = dicts[j].begin(); itr2 != dicts[j].end(); ++ itr2) {
             if(j >= 1 && itr->ptr0.size() <= stat && itr->str[i + 1] == itr2->str[0] && itr2->str[1] == str) {
               T key[j + 2];
               for(int k = 0; k < j + 1; k ++)
@@ -426,7 +434,7 @@ template <typename T> void lword<T>::balanceBonded() {
               }
               if(itr->ptr1.size() > 0) {
                 std::vector<int> rptr;
-                for(auto litr = itr->ptr1.begin(); litr != itr->ptr1.end(); ++ litr)
+                for(viitr litr = itr->ptr1.begin(); litr != itr->ptr1.end(); ++ litr)
                   for(int iitr2 = 0; iitr2 < itr2->ptr0.size(); iitr2 ++)
                     if(*litr == itr2->ptr0[iitr2]) {
                       rptr.push_back(*litr);
@@ -458,7 +466,7 @@ template <typename T> void lword<T>::balanceBonded() {
               }
               if(itr2->ptr1.size() > 0) {
                 std::vector<int> rptr;
-                for(auto litr = itr2->ptr1.begin(); litr != itr2->ptr1.end(); ++ litr)
+                for(viitr litr = itr2->ptr1.begin(); litr != itr2->ptr1.end(); ++ litr)
                   for(int iitr2 = 0; iitr2 < itr->ptr0.size(); iitr2 ++)
                     if(*litr == itr->ptr0[iitr2]) {
                       rptr.push_back(*litr);
@@ -536,8 +544,8 @@ template <typename T> void lword<T>::balanceBonded() {
 }
 
 template <typename T> void lword<T>::makeWords() {
-  for(auto itr = dicts.begin(); itr != dicts.end(); ++ itr) {
-    for(auto itr2 = itr->begin(); itr2 != itr->end(); ++ itr2) {
+  for(vvgTitr itr = dicts.begin(); itr != dicts.end(); ++ itr) {
+    for(vgTitr itr2 = itr->begin(); itr2 != itr->end(); ++ itr2) {
       word_t<T> work;
       work.str   = itr2->str;
       work.count = itr2->ptr0.size();

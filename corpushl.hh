@@ -44,6 +44,7 @@ public:
 private:
   std::vector<std::string>        words;
   Tensor                          corpust;
+  typedef std::vector<std::string>::iterator vsitr;
    
   std::vector<std::string>        gatherWords(const std::vector<std::string>& in0, const std::vector<std::string>& in1, std::vector<int>& ridx0, std::vector<int>& ridx1) const;
 };
@@ -74,10 +75,10 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::cast(cons
   std::sort(sword.begin(), sword.end());
   std::vector<int>         idxs;
   for(int i = 0; i < sword.size(); i ++) {
-    auto p(std::equal_range(words.begin(), words.end(), sword[i]));
-    if(*p.first == sword[i]) {
-      idxs.push_back(std::distance(words.begin(), p.first));
-      result.words.push_back(*p.first);
+    std::vector<const std::string>::iterator p(std::equal_range(words.begin(), words.end(), sword[i]).first);
+    if(*p == sword[i]) {
+      idxs.push_back(std::distance(words.begin(), p));
+      result.words.push_back(*p);
     }
   }
   result.corpust = Tensor(idxs.size(), idxs.size());
@@ -157,7 +158,8 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
   std::cerr << "withDetail 1/3" << std::endl;
   if(words.size() <= 0)
     return *this;
-  auto itr(std::equal_range(words.begin(), words.end(), word).first);
+  //std::pair<vsitr, vsitr>;
+  vsitr itr(std::equal_range(words.begin(), words.end(), word).first);
   std::cout << *itr << ", " << word << ": " << itr->size() << " / " << word.size() << std::endl;
   if(*itr != word)
     return *this;
@@ -339,6 +341,8 @@ template <typename T> int summarycmp(const std::pair<T, int>& x0, const std::pai
 }
 
 template <typename T, typename U> const std::string corpushl<T, U>::summary0(const T& thresh) const {
+  if(corpust.rows() < 1 || corpust.cols() < 1)
+    return std::string("null");
   std::string result;
   std::vector<std::pair<T, int> > scores;
   for(int i = 0; i < corpust(0, 0).size(); i ++) {

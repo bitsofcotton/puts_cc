@@ -30,6 +30,9 @@ private:
   std::vector<std::string>       words;
   std::vector<std::vector<int> > ptrs0;
   std::vector<std::vector<int> > ptrs;
+  typedef std::vector<std::string>::iterator       vsitr;
+  typedef std::vector<int>::iterator               viitr;
+  typedef std::vector<std::vector<int> >::iterator vviitr;
   Tensor                         corpust;
   int                            nthresh;
   int                            Nthresh;
@@ -111,9 +114,9 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) 
   for(int i = 0; input[i]; i ++) {
     work += input[i];
     if(std::binary_search(words0.begin(), words0.end(), work, partial_compare)) {
-      auto p = std::equal_range(words0.begin(), words0.end(), work, partial_compare);
+      std::pair<vsitr, vsitr> p = std::equal_range(words0.begin(), words0.end(), work, partial_compare);
       bool match = false;
-      for(auto pp = p.first; pp != p.second; ++ pp) {
+      for(vsitr pp = p.first; pp != p.second; ++ pp) {
         if(work == *pp) {
           ptrs0[std::distance(words0.begin(), pp)].push_back(i);
           match = false;
@@ -128,7 +131,7 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) 
     i -= work.size() - 1;
     work = std::string();
   }
-  for(auto itr = words0.begin(); itr != words0.end(); ++ itr) {
+  for(vsitr itr = words0.begin(); itr != words0.end(); ++ itr) {
     const int idx = std::distance(words0.begin(), itr);
     if(ptrs0[idx].size()) {
       words.push_back(*itr);
@@ -156,7 +159,7 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
           continue;
         int ctru = 0;
         int ctrv = 0;
-        for(auto itr = ptrs[k].begin(); itr != ptrs[k].end(); ++ itr) {
+        for(viitr itr = ptrs[k].begin(); itr != ptrs[k].end(); ++ itr) {
           while(ctru < ptrs[i].size() && ptrs[i][ctru] < *itr) ctru ++;
           if(ctru >= ptrs[i].size())
             continue;
