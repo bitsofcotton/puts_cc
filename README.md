@@ -2,10 +2,8 @@
 Cluster large documents from small elementary document sets.
 
 This program aims to cluster and collect TOC and make links to medium sized set of documents.
-So first, collect unknown words, then, make a word distance table using prepared word list and collected ones.
-Second, make a detail on that with using prepared word distance tables, then,
-make a TOC and links from statistical information.  
-And using detailed statistics, we may able to detect collisions or which prejudice gains with prejudice rule set.
+Statistics definition needs to be not dense.
+If it's dense, the context we get from statistics may say nothing.
 
 # Usage
     make tools
