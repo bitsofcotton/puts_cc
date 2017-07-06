@@ -1,8 +1,8 @@
 # Puts_CC
 Cluster large documents from small elementary document sets.
 
-This program aims to cluster and collect TOC and make links to medium sized set of documents.
-Statistics definition needs to be not dense.  
+This program aims to cluster and collect TOC and make links to medium sized set of documents.  
+Statistics definition needs to be not dense.
 If it's dense, the context we get from statistics may say nothing.
 
 # Usage
