@@ -7,8 +7,6 @@ Second, make a detail on that with using prepared word distance tables, then,
 make a TOC and links from statistical information.  
 And using detailed statistics, we may able to detect collisions or which prejudice gains with prejudice rule set.
 
-Now, only collecting words and making word distance table is available.
-
 # Usage
     make tools
     ./tools lword < data.txt
