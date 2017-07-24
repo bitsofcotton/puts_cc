@@ -12,6 +12,10 @@ So with layered dictionaries, we can calculate a little accuratery.
     ./tools corpus wordlist.txt < data.txt
     ./tools toc wordlist.txt dictionaries ... -toc topics ... < data.txt
 
+# Demos
+http://services.limpid-intensity.info/puts.php have a working sample.
+Please pseudo-login with e-mail address - salt pair.
+
 # Example of using as a library
     #include "lword.hh"
     #include "corpus.hh"
