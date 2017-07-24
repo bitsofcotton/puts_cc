@@ -5,6 +5,7 @@
 #include <vector>
 #include <map>
 #include <iostream>
+#include <cstring>
 
 using namespace std;
 
@@ -12,6 +13,18 @@ template <typename T> class word_t {
 public:
   T*  str;
   int count;
+  word_t() {
+    str   = NULL;
+    count = 0;
+  }
+  word_t(const word_t& other) {
+    this->str   = other.str;
+    this->count = other.count;
+  }
+  ~word_t() {
+    // frees in another place.
+    ;
+  }
 };
 
 template <typename T> class gram_t {
@@ -29,8 +42,16 @@ public:
   }
 };
 
-template <typename T> static int cmpwrap(const gram_t<T>& x0, const gram_t<T>& x1);
-template <typename T> static int wordcmp(const word_t<T>& x0, const word_t<T>& x1);
+template <typename T> int cmpwrap(const gram_t<T>& x0, const gram_t<T>& x1) {
+  return std::strcmp(x0.str, x1.str) < 0;
+}
+
+template <typename T> int cmpwrap2(const word_t<T>& x0, const word_t<T>& x1) {
+  // gcc4.9 is bugly...
+  // return (x0.count < x1.count) || (x0.count == x1.count && std::strcmp(x0.str, x1.str) < 0);
+  return std::strcmp(x0.str, x1.str) < 0;
+}
+
 
 template <typename T> class lword {
 public:
@@ -92,14 +113,6 @@ template <typename T> void lword<T>::init(const int& loop, const int& mthresh, c
   this->loop    = loop;
   this->mthresh = mthresh;
   this->Mthresh = Mthresh;
-}
-
-template <typename T> int cmpwrap(const gram_t<T>& x0, const gram_t<T>& x1) {
-  return std::strcmp(x0.str, x1.str) < 0;
-}
-
-template <typename T> int wordcmp(const word_t<T>& x0, const word_t<T>& x1) {
-  return (x0.count < x1.count) || (x0.count == x1.count && std::strcmp(x0.str, x1.str) < 0);
 }
 
 template <typename T> bool lword<T>::isin(const T* key, const vector<gram_t<T> >& dict) {
@@ -554,7 +567,7 @@ template <typename T> void lword<T>::makeWords() {
       words.push_back(work);
     }
   }
-  std::sort(words.begin(), words.end(), wordcmp<T>);
+  std::sort(words.begin(), words.end(), cmpwrap2<T>);
   return;
 }
 

@@ -75,7 +75,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::cast(cons
   std::sort(sword.begin(), sword.end());
   std::vector<int>         idxs;
   for(int i = 0; i < sword.size(); i ++) {
-    std::vector<const std::string>::iterator p(std::equal_range(words.begin(), words.end(), sword[i]).first);
+    std::vector<const std::string>::iterator p(std::find(words.begin(), words.end(), sword[i]));
     if(*p == sword[i]) {
       idxs.push_back(std::distance(words.begin(), p));
       result.words.push_back(*p);
@@ -159,7 +159,10 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
   if(words.size() <= 0)
     return *this;
   //std::pair<vsitr, vsitr>;
-  vsitr itr(std::equal_range(words.begin(), words.end(), word).first);
+  vsitr itr(std::find(words.begin(), words.end(), word));
+  int fidx(std::distance(words.begin(), itr));
+  if(!(0 <= fidx && fidx < words.size()))
+    return *this;
   std::cout << *itr << ", " << word << ": " << itr->size() << " / " << word.size() << std::endl;
   if(*itr != word)
     return *this;
@@ -167,19 +170,6 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
   std::vector<int> ridx0, ridx1;
   std::vector<std::string> workwords(gatherWords(words, other.words, ridx0, ridx1));
   result.corpust = Tensor(workwords.size() - 1, workwords.size() - 1);
-  for(int i = 0; i < result.corpust.rows(); i ++)
-    for(int j = 0; j < result.corpust.cols(); j ++) {
-      result.corpust(i, j) = Vec(workwords.size() - 1);
-      if(ridx0[i] >= 0 && ridx0[j] >= 0) {
-        for(int k = 0; k < result.corpust(i, j).size(); k ++)
-          if(ridx0[k] >= 0)
-            result.corpust(i, j)[k] = corpust(ridx0[i], ridx0[j])[ridx0[k]];
-          else
-            result.corpust(i, j)[k] = 0;
-      } else
-        for(int k = 0; k < result.corpust(i, j).size(); k ++)
-          result.corpust(i, j)[k] = 0;
-    }
   std::vector<int> ridx2;
   int eidx = - 1;
   for(int i = 0, ii = 0; i < workwords.size(); i ++) {
@@ -190,6 +180,20 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
     }
     ridx2.push_back(ii ++);
   }
+  for(int i = 0; i < workwords.size(); i ++) if(ridx2[i] >= 0)
+    for(int j = 0; j < workwords.size(); j ++) if(ridx2[j] >= 0) {
+      result.corpust(ridx2[i], ridx2[j]) = Vec(workwords.size() - 1);
+      if(ridx0[i] >= 0 && ridx0[j] >= 0) {
+        for(int k = 0; k < result.corpust(i, j).size(); k ++) if(ridx2[k] >= 0) {
+          if(ridx0[k] >= 0)
+            result.corpust(ridx2[i], ridx2[j])[ridx2[k]] = corpust(ridx0[i], ridx0[j])[ridx0[k]];
+          else
+            result.corpust(ridx2[i], ridx2[j])[ridx2[k]] = 0;
+        }
+      } else
+        for(int k = 0; k < result.corpust(i, j).size(); k ++)
+          result.corpust(ridx2[i], ridx2[j])[k] = 0;
+    }
   for(int i = 0; i < workwords.size(); i ++) if(ridx2[i] >= 0) {
     result.words.push_back(workwords[i]);
     // Sum-up detailed word into result pool without definition itself.
@@ -403,6 +407,7 @@ template <typename T, typename U> std::vector<std::string> corpushl<T, U>::gathe
     if(!in1.size())
       return result;
     for(int i = 0; i < in1.size(); i ++) {
+      ridx0.push_back(- 1);
       ridx1.push_back(i);
       result.push_back(in1[i]);
     }
@@ -411,6 +416,7 @@ template <typename T, typename U> std::vector<std::string> corpushl<T, U>::gathe
   if(!in1.size()) {
     for(int i = 0; i < in0.size(); i ++) {
       ridx0.push_back(i);
+      ridx1.push_back(- 1);
       result.push_back(in0[i]);
     }
     return result;
@@ -427,17 +433,17 @@ template <typename T, typename U> std::vector<std::string> corpushl<T, U>::gathe
   for(int i = 0; i < sin0.size(); i ++) {
     for(; j < sin1.size(); j ++) {
       if(sin0[i] == sin1[j])
-        ridx1[result.size()] = std::distance(in1.begin(), std::equal_range(in1.begin(), in1.end(), sin1[j]).first);
+        ridx1[result.size()] = std::distance(in1.begin(), std::find(in1.begin(), in1.end(), sin1[j]));
       else if(sin0[i] > sin1[j]) {
         result.push_back(std::string(sin1[j]));
-        ridx1[result.size() - 1] = std::distance(in1.begin(), std::equal_range(in1.begin(), in1.end(), sin1[j]).first);
+        ridx1[result.size() - 1] = std::distance(in1.begin(), std::find(in1.begin(), in1.end(), sin1[j]));
         continue;
       } else
         j --;
       j ++;
       break;
     }
-    const int dist(std::distance(in0.begin(), std::equal_range(in0.begin(), in0.end(), sin0[i]).first));
+    const int dist(std::distance(in0.begin(), std::find(in0.begin(), in0.end(), sin0[i])));
     if(0 <= dist && dist < in0.size()) {
       result.push_back(std::string(sin0[i]));
       ridx0[result.size() - 1] = dist;

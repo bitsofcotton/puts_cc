@@ -1,10 +1,10 @@
+#include <string>
+#include <iostream>
+#include <fstream>
 #include "lword.hh"
 #include "corpus.hh"
 #include "corpushl.hh"
 #include "file2eigen.hh"
-#include <string>
-#include <iostream>
-#include <fstream>
 
 void usage() {
   std::cout << "tools (lword|toc)" << std::endl;
@@ -112,6 +112,9 @@ int main(int argc, const char* argv[]) {
       }
       for(int i = 0; i < details.size(); i ++)
         cstat0 = cstat0.withDetail(detailwords[i], details[i]);
+      for(int i = 0; i < tocs.size(); i ++)
+        for(int j = 0; j < details.size(); j ++)
+          tocs[i] = tocs[i].withDetail(detailwords[j], details[j]);
       std::cout << cstat0.toc(details, detailwords, tocs, tocwords, 0, 0.);
     }
     break;
