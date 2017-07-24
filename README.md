@@ -4,15 +4,18 @@ Cluster large documents from small elementary document sets.
 This program aims to cluster and collect TOC and make links to medium sized set of documents.  
 Statistics definition needs to be not dense.
 If it's dense, the context we get from statistics may say nothing.
+So with layered dictionaries, we can calculate a little accuratery.
 
 # Usage
     make tools
     ./tools lword < data.txt
     ./tools corpus wordlist.txt < data.txt
-    ./tools detail wordlist.txt dictionaries ... < data.txt
+    ./tools toc wordlist.txt dictionaries ... -toc topics ... < data.txt
 
 # Example of using as a library
     #include "lword.hh"
+    #include "corpus.hh"
+    #include "corpushl.hh"
     #include <string>
     #include <iostream>
     #include <fstream>
@@ -36,13 +39,14 @@ If it's dense, the context we get from statistics may say nothing.
     corpushl<double, char> cstats;
     cstats = corpushl<double, char>(cstat);
     
-    std::vector<corpushl<double, char> > details;
-    std::vector<std::string> detailwords;
-    // initialize details.
+    std::vector<corpushl<double, char> > details, tocs;
+    std::vector<std::string> detailwords, tocwords;
+    // ... initialize details and tocs.
+    
     for(int i = 0; i < details.size(); i ++)
       cstat0 = cstat0.withDetail(detailwords[i], details[i]);
     // cstat0 is detailed corpus.
     
     // sample output for toc.
-    std::cout << cstat0.toc(details, detailwords, details, 10);
+    std::cout << cstat0.toc(details, detailwords, details, tocwords, tocs, 10);
     
