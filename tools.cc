@@ -7,7 +7,7 @@
 #include <fstream>
 
 void usage() {
-  std::cout << "tools (lword|detail)" << std::endl;
+  std::cout << "tools (lword|toc)" << std::endl;
 }
 
 int main(int argc, const char* argv[]) {
@@ -20,7 +20,7 @@ int main(int argc, const char* argv[]) {
     mode = 0;
   else if(std::strcmp(argv[1], "corpus") == 0 && argc > 2)
     mode = 1;
-  else if(std::strcmp(argv[1], "detail") == 0 && argc > 2)
+  else if(std::strcmp(argv[1], "toc") == 0 && argc > 2)
     mode = 2;
   else {
     usage();
@@ -69,8 +69,15 @@ int main(int argc, const char* argv[]) {
         input2.close();
       }
       std::vector<corpushl<double, char> > details;
+      std::vector<corpushl<double, char> > tocs;
       std::vector<std::string>             detailwords;
+      std::vector<std::string>             tocwords;
+      bool toc(false);
       for(int iidx = 3; iidx < argc; iidx ++) {
+        if(std::string(argv[iidx]) == std::string("-toc")) {
+          toc = true;
+          continue;
+        }
         std::string   inbuf, line;
         std::ifstream input2;
         input2.open(argv[iidx]);
@@ -79,8 +86,22 @@ int main(int argc, const char* argv[]) {
         corpus<double, char> cstat;
         cstat.init(wordbuf.c_str(), 0, 120);
         cstat.compute(inbuf.c_str());
-        details.push_back(corpushl<double, char>(cstat));
-        detailwords.push_back(std::string(argv[iidx]));
+        std::string wbuf(argv[iidx]);
+        int slash = - 1;
+        for(int j = 0; j < wbuf.size(); j ++)
+          if(wbuf[j] == '/')
+            slash = j;
+        std::string wwbuf;
+        slash ++;
+        for(int j = slash; j < wbuf.size(); j ++)
+          wwbuf += wbuf[j];
+        if(toc) {
+          tocs.push_back(corpushl<double, char>(cstat));
+          tocwords.push_back(wwbuf);
+        } else {
+          details.push_back(corpushl<double, char>(cstat));
+          detailwords.push_back(wwbuf);
+        }
       }
       corpushl<double, char> cstat0;
       {
@@ -91,7 +112,7 @@ int main(int argc, const char* argv[]) {
       }
       for(int i = 0; i < details.size(); i ++)
         cstat0 = cstat0.withDetail(detailwords[i], details[i]);
-      std::cout << cstat0.toc(details, detailwords, details, 10);
+      std::cout << cstat0.toc(details, detailwords, tocs, tocwords, 0, 0.);
     }
     break;
   }
