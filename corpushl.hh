@@ -75,7 +75,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::cast(cons
   std::sort(sword.begin(), sword.end());
   std::vector<int>         idxs;
   for(int i = 0; i < sword.size(); i ++) {
-    std::vector<const std::string>::iterator p(std::find(words.begin(), words.end(), sword[i]));
+    auto p(std::find(words.begin(), words.end(), sword[i]));
     if(*p == sword[i]) {
       idxs.push_back(std::distance(words.begin(), p));
       result.words.push_back(*p);
@@ -156,7 +156,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetail(const std::string& word, const corpushl<T, U>& other) {
   std::cerr << "withDetail 1/3" << std::endl;
-  if(words.size() <= 0)
+  if(words.size() <= 0 || other.words.size() <= 0)
     return *this;
   //std::pair<vsitr, vsitr>;
   vsitr itr(std::find(words.begin(), words.end(), word));
@@ -172,26 +172,33 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
   result.corpust = Tensor(workwords.size() - 1, workwords.size() - 1);
   std::vector<int> ridx2;
   int eidx = - 1;
+  bool flag1 = false;
   for(int i = 0, ii = 0; i < workwords.size(); i ++) {
     if(workwords[i] == word) {
       ridx2.push_back(- 1);
       eidx = i;
       continue;
     }
+    if(ridx1[i] >= 0)
+      flag1 = true;
     ridx2.push_back(ii ++);
   }
+  if(!flag1 || eidx < 0)
+    return *this;
   for(int i = 0; i < workwords.size(); i ++) if(ridx2[i] >= 0)
     for(int j = 0; j < workwords.size(); j ++) if(ridx2[j] >= 0) {
       result.corpust(ridx2[i], ridx2[j]) = Vec(workwords.size() - 1);
       if(ridx0[i] >= 0 && ridx0[j] >= 0) {
-        for(int k = 0; k < result.corpust(i, j).size(); k ++) if(ridx2[k] >= 0) {
+        for(int k = 0; k < result.corpust(ridx2[i], ridx2[j]).size(); k ++) if(ridx2[k] >= 0) {
           if(ridx0[k] >= 0)
             result.corpust(ridx2[i], ridx2[j])[ridx2[k]] = corpust(ridx0[i], ridx0[j])[ridx0[k]];
           else
             result.corpust(ridx2[i], ridx2[j])[ridx2[k]] = 0;
-        }
+        } else
+          for(int k = 0; k < result.corpust(ridx2[i], ridx2[j]).size(); k ++)
+            result.corpust(ridx2[i], ridx2[j])[k] = 0;
       } else
-        for(int k = 0; k < result.corpust(i, j).size(); k ++)
+        for(int k = 0; k < result.corpust(ridx2[i], ridx2[j]).size(); k ++)
           result.corpust(ridx2[i], ridx2[j])[k] = 0;
     }
   for(int i = 0; i < workwords.size(); i ++) if(ridx2[i] >= 0) {
@@ -400,6 +407,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(co
 }
 
 template <typename T, typename U> std::vector<std::string> corpushl<T, U>::gatherWords(const std::vector<std::string>& in0, const std::vector<std::string>& in1, std::vector<int>& ridx0, std::vector<int>& ridx1) const {
+  std::cerr << "gatherWords" << std::endl;
   std::vector<std::string> result;
   ridx0 = std::vector<int>();
   ridx1 = std::vector<int>();
