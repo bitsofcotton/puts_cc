@@ -12,6 +12,13 @@ So with layered dictionaries, we can calculate a little accuratery.
     ./tools corpus wordlist.txt < data.txt
     ./tools toc wordlist.txt dictionaries ... -toc topics ... < data.txt
 
+# Contexts
+Inspired from morphological analysis softwares and parameter auto configuring algorithms' structure. 
+
+# Status
+Writing optimize toc, checking and testing implementation.
+And preparing for collision detecting (searching 'NOT' definition and small sized dictionaries.). 
+
 # Demos
 http://services.limpid-intensity.info/puts.php have a working sample.
 Please pseudo-login with e-mail address - salt pair.
@@ -54,3 +61,16 @@ Please pseudo-login with e-mail address - salt pair.
     // sample output for toc.
     std::cout << cstat0.toc(details, detailwords, details, tocwords, tocs, 10);
     
+# Tips
+These programs have a algorithm that is not carefully confirmed.  
+abbrev function is not ideal definition, so in fact, it is needed to be the inverse of withDetail function, but now, not so.  
+This is from simply interest, so don't use this for the reason other than standing under the context.  
+And this algorithm have a specification that edges remains as obscure, to get clear edge, we should use this with morphological analysis softwares.  
+If there's prejudice definition and elementary train base text sets, this can score which prejudice gains, but this is applied to what is said in the context, not the not said in the context.  
+If there's original text and train base text sets, this can score cultural conflicts with the text, but this algorithm is obscure now.  
+If there's large numbers of the sets that correctly defined texts, it may optimizable out to get opposite side's claim, but this is only the what's able to be said, so this isn't what's the matter.
+
+# Another downloads
+* https://ja.osdn.net/projects/puts-cc/
+* https://www.sourceforge.net/projects/puts-cc/
+* https://files.limpid-intensity.info/puts_cc-0.07-stable.tar.gz
