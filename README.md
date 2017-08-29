@@ -13,7 +13,8 @@ So with layered dictionaries, we can calculate a little accuratery.
     ./tools toc wordlist.txt dictionaries ... -toc topics ... < data.txt
 
 # Contexts
-Inspired from morphological analysis softwares and parameter auto configuring algorithms' structure. 
+Inspired from morphological analysis softwares and parameter auto configuring algorithms' structure.   
+There's preceders Tensor representation of the text set (with a way different to this) eg. ieee 2004.
 
 # Status
 Writing optimize toc, checking and testing implementation.
