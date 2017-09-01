@@ -110,12 +110,24 @@ int main(int argc, const char* argv[]) {
         cstat.compute(input.c_str());
         cstat0 = corpushl<double, char>(cstat);
       }
+      std::cerr << "analysing input text." << std::endl;
       for(int i = 0; i < details.size(); i ++)
         cstat0 = cstat0.withDetail(detailwords[i], details[i]);
+      std::cerr << "analysing topics text." << std::endl;
       for(int i = 0; i < tocs.size(); i ++)
         for(int j = 0; j < details.size(); j ++)
           tocs[i] = tocs[i].withDetail(detailwords[j], details[j]);
+      std::cerr << "getting toc." << std::endl;
       std::cout << cstat0.toc(details, detailwords, tocs, tocwords, 0, 0.);
+      std::cout << std::endl << std::endl;
+      corpushl<double, char> summ(cstat0);
+      summ.simpleThresh(.8);
+      for(int i = 0; i < tocs.size(); i ++) {
+        std::vector<std::string> work(summ.reverseLink(tocs[i]));
+        std::cout << tocwords[i] << " : " << std::endl;
+        for(int j = 0; j < work.size(); j ++)
+          std::cout << work[j] << std::endl;
+      }
     }
     break;
   }

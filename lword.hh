@@ -7,7 +7,18 @@
 #include <iostream>
 #include <cstring>
 
-using namespace std;
+using std::strcmp;
+using std::vector;
+using std::map;
+using std::string;
+using std::pair;
+using std::binary_search;
+using std::equal_range;
+using std::sort;
+using std::cerr;
+using std::endl;
+using std::max;
+using std::min;
 
 template <typename T> class word_t {
 public:
@@ -43,13 +54,13 @@ public:
 };
 
 template <typename T> int cmpwrap(const gram_t<T>& x0, const gram_t<T>& x1) {
-  return std::strcmp(x0.str, x1.str) < 0;
+  return strcmp(x0.str, x1.str) < 0;
 }
 
 template <typename T> int cmpwrap2(const word_t<T>& x0, const word_t<T>& x1) {
   // gcc4.9 is bugly...
-  // return (x0.count < x1.count) || (x0.count == x1.count && std::strcmp(x0.str, x1.str) < 0);
-  return std::strcmp(x0.str, x1.str) < 0;
+  return (x0.count < x1.count) || (x0.count == x1.count && strcmp(x0.str, x1.str) < 0);
+  // return strcmp(x0.str, x1.str) < 0;
 }
 
 
@@ -59,19 +70,19 @@ public:
   ~lword();
   void init(const int& loop, const int& mthresh, const int& Mthresh);
   
-  const std::vector<word_t<T> >& compute(const T* input);
+  const vector<word_t<T> >& compute(const T* input);
 private:
-  std::vector<T>                        dict0;
-  std::vector<std::vector<gram_t<T> > > dicts;
-  std::vector<word_t<T> >               words;
-  typedef typename std::vector<T>::iterator          vTitr;
-  typedef typename std::vector<gram_t<T> >::iterator vgTitr;
-  typedef typename std::vector<word_t<T> >::iterator vwTitr;
-  typedef  std::vector<int>::iterator        viitr;
-  typedef typename std::vector<std::vector<gram_t<T> > >::iterator vvgTitr;
-  typedef typename std::map<T, T>::iterator   mTTitr;
-  typedef typename std::map<T, int>::iterator mTiitr;
-  typedef  std::map<std::string, std::vector<int> >::iterator msviitr;
+  vector<T>                   dict0;
+  vector<vector<gram_t<T> > > dicts;
+  vector<word_t<T> >          words;
+  typedef typename vector<T>::iterator          vTitr;
+  typedef typename vector<gram_t<T> >::iterator vgTitr;
+  typedef typename vector<word_t<T> >::iterator vwTitr;
+  typedef vector<int>::iterator                 viitr;
+  typedef typename vector<vector<gram_t<T> > >::iterator vvgTitr;
+  typedef typename map<T, T>::iterator   mTTitr;
+  typedef typename map<T, int>::iterator mTiitr;
+  typedef map<string, vector<int> >::iterator msviitr;
   
   int loop;
   int mthresh;
@@ -118,7 +129,7 @@ template <typename T> void lword<T>::init(const int& loop, const int& mthresh, c
 template <typename T> bool lword<T>::isin(const T* key, const vector<gram_t<T> >& dict) {
   gram_t<T> key0;
   key0.str = const_cast<T*>(key);
-  return std::binary_search(dict.begin(), dict.end(), key0, cmpwrap<T>);
+  return binary_search(dict.begin(), dict.end(), key0, cmpwrap<T>);
 }
 
 template <typename T> gram_t<T>& lword<T>::find(const T* key, vector<gram_t<T> >& dict) {
@@ -128,20 +139,20 @@ template <typename T> gram_t<T>& lword<T>::find(const T* key, vector<gram_t<T> >
   }
   gram_t<T> key0;
   key0.str = const_cast<T*>(key);
-  std::pair<vgTitr, vgTitr> p = std::equal_range(dict.begin(), dict.end(), key0, cmpwrap<T>);
+  pair<vgTitr, vgTitr> p = equal_range(dict.begin(), dict.end(), key0, cmpwrap<T>);
   return *(p.first);
 }
 
 template <typename T> void lword<T>::assign(const T* key, vector<gram_t<T> >& dict, const gram_t<T>& val) {
   gram_t<T> key0;
   key0.str = const_cast<T*>(key);
-  std::pair<vgTitr, vgTitr> p = std::equal_range(dict.begin(), dict.end(), key0, cmpwrap<T>);
+  pair<vgTitr, vgTitr> p = equal_range(dict.begin(), dict.end(), key0, cmpwrap<T>);
   p.first->ptr0 = val.ptr0;
   p.first->ptr1 = val.ptr1;
   return;
 }
 
-template <typename T> const std::vector<word_t<T> >& lword<T>::compute(const T* input) {
+template <typename T> const vector<word_t<T> >& lword<T>::compute(const T* input) {
   cerr << "bi-gramming..." << endl;
   makeBigram(input);
   cerr << "constructing longest words..." << endl;
@@ -156,21 +167,21 @@ template <typename T> const std::vector<word_t<T> >& lword<T>::compute(const T* 
 }
 
 template <typename T> void lword<T>::makeBigram(const T* input) {
-  std::map<T, T> map0;
-  std::map<std::string, vector<int> > map;
+  map<T, T> map0;
+  map<string, vector<int> > map;
   for(int i = 1; input[i]; i ++) {
     T work[3];
     work[0] = input[i - 1];
     work[1] = input[i];
     work[2] = T(0);
-    map[std::string(work)].push_back(i);
+    map[string(work)].push_back(i);
     map0[input[i]] = input[i];
   }
-  for(mTTitr itr = map0.begin(); itr != map0.end(); ++ itr)
+  for(auto itr = map0.begin(); itr != map0.end(); ++ itr)
     dict0.push_back(itr->first);
-  std::sort(dict0.begin(), dict0.end());
-  std::vector<gram_t<T> > buf;
-  for(std::map<std::string, vector<int> >::iterator itr = map.begin(); itr != map.end(); ++ itr) {
+  sort(dict0.begin(), dict0.end());
+  vector<gram_t<T> > buf;
+  for(auto itr = map.begin(); itr != map.end(); ++ itr) {
     gram_t<T> work;
     work.str = new T[3];
     for(int i = 0; i < 2; i ++)
@@ -183,20 +194,20 @@ template <typename T> void lword<T>::makeBigram(const T* input) {
     buf.push_back(work);
   }
   dicts.push_back(buf);
-  std::sort(dicts[0].begin(), dicts[0].end(), cmpwrap<T>);
+  sort(dicts[0].begin(), dicts[0].end(), cmpwrap<T>);
 }
 
 template <typename T> void lword<T>::constructNwords() {
   int i;
   for(i = 1; i < loop; i ++) {
-    std::cerr << "constructing " << i + 2 << " table..." << std::endl;
-    std::map<std::string, vector<int> > map0;
-    std::map<std::string, vector<int> > map1;
-    std::map<std::string, vector<int> > dmap;
+    cerr << "constructing " << i + 2 << " table..." << endl;
+    map<string, vector<int> > map0;
+    map<string, vector<int> > map1;
+    map<string, vector<int> > dmap;
     for(vgTitr itr = dicts[i - 1].begin(); itr != dicts[i - 1].end(); ++ itr) {
       const T* key = itr->str;
       if(!isin(key, dicts[i - 1])) {
-        std::cerr << "Something odd has occurred." << std::endl;
+        cerr << "Something odd has occurred." << endl;
         continue;
       }
       gram_t<T> idxkey(find(key, dicts[i - 1]));
@@ -232,8 +243,8 @@ template <typename T> void lword<T>::constructNwords() {
         }
         if(idxwork[0].size() < Mthresh)
           continue;
-        const int diff(std::min(idxkey.ptr0.size(), idxkey2.ptr0.size()) - idxwork[0].size());
-        const int diffM(std::max(idxkey.ptr0.size(), idxkey2.ptr0.size()) - idxwork[0].size());
+        const int diff(min(idxkey.ptr0.size(), idxkey2.ptr0.size()) - idxwork[0].size());
+        const int diffM(max(idxkey.ptr0.size(), idxkey2.ptr0.size()) - idxwork[0].size());
         if(0 < diff && diffM < mthresh)
           continue;
         for(int i = 0; i < idxwork[0].size(); i ++) {
@@ -246,9 +257,9 @@ template <typename T> void lword<T>::constructNwords() {
     }
     // delete this stage garbage.
     for(msviitr itr = dmap.begin(); itr != dmap.end(); ++ itr) {
-      std::sort(itr->second.begin(), itr->second.end());
+      sort(itr->second.begin(), itr->second.end());
       if(!isin(itr->first.c_str(), dicts[i - 1])) {
-        std::cerr << "Something odd has occured." << std::endl;
+        cerr << "Something odd has occured." << endl;
         continue;
       }
       gram_t<T> before(find(itr->first.c_str(), dicts[i - 1]));
@@ -286,7 +297,7 @@ template <typename T> void lword<T>::constructNwords() {
     }
     if(workv.size() < 1)
       break;
-    std::sort(workv.begin(), workv.end(), cmpwrap<T>);
+    sort(workv.begin(), workv.end(), cmpwrap<T>);
     dicts.push_back(workv);
   }
   return;
@@ -299,14 +310,14 @@ template <typename T> void lword<T>::bondLast() {
     loopf = false;
     count ++;
     for(int i = 0; i < dicts.size(); i ++) {
-      std::cerr << "bondLast: " << i << "/" << dicts.size() << " @ " << count << std::endl;
+      cerr << "bondLast: " << i << "/" << dicts.size() << " @ " << count << endl;
       for(vgTitr itr = dicts[i].begin(); itr != dicts[i].end(); ++ itr)
         for(int j = 0; j < dicts.size(); j ++) {
           if(i + j + 1 >= loop)
             continue;
           for(vgTitr itr2 = dicts[j].begin();  itr2 != dicts[j].end(); ++ itr2) {
-            std::vector<int> ptr0;
-            std::vector<int> ptr1;
+            vector<int> ptr0;
+            vector<int> ptr1;
             if(!itr->str || itr2->str)
               continue;
             if(itr->str[i + 1] == itr2->str[0]) {
@@ -316,8 +327,8 @@ template <typename T> void lword<T>::bondLast() {
                     ptr0.push_back(itr->ptr0[ii]);
                     ptr1.push_back(itr2->ptr1[jj]);
                   }
-              const int diff(std::min(itr->ptr0.size(), itr2->ptr0.size()) - ptr0.size());
-              const int diffM(std::max(itr->ptr0.size(), itr2->ptr0.size()) - ptr0.size());
+              const int diff(min(itr->ptr0.size(), itr2->ptr0.size()) - ptr0.size());
+              const int diffM(max(itr->ptr0.size(), itr2->ptr0.size()) - ptr0.size());
               if(0 < diff && diffM < mthresh)
                 continue;
               if(ptr0.size() < Mthresh)
@@ -349,10 +360,10 @@ template <typename T> void lword<T>::bondLast() {
                 assign(key2, dicts[i + j + 1], work);
               }
               // delete.
-              std::vector<int> i0ptr0;
-              std::vector<int> i0ptr1;
-              std::vector<int> i1ptr0;
-              std::vector<int> i1ptr1;
+              vector<int> i0ptr0;
+              vector<int> i0ptr1;
+              vector<int> i1ptr0;
+              vector<int> i1ptr1;
               for(int ii = 0; ii < itr->ptr0.size(); ii ++) {
                 bool flag = false;
                 for(viitr itr3 = ptr0.begin(); itr3 != ptr0.end(); ++ itr3)
@@ -397,9 +408,9 @@ template <typename T> void lword<T>::balanceBonded() {
     loopf = false;
     count ++;
     for(int i = 0; i < dicts.size(); i ++) {
-      std::cerr << "balance: " << i << "/" << dicts.size() << " @ " << count << std::endl;
-      std::map<T, int> wstat;
-      std::map<T, int> wstat2;
+      cerr << "balance: " << i << "/" << dicts.size() << " @ " << count << endl;
+      map<T, int> wstat;
+      map<T, int> wstat2;
       for(vgTitr itr = dicts[i].begin(); itr != dicts[i].end(); ++ itr) {
         for(int j = 0; j < dicts.size(); j ++)
           for(vgTitr itr2 = dicts[j].begin(); itr2 != dicts[j].end(); ++ itr2) {
@@ -446,7 +457,7 @@ template <typename T> void lword<T>::balanceBonded() {
                   work.str[k] = key[k];
               }
               if(itr->ptr1.size() > 0) {
-                std::vector<int> rptr;
+                vector<int> rptr;
                 for(viitr litr = itr->ptr1.begin(); litr != itr->ptr1.end(); ++ litr)
                   for(int iitr2 = 0; iitr2 < itr2->ptr0.size(); iitr2 ++)
                     if(*litr == itr2->ptr0[iitr2]) {
@@ -478,7 +489,7 @@ template <typename T> void lword<T>::balanceBonded() {
                   work.str[k] = key[k];
               }
               if(itr2->ptr1.size() > 0) {
-                std::vector<int> rptr;
+                vector<int> rptr;
                 for(viitr litr = itr2->ptr1.begin(); litr != itr2->ptr1.end(); ++ litr)
                   for(int iitr2 = 0; iitr2 < itr->ptr0.size(); iitr2 ++)
                     if(*litr == itr->ptr0[iitr2]) {
@@ -567,7 +578,7 @@ template <typename T> void lword<T>::makeWords() {
       words.push_back(work);
     }
   }
-  std::sort(words.begin(), words.end(), cmpwrap2<T>);
+  sort(words.begin(), words.end(), cmpwrap2<T>);
   return;
 }
 

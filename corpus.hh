@@ -7,8 +7,14 @@
 #include <iterator>
 #include <iostream>
 
-int partial_compare(const std::string& x0, const std::string& x1);
-bool partial_compare_equal(const std::string& x0, const std::string& x1);
+using std::vector;
+using std::string;
+using std::sort;
+using std::min;
+using std::abs;
+using std::distance;
+using std::cerr;
+using std::endl;
 
 template <typename T, typename U> class corpus {
 public:
@@ -19,24 +25,23 @@ public:
   corpus();
   ~corpus();
   
-  int  isin(const std::string& key);
   void init(const U* words, const int& nthresh, const int& Nthresh);
-  corpus<T, U>&                   operator = (const corpus<T, U>& other);
-  const void                      compute(const U* input);
-  const std::vector<std::string>& getWords() const;
-  const Tensor&                   getCorpus() const;
+  corpus<T, U>&         operator = (const corpus<T, U>& other);
+  const void            compute(const U* input);
+  const vector<string>& getWords() const;
+  const Tensor&         getCorpus() const;
 private:
-  std::vector<std::string>       words0;
-  std::vector<std::string>       words;
-  std::vector<std::vector<int> > ptrs0;
-  std::vector<std::vector<int> > ptrs;
-  typedef std::vector<std::string>::iterator       vsitr;
-  typedef std::vector<int>::iterator               viitr;
-  typedef std::vector<std::vector<int> >::iterator vviitr;
-  Tensor                         corpust;
-  int                            nthresh;
-  int                            Nthresh;
-  T                              Midx;
+  vector<string>       words0;
+  vector<string>       words;
+  vector<vector<int> > ptrs0;
+  vector<vector<int> > ptrs;
+  typedef vector<string>::iterator       vsitr;
+  typedef vector<int>::iterator          viitr;
+  typedef vector<vector<int> >::iterator vviitr;
+  Tensor               corpust;
+  int                  nthresh;
+  int                  Nthresh;
+  T                    Midx;
    
   void getWordPtrs(const U* input);
   void corpusEach();
@@ -52,15 +57,15 @@ template <typename T, typename U> corpus<T,U>::~corpus() {
 }
 
 template <typename T, typename U> void corpus<T,U>::init(const U* words, const int& nthresh, const int& Nthresh) {
-  std::string buf;
-  bool        flag  = false;
+  string buf;
+  bool   flag  = false;
   for(int i = 0; words[i]; i ++) {
     if(words[i] == ',' || words[i] == '\n') {
       if(buf.size()) {
         this->words0.push_back(buf);
-        this->ptrs0.push_back(std::vector<int>());
+        this->ptrs0.push_back(vector<int>());
       }
-      buf = std::string();
+      buf = string();
       if(words[i] == ',')
         flag = true;
       else
@@ -77,10 +82,6 @@ template <typename T, typename U> void corpus<T,U>::init(const U* words, const i
   return;
 }
 
-template <typename T, typename U> int corpus<T,U>::isin(const std::string& key) {
-  return 0;
-}
-
 template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator = (const corpus<T, U>& other) {
   words0  = other.words0;
   words   = other.words;
@@ -93,14 +94,14 @@ template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator = (const 
 }
 
 template <typename T, typename U> const void corpus<T,U>::compute(const U* input) {
-  std::cerr << "Getting word pointers." << std::endl;
+  cerr << "Getting word pointers." << endl;
   getWordPtrs(input);
-  std::cerr << "Corpus..." << std::endl;
+  cerr << "Corpus..." << endl;
   corpusEach();
   return;
 }
 
-template <typename T, typename U> const std::vector<std::string>& corpus<T,U>::getWords() const {
+template <typename T, typename U> const vector<string>& corpus<T,U>::getWords() const {
   return words;
 }
 
@@ -110,16 +111,16 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
 
 template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) {
   // XXX fixme:
-  std::sort(words0.begin(), words0.end());
-  std::string work;
-  std::vector<int>         matchwidx;
-  std::vector<int>         matchidxs;
+  sort(words0.begin(), words0.end());
+  string work;
+  vector<int> matchwidx;
+  vector<int> matchidxs;
   for(int i = 0; input[i]; i ++) {
     work += input[i];
     int lo = 0, hi = words0.size() - 1;
     for(; lo < hi - 1;) {
       int cmp = 0, jidx = 0;
-      for(; !cmp && jidx < std::min(work.size(), words0[(lo + hi) / 2].size()); jidx ++)
+      for(; !cmp && jidx < min(work.size(), words0[(lo + hi) / 2].size()); jidx ++)
         cmp = work[jidx] - words0[(lo + hi) / 2][jidx];
       if(cmp > 0)
         lo = (lo + hi) / 2;
@@ -129,7 +130,7 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) 
     int hii = words0.size() - 1;
     for(; hi < hii - 1;) {
       int cmp = 0, jidx = 0;
-      for(; !cmp && jidx < std::min(work.size(), words0[(hi + hii) / 2].size()); jidx ++)
+      for(; !cmp && jidx < min(work.size(), words0[(hi + hii) / 2].size()); jidx ++)
         cmp = work[jidx] - words0[(hi + hii) / 2][jidx];
       if(cmp < 0)
         hi  = (hi + hii) / 2;
@@ -140,7 +141,7 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) 
     bool match = false;
     for(; lo < words0.size() && lo <= hi; lo ++) {
       int cmp = 0, jidx = 0;
-      for(; !cmp && jidx < std::min(work.size(), words0[lo].size()); jidx ++)
+      for(; !cmp && jidx < min(work.size(), words0[lo].size()); jidx ++)
         cmp = work[jidx] - words0[lo][jidx];
       if(jidx >= work.size() && !cmp) {
         if(work.size() == words0[lo].size()) {
@@ -157,34 +158,34 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) 
       int j = matchwidx.size() - 1;
       ptrs0[matchwidx[j]].push_back(matchidxs[j]);
       Midx = matchidxs[j];
-      matchwidx = std::vector<int>();
-      matchidxs = std::vector<int>();
+      matchwidx = vector<int>();
+      matchidxs = vector<int>();
     }
     i   -= work.size() - 1;
-    work = std::string();
+    work = string();
   }
-  words.push_back(std::string("^"));
-  std::vector<int> head, tail;
+  words.push_back(string("^"));
+  vector<int> head, tail;
   head.push_back(0);
   ptrs.push_back(head);
   for(vsitr itr = words0.begin(); itr != words0.end(); ++ itr) {
-    const int idx = std::distance(words0.begin(), itr);
+    const int idx = distance(words0.begin(), itr);
     if(ptrs0[idx].size()) {
       words.push_back(*itr);
       ptrs.push_back(ptrs0[idx]);
     }
   }
-  words.push_back(std::string("$"));
+  words.push_back(string("$"));
   tail.push_back(Midx + 1);
   ptrs.push_back(tail);
-  std::cerr << words.size() - 2 << " words used." << std::endl;
+  cerr << words.size() - 2 << " words used." << endl;
   return;
 }
 
 template <typename T, typename U> void corpus<T,U>::corpusEach() {
   corpust = Tensor(words.size() + 2, words.size() + 2);
   for(int i = 0; i < words.size(); i ++) {
-    std::cerr << "Corpushing row : " << i << std::endl;
+    cerr << "Corpushing row : " << i << endl;
     if(!ptrs[i].size())
       continue;
     for(int j = 0; j < words.size(); j ++) {
@@ -206,8 +207,8 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
           if(ptrs[j][ctrv] < *itr)
             break;
           T work(0);
-          const T buf0(log(std::abs(*itr - ptrs[i][ctru])));
-          const T buf1(log(std::abs(*itr - ptrs[j][ctrv])));
+          const T buf0(log(abs(*itr - ptrs[i][ctru])));
+          const T buf1(log(abs(*itr - ptrs[j][ctrv])));
           if(nthresh < buf0 && buf0 < Nthresh &&
              nthresh < buf1 && buf1 < Nthresh)
             work += buf0 * buf0 + buf1 * buf1;
