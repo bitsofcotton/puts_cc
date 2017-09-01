@@ -73,5 +73,5 @@ abbrev 関数は、理想的には withDetail 関数の逆の最適化となっ�
 # その他のダウンロードサイト
 * https://ja.osdn.net/projects/puts-cc/
 * https://www.sourceforge.net/projects/puts-cc/
-* https://konbu.sakura.ne.jp/files/puts_cc-0.07-stable.tar.gz
-* http://files.limpid-intensity.info/puts_cc-0.07-stable.tar.gz
+* https://konbu.sakura.ne.jp/files/puts_cc-0.08.tar.gz
+* http://files.limpid-intensity.info/puts_cc-0.08.tar.gz
