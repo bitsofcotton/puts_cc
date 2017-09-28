@@ -265,7 +265,7 @@ template <typename T, typename U> const string corpushl<T, U>::toc(const vector<
     work0  -= work;
     for(int j = 0; j < base.size(); j ++)
       work = work.abbrev(words[j], base[j]);
-    result += mwords[i] + string("(") + to_string(work.distanceInUnion(work))+ string(")") + string(" : ") + work.summary0(thresh) + string("\n");
+    result += mwords[i] + string("(") + to_string(work.distanceInUnion(work) / distanceInUnion(*this))+ string(")") + string(" : ") + work.summary0(thresh) + string("\n");
   }
   for(int j = 0; j < base.size(); j ++)
     work0 = work0.abbrev(words[j], base[j]);
@@ -279,7 +279,7 @@ template <typename T, typename U> const vector<T> corpushl<T, U>::prej(const vec
     // XXX confirm me: need some other counting methods?
     // XXX fixme: amount of the word that is not said in the context is
     //            also important.
-    result.push_back(distanceInUnion(match2relPseudo(prejs[i])));
+    result.push_back(distanceInUnion(match2relPseudo(prejs[i])) / distanceInUnion(*this));
   return result;
 }
 

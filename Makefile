@@ -8,10 +8,9 @@ CXXFLAGS+=	-O2 -g2
 CXXFLAGS+=	-std=c++11
 LDFLAGS=	-lstdc++
 
-CLEANFILES= *.o *.dSYM tools
+CLEANFILES= tools
 
 all:	tools
-tools:	corpus.o tools.o
 
 clean:
 	@rm -rf ${CLEANFILES}

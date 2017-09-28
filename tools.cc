@@ -1,6 +1,8 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <locale>
+#include <codecvt>
 #include "lword.hh"
 #include "corpus.hh"
 #include "corpushl.hh"
@@ -32,11 +34,13 @@ int main(int argc, const char* argv[]) {
   switch(mode) {
   case 0:
     {
-      lword<char> stat;
+      lword<char32_t, std::u32string> stat;
+      std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
+      std::u32string itrans(converter.from_bytes(input));
       stat.init(120, 2, 2);
-      std::vector<word_t<char> > words(stat.compute(input.c_str()));
-      for(std::vector<word_t<char> >::iterator itr = words.begin(); itr != words.end(); ++ itr) {
-        std::cout << itr->str << ", ";
+      std::vector<word_t<char32_t> > words(stat.compute(itrans.c_str()));
+      for(std::vector<word_t<char32_t> >::iterator itr = words.begin(); itr != words.end(); ++ itr) {
+        std::cout << converter.to_bytes(itr->str) << ", ";
         std::cout << itr->count << std::endl;
       }
       break;
