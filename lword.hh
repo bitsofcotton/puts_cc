@@ -15,6 +15,7 @@ using std::lower_bound;
 using std::sort;
 using std::cerr;
 using std::endl;
+using std::fflush;
 using std::max;
 using std::min;
 
@@ -51,7 +52,9 @@ public:
   vector<int> ptr0;
   vector<int> ptr1;
   gram_t() {
-    this->str = 0;
+    this->str  = 0;
+    this->ptr0 = vector<int>();
+    this->ptr1 = vector<int>();
   }
   gram_t(const gram_t<T>& x) {
     this->str  = x.str;
@@ -133,9 +136,7 @@ template <typename T, typename U> void lword<T, U>::init(const int& loop, const 
 template <typename T, typename U> bool lword<T, U>::isin(const T* key, const vector<gram_t<T> >& dict) {
   gram_t<T> key0;
   key0.str = const_cast<T*>(key);
-  // binary_search have a some bug.
-  auto p(lower_bound(dict.begin(), dict.end(), key0, cmpwrap<T>));
-  return !(p == dict.begin() || p == dict.end());
+  return binary_search(dict.begin(), dict.end(), key0, cmpwrap<T>);
 }
 
 template <typename T, typename U> gram_t<T>& lword<T, U>::find(const T* key, vector<gram_t<T> >& dict) {
@@ -151,8 +152,10 @@ template <typename T, typename U> void lword<T, U>::assign(const T* key, vector<
   gram_t<T> key0;
   key0.str = const_cast<T*>(key);
   auto p(lower_bound(dict.begin(), dict.end(), key0, cmpwrap<T>));
-  if(p == dict.begin() || p == dict.end())
+  if(p == dict.begin() || p == dict.end()) {
     cerr << "XXX: slipping assign." << endl;
+    return;
+  }
   p->ptr0 = val.ptr0;
   p->ptr1 = val.ptr1;
   return;
@@ -207,11 +210,13 @@ template <typename T, typename U> void lword<T, U>::makeBigram(const T* input) {
 template <typename T, typename U> void lword<T, U>::constructNwords() {
   int i;
   for(i = 1; i < loop; i ++) {
-    cerr << "constructing " << i + 2 << " table..." << endl;
+    cerr << "constructing " << i + 2 << " table";
     map<U, vector<int> > map0;
     map<U, vector<int> > map1;
     map<U, vector<int> > dmap;
     for(auto itr = dicts[i - 1].begin(); itr != dicts[i - 1].end(); ++ itr) {
+      cerr << ".";
+      fflush(stderr);
       const T* key = itr->str;
       gram_t<T> idxkey(find(key, dicts[i - 1]));
       for(auto itr2 = dict0.begin(); itr2 != dict0.end(); ++ itr2) {
@@ -228,6 +233,8 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
         workkey[i + 1] = *itr2;
         workkey[i + 2] = T(0);
         vector<int> idxwork[4];
+        for(int j = 0; j < 4; j ++)
+          idxwork[j] = vector<int>();
         gram_t<T>   idxkey2(find(key2, dicts[i - 1]));
         int tt = 0;
         int ss = 0;
@@ -298,6 +305,7 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
       break;
     sort(workv.begin(), workv.end(), cmpwrap<T>);
     dicts.push_back(workv);
+    cerr << endl;
   }
   return;
 }
