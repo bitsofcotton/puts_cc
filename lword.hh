@@ -43,6 +43,9 @@ public:
     count = other.count;
     return *this;
   }
+  bool operator < (const word_t<T>& x1) const {
+    return (count < x1.count) || (count == x1.count && strTcmp<T>(str, x1.str) < 0);
+  }
 };
 
 // be careful ditto.
@@ -61,22 +64,16 @@ public:
     this->ptr0 = x.ptr0;
     this->ptr1 = x.ptr1;
   }
-  gram_t& operator = (const gram_t& x) {
+  gram_t& operator = (const gram_t<T>& x) {
     str  = x.str;
     ptr0 = x.ptr0;
     ptr1 = x.ptr1;
     return *this;
   }
+  bool operator < (const gram_t<T>& x1) const {
+    return strTcmp<T>(str, x1.str) < 0;
+  }
 };
-
-template <typename T> int cmpwrap(const gram_t<T>& x0, const gram_t<T>& x1) {
-  return strTcmp<T>(x0.str, x1.str) < 0;
-//  return strTcmp<T>(x0.str, x1.str);
-}
-
-template <typename T> int cmpwrap2(const word_t<T>& x0, const word_t<T>& x1) {
-  return (x0.count < x1.count) || (x0.count == x1.count && strTcmp<T>(x0.str, x1.str) < 0);
-}
 
 
 template <typename T, typename U> class lword {
@@ -136,13 +133,13 @@ template <typename T, typename U> void lword<T, U>::init(const int& loop, const 
 template <typename T, typename U> bool lword<T, U>::isin(const T* key, const vector<gram_t<T> >& dict) {
   gram_t<T> key0;
   key0.str = const_cast<T*>(key);
-  return binary_search(dict.begin(), dict.end(), key0, cmpwrap<T>);
+  return binary_search(dict.begin(), dict.end(), key0);
 }
 
 template <typename T, typename U> gram_t<T>& lword<T, U>::find(const T* key, vector<gram_t<T> >& dict) {
   gram_t<T> key0;
   key0.str = const_cast<T*>(key);
-  auto p(lower_bound(dict.begin(), dict.end(), key0, cmpwrap<T>));
+  auto p(lower_bound(dict.begin(), dict.end(), key0));
   if(p == dict.begin() || p == dict.end())
     cerr << "XXX: slipping find." << endl;
   return *p;
@@ -151,7 +148,7 @@ template <typename T, typename U> gram_t<T>& lword<T, U>::find(const T* key, vec
 template <typename T, typename U> void lword<T, U>::assign(const T* key, vector<gram_t<T> >& dict, const gram_t<T>& val) {
   gram_t<T> key0;
   key0.str = const_cast<T*>(key);
-  auto p(lower_bound(dict.begin(), dict.end(), key0, cmpwrap<T>));
+  auto p(lower_bound(dict.begin(), dict.end(), key0));
   if(p == dict.begin() || p == dict.end()) {
     cerr << "XXX: slipping assign." << endl;
     return;
@@ -203,7 +200,7 @@ template <typename T, typename U> void lword<T, U>::makeBigram(const T* input) {
     buf.push_back(work);
   }
   dicts.push_back(buf);
-  sort(dicts[0].begin(), dicts[0].end(), cmpwrap<T>);
+  sort(dicts[0].begin(), dicts[0].end());
   return;
 }
 
@@ -303,7 +300,7 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
     }
     if(workv.size() < 1)
       break;
-    sort(workv.begin(), workv.end(), cmpwrap<T>);
+    sort(workv.begin(), workv.end());
     dicts.push_back(workv);
     cerr << endl;
   }
@@ -585,7 +582,7 @@ template <typename T, typename U> void lword<T, U>::makeWords() {
       words.push_back(work);
     }
   }
-  sort(words.begin(), words.end(), cmpwrap2<T>);
+  sort(words.begin(), words.end());
   return;
 }
 
