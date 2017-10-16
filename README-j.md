@@ -33,9 +33,9 @@ http://services.limpid-intensity.info/puts.php にサンプルがあります。
     
     std::string input;
     // ... initialize input.
-    lword<char> stat;
-    stat.init(120, 2, 2);
-    std::vector<word_t<char> > words(stat.compute(input.c_str()));
+    lword<char, std::string> stat;
+    stat.init(60, 2, 2, 4);
+    std::vector<word_t<std::string> > words(stat.compute(input.c_str()));
     for(auto itr = words.begin(); itr != words.end(); ++ itr) {
       std::cout << itr->str << ", ";
       std::cout << itr->count << std::endl;
