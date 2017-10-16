@@ -98,6 +98,9 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::cast(cons
     }
   }
   result.corpust = Tensor(idxs.size(), idxs.size());
+#if defined(_OPENMP)
+#pragma omp parallel for
+#endif
   for(int i = 0; i < idxs.size(); i ++)
     for(int j = 0; j < idxs.size(); j ++)
       result.corpust(i, j) = corpust(idxs[i], idxs[j]);
@@ -120,6 +123,9 @@ template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator
 
 template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator *= (const T& t) {
   cerr << "operator *=" << endl;
+#if defined(_OPENMP)
+#pragma omp parallel for
+#endif
   for(int i = 0; i < corpust.rows(); i ++)
     for(int j = 0; j < corpust.cols(); j ++)
       corpust(i, j) *= t;
@@ -221,9 +227,16 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2rel
   vector<int>    ridx0, ridx1;
   vector<string> words(gatherWords(result.words, other.words, ridx0, ridx1));
   Tensor mul(result.corpust);
+#if defined(_OPENMP)
+#pragma omp parallel
+#pragma omp for
+#endif
   for(int i = 0; i < mul.rows(); i ++)
     for(int j = 0; j < mul.cols(); j ++)
       mul(i, j) *= T(0);
+#if defined(_OPENMP)
+#pragma omp for
+#endif
   for(int i = 0; i < words.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0)
     for(int j = 0; j < words.size(); j ++) if(ridx0[j] >= 0 && ridx1[j] >= 0)
       for(int k = 0; k < words.size(); k ++) if(ridx0[k] >= 0) {
@@ -237,6 +250,9 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2rel
         mul(ridx0[k], ridx0[i])[ridx0[j]] += 1.;
 */
       }
+#if defined(_OPENMP)
+#pragma omp for
+#endif
   for(int i = 0; i < result.corpust.rows(); i ++)
     for(int j = 0; j < result.corpust.cols(); j ++)
       for(int k = 0; k < result.corpust(i, j).size(); k ++)
@@ -489,6 +505,10 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
   cerr << "prepareDetail 0/2" << endl;
   // initialize result tensor with 0.
   Tensor res(workwords.size() - 1, workwords.size() - 1);
+#if defined(_OPENMP)
+#pragma omp parallel
+#pragma omp for
+#endif
   for(int i = 0; i < workwords.size(); i ++) if(ridx2[i] >= 0)
     for(int j = 0; j < workwords.size(); j ++) if(ridx2[j] >= 0) {
       res(ridx2[i], ridx2[j]) = Vec(workwords.size() - 1);

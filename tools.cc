@@ -13,6 +13,7 @@ void usage() {
 }
 
 int main(int argc, const char* argv[]) {
+  std::ios::sync_with_stdio(false);
   if(argc < 2) {
     usage();
     return - 1;
@@ -30,19 +31,27 @@ int main(int argc, const char* argv[]) {
   }
   std::string buf;
   std::string input;
-  while(std::getline(std::cin, buf, '\n')) input += buf + std::string("\n");
+  while(std::getline(std::cin, buf, '\n') && !std::cin.eof() && !std::cin.bad()) input += buf + std::string("\n");
   switch(mode) {
   case 0:
     {
+#if 1
       lword<char32_t, std::u32string> stat;
       std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
       std::u32string itrans(converter.from_bytes(input));
-      stat.init(120, 2, 2);
-      std::vector<word_t<char32_t> > words(stat.compute(itrans.c_str()));
-      for(std::vector<word_t<char32_t> >::iterator itr = words.begin(); itr != words.end(); ++ itr) {
+      std::vector<word_t<std::u32string> > words(stat.compute(itrans.c_str()));
+      for(std::vector<word_t<std::u32string> >::iterator itr = words.begin(); itr != words.end(); ++ itr) {
         std::cout << converter.to_bytes(itr->str) << ", ";
         std::cout << itr->count << std::endl;
       }
+#else
+      lword<char, std::string> stat;
+      std::vector<word_t<std::string> > words(stat.compute(input.c_str()));
+      for(auto itr = words.begin(); itr != words.end(); ++ itr) {
+        std::cout << itr->str << ", ";
+        std::cout << itr->count << std::endl;
+      }
+#endif
       break;
     }
   case 1:
@@ -51,7 +60,7 @@ int main(int argc, const char* argv[]) {
       std::string          wordsbuf, line;
       std::ifstream input2;
       input2.open(argv[2]);
-      while(getline(input2, line)) wordsbuf += line + std::string("\n");
+      while(getline(input2, line) && !input2.eof() && !input2.bad()) wordsbuf += line + std::string("\n");
       input2.close();
       
       stat.init(wordsbuf.c_str(), 0, 120);
@@ -69,7 +78,7 @@ int main(int argc, const char* argv[]) {
         std::string   inbuf, line;
         std::ifstream input2;
         input2.open(argv[2]);
-        while(getline(input2, line)) wordbuf += line + std::string("\n");
+        while(getline(input2, line) && !input2.eof() && !input2.bad()) wordbuf += line + std::string("\n");
         input2.close();
       }
       std::vector<corpushl<double, char> > details;
@@ -85,7 +94,7 @@ int main(int argc, const char* argv[]) {
         std::string   inbuf, line;
         std::ifstream input2;
         input2.open(argv[iidx]);
-        while(getline(input2, line)) inbuf += line + std::string("\n");
+        while(getline(input2, line) && !input2.eof() && !input2.bad()) inbuf += line + std::string("\n");
         input2.close();
         corpus<double, char> cstat;
         cstat.init(wordbuf.c_str(), 0, 120);

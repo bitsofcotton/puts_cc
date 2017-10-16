@@ -184,6 +184,9 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) 
 
 template <typename T, typename U> void corpus<T,U>::corpusEach() {
   corpust = Tensor(words.size() + 2, words.size() + 2);
+#if defined(_OPENMP)
+#pragma omp parallel for
+#endif
   for(int i = 0; i < words.size(); i ++) {
     cerr << "Corpushing row : " << i << endl;
     if(!ptrs[i].size())

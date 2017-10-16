@@ -80,6 +80,7 @@ for iprange in ipranges:
     ips  = str(ipaddress.IPv4Address(start))
     start += 1
     if(not ping80(ips)):
+      print "no response from:",  ips
       continue
     html = ""
     try:
