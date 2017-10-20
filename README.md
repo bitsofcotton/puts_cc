@@ -74,5 +74,5 @@ If there's large numbers of the sets that correctly defined texts, it may optimi
 # Another downloads
 * https://ja.osdn.net/projects/puts-cc/
 * https://www.sourceforge.net/projects/puts-cc/
-* https://konbu.sakura.ne.jp/files/puts_cc-0.08.tar.gz
-* http://files.limpid-intensity.info/puts_cc-0.08.tar.gz
+* https://konbu.sakura.ne.jp/files/puts_cc-0.08-stable5.tar.gz
+* http://files.limpid-intensity.info/puts_cc-0.08-stable5.tar.gz
