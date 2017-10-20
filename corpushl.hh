@@ -179,17 +179,17 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetail(const string& word, const corpushl<T, U>& other) {
-  corpushl<T, U> result;
   cerr << "withDetail : enter" << endl;
   if(words.size() <= 0 || other.words.size() <= 0)
-    return result;
+    return *this;
   auto itr(find(words.begin(), words.end(), word));
   int fidx(distance(words.begin(), itr));
   if(!(0 <= fidx && fidx < words.size()))
-    return result;
+    return *this;
   std::cout << *itr << ", " << word << ": " << itr->size() << " / " << word.size() << endl;
   if(*itr != word)
-    return result;
+    return *this;
+  corpushl<T, U> result;
   vector<int>    ridx0, ridx1, ridx2;
   vector<string> workwords(gatherWords(words, other.words, ridx0, ridx1));
   int  eidx(- 1);
@@ -399,7 +399,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(co
         } else
           orig[idx] = delta[idx] = 0;
       }
-  const T t(orig.dot(orig) / sqrt(delta.dot(delta)));
+  const T t(orig.dot(delta) / delta.dot(delta));
   cerr << "abbrev 2/2" << endl;
   if(isfinite(t))
     return *this - (work * t);
