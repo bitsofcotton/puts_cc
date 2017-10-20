@@ -80,16 +80,15 @@ template <typename T, typename U> corpushl<T,U>::corpushl(const corpus<T, U>& ob
 }
 
 template <typename T, typename U> corpushl<T,U>::corpushl(const corpushl<T, U>& obj) {
-  words   = vector<string>(obj.words);
-  corpust = Tensor(obj.corpust);
+  *this = obj;
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::cast(const vector<string>& words) const {
   cerr << "cast" << endl;
   corpushl<T, U> result;
-  vector<string> sword;
+  vector<string> sword(words);
+  vector<int>    idxs;
   sort(sword.begin(), sword.end());
-  vector<int>         idxs;
   for(int i = 0; i < sword.size(); i ++) {
     auto p(find(words.begin(), words.end(), sword[i]));
     if(*p == sword[i]) {
@@ -99,11 +98,14 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::cast(cons
   }
   result.corpust = Tensor(idxs.size(), idxs.size());
 #if defined(_OPENMP)
-#pragma omp parallel for
+#pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < idxs.size(); i ++)
-    for(int j = 0; j < idxs.size(); j ++)
-      result.corpust(i, j) = corpust(idxs[i], idxs[j]);
+    for(int j = 0; j < idxs.size(); j ++) {
+      result.corpust(i, j) = Vec(idxs.size());
+      for(int k = 0; k < idxs.size(); k ++)
+        result.corpust(i, j)[k] = corpust(idxs[i], idxs[j])[idxs[k]];
+    }
   return result;
 }
 
@@ -124,7 +126,7 @@ template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator
 template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator *= (const T& t) {
   cerr << "operator *=" << endl;
 #if defined(_OPENMP)
-#pragma omp parallel for
+#pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < corpust.rows(); i ++)
     for(int j = 0; j < corpust.cols(); j ++)
@@ -138,6 +140,9 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
   result.words   = gatherWords(words, other.words, ridx0, ridx1);
   result.corpust = Tensor(result.words.size(), result.words.size());
   cerr << "operator +" << endl;
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
   for(int i = 0; i < result.corpust.rows(); i ++) {
     for(int j = 0; j < result.corpust.cols(); j ++) {
       result.corpust(i, j) = Vec(result.words.size());
@@ -177,8 +182,8 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
   corpushl<T, U> result;
   cerr << "withDetail : enter" << endl;
   if(words.size() <= 0 || other.words.size() <= 0)
-    return *this;
-  vsitr itr(find(words.begin(), words.end(), word));
+    return result;
+  auto itr(find(words.begin(), words.end(), word));
   int fidx(distance(words.begin(), itr));
   if(!(0 <= fidx && fidx < words.size()))
     return result;
@@ -187,8 +192,8 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
     return result;
   vector<int>    ridx0, ridx1, ridx2;
   vector<string> workwords(gatherWords(words, other.words, ridx0, ridx1));
-  int  eidx  = - 1;
-  bool flag1 = false;
+  int  eidx(- 1);
+  bool flag1(false);
   for(int i = 0, ii = 0; i < workwords.size(); i ++) {
     if(workwords[i] == word) {
       ridx2.push_back(- 1);
@@ -203,8 +208,15 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
     return result;
   result.corpust = Tensor(workwords.size() - 1, workwords.size() - 1);
   Tensor work(prepareDetail(other, workwords, eidx, ridx0, ridx1, ridx2));
-  for(int i = 0; i < workwords.size(); i ++) if(ridx2[i] >= 0) {
-    result.words.push_back(workwords[i]);
+  for(int i = 0; i < workwords.size(); i ++)
+    if(ridx0[i] >= 0 && ridx2[i] >= 0)
+      result.words.push_back(words[ridx0[i]]);
+    else if(ridx1[i] >= 0 && ridx2[i] >= 0)
+      result.words.push_back(other.words[ridx1[i]]);
+#if defined(_OPENMP)
+#pragma omp paralell for schedule(static, 1)
+#endif
+  for(int i = 0; i < workwords.size(); i ++) if(ridx2[i] >= 0)
     for(int j = 0; j < workwords.size(); j ++) if(ridx2[j] >= 0) {
       result.corpust(ridx2[i], ridx2[j]) = Vec(workwords.size() - 1);
       for(int k = 0; k < result.corpust(ridx2[i], ridx2[j]).size(); k ++) if(ridx2[k] >= 0) {
@@ -214,7 +226,6 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
           result.corpust(ridx2[i], ridx2[j])[ridx2[k]] = T(0);
       }
     }
-  }
   cerr << "withDetail: adding detail table." << endl;
   result.corpust += work;
   return result;
@@ -227,30 +238,24 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2rel
   vector<string> words(gatherWords(result.words, other.words, ridx0, ridx1));
   Tensor mul(result.corpust);
 #if defined(_OPENMP)
-#pragma omp parallel
-#pragma omp for
+#pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < mul.rows(); i ++)
     for(int j = 0; j < mul.cols(); j ++)
-      mul(i, j) *= T(0);
+      for(int k = 0; k < mul(i, j).size(); k ++)
+        mul(i, j)[k] = T(0);
 #if defined(_OPENMP)
-#pragma omp for
+#pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < words.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0)
     for(int j = 0; j < words.size(); j ++) if(ridx0[j] >= 0 && ridx1[j] >= 0)
       for(int k = 0; k < words.size(); k ++) if(ridx0[k] >= 0) {
-        // XXX select me:
         mul(ridx0[i], ridx0[j])[ridx0[k]] = 1.;
         mul(ridx0[j], ridx0[k])[ridx0[i]] = 1.;
         mul(ridx0[k], ridx0[i])[ridx0[j]] = 1.;
-/*
-        mul(ridx0[i], ridx0[j])[ridx0[k]] += 1.;
-        mul(ridx0[j], ridx0[k])[ridx0[i]] += 1.;
-        mul(ridx0[k], ridx0[i])[ridx0[j]] += 1.;
-*/
       }
 #if defined(_OPENMP)
-#pragma omp for
+#pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < result.corpust.rows(); i ++)
     for(int j = 0; j < result.corpust.cols(); j ++)
@@ -277,7 +282,7 @@ template <typename T, typename U> const string corpushl<T, U>::toc(const vector<
   corpushl<T, U> work0(*this);
   for(int i = 0; i < meanings.size(); i ++) {
     corpushl<T, U> work(this->match2relPseudo(meanings[i]));
-    work0  -= work;
+    work0 -= work;
     for(int j = 0; j < base.size(); j ++)
       work = work.abbrev(words[j], base[j]);
     result += mwords[i] + string("(") + to_string(work.distanceInUnion(work) / distanceInUnion(*this))+ string(")") + string(" : ") + work.summary0(thresh) + string("\n");
@@ -341,10 +346,6 @@ template <typename T, typename U> const string corpushl<T, U>::summary(const vec
   return result;
 }
 
-template <typename T> int summarycmp(const pair<T, int>& x0, const pair<T, int>& x1) {
-  return x0.first < x1.first;
-}
-
 template <typename T, typename U> const string corpushl<T, U>::summary0(const T& thresh) const {
   if(corpust.rows() < 1 || corpust.cols() < 1)
     return string("null");
@@ -361,7 +362,7 @@ template <typename T, typename U> const string corpushl<T, U>::summary0(const T&
     for(int j = 0; j < corpust.cols(); j ++)
       for(int k = 0; k < corpust(i, j).size(); k ++)
         scores[k].first += corpust(i, j)[k];
-  sort(scores.begin(), scores.end(), summarycmp<T>);
+  sort(scores.begin(), scores.end());
   for(int i = 0; i < scores.size(); i ++) {
     const int idx = scores.size() - i - 1;
     result += words[scores[idx].second];
@@ -379,6 +380,9 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(co
   Vec orig(words.size() * words.size() * words.size());
   Vec delta(orig.size());
   cerr << "abbrev 1/2" << endl;
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
   for(int i = 0; i < words.size(); i ++) if(ridx0[i] >= 0 || ridx1[i] >= 0)
     for(int j = 0; j < words.size(); j ++) if(ridx0[j] >= 0 || ridx1[j] >= 0)
       for(int k = 0; k < words.size(); k ++) {
@@ -395,11 +399,12 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(co
         } else
           orig[idx] = delta[idx] = 0;
       }
-  const T t(orig.dot(delta) / sqrt(delta.dot(delta)));
+  const T t(orig.dot(orig) / sqrt(delta.dot(delta)));
   cerr << "abbrev 2/2" << endl;
   if(isfinite(t))
     return *this - (work * t);
   // can't abbrev.
+  cerr << "abbrev : XXX : nan" << endl;
   return *this;
 }
 
@@ -424,6 +429,9 @@ template <typename T, typename U> const vector<string> corpushl<T, U>::reverseLi
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::reDig(const corpushl<T, U>& src, const T& ratio) {
   vector<int>    ridx0, ridx1;
   vector<string> words(gatherWords(words, src.words, ridx0, ridx1));
+#if defined(_OPENMP)
+#pragma omp paralell for schedule(static, 1)
+#endif
   for(int i = 0; i < words.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0)
     for(int j = 0; j < words.size(); j ++) if(ridx0[j] >= 0 && ridx1[j] >= 0)
       for(int k = 0; k < words.size(); k ++) if(ridx0[k] >= 0 && ridx1[k] >= 0)
@@ -505,8 +513,7 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
   // initialize result tensor with 0.
   Tensor res(workwords.size() - 1, workwords.size() - 1);
 #if defined(_OPENMP)
-#pragma omp parallel
-#pragma omp for
+#pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < workwords.size(); i ++) if(ridx2[i] >= 0)
     for(int j = 0; j < workwords.size(); j ++) if(ridx2[j] >= 0) {
@@ -515,12 +522,17 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
         res(ridx2[i], ridx2[j])[ridx2[k]] = T(0);
     }
   // Sum-up detailed word into result pool without definition row, col.
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
   for(int i = 0; i < workwords.size(); i ++) if(ridx2[i] >= 0)
     for(int j = 0; j < workwords.size(); j ++) if(ridx2[j] >= 0) {
-      for(int k = 0; k < workwords.size(); k ++)
+      for(int k = 0; k < workwords.size(); k ++) {
+        const T ratio(corpust(ridx0[i], ridx0[j])[ridx0[k]]);
         if(ridx2[k] >= 0 && ridx1[k] >= 0 && ridx1[i] >= 0 && ridx1[j] >= 0)
-          // XXX check me: just add.
-          res(ridx2[i], ridx2[j])[ridx2[k]] += other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
+          res(ridx2[i], ridx2[j])[ridx2[k]] +=
+            ratio * other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
+      }
     }
 
   // Sum-up words defined in definition row, col without crossing point.
@@ -532,12 +544,15 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
         // if all side exists on both corpust, weight and add.
         if(ridx0[i] >= 0 && ridx0[j] >= 0 && ridx0[k] >= 0 &&
            ridx1[j] >= 0 && ridx1[k] >= 0) {
-          for(int kk = 0; kk < workwords.size(); kk ++) if(ridx1[kk] >= 0) {
-            // XXX fixme: ridx2 index order.
-            res(ridx2[kk], ridx2[j])[ridx2[k]] += corpust(ridx0[i], ridx0[j])[ridx0[k]] * (other.corpust(ridx1[k], ridx1[j])[ridx1[kk]] + other.corpust(ridx1[k], ridx1[kk])[ridx1[j]]) / T(2);
-            res(ridx2[j], ridx2[kk])[ridx2[k]] += corpust(ridx0[j], ridx0[i])[ridx0[k]] * (other.corpust(ridx1[j], ridx1[k])[ridx1[kk]] + other.corpust(ridx1[kk], ridx1[k])[ridx1[j]]) / T(2);
-          }
-        // XXX check me:
+          const T& r0(corpust(ridx0[i], ridx0[j])[ridx0[k]]);
+          const T& r1(corpust(ridx0[j], ridx0[i])[ridx0[k]]);
+          for(int kk = 0; kk < workwords.size(); kk ++)
+            if(ridx1[kk] >= 0 && ridx2[kk] >= 0) {
+              res(ridx2[kk], ridx2[j])[ridx2[k]] +=
+                r0 * other.corpust(ridx1[kk], ridx1[j])[ ridx1[k]];
+              res(ridx2[j], ridx2[kk])[ridx2[k]] +=
+                r1 * other.corpust(ridx1[j], ridx1[kk])[ ridx1[k]];
+            }
         // if only other have words defined, just add.
         } else if(ridx1[j] >= 0 && ridx1[k] >= 0) {
           res(ridx2[i], ridx2[j])[ridx2[k]] += other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
