@@ -39,17 +39,25 @@ int main(int argc, const char* argv[]) {
       lword<char32_t, std::u32string> stat;
       std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
       std::u32string itrans(converter.from_bytes(input));
-      std::vector<word_t<std::u32string> > words(stat.compute(itrans.c_str()));
-      for(std::vector<word_t<std::u32string> >::iterator itr = words.begin(); itr != words.end(); ++ itr) {
-        std::cout << converter.to_bytes(itr->str) << ", ";
-        std::cout << itr->count << std::endl;
+      for(int i = 2; i < 20; i ++) {
+        stat.init(60, i, i);
+        auto words(stat.compute(itrans.c_str()));
+        for(auto itr = words.begin(); itr != words.end(); ++ itr)
+          if(itr->str.size() > 2 && itr->count >= i) {
+            std::cout << converter.to_bytes(itr->str) << ", ";
+            std::cout << itr->count << std::endl;
+          }
       }
 #else
       lword<char, std::string> stat;
-      std::vector<word_t<std::string> > words(stat.compute(input.c_str()));
-      for(auto itr = words.begin(); itr != words.end(); ++ itr) {
-        std::cout << itr->str << ", ";
-        std::cout << itr->count << std::endl;
+      for(int i = 2; i < 20; i ++) {
+        stat.init(60, i, i);
+        auto words(stat.compute(input.c_str()));
+        for(auto itr = words.begin(); itr != words.end(); ++ itr)
+          if(itr->str.size() > 2 && itr->count >= i) {
+            std::cout << itr->str << ", ";
+            std::cout << itr->count << std::endl;
+          }
       }
 #endif
       break;
@@ -75,7 +83,7 @@ int main(int argc, const char* argv[]) {
     {
       std::string wordbuf;
       {
-        std::string   inbuf, line;
+        std::string   line;
         std::ifstream input2;
         input2.open(argv[2]);
         while(getline(input2, line) && !input2.eof() && !input2.bad()) wordbuf += line + std::string("\n");

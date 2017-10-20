@@ -9,10 +9,7 @@
 
 using std::vector;
 using std::map;
-using std::pair;
-using std::binary_search;
 using std::lower_bound;
-using std::remove_if;
 using std::sort;
 using std::cerr;
 using std::endl;
@@ -77,7 +74,7 @@ template <typename T, typename U> class lword {
 public:
   lword();
   ~lword();
-  void init(const int& loop, const int& mthresh, const int& Mthresh, const int& Mbalance);
+  void init(const int& loop, const int& mthresh, const int& Mthresh);
   
   const vector<word_t<U> >& compute(const T* input);
 private:
@@ -85,24 +82,20 @@ private:
   vector<vector<gram_t<U> > > dicts;
   vector<word_t<U> >          words;
   
-  int loop;
   int mthresh;
   int Mthresh;
-  int Mbalance;
   
   void makeBigram(const T* input);
   void constructNwords();
-  void bondLast();
-  void balanceBonded();
   void makeWords();
   
-  bool       isin(const U key, const vector<gram_t<U> >& dict);
-  gram_t<U>& find(const U key, vector<gram_t<U> >& dict);
-  void       assign(vector<gram_t<U> >& dict, const gram_t<U>& val);
+  bool       isin(const U key);
+  gram_t<U>& find(const U key);
+  void       assign(const gram_t<U>& val);
 };
 
 template <typename T, typename U> lword<T, U>::lword() {
-  init(60, 2, 2, 4);
+  init(60, 2, 2);
 }
 
 template <typename T, typename U> lword<T, U>::~lword() {
@@ -110,35 +103,78 @@ template <typename T, typename U> lword<T, U>::~lword() {
   ;
 }
 
-template <typename T, typename U> void lword<T, U>::init(const int& loop, const int& mthresh, const int& Mthresh, const int& Mbalance) {
-  this->loop     = loop;
+template <typename T, typename U> void lword<T, U>::init(const int& loop, const int& mthresh, const int& Mthresh) {
   this->mthresh  = mthresh;
   this->Mthresh  = Mthresh;
-  this->Mbalance = Mbalance;
+  dicts          = vector<vector<gram_t<U> > >();
+  for(int i = 0; i < loop; i ++)
+    dicts.push_back(vector<gram_t<U> >());
+  return;
 }
 
-template <typename T, typename U> bool lword<T, U>::isin(const U key, const vector<gram_t<U> >& dict) {
+template <typename T, typename U> bool lword<T, U>::isin(const U key) {
+  if(dicts.size() < key.size()) {
+    cerr << "dictionary small" << endl;
+    return false;
+  }
+  const vector<gram_t<U> >& dict(dicts[key.size()]);
   gram_t<U> key0;
   key0.str = key;
   auto p(lower_bound(dict.begin(), dict.end(), key0));
-  return !(p == dict.begin() || p == dict.end()) && p->str == key;
+  return !(p < dict.begin() || dict.end() <= p) && p->str == key;
 }
 
-template <typename T, typename U> gram_t<U>& lword<T, U>::find(const U key, vector<gram_t<U> >& dict) {
+template <typename T, typename U> gram_t<U>& lword<T, U>::find(const U key) {
+  if(dicts.size() < key.size()) {
+    cerr << "XXX: find slips." << endl;
+    static gram_t<U> dummy;
+    return dummy;
+  }
+  vector<gram_t<U> >& dict(dicts[key.size()]);
   gram_t<U> key0;
   key0.str = key;
   auto p(lower_bound(dict.begin(), dict.end(), key0));
-  if(p < dict.begin() || dict.end() <= p || p->str != key)
+  if(p < dict.begin() || dict.end() <= p || p->str != key) {
     cerr << "XXX: slipping find." << endl;
+    static gram_t<U> dummy;
+    return dummy;
+  }
   return *p;
 }
 
-template <typename T, typename U> void lword<T, U>::assign(vector<gram_t<U> >& dict, const gram_t<U>& val) {
+template <typename T, typename U> void lword<T, U>::assign(const gram_t<U>& val) {
+  if(dicts.size() < val.str.size()) {
+    cerr << "assign : dictionary small." << endl;
+    return;
+  }
+  vector<gram_t<U> >& dict(dicts[val.str.size()]);
   auto p(lower_bound(dict.begin(), dict.end(), val));
-  if(p < dict.begin() || dict.end() <= p || p->str != val.str)
-    dict.push_back(val);
-  else
-    *p = val;
+  if(val.ptr0.size()) {
+    // delete duplicates:
+    gram_t<U> work;
+    work.str = val.str;
+    for(int i = 0; i < val.ptr0.size(); i ++) {
+      bool flag(false);
+      for(int j = 0; j < work.ptr0.size(); j ++)
+        if(work.ptr0[j] == val.ptr0[i] &&
+           work.ptr1[j] == val.ptr1[i]) {
+          flag = true;
+          break;
+        }
+      if(flag)
+        continue;
+      work.ptr0.push_back(val.ptr0[i]);
+      work.ptr1.push_back(val.ptr1[i]);
+    }
+    sort(work.ptr0.begin(), work.ptr0.end());
+    sort(work.ptr1.begin(), work.ptr1.end());
+    if(p < dict.begin() || dict.end() <= p || p->str != work.str) {
+      dict.push_back(work);
+      sort(dict.begin(), dict.end());
+    } else
+      *p = work;
+  } else if(dict.begin() <= p && p < dict.end() && p->str == val.str)
+    dict.erase(p);
   return;
 }
 
@@ -147,11 +183,6 @@ template <typename T, typename U> const vector<word_t<U> >& lword<T, U>::compute
   makeBigram(input);
   cerr << "constructing longest words..." << endl;
   constructNwords();
-  cerr << "gathering unknown words..." << endl;
-  bondLast();
-  cerr << "balancing bonded word tables..." << endl;
-  // XXX fixme memory.
-  balanceBonded();
   cerr << "making word tables..." << endl;
   makeWords();
   return words;
@@ -170,7 +201,6 @@ template <typename T, typename U> void lword<T, U>::makeBigram(const T* input) {
   for(auto itr = map0.begin(); itr != map0.end(); ++ itr)
     dict0.push_back(itr->first);
   sort(dict0.begin(), dict0.end());
-  vector<gram_t<U> > buf;
   for(auto itr = map.begin(); itr != map.end(); ++ itr) {
     gram_t<U> work;
     work.str = itr->first;
@@ -178,37 +208,34 @@ template <typename T, typename U> void lword<T, U>::makeBigram(const T* input) {
       work.ptr0.push_back(*itr2 - 1);
       work.ptr1.push_back(*itr2);
     }
-    buf.push_back(work);
+    assign(work);
   }
-  dicts.push_back(buf);
-  sort(dicts[0].begin(), dicts[0].end());
   return;
 }
 
 template <typename T, typename U> void lword<T, U>::constructNwords() {
   int i;
-  for(i = 1; i < loop; i ++) {
+  for(i = 0; i < dicts.size(); i ++) {
     cerr << "constructing " << i + 2 << " table";
     map<U, vector<int> > map0;
     map<U, vector<int> > map1;
     map<U, vector<int> > dmap;
-    for(auto itr = dicts[i - 1].begin(); itr != dicts[i - 1].end(); ++ itr) {
+    for(auto itr = dicts[i].begin(); itr != dicts[i].end(); ++ itr) {
       cerr << ".";
       fflush(stderr);
-      const U& key(itr->str);
-      if(!isin(key, dicts[i - 1]))
-        continue;
-      const gram_t<U>& idxkey(find(key, dicts[i - 1]));
+      const gram_t<U>& idxkey(*itr);
       for(auto itr2 = dict0.begin(); itr2 != dict0.end(); ++ itr2) {
         U key2;
-        for(int j = 1; j < key.size(); j ++)
-          key2 += key[j];
+        for(int j = 1; j < idxkey.str.size(); j ++)
+          key2 += idxkey.str[j];
         key2 += T(*itr2);
-        if(!isin(key2, dicts[i - 1]))
+        if(!isin(key2))
           continue;
-        const gram_t<U>& idxkey2(find(key2, dicts[i - 1]));
-        U workkey(key);
+        const gram_t<U>& idxkey2(find(key2));
+        U workkey(idxkey.str);
         workkey += T(*itr2);
+        if(isin(workkey))
+          continue;
         vector<int> idxwork[4];
         for(int j = 0; j < 4; j ++)
           idxwork[j] = vector<int>();
@@ -229,14 +256,14 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
         }
         if(idxwork[0].size() < Mthresh)
           continue;
-        const int diff(min(idxkey.ptr0.size(), idxkey2.ptr0.size()) - idxwork[0].size());
+        const int diff(min( idxkey.ptr0.size(), idxkey2.ptr0.size()) - idxwork[0].size());
         const int diffM(max(idxkey.ptr0.size(), idxkey2.ptr0.size()) - idxwork[0].size());
-        if(0 < diff && diffM < mthresh)
+        if(0 < diff && mthresh < diffM)
           continue;
         for(int i = 0; i < idxwork[0].size(); i ++) {
           map0[U(workkey)].push_back(idxwork[0][i]);
           map1[U(workkey)].push_back(idxwork[1][i]);
-          dmap[U(key)].push_back(idxwork[2][i]);
+          dmap[U(idxkey.str)].push_back(idxwork[2][i]);
           dmap[U(key2)].push_back(idxwork[3][i]);
         }
       }
@@ -244,11 +271,11 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
     // delete this stage garbage.
     for(auto itr = dmap.begin(); itr != dmap.end(); ++ itr) {
       sort(itr->second.begin(), itr->second.end());
-      const gram_t<U>& before(find(itr->first, dicts[i - 1]));
+      const gram_t<U>& before(find(itr->first));
             gram_t<U>  after(before);
       after.ptr0 = vector<int>();
       after.ptr1 = vector<int>();
-      for(int j = 0; j < before.ptr0.size(); j ++) {
+      for(int j = 0; j < before.ptr1.size(); j ++) {
         bool flag = false;
         for(auto itr2 = itr->second.begin(); itr2 != itr->second.end(); ++ itr2)
           if(*itr2 == j) {
@@ -260,275 +287,17 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
         after.ptr0.push_back(before.ptr0[j]);
         after.ptr1.push_back(before.ptr1[j]);
       }
-      assign(dicts[i - 1], after);
+      assign(after);
     }
     // construct next stage.
-    vector<gram_t<U> > workv;
     for(auto itr = map0.begin(); itr != map0.end(); ++ itr) {
       gram_t<U> work;
-      work.str = itr->first;
-      const vector<int>& ptr0orig(itr->second);
-      const vector<int>& ptr1orig(map1[itr->first]);
-      for(int j = 0; j < ptr0orig.size(); j ++) {
-        work.ptr0.push_back(ptr0orig[j]);
-        work.ptr1.push_back(ptr1orig[j]);
-      }
-      workv.push_back(work);
+      work.str  = itr->first;
+      work.ptr0 = itr->second;
+      work.ptr1 = map1[itr->first];
+      assign(work);
     }
-    if(workv.size() < 1)
-      break;
-    sort(workv.begin(), workv.end());
-    dicts.push_back(workv);
-    auto rend(remove_if(dicts[i - 1].begin(), dicts[i - 1].end(),
-                        [](const gram_t<U>& i)->bool { return !i.ptr0.size() && !i.ptr1.size(); }));
-    dicts[i - 1].erase(rend, dicts[i - 1].end());
     cerr << endl;
-  }
-  return;
-}
-
-template <typename T, typename U> void lword<T, U>::bondLast() {
-  bool loopf = true;
-  int  count = 0;
-  while(loopf) {
-    loopf = false;
-    count ++;
-    for(int i = 0; i < dicts.size(); i ++) {
-      cerr << "bondLast: " << i << "/" << dicts.size() << " @ " << count << endl;
-      for(auto itr = dicts[i].begin(); itr != dicts[i].end(); ++ itr)
-        for(int j = 0; j < dicts.size(); j ++) {
-          if(i + j + 1 >= loop)
-            continue;
-          for(auto itr2 = dicts[j].begin();  itr2 != dicts[j].end(); ++ itr2) {
-            vector<int> ptr0;
-            vector<int> ptr1;
-            if(itr->str[i] == itr2->str[0]) {
-              for(int ii = 0; ii < itr->ptr0.size(); ii ++)
-                for(int jj = 0; jj < itr2->ptr0.size(); jj ++)
-                  if(itr->ptr1[ii] == itr2->ptr0[jj]) {
-                    ptr0.push_back(itr->ptr0[ii]);
-                    ptr1.push_back(itr2->ptr1[jj]);
-                  }
-              const int diff(min(itr->ptr0.size(), itr2->ptr0.size()) - ptr0.size());
-              const int diffM(max(itr->ptr0.size(), itr2->ptr0.size()) - ptr0.size());
-              if(0 < diff && diffM < mthresh)
-                continue;
-              if(ptr0.size() < Mthresh)
-                continue;
-              // insert longer word.
-              U key2;
-              for(int ii = 0; ii <  i; ii ++)
-                key2 += itr->str[ii];
-              for(int jj = 0; jj <= j; jj ++)
-                key2 += itr2->str[jj];
-              if(!isin(key2, dicts[i + j + 1])) {
-                gram_t<U> work;
-                work.str  = key2;
-                work.ptr0 = ptr0;
-                work.ptr1 = ptr1;
-                assign(dicts[i + j + 1], work);
-              } else {
-                gram_t<U> work(find(key2, dicts[i + j + 1]));
-                int k = 0;
-                for(int jj = 0; jj < work.ptr0.size(); jj ++)
-                  for(; k < ptr0.size() && (jj == work.ptr0.size() - 1 || ptr0[k] <= work.ptr0[jj]); k ++)
-                    if(work.ptr0[jj] <= ptr0[k] && (jj == work.ptr0.size() - 1 || ptr0[k] <= work.ptr0[jj + 1])) {
-                      work.ptr0.insert(work.ptr0.begin() + jj, ptr0[k]);
-                      work.ptr1.insert(work.ptr1.begin() + jj, ptr1[k]);
-                    }
-                assign(dicts[i + j + 1], work);
-              }
-              // delete.
-              vector<int> i0ptr0;
-              vector<int> i0ptr1;
-              vector<int> i1ptr0;
-              vector<int> i1ptr1;
-              for(int ii = 0; ii < itr->ptr0.size(); ii ++) {
-                bool flag = false;
-                for(auto itr3 = ptr0.begin(); itr3 != ptr0.end(); ++ itr3)
-                  if(itr->ptr0[ii] == *itr3) {
-                    flag = true;
-                    break;
-                  }
-                if(!flag) {
-                  i0ptr0.push_back(itr->ptr0[ii]);
-                  i0ptr1.push_back(itr->ptr1[ii]);
-                }
-              }
-              itr->ptr0 = i0ptr0;
-              itr->ptr1 = i0ptr1;
-              for(int ii = 0; ii < itr2->ptr0.size(); ii ++) {
-                bool flag = false;
-                for(auto itr3 = ptr1.begin(); itr3 != ptr1.end(); ++ itr3)
-                  if(itr2->ptr1[ii] == *itr3) {
-                    flag = true;
-                    break;
-                  }
-                if(!flag) {
-                  i1ptr0.push_back(itr2->ptr0[ii]);
-                  i1ptr1.push_back(itr2->ptr1[ii]);
-                }
-              }
-              itr2->ptr0 = i1ptr0;
-              itr2->ptr1 = i1ptr1;
-              loopf = true;
-            }
-          }
-        }
-      auto rend(remove_if(dicts[i].begin(), dicts[i].end(),
-                          [](const gram_t<U>& i)->bool { return !i.ptr0.size() && !i.ptr1.size(); }));
-      dicts[i].erase(rend, dicts[i].end());
-    }
-  }
-  return;
-}
-
-template <typename T, typename U> void lword<T, U>::balanceBonded() {
-  int  count = 0;
-  bool loopf = true;
-  while(loopf) {
-    loopf = false;
-    if(count ++ >= Mbalance)
-      break;
-    for(int i = 0; i < dicts.size(); i ++) {
-      cerr << "balance: " << i << "/" << dicts.size() << " @ " << count << endl;
-      map<T, int> wstat;
-      map<T, int> wstat2;
-      for(auto itr = dicts[i].begin(); itr != dicts[i].end(); ++ itr) {
-        cerr << ".";
-        fflush(stderr);
-        for(int j = 0; j < dicts.size(); j ++)
-          for(auto itr2 = dicts[j].begin(); itr2 != dicts[j].end(); ++ itr2) {
-            if(itr->str[i + 1] == itr2->str[0]) {
-              wstat[itr2->str[1]] = 0;
-              for(auto litr = itr->ptr1.begin(); litr != itr->ptr1.end(); ++ litr)
-                for(auto litr2 = itr2->ptr0.begin(); litr2 != itr2->ptr0.end(); ++ litr2)
-                  if(*litr == *litr2)
-                    wstat[itr2->str[1]] ++;
-            }
-            if(itr->str[0] == itr2->str[j + 1]) {
-              wstat2[itr->str[1]] = 0;
-              for(auto litr = itr->ptr0.begin(); litr != itr->ptr0.end(); ++ litr)
-                for(auto litr2 = itr2->ptr1.begin(); litr2 != itr2->ptr1.end(); ++ litr2)
-                  if(*litr == *litr2)
-                    wstat2[itr2->str[j]] ++;
-            }
-          }
-        int stat(0), stat2(0);
-        T   str(0),  str2(0);
-        for(auto itr2 = wstat.begin(); itr2 != wstat.end(); ++ itr2)
-          if(stat < itr2->second) {
-            str  = itr2->first;
-            stat = itr2->second;
-          }
-        for(auto itr2 = wstat2.begin(); itr2 != wstat2.end(); ++ itr2)
-          if(stat < itr2->second) {
-            str2  = itr2->first;
-            stat2 = itr2->second;
-          }
-        for(int j = 0; j < dicts.size(); j ++)
-          for(auto itr2 = dicts[j].begin(); itr2 != dicts[j].end(); ++ itr2) {
-            if(j >= 1 && itr->ptr0.size() <= stat && itr->str[i + 1] == itr2->str[0] && itr2->str[1] == str) {
-              U key;
-              for(int k = 0; k < j + 1; k ++)
-                key += itr2->str[k + 1];
-              gram_t<U> work;
-              if(isin(key, dicts[j - 1]))
-                work = gram_t<U>(find(key, dicts[j - 1]));
-              else
-                work.str = key;
-              if(itr->ptr1.size() > 0) {
-                vector<int> rptr;
-                for(auto litr = itr->ptr1.begin(); litr != itr->ptr1.end(); ++ litr)
-                  for(int iitr2 = 0; iitr2 < itr2->ptr0.size(); iitr2 ++)
-                    if(*litr == itr2->ptr0[iitr2]) {
-                      rptr.push_back(*litr);
-                      work.ptr0.push_back(itr2->ptr0[iitr2] + 1);
-                      work.ptr1.push_back(itr2->ptr1[iitr2]);
-                      itr2->ptr0.erase(itr2->ptr0.begin() + iitr2);
-                      itr2->ptr1.erase(itr2->ptr1.begin() + iitr2);
-                      loopf = true;
-                      break;
-                    }
-                for(int k = 0, l = 0; k < rptr.size(); k ++)
-                  if(itr->ptr1[l ++] == rptr[k])
-                    itr->ptr1[l - 1] ++;
-              }
-              assign(dicts[j - 1], work);
-            }
-            if(j >= 1 && itr->ptr0.size() <= stat2 && itr->str[0] == itr2->str[j + 1] && itr2->str[j] == str2) {
-              const U& key(itr->str);
-              gram_t<U> work;
-              if(isin(key, dicts[j - 1]))
-                work = gram_t<U>(find(key, dicts[j - 1]));
-              else
-                work.str = key;
-              if(itr2->ptr1.size() > 0) {
-                vector<int> rptr;
-                for(auto litr = itr2->ptr1.begin(); litr != itr2->ptr1.end(); ++ litr)
-                  for(int iitr2 = 0; iitr2 < itr->ptr0.size(); iitr2 ++)
-                    if(*litr == itr->ptr0[iitr2]) {
-                      rptr.push_back(*litr);
-                      work.ptr0.push_back(itr->ptr0[iitr2] + 1);
-                      work.ptr1.push_back(itr->ptr1[iitr2]);
-                      itr->ptr0.erase(itr->ptr0.begin() + iitr2);
-                      itr->ptr1.erase(itr->ptr1.begin() + iitr2);
-                      loopf = true;
-                      break;
-                    }
-                for(int k = 0, l = 0; k < rptr.size(); k ++)
-                  if(itr2->ptr1[l ++] == rptr[k])
-                    itr->ptr0[l - 1] --;
-              }
-              assign(dicts[j - 1], work);
-            }
-          }
-        if(itr->ptr0.size() <= stat && itr->ptr0.size() <= stat2 && i + 2 < dicts.size()) {
-          U bstr;
-          bstr += T(str2);
-          bstr += itr->str;
-          bstr += T(str);
-          if(isin(bstr, dicts[i + 2])) {
-            gram_t<U>& work(find(bstr, dicts[i + 2]));
-            for(int i = 0; i < itr->ptr0.size(); i ++) {
-              work.ptr0.push_back(itr->ptr0[i]);
-              work.ptr1.push_back(itr->ptr1[i]);
-            }
-          } else {
-            gram_t<U> work(*itr);
-            work.str = bstr;
-            assign(dicts[i + 2], work);
-          }
-          itr->ptr0 = itr->ptr1 = vector<int>();
-          break;
-        } else if((itr->ptr0.size() <= stat || itr->ptr0.size() <= stat2) && i + 1 < dicts.size()) {
-          U bstr;
-          if(itr->ptr0.size() <= stat) {
-            bstr  = itr->str;
-            bstr += T(str);
-          } else {
-            bstr += T(str2);
-            bstr += itr->str;
-          }
-          if(isin(bstr, dicts[i + 1])) {
-            gram_t<U>& work(find(bstr, dicts[i + 1]));
-            for(int i = 0; i < itr->ptr0.size(); i ++) {
-              work.ptr0.push_back(itr->ptr0[i]);
-              work.ptr1.push_back(itr->ptr1[i]);
-            }
-          } else {
-            gram_t<U> work(*itr);
-            work.str = bstr;
-            assign(dicts[i + 1], work);
-          }
-          itr->ptr0 = itr->ptr1 = vector<int>();
-          break;
-        }
-      }
-      auto rend(remove_if(dicts[i].begin(), dicts[i].end(),
-                          [](const gram_t<U>& i)->bool { return !i.ptr0.size() && !i.ptr1.size(); } ));
-      dicts[i].erase(rend, dicts[i].end());
-    }
   }
   return;
 }
@@ -537,10 +306,18 @@ template <typename T, typename U> void lword<T, U>::makeWords() {
   for(auto itr = dicts.begin(); itr != dicts.end(); ++ itr) {
     for(auto itr2 = itr->begin(); itr2 != itr->end(); ++ itr2) {
       word_t<U> work;
-      work.str   = itr2->str;
       work.count = itr2->ptr0.size();
       if(!work.count)
         continue;
+      work.str   = itr2->str;
+      // XXX fixme not here.
+      bool flag(false);
+      for(int i = 0; i < words.size(); i ++)
+        if(work.str == words[i].str) {
+          flag = true;
+          break;
+        }
+      if(flag) continue;
       words.push_back(work);
     }
   }

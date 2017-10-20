@@ -110,7 +110,6 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
 }
 
 template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) {
-  // XXX fixme:
   sort(words0.begin(), words0.end());
   string work;
   vector<int> matchwidx;
@@ -164,11 +163,12 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) 
     i   -= work.size() - 1;
     work = string();
   }
+  words = vector<string>();
   words.push_back(string("^"));
   vector<int> head, tail;
   head.push_back(0);
   ptrs.push_back(head);
-  for(vsitr itr = words0.begin(); itr != words0.end(); ++ itr) {
+  for(auto itr = words0.begin(); itr != words0.end(); ++ itr) {
     const int idx = distance(words0.begin(), itr);
     if(ptrs0[idx].size()) {
       words.push_back(*itr);

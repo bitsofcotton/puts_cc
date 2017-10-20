@@ -174,22 +174,20 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetail(const string& word, const corpushl<T, U>& other) {
+  corpushl<T, U> result;
   cerr << "withDetail : enter" << endl;
   if(words.size() <= 0 || other.words.size() <= 0)
     return *this;
   vsitr itr(find(words.begin(), words.end(), word));
   int fidx(distance(words.begin(), itr));
   if(!(0 <= fidx && fidx < words.size()))
-    return *this;
+    return result;
   std::cout << *itr << ", " << word << ": " << itr->size() << " / " << word.size() << endl;
   if(*itr != word)
-    return *this;
-  corpushl<T, U> result;
-  vector<int>    ridx0, ridx1;
+    return result;
+  vector<int>    ridx0, ridx1, ridx2;
   vector<string> workwords(gatherWords(words, other.words, ridx0, ridx1));
-  result.corpust = Tensor(workwords.size() - 1, workwords.size() - 1);
-  vector<int>    ridx2;
-  int  eidx = - 1;
+  int  eidx  = - 1;
   bool flag1 = false;
   for(int i = 0, ii = 0; i < workwords.size(); i ++) {
     if(workwords[i] == word) {
@@ -202,7 +200,8 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
     ridx2.push_back(ii ++);
   }
   if(!flag1 || eidx < 0 || ridx1[eidx] < 0)
-    return *this;
+    return result;
+  result.corpust = Tensor(workwords.size() - 1, workwords.size() - 1);
   Tensor work(prepareDetail(other, workwords, eidx, ridx0, ridx1, ridx2));
   for(int i = 0; i < workwords.size(); i ++) if(ridx2[i] >= 0) {
     result.words.push_back(workwords[i]);
