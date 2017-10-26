@@ -1,0 +1,58 @@
+<?php
+$dir = './datas';
+foreach(new DirectoryIterator($dir) as $fileInfo) {
+  if(!is_dir($dir . $fileInfo->getFilename()))
+    continue;
+  $pathb = $dir . $fileInfo->getFilename() . "/";
+  foreach(new DirectoryIterator($pathb) as $fileInfoSub) {
+    $pathb2 = $pathb . $fileInfoSub->getFilename() . "/";
+    if(file_exists($pathb2 . "orig.txt") && !file_exists($pathb2 . ".lock")) {
+      system('touch ' . $pathb2 . '/.lock');
+      $name = $pathb2 . "orig.txt";
+      echo $name . "\n";
+      $text = "";
+      $file = fopen($name, "r");
+      while(($buf = fgets($file)) !== false)
+        $text .= $buf;
+      fclose($file);
+      $descriptorspec = array(
+        0 => array("pipe", "r"),  // stdin.
+        1 => array("file", $pathb2 . "lword.txt", "w"),  // stdout.
+        2 => array("file", $pathb2 . "lword-error.txt", "w") // stderr.
+      );
+      $process = proc_open('./puts lword', $descriptorspec, $pipes, $cwd, $env);
+      if (is_resource($process)) {
+        fwrite($pipes[0], $text . "\n");
+        fclose($pipes[0]);
+        $return_value = proc_close($process);
+      }
+      
+      $buf = "";
+      foreach (new DirectoryIterator($pathb . 'dicts') as $fileInfo) {
+        if($fileInfo->isDot()) continue;
+        $name = $fileInfo->getFilename();
+        $buf .= "\"dicts/" . $name . "\" ";
+      }
+      $buf .= " -toc ";
+      foreach (new DirectoryIterator($pathb . 'topics') as $fileInfo) {
+        if($fileInfo->isDot()) continue;
+        $name = $fileInfo->getFilename();
+        $buf .= "\"topics/" . $name . "\" ";
+      }
+      
+      $descriptorspec = array(
+        0 => array("pipe", "r"),  // stdin.
+        1 => array("file", $pathb2 . "detail.txt", "w"),  // stdout.
+        2 => array("file", $pathb2 . "detail-error.txt", "w") // stderr.
+      );
+      $process = proc_open('cd ' . $pathb . ' && ../../puts toc ' . 'words.txt ' . $buf, $descriptorspec, $pipes, $cwd, $env);
+      
+      if (is_resource($process)) {
+        fwrite($pipes[0], $text . "\n");
+        fclose($pipes[0]);
+        $return_value = proc_close($process);
+      }
+    }
+  }
+}
+?>
