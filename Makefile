@@ -2,8 +2,8 @@ CXX=	clang++
 
 # compiler flags.
 CXXFLAGS+=	-I/usr/local/include/eigen3
-#CXXFLAGS+=	-Ofast
-CXXFLAGS+=	-O2 -g2
+CXXFLAGS+=	-Ofast
+#CXXFLAGS+=	-O2 -g2
 CXXFLAGS+=	-std=c++11
 LDFLAGS+=	-lstdc++
 
