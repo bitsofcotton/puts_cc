@@ -13,7 +13,7 @@ using std::lower_bound;
 using std::sort;
 using std::cerr;
 using std::endl;
-using std::fflush;
+using std::flush;
 using std::max;
 using std::min;
 
@@ -221,8 +221,7 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
     map<U, vector<int> > map1;
     map<U, vector<int> > dmap;
     for(auto itr = dicts[i].begin(); itr != dicts[i].end(); ++ itr) {
-      cerr << ".";
-      fflush(stderr);
+      cerr << "." << flush;
       const gram_t<U>& idxkey(*itr);
       for(auto itr2 = dict0.begin(); itr2 != dict0.end(); ++ itr2) {
         U key2;
