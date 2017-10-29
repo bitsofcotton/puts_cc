@@ -5,7 +5,6 @@
 #include <codecvt>
 #include "lword.hh"
 #include "corpus.hh"
-#include "corpushl.hh"
 #include "file2eigen.hh"
 
 void usage() {
@@ -35,7 +34,7 @@ int main(int argc, const char* argv[]) {
   switch(mode) {
   case 0:
     {
-#if 0
+#if 1
       lword<char32_t, std::u32string> stat;
       std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
       std::u32string itrans(converter.from_bytes(input));
