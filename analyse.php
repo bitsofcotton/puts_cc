@@ -1,9 +1,10 @@
 <?php
-$dir = './datas';
-foreach(new DirectoryIterator($dir) as $fileInfo) {
-  if(!is_dir($dir . $fileInfo->getFilename()))
+foreach(new DirectoryIterator('./datas/') as $fileInfo) {
+  if(!is_dir('./datas/' . $fileInfo->getFilename()))
     continue;
-  $pathb = $dir . $fileInfo->getFilename() . "/";
+  $pathb = "./datas/" . $fileInfo->getFilename() . "/output/";
+  if(!file_exists($pathb))
+    continue;
   foreach(new DirectoryIterator($pathb) as $fileInfoSub) {
     $pathb2 = $pathb . $fileInfoSub->getFilename() . "/";
     if(file_exists($pathb2 . "orig.txt") && !file_exists($pathb2 . ".lock")) {
@@ -28,13 +29,13 @@ foreach(new DirectoryIterator($dir) as $fileInfo) {
       }
       
       $buf = "";
-      foreach (new DirectoryIterator($pathb . 'dicts') as $fileInfo) {
+      foreach (new DirectoryIterator($pathb . '../dicts') as $fileInfo) {
         if($fileInfo->isDot()) continue;
         $name = $fileInfo->getFilename();
         $buf .= "\"dicts/" . $name . "\" ";
       }
       $buf .= " -toc ";
-      foreach (new DirectoryIterator($pathb . 'topics') as $fileInfo) {
+      foreach (new DirectoryIterator($pathb . '../topics') as $fileInfo) {
         if($fileInfo->isDot()) continue;
         $name = $fileInfo->getFilename();
         $buf .= "\"topics/" . $name . "\" ";
@@ -45,7 +46,7 @@ foreach(new DirectoryIterator($dir) as $fileInfo) {
         1 => array("file", $pathb2 . "detail.txt", "w"),  // stdout.
         2 => array("file", $pathb2 . "detail-error.txt", "w") // stderr.
       );
-      $process = proc_open('cd ' . $pathb . ' && ../../puts toc ' . 'words.txt ' . $buf, $descriptorspec, $pipes, $cwd, $env);
+      $process = proc_open('cd ' . $pathb . '../ && ../../puts toc ' . 'words.txt ' . $buf, $descriptorspec, $pipes, $cwd, $env);
       
       if (is_resource($process)) {
         fwrite($pipes[0], $text . "\n");

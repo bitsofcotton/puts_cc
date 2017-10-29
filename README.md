@@ -21,13 +21,12 @@ Writing optimize toc, checking and testing implementation.
 And preparing for collision detecting (searching 'NOT' definition and small sized dictionaries.). 
 
 # Demos
-http://services.limpid-intensity.info/puts.php have a working sample.
+https://services.limpid-intensity.info/puts.php have a working sample.
 Please pseudo-login with e-mail address - salt pair.
 
 # Example of using as a library
     #include "lword.hh"
     #include "corpus.hh"
-    #include "corpushl.hh"
     #include <string>
     #include <iostream>
     #include <fstream>
@@ -75,4 +74,4 @@ If there's large numbers of the sets that correctly defined texts, it may optimi
 * https://ja.osdn.net/projects/puts-cc/
 * https://www.sourceforge.net/projects/puts-cc/
 * https://konbu.sakura.ne.jp/files/puts_cc-0.08-stable5.tar.gz
-* http://files.limpid-intensity.info/puts_cc-0.08-stable5.tar.gz
+* https://files.limpid-intensity.info/puts_cc-0.08-stable5.tar.gz

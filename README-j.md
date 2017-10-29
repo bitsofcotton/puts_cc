@@ -20,13 +20,12 @@
 また、衝突検出を準備しています。
 
 # デモ
-http://services.limpid-intensity.info/puts.php にサンプルがあります。
+https://services.limpid-intensity.info/puts.php にサンプルがあります。
 擬似的なログインですので、登録は必要ありません。
 
 # ライブラリとしての使い方
     #include "lword.hh"
     #include "corpus.hh"
-    #include "corpushl.hh"
     #include <string>
     #include <iostream>
     #include <fstream>
@@ -74,4 +73,4 @@ abbrev 関数は、理想的には withDetail 関数の逆の最適化となっ�
 * https://ja.osdn.net/projects/puts-cc/
 * https://www.sourceforge.net/projects/puts-cc/
 * https://konbu.sakura.ne.jp/files/puts_cc-0.08-stable5.tar.gz
-* http://files.limpid-intensity.info/puts_cc-0.08-stable5.tar.gz
+* https://files.limpid-intensity.info/puts_cc-0.08-stable5.tar.gz
