@@ -36,11 +36,11 @@ template <typename T> bool lessStrClip(const T& a, const T& b) {
   return cmp < 0 || (!cmp && a.size() < b.size());
 }
 
-template <typename T> bool lessNotEqualStrClip(const T& a, const T& b) {
+template <typename T> bool lessEqualStrClip(const T& a, const T& b) {
   return lessStrClip<T>(a, b) || equalStrClip<T>(a, b);
 }
 
-template <typename T> bool lessEqualStrClip(const T& a, const T& b) {
+template <typename T> bool lessNotEqualStrClip(const T& a, const T& b) {
   return lessStrClip<T>(a, b) && !equalStrClip<T>(a, b);
 }
 
@@ -136,8 +136,8 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) 
   int i(0);
   for( ; input[i]; i ++) {
     work += input[i];
-    auto lo(words0.begin() + distance(words0.begin(), upper_bound(words0.begin(), words0.end(), work, lessNotEqualStrClip<string>)));
-    auto up(words0.begin() + distance(words0.begin(), upper_bound(words0.begin(), words0.end(), work, lessEqualStrClip<string>)));
+    auto lo(words0.begin() + distance(words0.begin(), upper_bound(words0.begin(), words0.end(), work, lessEqualStrClip<string>)));
+    auto up(words0.begin() + distance(words0.begin(), upper_bound(words0.begin(), words0.end(), work, lessNotEqualStrClip<string>)));
     bool match(false);
     for(auto itr(lo); itr < up; ++ itr) {
       if(equalStrClip<string>(work, *itr)) {
@@ -149,7 +149,7 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) 
           match = true;
       }
     }
-    if(match)
+    if(match && input[i + 1])
       continue;
     if(matchwidx.size() > 0) {
       int j = matchwidx.size() - 1;
