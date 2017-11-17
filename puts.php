@@ -15,7 +15,8 @@
     exec("mkdir " . $pathb . "topics");
     exec("mkdir " . $pathb . "dicts");
     exec("mkdir " . $pathb . "output");
-    exec("cp ./words.txt " . $pathb);
+    if(!file_exists($pathb . "words.txt"))
+      exec("cp ./words.txt " . $pathb);
     file_put_contents($pathb . "email.txt", $_REQUEST["email"]);
   } else
     $pathb = "./datas/" . hash("sha256", $_SESSION["email"] . $_SESSION["salt"]) . "/";
@@ -114,6 +115,11 @@ function deleteDict(name) {
   dom.parentElement.removeChild(dom);
   return;
 }
+
+function deleteCache() {
+  asyncPost("./apply.php", "cmd=da");
+  return;
+}
 </script>
 </head>
 <body>
@@ -133,8 +139,9 @@ function deleteDict(name) {
 <?php
   } else {
 ?>
-<p><form action="./puts.php" method="GET"><input type="submit" value="logout" /><input type="hidden" name="logout" /></form></p>
-<p>Your root path: <a href="<?php echo $pathb; ?>">here</a></p>
+<p><form action="./puts.php" method="GET"><input type="submit" value="logout" /><input type="hidden" name="logout" /></form>
+<a href="javascript:;" onClick="deleteCache();">Delete cache</a>
+Your root path: <a href="<?php echo $pathb; ?>">here</a></p>
 <p>
 Analyse text:<br/>
 <textarea maxlength="80000" rows="12" cols="80" name="object" id="object"></textarea><br/>
