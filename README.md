@@ -11,6 +11,8 @@ So with layered dictionaries, we can calculate a little accuratery.
     ./tools lword < data.txt
     ./tools corpus wordlist.txt < data.txt
     ./tools toc wordlist.txt dictionaries ... -toc topics ... < data.txt
+    ./tools redig wordlist.txt < data.txt
+    ./tools reconstruct wordlist.txt < data.txt
 
 # Contexts
 Inspired from morphological analysis softwares and parameter auto configuring algorithms' structure.   
