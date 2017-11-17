@@ -8,7 +8,7 @@
 #include "file2eigen.hh"
 
 void usage() {
-  std::cout << "tools (lword|toc)" << std::endl;
+  std::cout << "tools (lword|corpus|toc|redig|reconstruct)" << std::endl;
 }
 
 int main(int argc, const char* argv[]) {
@@ -24,6 +24,10 @@ int main(int argc, const char* argv[]) {
     mode = 1;
   else if(std::strcmp(argv[1], "toc") == 0 && argc > 2)
     mode = 2;
+  else if(std::strcmp(argv[1], "redig") == 0 && argc > 2)
+    mode = 4;
+  else if(std::strcmp(argv[1], "reconstruct") == 0 && argc > 2)
+    mode = 3;
   else {
     usage();
     return - 2;
@@ -146,6 +150,7 @@ int main(int argc, const char* argv[]) {
         cstat.compute(input.c_str());
         cstat0 = corpushl<double, char>(cstat);
       }
+      std::cout << cstat0.serialize(.8, .01) << std::endl;
       std::cerr << "analysing input text." << std::endl;
       for(int i = 0; i < details.size(); i ++)
         cstat0 = cstat0.withDetail(detailwords[i], details[i]);
@@ -154,7 +159,7 @@ int main(int argc, const char* argv[]) {
         for(int j = 0; j < details.size(); j ++)
           tocs[i] = tocs[i].withDetail(detailwords[j], details[j]);
       std::cerr << "getting toc." << std::endl;
-      std::cout << cstat0.toc(details, detailwords, tocs, tocwords, 0, 0.);
+      std::cout << cstat0.toc(details, detailwords, tocs, tocwords, 0, .8);
       std::cout << std::endl << std::endl;
       corpushl<double, char> summ(cstat0);
       summ.simpleThresh(.8);
@@ -164,6 +169,52 @@ int main(int argc, const char* argv[]) {
         for(int j = 0; j < work.size(); j ++)
           std::cout << work[j] << std::endl;
       }
+    }
+    break;
+  case 3:
+    {
+      std::string wordbuf;
+      {
+        std::string   line;
+        std::ifstream input2;
+        input2.open(argv[2]);
+        while(getline(input2, line)) {
+          wordbuf += line + std::string("\n");
+          if(input2.eof() || input2.bad())
+            break;
+        }
+        input2.close();
+      }
+      corpus<double, char> stat;
+      stat.init(wordbuf.c_str(), 0, 120);
+      stat.compute(input.c_str());
+      corpushl<double, char> recons(stat);
+      std::cout << recons.serialize(.8, .01);
+    }
+    break;
+  case 4:
+    {
+      std::string wordbuf;
+      { 
+        std::string   line;
+        std::ifstream input2;
+        input2.open(argv[2]); 
+        while(getline(input2, line)) {
+          wordbuf += line + std::string("\n");
+          if(input2.eof() || input2.bad())
+            break;
+        }
+        input2.close();
+      }
+      corpus<double, char> stat; 
+      stat.init(wordbuf.c_str(), 0, 120);
+      stat.compute(input.c_str());
+      corpushl<double, char> recons(stat), harden(stat), weaken(stat);
+      harden.reDig(double(4.));
+      weaken.reDig(double(.25));
+      std::cout << recons.serialize(.9, .01) << std::endl;
+      std::cout << harden.serialize(.9, .01) << std::endl;
+      std::cout << weaken.serialize(.9, .01) << std::endl;
     }
     break;
   }

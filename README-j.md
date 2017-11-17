@@ -10,6 +10,8 @@
     ./tools lword < data.txt
     ./tools corpus wordlist.txt < data.txt
     ./tools toc wordlist.txt dictionaries ... -toc topics ... < data.txt
+    ./tools redig wordlist.txt < data.txt
+    ./tools reconstruct wordlist.txt < data.txt
 
 # 文脈
 形態要素解析のソフトウェア、及び自動パラメタ調整のソフトウェアに刺激されました。  
