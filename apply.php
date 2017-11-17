@@ -44,6 +44,9 @@ case "ad":
 case "dd":
   unlink($pathb . "dicts/" . $name);
   break;
+case "da":
+  exec("rm -fr " . $pathb . "/output && mkdir -p " . $pathb . "/output");
+  break;
 default:
   echo "invalid cmd.";
   return;

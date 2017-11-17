@@ -53,6 +53,18 @@ foreach(new DirectoryIterator('./datas/') as $fileInfo) {
         fclose($pipes[0]);
         $return_value = proc_close($process);
       }
+      
+      $descriptorspec = array(
+        0 => array("pipe", "r"),  // stdin.
+        1 => array("file", $pathb2 . "redig.txt", "w"),  // stdout.
+        2 => array("file", $pathb2 . "redig-error.txt", "w") // stderr.
+      );
+      $process = proc_open('cd ' . $pathb . '../ && ../../puts redig words.txt ', $descriptorspec, $pipes, $cwd, $env);
+      if (is_resource($process)) {
+        fwrite($pipes[0], $text . "\n");
+        fclose($pipes[0]);
+        $return_value = proc_close($process);
+      }
     }
   }
 }
