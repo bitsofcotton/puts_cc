@@ -257,7 +257,7 @@ public:
   const string          optToc();
   const vector<string>& getWords() const;
   const Tensor&         getCorpus() const;
-  const string          serialize(const T& thresh, const T& threshall) const;
+  const string          serialize(const T& thresh, const T& threshall, const T& threshm = - T(1)) const;
   const string          summary(const vector<string>& words, const vector<corpushl<T, U> >& meanings, const T& thresh) const;
   const corpushl<T, U>  abbrev(const string word, const corpushl<T, U>& mean);
   const vector<string>  reverseLink(const corpushl<T, U>& orig) const;
@@ -265,8 +265,8 @@ public:
   const corpushl<T, U>  simpleThresh(const T& ratio);
 private:
   const string          serializeSub(const vector<pair<T, pair<pair<int, int>, int> > >& idxs, const bool& sign) const;
-  vector<string>                   words;
-  Tensor                           corpust;
+  vector<string>        words;
+  Tensor                corpust;
    
   vector<string> gatherWords(const vector<string>& in0, const vector<string>& in1, vector<int>& ridx0, vector<int>& ridx1) const;
   const Tensor   prepareDetail(const corpushl<T, U>& other, const vector<string>& workwords, const int& eidx, const vector<int>& ridx0, const vector<int>& ridx1, const vector<int>& ridx2);
@@ -527,12 +527,12 @@ template <typename T, typename U> const string corpushl<T, U>::optToc() {
   return result;
 }
 
-template <typename T, typename U> const string corpushl<T, U>::serialize(const T& thresh, const T& threshall) const {
+template <typename T, typename U> const string corpushl<T, U>::serialize(const T& thresh, const T& threshall, const T& threshm) const {
   cerr << "serialize" << endl;
   string result;
   string resultm;
   T th(thresh);
-  T MM(.1);
+  T MM(0.);
   vector<int> looked;
   for( ; threshall < th; th *= thresh) {
     cerr << "." << flush;
@@ -555,7 +555,8 @@ template <typename T, typename U> const string corpushl<T, U>::serialize(const T
 #endif
       for(int i = 0; i < corpust.rows(); i ++) if(!binary_search(looked.begin(), looked.end(), i))
         for(int j = 0; j < corpust.cols(); j ++) if(!binary_search(looked.begin(), looked.end(), j))
-          if(MM * th <= abs(corpust(i, j)[k]) &&
+          if(threshm <= abs(corpust(i, j)[k]) &&
+             MM * th <= abs(corpust(i, j)[k]) &&
              abs(corpust(i, j)[k]) <= MM * th / thresh)
             idxs.push_back(make_pair(abs(corpust(i, j)[k]),
                              make_pair(make_pair(i, j), k)));
@@ -631,8 +632,6 @@ template <typename T, typename U> const string corpushl<T, U>::serializeSub(cons
     else
       lwords[idx].first += corpust(ii, kk)[jj] * val;
   }
-  if(iwords.size() <= 0)
-    return result;
   sort(iwords.begin(), iwords.end());
   sort(lwords.begin(), lwords.end());
   vector<int> id, ld;
@@ -660,10 +659,10 @@ template <typename T, typename U> const string corpushl<T, U>::serializeSub(cons
   for(int k = 0; k < id.size(); k ++)
     iwords.erase(iwords.begin() + id[k] - k);
   for(int k = 0; k < iwords.size(); k ++)
-    result += words[iwords[k].second];
+    result += words[iwords[iwords.size() - 1 - k].second];
   result += words[idxs[0].second.second];
   for(int k = 0; k < lwords.size(); k ++)
-    result += words[lwords[lwords.size() - 1 - k].second];
+    result += words[lwords[k].second];
   result += string(".");
   return result;
 }

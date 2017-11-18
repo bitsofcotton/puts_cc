@@ -281,14 +281,16 @@ int main(int argc, const char* argv[]) {
         cstat0 = corpushl<double, char>(cstat);
       }
       corpushl<double, char> cstat1;
-      std::cout << cstat0.serialize(.9, .01) << std::endl;
+      std::cout << cstat0.serialize(.9, .01, .001) << std::endl;
       std::cerr << "analysing input text." << std::endl;
       for(int i = 0; i < details.size(); i ++)
         cstat0 = cstat0.withDetail(detailwords[i] , details[i]);
       for(int i = 0; i < details2.size(); i ++)
         cstat1 = cstat1.withDetail(detailwords2[i], details2[i]);
+      cstat0.reDig(double(4));
+      cstat1.reDig(double(4));
       auto diff(cstat0 - cstat1);
-      std::cout << diff.serialize(.9, .01) << std::endl;
+      std::cout << diff.serialize(.9, .01, .001) << std::endl;
     }
     break;
   }
