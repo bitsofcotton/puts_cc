@@ -15,6 +15,7 @@ using std::vector;
 using std::sort;
 using std::distance;
 using std::upper_bound;
+using std::unique;
 using std::pair;
 using std::make_pair;
 using std::to_string;
@@ -184,7 +185,7 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) 
 }
 
 template <typename T, typename U> void corpus<T,U>::corpusEach() {
-  corpust = Tensor(words.size() + 2, words.size() + 2);
+  corpust = Tensor(words.size(), words.size());
 #if defined(_OPENMP)
 #pragma omp parallel for
 #endif
@@ -529,72 +530,51 @@ template <typename T, typename U> const string corpushl<T, U>::optToc() {
 template <typename T, typename U> const string corpushl<T, U>::serialize(const T& thresh, const T& threshall) const {
   cerr << "serialize" << endl;
   string result;
-  T      MM(0);
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-  for(int i = 0; i < corpust.rows(); i ++)
-    for(int j = 0; j < corpust.cols(); j ++)
-      for(int k = 0; k < corpust(i, j).size(); k ++)
-        MM = max(MM, abs(corpust(i, j)[k]));
-  T th(1);
   string resultm;
-  corpushl<T, U> work(*this);
+  T th(thresh);
+  T MM(0);
+  vector<int> looked;
   for( ; threshall < th; th *= thresh) {
-    cerr << "!" << flush;
-    vector<vector<pair<T, pair<pair<int, int>, int> > > > idxs;
-    vector<pair<int, int> > MMM;
+    cerr << "." << flush;
+    vector<pair<T, int> > MMM;
     for(int kk = 0; kk < corpust(0, 0).size(); kk ++) {
-      cerr << "." << flush;
       MMM.push_back(make_pair(0, kk));
       for(int i = 0; i < corpust.rows(); i ++)
         for(int j = 0; j < corpust.cols(); j ++)
-          if(work.corpust(i, j).size() &&
-            MMM[kk].first < abs(work.corpust(i, j)[kk]))
-            MMM[kk].first = abs(work.corpust(i, j)[kk]);
+          MMM[kk].first = max(MMM[kk].first, abs(corpust(i, j)[kk]));
     }
     sort(MMM.begin(), MMM.end());
-    for(int kk = 0; kk < corpust(0, 0).size(); kk ++) {
-      idxs.push_back(vector<pair<T, pair<pair<int, int>, int> > >());
-      T   mm(MMM[corpust(0, 0).size() - 1 - kk].first);
-      int k(MMM[corpust(0, 0).size() - 1 - kk].second);
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-      for(int i = 0; i < corpust.rows(); i ++)
-        for(int j = 0; j < corpust.cols(); j ++)
-          if(work.corpust(i, j).size() &&
-            MM * th <= abs(work.corpust(i, j)[k]) &&
-            abs(work.corpust(i, j)[k]) <= MM * th / thresh) {
-            idxs[kk].push_back(make_pair(abs(work.corpust(i, j)[k]),
-                                 make_pair(make_pair(i, j), k)));
-            if(thresh / T(2) < abs(work.corpust(i, j)[k]))
-              mm = min(mm, abs(work.corpust(i, j)[k]));
-          }
-      sort(idxs[kk].begin(), idxs[kk].end());
-      if(!idxs[kk].size())
+    MM = max(MM, MMM[MMM.size() - 1].first);
+    for(int kk = 0; kk < MMM.size(); kk ++) {
+      vector<pair<T, pair<pair<int, int>, int> > > idxs;
+      const int k(MMM[MMM.size() - 1 - kk].second);
+      if(binary_search(looked.begin(), looked.end(), k))
         continue;
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-      for(int i = 0; i < corpust.rows(); i ++)
-        for(int j = 0; j < corpust.cols(); j ++)
-          if(work.corpust(i, j).size())
-            work.corpust(i, j)[k] -= abs(work.corpust(i, j)[k]) <= thresh / T(2) ?
-              T(0) : (work.corpust(i, j)[k] < T(0) ? - mm : mm);
-    }
-    sort(idxs.begin(), idxs.end(), [](const vector<pair<T, pair<pair<int, int>, int> > >& x, const vector<pair<T, pair<pair<int, int>, int> > >& y) {
-        return ( x.size() && y.size() && x[x.size() - 1] < y[y.size() - 1]) ||
-               (!x.size() && y.size());
-      });
-    string buf;
-    for(int k = 0; k < idxs.size(); k ++) {
-      buf = serializeSub(idxs[idxs.size() - 1 - k], true);
+      for(int i = 0; i < corpust.rows(); i ++) if(!binary_search(looked.begin(), looked.end(), i))
+        for(int j = 0; j < corpust.cols(); j ++) if(!binary_search(looked.begin(), looked.end(), j))
+          if(MM * th <= abs(corpust(i, j)[k]) &&
+             abs(corpust(i, j)[k]) <= MM * th / thresh)
+            idxs.push_back(make_pair(abs(corpust(i, j)[k]),
+                             make_pair(make_pair(i, j), k)));
+      sort(idxs.begin(), idxs.end());
+      if(!idxs.size()) continue;
+      string buf;
+      buf = serializeSub(idxs, true);
       if(buf.size())
         result  += buf;
-      buf = serializeSub(idxs[idxs.size() - 1 - k], false);
+      buf = serializeSub(idxs, false);
       if(buf.size())
         resultm += buf;
+      for(int i = 0; i < idxs.size(); i ++) {
+        looked.push_back(idxs[i].second.first.first);
+        looked.push_back(idxs[i].second.first.second);
+        looked.push_back(idxs[i].second.second);
+      }
+      sort(looked.begin(), looked.end());
+      looked.erase(unique(looked.begin(), looked.end()), looked.end());
     }
   }
   return result + "\n-" + resultm;
@@ -611,8 +591,8 @@ template <typename T, typename U> const string corpushl<T, U>::serializeSub(cons
     // N.B. added order.
     const int& kk(idxs[idxs.size() - 1 - i].second.first.second);
     const int& jj(idxs[idxs.size() - 1 - i].second.second);
-    if(sign ? corpust(ii, kk)[jj] < T(0) :
-              corpust(ii, kk)[jj] > T(0))
+    if(sign ? corpust(ii, kk)[jj] <= T(0) :
+              corpust(ii, kk)[jj] >= T(0))
       continue;
     int idx(- 1);
     for(int j = 0; j < iwords.size(); j ++)
@@ -623,7 +603,7 @@ template <typename T, typename U> const string corpushl<T, U>::serializeSub(cons
     T val(0);
     if(jj < corpust.cols() && ii < corpust(0, jj).size())
       for(int k = 0; k < corpust.rows(); k ++) {
-        if(corpust(k ,jj).size())
+        if(corpust(k, jj).size())
           val += corpust(k, jj)[ii];
       }
     else
@@ -658,13 +638,23 @@ template <typename T, typename U> const string corpushl<T, U>::serializeSub(cons
   vector<int> id, ld;
   for(int k = 0; k < iwords.size(); k ++)
     for(int kk = 0; kk < lwords.size(); kk ++)
-      if(iwords[k].second == lwords[lwords.size() - 1 - kk].second) {
-        if(iwords[k].first > lwords[lwords.size() - 1 - kk].first)
+      if(iwords[k].second == lwords[kk].second) {
+        if(iwords[k].first > lwords[kk].first)
           ld.push_back(lwords.size() - 1 - kk);
         else
           id.push_back(k);
       }
+  // XXX is this needed?
+  for(int k = 0; k < iwords.size(); k ++)
+    if(iwords[k].second == idxs[0].second.second)
+      id.push_back(k);
+  for(int k = 0; k < lwords.size(); k ++)
+    if(lwords[k].second == idxs[0].second.second)
+      ld.push_back(k);
+  sort(id.begin(), id.end());
   sort(ld.begin(), ld.end());
+  id.erase(unique(id.begin(), id.end()), id.end());
+  ld.erase(unique(ld.begin(), ld.end()), ld.end());
   for(int k = 0; k < ld.size(); k ++)
     lwords.erase(lwords.begin() + ld[k] - k);
   for(int k = 0; k < id.size(); k ++)
