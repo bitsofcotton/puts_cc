@@ -12,7 +12,7 @@ void usage() {
 }
 
 int main(int argc, const char* argv[]) {
-  std::ios::sync_with_stdio(false);
+//  std::ios::sync_with_stdio(false);
   if(argc < 2) {
     usage();
     return - 1;
@@ -150,7 +150,7 @@ int main(int argc, const char* argv[]) {
         cstat.compute(input.c_str());
         cstat0 = corpushl<double, char>(cstat);
       }
-      std::cout << cstat0.serialize(.8, .01) << std::endl;
+      std::cout << cstat0.serialize(.9, .01) << std::endl;
       std::cerr << "analysing input text." << std::endl;
       for(int i = 0; i < details.size(); i ++)
         cstat0 = cstat0.withDetail(detailwords[i], details[i]);
@@ -189,7 +189,7 @@ int main(int argc, const char* argv[]) {
       stat.init(wordbuf.c_str(), 0, 120);
       stat.compute(input.c_str());
       corpushl<double, char> recons(stat);
-      std::cout << recons.serialize(.8, .01);
+      std::cout << recons.serialize(.9, .01);
     }
     break;
   case 4:
