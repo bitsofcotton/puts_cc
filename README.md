@@ -13,6 +13,7 @@ So with layered dictionaries, we can calculate a little accuratery.
     ./tools toc wordlist.txt dictionaries ... -toc topics ... < data.txt
     ./tools redig wordlist.txt < data.txt
     ./tools reconstruct wordlist.txt < data.txt
+    ./tools diff wordlist.txt -dict ... -dict2 ... < data.txt
 
 # Contexts
 Inspired from morphological analysis softwares and parameter auto configuring algorithms' structure.   
@@ -66,6 +67,7 @@ Please pseudo-login with e-mail address - salt pair.
 # Tips
 These programs have a algorithm that is not carefully confirmed.  
 abbrev function is not ideal definition, so in fact, it is needed to be the inverse of withDetail function, but now, not so.  
+serialize function is not ideal definition, so in fact, it is needed to be the inverse of corpushl(corpus(...)) but now, not so.  
 This is from simply interest, so don't use this for the reason other than standing under the context.  
 And this algorithm have a specification that edges remains as obscure, to get clear edge, we should use this with morphological analysis softwares.  
 If there's prejudice definition and elementary train base text sets, this can score which prejudice gains, but this is applied to what is said in the context, not the not said in the context.  
