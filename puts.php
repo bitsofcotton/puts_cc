@@ -48,8 +48,12 @@ function asyncPost(addr, data) {
 }
 
 function uploadAnalyse() {
-  // asyncPost("./analyse.php", "cmd=aa&object=" + encodeURIComponent(document.getElementById("object").value));
   asyncPost("./apply.php", "cmd=aa&containt=" + encodeURIComponent(document.getElementById("object").value));
+  return;
+}
+
+function relationDict() {
+  asyncPost("./apply.php", "cmd=ar&containt=" + encodeURIComponent(document.getElementById("object").value) + "&remail=" + encodeURIComponent(document.getElementById("remail").value) + "&rsalt=" + encodeURIComponent(document.getElementById("rsalt").value));
   return;
 }
 
@@ -145,7 +149,8 @@ Your root path: <a href="<?php echo $pathb; ?>">here</a></p>
 <p>
 Analyse text:<br/>
 <textarea maxlength="80000" rows="12" cols="80" name="object" id="object"></textarea><br/>
-<a href="javascript:;" onClick="uploadAnalyse();">upload analyse base.</a>
+<a href="javascript:;" onClick="uploadAnalyse();">upload analyse base.</a><br/>
+Differ: mail: <input type="text" id="remail" name="remail" /> salt: <input type="text" id="rsalt" name="rsalt" /><a href="javascript:;" onClick="relationDict();">Relative dicts</a>
 </p>
 <p>
 Word list:<br/>
