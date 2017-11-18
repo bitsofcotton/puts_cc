@@ -532,7 +532,7 @@ template <typename T, typename U> const string corpushl<T, U>::serialize(const T
   string result;
   string resultm;
   T th(thresh);
-  T MM(0);
+  T MM(.1);
   vector<int> looked;
   for( ; threshall < th; th *= thresh) {
     cerr << "." << flush;
