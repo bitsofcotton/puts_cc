@@ -2,8 +2,10 @@
 session_start();
 $M_COUNT = 300;
 $M_STR   = 80000;
-if(!isset($_SESSION["email"]) || !isset($_SESSION["salt"]))
+if(!isset($_SESSION["email"]) || !isset($_SESSION["salt"])) {
+  echo "Please login.";
   return;
+}
 $pathb = "./datas/" . hash("sha256", $_SESSION["email"] . $_SESSION["salt"]) . "/";
 $name  = "";
 if(isset($_REQUEST["name"]))
@@ -11,8 +13,10 @@ if(isset($_REQUEST["name"]))
 $containt = "";
 if(isset($_REQUEST["containt"]))
   $containt = $_REQUEST["containt"];
-if(!isset($_REQUEST["cmd"]))
+if(!isset($_REQUEST["cmd"])) {
+  echo "illegal command.";
   return;
+}
 $cmd = $_REQUEST["cmd"];
 switch($cmd) {
 case "ar":
@@ -44,7 +48,17 @@ case "aa":
   }
   break;
 case "aw":
-  file_put_contents($pathb . "words.txt", $containt);
+  if($containt == "") {
+    exec("rm -f " . $pathb . "words.txt");
+  } else {
+    file_put_contents($pathb . "words.txt", $containt);
+  }
+  break;
+case "url":
+  file_put_contents($pathb . "urls.txt", $containt);
+  break;
+case "scrap":
+  move_uploaded_file($_FILES['scrap']['tmp_name'], $pathb . "scrap/" . basename($_FILES['scrap']['name']));
   break;
 case "at":
   $fi = new FilesystemIterator($pathb . "topics/", FilesystemIterator::SKIP_DOTS);
