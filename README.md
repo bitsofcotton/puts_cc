@@ -69,9 +69,9 @@ These programs have a algorithm that is not carefully confirmed.
 abbrev function is not ideal definition, so in fact, it is needed to be the inverse of withDetail function, but now, not so.  
 serialize function is not ideal definition, so in fact, it is needed to be the inverse of corpushl(corpus(...)) but now, not so.  
 This is from simply interest, so don't use this for the reason other than standing under the context.  
-And this algorithm have a specification that edges remains as obscure, to get clear edge, we should use this with morphological analysis softwares.  
-If there's prejudice definition and elementary train base text sets, this can score which prejudice gains, but this is applied to what is said in the context, not the not said in the context.  
-If there's original text and train base text sets, this can score cultural conflicts with the text, but this algorithm is obscure now.  
+And this algorithm have a specification that edges remains as obscure, to get clear edge, we should use this with morphological analysis softwares. This algorithm only sees the word distances and orders that causes rough image of what is on the table.  
+If there's prejudice definition and elementary dictionary sets, this can score which prejudice gains, but this is applied to what is said in the context, not the not said in the context.  
+If there's original text and dictionary sets, this can score cultural conflicts with the text, but this algorithm is obscure now.  
 If there's large numbers of the sets that correctly defined texts, it may optimizable out to get opposite side's claim, but this is only the what's able to be said, so this isn't what's the matter.
 
 # Another downloads

@@ -15,8 +15,11 @@
     exec("mkdir " . $pathb . "topics");
     exec("mkdir " . $pathb . "dicts");
     exec("mkdir " . $pathb . "output");
+    exec("mkdir " . $pathb . "stack");
+    exec("mkdir " . $pathb . "web");
     if(!file_exists($pathb . "words.txt"))
       exec("cp ./words.txt " . $pathb);
+    exec("touch " . $pathb . "urls.txt");
     file_put_contents($pathb . "email.txt", $_REQUEST["email"]);
   } else
     $pathb = "./datas/" . hash("sha256", $_SESSION["email"] . $_SESSION["salt"]) . "/";
@@ -25,7 +28,7 @@
 <head>
 <title>Puts sample.</title>
 <script language="javascript">
-// from: qiita.com/katsunory/items/9bf9ee49ee5c08bf2b3d
+// thanks: qiita.com/katsunory/items/9bf9ee49ee5c08bf2b3d
 function asyncPost(addr, data) {
   var req = new XMLHttpRequest();
   req.onreadystatechange = function () {
@@ -41,24 +44,49 @@ function asyncPost(addr, data) {
     }
   };
   req.open('POST', addr, true);
-  req.setRequestHeader('Content-type',
-    'application/x-www-form-urlencoded;charset=UTF-8');
   req.send(data);
   return;
 }
 
 function uploadAnalyse() {
-  asyncPost("./apply.php", "cmd=aa&containt=" + encodeURIComponent(document.getElementById("object").value));
+  fd = new FormData();
+  fd.append("cmd", "aa");
+  fd.append("containt", document.getElementById("object").value);
+  asyncPost("./apply.php", fd);
+  return;
+}
+
+function uploadScrap() {
+  fd = new FormData();
+  fd.append("cmd", "scrap");
+  fd.append("scrap", document.getElementById("scrap").files[0]);
+  asyncPost("./apply.php", fd);
   return;
 }
 
 function relationDict() {
-  asyncPost("./apply.php", "cmd=ar&containt=" + encodeURIComponent(document.getElementById("object").value) + "&remail=" + encodeURIComponent(document.getElementById("remail").value) + "&rsalt=" + encodeURIComponent(document.getElementById("rsalt").value));
+  fd = new FormData();
+  fd.append("cmd", "ar");
+  fd.append("containt", document.getElementById("object").value);
+  fd.append("remail",   document.getElementById("remail").value);
+  fd.append("rsalt",    document.getElementById("rsalt").value);
+  asyncPost("./apply.php", fd);
   return;
 }
 
 function updateWords() {
-  asyncPost("./apply.php", "cmd=aw&containt=" + encodeURIComponent(document.getElementById("words").value));
+  fd = new FormData();
+  fd.append("cmd", "aw");
+  fd.append("containt", document.getElementById("words").value);1
+  asyncPost("./apply.php", fd);
+  return;
+}
+
+function updateURLs() {
+  fd = new FormData();
+  fd.append("cmd", "url");
+  fd.append("containt", document.getElementById("urls").value);
+  asyncPost("./apply.php", fd);
   return;
 }
 
@@ -68,7 +96,11 @@ function appendTopic() {
     alert("there's a same definition.");
     return;
   }
-  asyncPost("./apply.php", "cmd=at&name=" + encodeURIComponent(dom.value) + "&containt=");
+  fd = new FormData();
+  fd.append("cmd", "at");
+  fd.append("name", dom.value);
+  fd.append("containt", "");
+  asyncPost("./apply.php", fd);
   var par   = document.getElementById("topic-ul");
   var last  = document.getElementById("topic-last");
   var newli = document.createElement("li");
@@ -80,12 +112,19 @@ function appendTopic() {
 }
 
 function applyTopic(name, containt) {
-  asyncPost("./apply.php", "cmd=at&name=" + encodeURIComponent(name) + "&containt=" + encodeURIComponent(containt));
+  fd = new FormData();
+  fd.append("cmd", "at");
+  fd.append("name", name);
+  fd.append("containt", containt);
+  asyncPost("./apply.php", fd);
   return;
 }
 
 function deleteTopic(name) {
-  asyncPost("./apply.php", "cmd=dt&name=" + encodeURIComponent(name));
+  fd = new FormData();
+  fd.append("cmd", "dt");
+  fd.append("name", name);
+  asyncPost("./apply.php", fd);
   var dom = document.getElementById("topic-li-" + name);
   dom.parentElement.removeChild(dom);
   return;
@@ -97,7 +136,11 @@ function appendDict() {
     alert("there's a same definition.");
     return;
   }
-  asyncPost("./apply.php", "cmd=ad&name=" + encodeURIComponent(dom.value) + "&containt=");
+  fd = new FormData();
+  fd.append("cmd", "ad");
+  fd.append("name", dom.value);
+  fd.append("containt", "");
+  asyncPost("./apply.php", fd);
   var par   = document.getElementById("dicts-ul");
   var last  = document.getElementById("dicts-last");
   var newli = document.createElement("li");
@@ -109,19 +152,28 @@ function appendDict() {
 }
 
 function applyDict(name, containt) {
-  asyncPost("./apply.php", "cmd=ad&name=" + encodeURIComponent(name) + "&containt=" + encodeURIComponent(containt));
+  fd = new FormData();
+  fd.append("cmd", "ad");
+  fd.append("name", name);
+  fd.append("containt", containt);
+  asyncPost("./apply.php", fd);
   return;
 }
 
 function deleteDict(name) {
-  asyncPost("./apply.php", "cmd=dd&name=" + encodeURIComponent(name));
+  fd = new FormData();
+  fd.append("cmd", "dd");
+  fd.append("name", name);
+  asyncPost("./apply.php", fd);
   var dom = document.getElementById("dicts-li-" + name);
   dom.parentElement.removeChild(dom);
   return;
 }
 
 function deleteCache() {
-  asyncPost("./apply.php", "cmd=da");
+  fd = new FormData();
+  fd.append("cmd", "da");
+  asyncPost("./apply.php", fd);
   return;
 }
 </script>
@@ -162,7 +214,18 @@ Word list:<br/>
   }
   fclose($file);
 ?></textarea><br/>
-<a href="javascript: ;" onClick="updateWords();">update</a>
+<a href="javascript: ;" onClick="updateWords();">update</a> <br/>
+<textarea rows="12" cols="80" name="urls" id="urls">
+<?php
+  $file = fopen($pathb . "urls.txt", "r");
+  while(($buf = fgets($file)) !== false) {
+    echo $buf;
+  }
+  fclose($file);
+?></textarea><br/>
+<a href="javascript: ;" onClick="updateURLs();">update</a><br/>
+<input type="file" id="scrap" name="scrap">
+<a href="javascript: uploadScrap();">upload</a>
 </p>
 <div style="display:inline-block;vertical-align:top;">
 Topics:<br/>
