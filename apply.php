@@ -58,7 +58,7 @@ case "url":
   file_put_contents($pathb . "urls.txt", $containt);
   break;
 case "scrap":
-  move_uploaded_file($_FILES['scrap']['tmp_name'], $pathb . "scrap/" . basename($_FILES['scrap']['name']));
+  move_uploaded_file($_FILES['scrap']['tmp_name'], $pathb . "stack/" . basename($_FILES['scrap']['name']));
   break;
 case "at":
   $fi = new FilesystemIterator($pathb . "topics/", FilesystemIterator::SKIP_DOTS);
