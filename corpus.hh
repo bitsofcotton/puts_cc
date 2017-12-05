@@ -57,7 +57,7 @@ public:
   corpus();
   ~corpus();
   
-  void init(const U* words, const int& nthresh, const int& Nthresh);
+  void init(const U* words, const int& nthresh, const int& Nthresh, const int& Mwords = 120);
   corpus<T, U>&         operator = (const corpus<T, U>& other);
   const void            compute(const U* input);
   const vector<string>& getWords() const;
@@ -70,6 +70,7 @@ private:
   Tensor               corpust;
   int                  nthresh;
   int                  Nthresh;
+  int                  Mwords;
   T                    Midx;
    
   void getWordPtrs(const U* input);
@@ -85,7 +86,7 @@ template <typename T, typename U> corpus<T,U>::~corpus() {
   ;
 }
 
-template <typename T, typename U> void corpus<T,U>::init(const U* words, const int& nthresh, const int& Nthresh) {
+template <typename T, typename U> void corpus<T,U>::init(const U* words, const int& nthresh, const int& Nthresh, const int& Mwords) {
   string buf;
   for(int i = 0; words[i]; i ++) {
     if(words[i] == ',' || words[i] == '\n') {
@@ -102,6 +103,7 @@ template <typename T, typename U> void corpus<T,U>::init(const U* words, const i
   this->nthresh = nthresh;
   this->Nthresh = Nthresh;
   this->Midx    = 1;
+  this->Mwords  = Mwords;
   return;
 }
 
@@ -119,6 +121,10 @@ template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator = (const 
 template <typename T, typename U> const void corpus<T,U>::compute(const U* input) {
   cerr << "Getting word pointers." << endl;
   getWordPtrs(input);
+  if(Mwords < words.size()) {
+    cerr << "exceeds Mwords." << endl;
+    return;
+  }
   cerr << "Corpus..." << endl;
   corpusEach();
   return;
@@ -250,7 +256,8 @@ public:
   const corpushl<T, U>  withDetail(const string& word, const corpushl<T, U>& other);
   const T               distanceInUnion(const corpushl<T, U>& other) const;
   const corpushl<T, U>  match2relPseudo(const corpushl<T, U>& other) const;
-  const string          toc(const vector<corpushl<T, U> >& base, const vector<string>& words, const vector<corpushl<T, U> >& meanings, const vector<string>& mwords, const int& nloop, const T& thresh) const;
+  const string          toc(const vector<corpushl<T, U> >& base, const vector<string>& words, const vector<corpushl<T, U> >& meanings, const string& mwords, const int& nloop, const T& thresh) const;
+  const string          toc(const vector<vector<corpushl<T, U> > >& base, const vector<string>& words, const vector<corpushl<T, U> >& meanings, const string& mwords, const int& nloop, const T& thresh) const;
   const vector<T>       prej(const vector<corpushl<T, U> >& prejs) const;
   const T               culturalConflicts(const corpushl<T, U>& base) const;
   const corpushl<T, U>  conflictPart();
@@ -478,19 +485,34 @@ template <typename T, typename U> const T corpushl<T, U>::distanceInUnion(const 
   return res;
 }
 
-template <typename T, typename U> const string corpushl<T, U>::toc(const vector<corpushl<T, U> >& base, const vector<string>& words, const vector<corpushl<T, U> >& meanings, const vector<string>& mwords, const int& nloop, const T& thresh) const {
+template <typename T, typename U> const string corpushl<T, U>::toc(const vector<corpushl<T, U> >& base, const vector<string>& words, const vector<corpushl<T, U> >& meanings, const string& mwords, const int& nloop, const T& thresh) const {
+  vector<vector<corpushl<T, U> > > basev;
+  for(int i = 0; i < base.size(); i ++) {
+    vector<corpushl<T, U> > work;
+    work.push_back(base[i]);
+    basev.push_back(work);
+  }
+  return toc(basev, words, meanings, mwords, nloop, thresh);
+}
+
+template <typename T, typename U> const string corpushl<T, U>::toc(const vector<vector<corpushl<T, U> > >& base, const vector<string>& words, const vector<corpushl<T, U> >& meanings, const string& mwords, const int& nloop, const T& thresh) const {
   string result;
   corpushl<T, U> work0(*this);
-  for(int i = 0; i < meanings.size(); i ++) {
-    corpushl<T, U> work(this->match2relPseudo(meanings[i]));
+  result += mwords + string(" : ");
+  vector<pair<T, string> > mlist;
+  for(int j = 0; j < meanings.size(); j ++) {
+    corpushl<T, U> work(this->match2relPseudo(meanings[j]));
     work0 -= work;
-    for(int j = 0; j < base.size(); j ++)
-      work = work.abbrev(words[j], base[j]);
-    result += mwords[i] + string("(") + to_string(work.distanceInUnion(work) / distanceInUnion(*this))+ string(")") + string(" : ") + work.serialize(thresh, pow(thresh, T(8))) + string("\n");
+    for(int k = 0; k < base.size(); k ++)
+      for(int l = 0; l < base.size(); l ++)
+        work = work.abbrev(words[k], base[k][l]);
+    mlist.push_back(make_pair(work.distanceInUnion(work) /
+                              distanceInUnion(*this),
+                              work.serialize(thresh, pow(thresh, T(8)))));
   }
-  for(int j = 0; j < base.size(); j ++)
-    work0 = work0.abbrev(words[j], base[j]);
-  result += work0.serialize(thresh, pow(thresh, T(8)));
+  sort(mlist.begin(), mlist.end());
+  result += to_string(mlist[mlist.size() - 1].first) + string(":") +
+            mlist[mlist.size() - 1].second + string("\n");
   return result;
 }
 
@@ -534,6 +556,10 @@ template <typename T, typename U> const string corpushl<T, U>::serialize(const T
   T th(thresh);
   T MM(0.);
   vector<int> looked;
+  if(corpust.rows() < 1 || corpust.cols() < 1) {
+    result = string("*NULL*");
+    return result;
+  }
   for( ; threshall < th; th *= thresh) {
     cerr << "." << flush;
     vector<pair<T, int> > MMM;

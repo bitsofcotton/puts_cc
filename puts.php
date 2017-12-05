@@ -104,7 +104,7 @@ function appendTopic() {
   var par   = document.getElementById("topic-ul");
   var last  = document.getElementById("topic-last");
   var newli = document.createElement("li");
-  newli.innerHTML = dom.value + " : <br/><textarea maxlength=\"80000\" rows=\"6\" cols=\"40\" id=\"topic-" + dom.value + "\"></textarea><br/><a href=\"javascript: ;\" onClick=\"applyTopic('" + dom.value + "', document.getElementById('topic-" + dom.value + "').value);\">Update</a>|<a href=\"javascript: ;\" onClick=\"deleteTopic('" + dom.value + "');\">-</a>";
+  newli.innerHTML = dom.value + " : <br/><textarea maxlength=\"800000\" rows=\"6\" cols=\"40\" id=\"topic-" + dom.value + "\"></textarea><br/><a href=\"javascript: ;\" onClick=\"applyTopic('" + dom.value + "', document.getElementById('topic-" + dom.value + "').value);\">Update</a>|<a href=\"javascript: ;\" onClick=\"deleteTopic('" + dom.value + "');\">-</a>";
   newli.id = "topic-li-" + dom.value;
   par.insertBefore(newli, last);
   dom.value  = "";
@@ -144,7 +144,7 @@ function appendDict() {
   var par   = document.getElementById("dicts-ul");
   var last  = document.getElementById("dicts-last");
   var newli = document.createElement("li");
-  newli.innerHTML = dom.value + " : <br/><textarea maxlength=\"80000\" rows=\"6\" cols=\"40\" id=\"dicts-" + dom.value + "\"></textarea><br/><a href=\"javascript: ;\" onClick=\"applyDict('" + dom.value + "', document.getElementById('dicts-" + dom.value + "').value);\">Update</a>|<a href=\"javascript: ;\" onClick=\"deleteDict('" + dom.value + "');\">-</a>";
+  newli.innerHTML = dom.value + " : <br/><textarea maxlength=\"800000\" rows=\"6\" cols=\"40\" id=\"dicts-" + dom.value + "\"></textarea><br/><a href=\"javascript: ;\" onClick=\"applyDict('" + dom.value + "', document.getElementById('dicts-" + dom.value + "').value);\">Update</a>|<a href=\"javascript: ;\" onClick=\"deleteDict('" + dom.value + "');\">-</a>";
   newli.id = "dicts-li-" + dom.value;
   par.insertBefore(newli, last);
   dom.value  = "";
@@ -200,7 +200,7 @@ function deleteCache() {
 Your root path: <a href="<?php echo $pathb; ?>">here</a></p>
 <p>
 Analyse text:<br/>
-<textarea maxlength="80000" rows="12" cols="80" name="object" id="object"></textarea><br/>
+<textarea maxlength="800000" rows="12" cols="80" name="object" id="object"></textarea><br/>
 <a href="javascript:;" onClick="uploadAnalyse();">upload analyse base.</a><br/>
 Differ: mail: <input type="text" id="remail" name="remail" /> salt: <input type="text" id="rsalt" name="rsalt" /><a href="javascript:;" onClick="relationDict();">Relative dicts</a>
 </p>
@@ -215,6 +215,7 @@ Word list:<br/>
   fclose($file);
 ?></textarea><br/>
 <a href="javascript: ;" onClick="updateWords();">update</a> <br/>
+Scrap URL list:<br/>
 <textarea rows="12" cols="80" name="urls" id="urls">
 <?php
   $file = fopen($pathb . "urls.txt", "r");
@@ -234,7 +235,7 @@ Topics:<br/>
   foreach (new DirectoryIterator($pathb . 'topics') as $fileInfo) {
     if($fileInfo->isDot()) continue;
     $name = $fileInfo->getFilename();
-    echo "<li id=\"topic-li-" . $name . "\">" . $name . " : <br/><textarea maxlength=\"80000\" rows=\"6\" cols=\"40\" id=\"topic-" . $name . "\">";
+    echo "<li id=\"topic-li-" . $name . "\">" . $name . " : <br/><textarea maxlength=\"800000\" rows=\"6\" cols=\"40\" id=\"topic-" . $name . "\">";
     $file = fopen($pathb . "topics/" . $name, "r");
     while(($buf = fgets($file)) !== false) {
       echo $buf;
@@ -255,7 +256,7 @@ Dictionaries:<br/>
   foreach (new DirectoryIterator($pathb . 'dicts') as $fileInfo) {
     if($fileInfo->isDot()) continue;
     $name = $fileInfo->getFilename();
-    echo "<li id=\"dicts-li-" . $name . "\">" . $name . " : <br/><textarea maxlength=\"80000\" rows=\"6\" cols=\"40\" id=\"dicts-" . $name . "\">";
+    echo "<li id=\"dicts-li-" . $name . "\">" . $name . " : <br/><textarea maxlength=\"800000\" rows=\"6\" cols=\"40\" id=\"dicts-" . $name . "\">";
     $file = fopen($pathb . "dicts/" . $name, "r");
     while(($buf = fgets($file)) !== false) {
       echo $buf;
