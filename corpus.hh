@@ -83,12 +83,15 @@ template <typename T, typename U> corpus<T,U>::~corpus() {
 template <typename T, typename U> void corpus<T,U>::init(const U* words, const int& nthresh, const int& Nthresh, const int& Mwords) {
   string buf;
   for(int i = 0; words[i]; i ++) {
-    if(words[i] == ',' || words[i] == '\n') {
+    if(words[i] == ',' || words[i] == '\n' || words[i] == '\r') {
       if(buf.size()) {
-        if(buf[buf.size() - 1] == '\n' && buf.size() > 1)
+        switch(buf[buf.size() - 1]) {
+        case '\n': case '\r': case ' ': case '\t': case ',':
           this->words0.push_back(buf.substr(0, buf.size() - 1));
-        else if(buf[buf.size() - 1] != '\n')
+          break;
+        default:
           this->words0.push_back(buf);
+        }
         this->ptrs0.push_back(vector<int>());
       }
       buf = string();
@@ -198,7 +201,7 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input, 
   tail.push_back(Midx + 1);
   ptrs.push_back(tail);
   pdelim.push_back(Midx + 2);
-  cerr << words.size() - 2 << " words used." << endl;
+  cerr << words.size() - 2 << " words used, ptr: " << i << endl;
   return;
 }
 
