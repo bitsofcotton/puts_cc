@@ -6,6 +6,8 @@ foreach(new DirectoryIterator('./datas/') as $fileInfo) {
   if(!file_exists($pathb))
     continue;
   foreach(new DirectoryIterator($pathb) as $fileInfoSub) {
+    if($fileInfoSub->isDot())
+      continue;
     $pathb2 = $pathb . $fileInfoSub->getFilename() . "/";
     echo $pathb2;
     if(file_exists($pathb2 . "orig-ref.txt") && !file_exists($pathb2 . ".lock")) {
@@ -114,6 +116,8 @@ foreach(new DirectoryIterator('./datas/') as $fileInfo) {
   if(!file_exists($pathb))
     continue;
   foreach(new DirectoryIterator($pathb) as $fileInfoSub) {
+    if($fileInfoSub->isDot())
+      continue;
     $pathb2 = $pathb . $fileInfoSub->getFilename();
     preg_match("<(-summary(-error)?|-redig(-error)?)\.txt$>", $pathb2, $match);
     if(count($match) == 0 && !file_exists($pathb2 . "-redig-error")) {

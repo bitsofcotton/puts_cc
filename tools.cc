@@ -11,9 +11,20 @@ void usage() {
   std::cout << "tools (lword|corpus|toc|redig|reconstruct|diff)" << std::endl;
 }
 
-const int szwindow(200);
+const int szwindow(300);
+std::vector<std::string> delimiter;
 
 int main(int argc, const char* argv[]) {
+  delimiter.push_back(string("."));
+  delimiter.push_back(string(","));
+  delimiter.push_back(string("\'"));
+  delimiter.push_back(string("\""));
+  delimiter.push_back(string("。"));
+  delimiter.push_back(string("、"));
+  delimiter.push_back(string("「"));
+  delimiter.push_back(string("」"));
+  delimiter.push_back(string("("));
+  delimiter.push_back(string(")"));
 //  std::ios::sync_with_stdio(false);
   if(argc < 2) {
     usage();
@@ -89,7 +100,7 @@ int main(int argc, const char* argv[]) {
       for(int i = 0; i < input.size() / szwindow + 1; i ++) {
         stat.init(wordsbuf.c_str(), 0, 120);
         const std::vector<std::string>& words(stat.getWords());
-        stat.compute(input.substr(i * szwindow, szwindow).c_str());
+        stat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
         Eigen::Matrix<Eigen::Matrix<double, Eigen::Dynamic, 1>, Eigen::Dynamic, Eigen::Dynamic> corpus(stat.getCorpus());
         std::cout << words  << std::endl;
         std::cout << corpus << std::endl;
@@ -148,7 +159,7 @@ int main(int argc, const char* argv[]) {
         for(int i = 0; i < inbuf.size() / szwindow + 1; i ++) {
           corpus<double, char> cstat;
           cstat.init(wordbuf.c_str(), 0, 120);
-          cstat.compute(inbuf.substr(i * szwindow, szwindow).c_str());
+          cstat.compute(inbuf.substr(i * szwindow, szwindow).c_str(), delimiter);
           if(toc)
             tocs[tocs.size() - 1].push_back(corpushl<double, char>(cstat));
           else
@@ -159,7 +170,7 @@ int main(int argc, const char* argv[]) {
       for(int i = 0; i < input.size() / szwindow + 1; i ++) {
         corpus<double, char> cstat;
         cstat.init(wordbuf.c_str(), 0, 120);
-        cstat.compute(input.substr(i * szwindow, szwindow).c_str());
+        cstat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
         cstat0.push_back(corpushl<double, char>(cstat));
       }
       for(int i = 0; i < cstat0.size(); i ++)
@@ -208,7 +219,7 @@ int main(int argc, const char* argv[]) {
       }
       corpus<double, char> stat;
       stat.init(wordbuf.c_str(), 0, 120);
-      stat.compute(input.c_str());
+      stat.compute(input.c_str(), delimiter);
       corpushl<double, char> recons(stat);
       std::cout << recons.serialize(.9, .01);
     }
@@ -235,7 +246,7 @@ int main(int argc, const char* argv[]) {
         for(int i = 0; i < input.size() / szwindow + 1; i ++) {
           corpus<double, char> stat; 
           stat.init(wordbuf.c_str(), 0, 120);
-          stat.compute(input.substr(i * szwindow, szwindow).c_str());
+          stat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
           corpushl<double, char> recons(stat);
           recons.reDig(emph[ei]);
           std::cout << recons.serialize(.9, pow(.01, emph[ei])) << std::endl;
@@ -280,7 +291,7 @@ int main(int argc, const char* argv[]) {
         input2.close();
         corpus<double, char> cstat;
         cstat.init(wordbuf.c_str(), 0, 120);
-        cstat.compute(inbuf.c_str());
+        cstat.compute(inbuf.c_str(), delimiter);
         std::string wbuf(argv[iidx]);
         int slash = - 1;
         for(int j = 0; j < wbuf.size(); j ++)
@@ -302,7 +313,7 @@ int main(int argc, const char* argv[]) {
       {
         corpus<double, char> cstat;
         cstat.init(wordbuf.c_str(), 0, 120);
-        cstat.compute(input.c_str());
+        cstat.compute(input.c_str(), delimiter);
         cstat0 = corpushl<double, char>(cstat);
       }
       corpushl<double, char> cstat1(cstat0), cstat2(cstat0);
