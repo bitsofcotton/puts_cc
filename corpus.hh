@@ -33,19 +33,12 @@ template <typename T> bool equalStrClip(const T& a, const T& b) {
   return !cmp && min(a.size(), b.size()) <= jidx;
 }
 
-template <typename T> bool lessStrClip(const T& a, const T& b) {
-  int cmp(0), jidx(0);
-  for( ; !cmp && jidx < min(a.size(), b.size()); jidx ++)
-    cmp = a[jidx] - b[jidx];
-  return cmp < 0 || (!cmp && a.size() < b.size());
-}
-
 template <typename T> bool lessEqualStrClip(const T& a, const T& b) {
-  return lessStrClip<T>(a, b) || equalStrClip<T>(a, b);
+  return a < b ||  equalStrClip<T>(a, b);
 }
 
 template <typename T> bool lessNotEqualStrClip(const T& a, const T& b) {
-  return lessStrClip<T>(a, b) && !equalStrClip<T>(a, b);
+  return a < b && !equalStrClip<T>(a, b);
 }
 
 template <typename T, typename U> class corpus {
@@ -57,9 +50,9 @@ public:
   corpus();
   ~corpus();
   
-  void init(const U* words, const int& nthresh, const int& Nthresh, const int& Mwords = 120);
+  void init(const U* words, const int& nthresh, const int& Nthresh, const int& Mwords = 150);
   corpus<T, U>&         operator = (const corpus<T, U>& other);
-  const void            compute(const U* input);
+  const void            compute(const U* input, const vector<string>& delimiter = vector<string>());
   const vector<string>& getWords() const;
   const Tensor&         getCorpus() const;
 private:
@@ -67,13 +60,14 @@ private:
   vector<string>       words;
   vector<vector<int> > ptrs0;
   vector<vector<int> > ptrs;
+  vector<int>          pdelim;
   Tensor               corpust;
   int                  nthresh;
   int                  Nthresh;
   int                  Mwords;
   T                    Midx;
    
-  void getWordPtrs(const U* input);
+  void getWordPtrs(const U* input, const vector<string>& delimiter);
   void corpusEach();
 };
 
@@ -91,7 +85,10 @@ template <typename T, typename U> void corpus<T,U>::init(const U* words, const i
   for(int i = 0; words[i]; i ++) {
     if(words[i] == ',' || words[i] == '\n') {
       if(buf.size()) {
-        this->words0.push_back(buf);
+        if(buf[buf.size() - 1] == '\n' && buf.size() > 1)
+          this->words0.push_back(buf.substr(0, buf.size() - 1));
+        else if(buf[buf.size() - 1] != '\n')
+          this->words0.push_back(buf);
         this->ptrs0.push_back(vector<int>());
       }
       buf = string();
@@ -118,9 +115,9 @@ template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator = (const 
   return *this;
 }
 
-template <typename T, typename U> const void corpus<T,U>::compute(const U* input) {
+template <typename T, typename U> const void corpus<T,U>::compute(const U* input, const vector<string>& delimiter) {
   cerr << "Getting word pointers." << endl;
-  getWordPtrs(input);
+  getWordPtrs(input, delimiter);
   if(Mwords < words.size()) {
     cerr << "exceeds Mwords." << endl;
     return;
@@ -138,20 +135,25 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
   return corpust;
 }
 
-template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) {
-  sort(words0.begin(), words0.end(), lessStrClip<string>);
+template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input, const vector<string>& delimiter) {
+  sort(words0.begin(), words0.end());
+  pdelim = vector<int>();
+  pdelim.push_back(0);
   string work;
   vector<int> matchwidx;
   vector<int> matchidxs;
   int i(0);
   for( ; input[i]; i ++) {
     work += input[i];
+    for(int j = 0; j < delimiter.size(); j ++)
+      if(work == delimiter[j] && i != pdelim[pdelim.size() - 1])
+        pdelim.push_back(i);
     auto lo(words0.begin() + distance(words0.begin(), upper_bound(words0.begin(), words0.end(), work, lessEqualStrClip<string>)));
     auto up(words0.begin() + distance(words0.begin(), upper_bound(words0.begin(), words0.end(), work, lessNotEqualStrClip<string>)));
     bool match(false);
     for(auto itr(lo); itr < up; ++ itr) {
       if(equalStrClip<string>(work, *itr)) {
-        if(work.size() == itr->size()) {
+        if(work.size() >= itr->size()) {
           matchwidx.push_back(distance(words0.begin(), itr));
           matchidxs.push_back(i);
           match = true;
@@ -171,6 +173,15 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) 
     i   -= work.size() - 1;
     work = string();
   }
+  {
+    if(matchwidx.size() > 0) {
+      int j = matchwidx.size() - 1;
+      ptrs0[matchwidx[j]].push_back(matchidxs[j]);
+      Midx = matchidxs[j];
+      matchwidx = vector<int>();
+      matchidxs = vector<int>();
+    }
+  }
   words = vector<string>();
   words.push_back(string("^"));
   vector<int> head, tail;
@@ -186,6 +197,7 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input) 
   words.push_back(string("$"));
   tail.push_back(Midx + 1);
   ptrs.push_back(tail);
+  pdelim.push_back(Midx + 2);
   cerr << words.size() - 2 << " words used." << endl;
   return;
 }
@@ -200,6 +212,7 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
     if(!ptrs[i].size())
       continue;
     for(int j = 0; j < words.size(); j ++) {
+      int kk(0);
       if(!ptrs[j].size())
         continue;
       corpust(i, j) = Vec(words.size());
@@ -217,14 +230,20 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
           while(ctrv < ptrs[j].size() && ptrs[j][ctrv] < *itr) ctrv ++;
           if(ptrs[j][ctrv] < *itr)
             break;
-          T work(0);
-          const T buf0(log(abs(*itr - ptrs[i][ctru])));
-          const T buf1(log(abs(*itr - ptrs[j][ctrv])));
-          if(nthresh < buf0 && buf0 < Nthresh &&
-             nthresh < buf1 && buf1 < Nthresh)
-            work += buf0 * buf0 + buf1 * buf1;
-          // XXX fixme:
-          corpust(i, j)[k] += sqrt(work) / Midx;
+          for( ; kk < pdelim.size() - 1; kk ++)
+            if(pdelim[kk] <= *itr && *itr <= pdelim[kk + 1])
+              break;
+          if(! (pdelim[kk] <= ptrs[i][ctru] &&
+                              ptrs[i][ctru] <= pdelim[kk + 1] &&
+                pdelim[kk] <= ptrs[j][ctrv] &&
+                              ptrs[j][ctrv] <= pdelim[kk + 1]) )
+            continue;
+          // XXX configure me:
+          const T buf0(log(T(abs(*itr + .5 - ptrs[i][ctru])) * T(2) * exp(T(1))));
+          const T buf1(log(T(abs(*itr + .5 - ptrs[j][ctrv])) * T(2) * exp(T(1))));
+          const T work(buf0 * buf0 + buf1 * buf1);
+          if(isfinite(work))
+            corpust(i, j)[k] += sqrt(work) / Midx;
         }
       }
     }
