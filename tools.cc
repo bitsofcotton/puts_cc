@@ -1,4 +1,5 @@
 #include <string>
+#include <iterator>
 #include <iostream>
 #include <fstream>
 #include <locale>
@@ -8,7 +9,7 @@
 #include "file2eigen.hh"
 
 void usage() {
-  std::cout << "tools (lword|corpus|toc|redig|reconstruct|diff)" << std::endl;
+  std::cout << "tools (lword|corpus|toc|redig|stat|reconstruct|diff)" << std::endl;
 }
 
 const int szwindow(300);
@@ -39,6 +40,8 @@ int main(int argc, const char* argv[]) {
     mode = 2;
   else if(std::strcmp(argv[1], "redig") == 0 && argc > 2)
     mode = 4;
+  else if(std::strcmp(argv[1], "stat") == 0 && argc > 2)
+    mode = 6;
   else if(std::strcmp(argv[1], "reconstruct") == 0 && argc > 2)
     mode = 3;
   else if(std::strcmp(argv[1], "diff") == 0 && argc > 2)
@@ -328,6 +331,85 @@ int main(int argc, const char* argv[]) {
       auto diff(cstat0 - cstat1);
       std::cout << diff.serialize(.9, .01, .001) << std::endl;
       std::cout << cstat2.toc(details2, detailwords2, std::vector<corpushl<double, char> >(), std::string(), 0, .8) << std::endl;
+    }
+    break;
+  case 6:
+    {
+      std::string wordbuf;
+      {
+        std::string   line;
+        std::ifstream input2;
+        input2.open(argv[2]);
+        while(getline(input2, line)) {
+          wordbuf += line + std::string("\n");
+          if(input2.eof() || input2.bad())
+            break;
+        }
+        input2.close();
+      }
+      std::vector<std::vector<corpushl<double, char> > > details;
+      std::vector<std::string> detailwords;
+      for(int iidx = 3; iidx < argc; iidx ++) {
+        std::string   inbuf, line;
+        std::ifstream input2;
+        input2.open(argv[iidx]);
+        while(getline(input2, line)) {
+          inbuf += line + std::string("\n");
+          if(input2.eof() || input2.bad())
+            break;
+        }
+        input2.close();
+        std::string wbuf(argv[iidx]);
+        int slash = - 1;
+        for(int j = 0; j < wbuf.size(); j ++)
+          if(wbuf[j] == '/')
+            slash = j;
+        std::string wwbuf;
+        slash ++;
+        for(int j = slash; j < wbuf.size(); j ++)
+          wwbuf += wbuf[j];
+        details.push_back(std::vector<corpushl<double, char> >());
+        detailwords.push_back(wwbuf);
+        for(int i = 0; i < inbuf.size() / szwindow + 1; i ++) {
+          corpus<double, char> cstat;
+          cstat.init(wordbuf.c_str(), 0, 120);
+          cstat.compute(inbuf.substr(i * szwindow, szwindow).c_str(), delimiter);
+          details[details.size() - 1].push_back(corpushl<double, char>(cstat));
+        }
+      }
+      std::vector<corpushl<double, char> > cstat0;
+      for(int i = 0; i < input.size() / szwindow + 1; i ++) {
+        corpus<double, char> cstat;
+        cstat.init(wordbuf.c_str(), 0, 120);
+        cstat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
+        cstat0.push_back(corpushl<double, char>(cstat));
+      }
+      std::cerr << "analysing input text." << std::endl;
+      for(int i = 0; i < details.size(); i ++)
+        for(int j = 0; j < cstat0.size(); j ++)
+          for(int k = 0; k < details[i].size(); k ++)
+            cstat0[j] = cstat0[j].withDetail(detailwords[i], details[i][k]);
+      std::vector<std::pair<std::pair<double, std::pair<int, int> >, corpushl<double, char> > > cstats;
+      for(int i = 0; i < cstat0.size(); i ++)
+        for(int j = i; j < cstat0.size(); j ++) {
+          std::cerr << "." << std::flush;
+          cstats.push_back(std::make_pair(std::make_pair(cstat0[i].distanceInUnion(cstat0[j]), std::make_pair(i, j)), cstat0[i].match2relPseudo(cstat0[j])));
+        }
+      std::sort(cstats.begin(), cstats.end());
+      std::vector<int> phrases;
+      for(int i = 0; i < cstats.size(); i ++) {
+        const int ii(cstats.size() - i - 1);
+        if(std::binary_search(phrases.begin(), phrases.end(), cstats[ii].first.second.first) ||
+           std::binary_search(phrases.begin(), phrases.end(), cstats[ii].first.second.second))
+          continue;
+        std::cout << cstats[ii].second.serialize(.9, .0001) << std::endl;
+        phrases.push_back(cstats[ii].first.second.first);
+        phrases.push_back(cstats[ii].first.second.second);
+        std::sort(phrases.begin(), phrases.end());
+        phrases.erase(std::unique(phrases.begin(), phrases.end()), phrases.end());
+        if(phrases.size() > 12)
+          break;
+      }
     }
     break;
   }
