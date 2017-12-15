@@ -13,6 +13,7 @@
     ./tools corpus wordlist.txt < data.txt
     ./tools toc wordlist.txt dictionaries ... -toc topics ... < data.txt
     ./tools redig wordlist.txt < data.txt
+    ./tools stat wordlist.txt dictionaries ... < data.txt
     ./tools reconstruct wordlist.txt < data.txt
     ./tools diff wordlist.txt -dict ... -dict2 ... < data.txt
 
@@ -66,7 +67,7 @@ https://services.limpid-intensity.info/puts.php にサンプルがあります�
     std::cout << cstat0.toc(details, detailwords, details, tocwords, tocs, 10);
     
 # Tips
-これらのプログラムはまだよく検証されたアルゴリズムを使用して*いません*。
+これらのプログラムはまだよく検証されたアルゴリズムを使用して*いない可能性があります*。
 abbrev 関数は、理想的には withDetail 関数の逆の最適化となっていることが望ましいですが、現状そうなっていません。  
 serialize 関数は、理想的には corpushl(corpus(...)) イニシャライザの逆の最適化となっていることが望ましいですが、現状そうなっていません。  
 純粋な興味で作られたプログラムですので、文脈を理解する際の補助として以外には使用しないでください。  
