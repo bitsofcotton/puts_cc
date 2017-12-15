@@ -14,6 +14,7 @@ using std::string;
 using std::vector;
 using std::sort;
 using std::distance;
+using std::equal_range;
 using std::upper_bound;
 using std::unique;
 using std::pair;
@@ -270,6 +271,7 @@ public:
   const corpushl<T, U>& operator += (const corpushl<T, U>& other);
   const corpushl<T, U>& operator -= (const corpushl<T, U>& other);
   const corpushl<T, U>& operator *= (const T& t);
+  const bool            operator <  (const corpushl<T, U>& other) const;
   const corpushl<T, U>  operator +  (const corpushl<T, U>& other) const;
   const corpushl<T, U>  operator -  () const;
   const corpushl<T, U>  operator -  (const corpushl<T, U>& other) const;
@@ -368,6 +370,10 @@ template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator
     for(int j = 0; j < corpust.cols(); j ++)
       corpust(i, j) *= t;
   return *this;
+}
+
+template <typename T, typename U> const bool corpushl<T, U>::operator < (const corpushl<T, U>& other) const {
+  return corpust.rows() < other.corpust.rows();
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator + (const corpushl<T, U>& other) const {
@@ -499,11 +505,10 @@ template <typename T, typename U> const T corpushl<T, U>::distanceInUnion(const 
   T res(0);
   vector<int>    ridx0, ridx1;
   vector<string> drop(gatherWords(words, other.words, ridx0, ridx1));
-  for(int i = 0; i < drop.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0) {
+  for(int i = 0; i < drop.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0)
     for(int j = 0; j < drop.size(); j ++) if(ridx0[j] >= 0 && ridx1[j] >= 0)
-      for(int k = 0; k < drop.size(); k ++) if(ridx0[i] >= 0 && ridx1[k] >= 0)
+      for(int k = 0; k < drop.size(); k ++) if(ridx0[k] >= 0 && ridx1[k] >= 0)
         res += corpust(ridx0[i], ridx0[j])[ridx0[k]] * other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
-  }
   return res;
 }
 
@@ -820,29 +825,39 @@ template <typename T, typename U> vector<string> corpushl<T, U>::gatherWords(con
   sort(sin0.begin(), sin0.end());
   sort(sin1.begin(), sin1.end());
   int rbufsize(in0.size() + in1.size() + 1);
-  for(int i = 0; i < rbufsize; i ++)
+  for(int i = 0; i < rbufsize; i ++) {
     ridx0.push_back(- 1);
-  for(int i = 0; i < rbufsize; i ++)
     ridx1.push_back(- 1);
+  }
   int j = 0;
   for(int i = 0; i < sin0.size(); i ++) {
-    for(; j < sin1.size(); j ++) {
-      if(sin0[i] == sin1[j])
-        ridx1[result.size()] = distance(in1.begin(), upper_bound(in1.begin(), in1.end(), sin1[j]));
-      else if(sin0[i] > sin1[j]) {
+    for(; i < sin0.size() && j < sin1.size(); j ++) {
+      if(sin0[i] == sin1[j]) {
+        result.push_back(string(sin0[i]));
+        const int d0(distance(in0.begin(), equal_range(in0.begin(), in0.end(), sin0[i]).first));
+        const int d1(distance(in1.begin(), equal_range(in1.begin(), in1.end(), sin1[j]).first));
+        if(0 <= d0 && d0 < in0.size())
+          ridx0[result.size() - 1] = d0;
+        if(0 <= d1 && d1 < in1.size())
+          ridx1[result.size() - 1] = d1;
+        i ++;
+        continue;
+      } else if(sin0[i] > sin1[j]) {
         result.push_back(string(sin1[j]));
-        ridx1[result.size() - 1] = distance(in1.begin(), upper_bound(in1.begin(), in1.end(), sin1[j]));
+        const int d1(distance(in1.begin(), equal_range(in1.begin(), in1.end(), sin1[j]).first));
+        if(0 <= d1 && d1 < in1.size())
+          ridx1[result.size() - 1] = d1;
         continue;
       } else
         j --;
       j ++;
       break;
     }
-    const int dist(distance(in0.begin(), upper_bound(in0.begin(), in0.end(), sin0[i])));
-    if(0 <= dist && dist < in0.size()) {
-      result.push_back(string(sin0[i]));
-      ridx0[result.size() - 1] = dist;
-    }
+    if(sin0.size() <= i) break;
+    result.push_back(string(sin0[i]));
+    const int d0(distance(in0.begin(), equal_range(in0.begin(), in0.end(), sin0[i]).first));
+    if(0 <= d0 && d0 < in0.size())
+      ridx0[result.size() - 1] = distance(in0.begin(), equal_range(in0.begin(), in0.end(), sin0[i]).first);
   }
   return result;
 }

@@ -93,6 +93,26 @@ foreach(new DirectoryIterator('./datas/') as $fileInfo) {
         fclose($pipes[0]);
         $return_value = proc_close($process);
       }
+
+      $buf = "";
+      foreach (new DirectoryIterator($pathb . '../dicts') as $fileInfo) {
+        if($fileInfo->isDot()) continue;
+        $name = $fileInfo->getFilename();
+        $buf .= "\"dicts/" . $name . "\" ";
+      }
+      
+      $descriptorspec = array(
+        0 => array("pipe", "r"),  // stdin.
+        1 => array("file", $pathb2 . "stat.txt", "w"),  // stdout.
+        2 => array("file", $pathb2 . "stat-error.txt", "w") // stderr.
+      );
+      $process = proc_open('cd ' . $pathb . '../ && ../../puts stat words.txt ' 
+. $buf, $descriptorspec, $pipes, $cwd, $env);
+      if (is_resource($process)) {
+        fwrite($pipes[0], $text . "\n");
+        fclose($pipes[0]);
+        $return_value = proc_close($process);
+      }
       
       $descriptorspec = array(
         0 => array("pipe", "r"),  // stdin.
@@ -141,6 +161,25 @@ foreach(new DirectoryIterator('./datas/') as $fileInfo) {
         2 => array("file", $pathb2 . "-summary-error.txt", "w") // stderr.
       );
       $process = proc_open('cd ' . $pathb . '../ && ../../puts toc words.txt ' . $buf, $descriptorspec, $pipes, $cwd, $env);
+      if (is_resource($process)) {
+        fwrite($pipes[0], $text . "\n");
+        fclose($pipes[0]);
+        $return_value = proc_close($process);
+      }
+      
+      $buf = "";
+      foreach (new DirectoryIterator($pathb . '../dicts') as $fileInfo) {
+        if($fileInfo->isDot()) continue;
+        $name = $fileInfo->getFilename();
+        $buf .= "\"dicts/" . $name . "\" ";
+      }
+      
+      $descriptorspec = array(
+        0 => array("pipe", "r"),  // stdin.
+        1 => array("file", $pathb2 . "-stat.txt", "w"),  // stdout.
+        2 => array("file", $pathb2 . "-stat-error.txt", "w") // stderr.
+      );
+      $process = proc_open('cd ' . $pathb . '../ && ../../puts stat words.txt ' . $buf, $descriptorspec, $pipes, $cwd, $env);
       if (is_resource($process)) {
         fwrite($pipes[0], $text . "\n");
         fclose($pipes[0]);
