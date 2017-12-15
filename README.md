@@ -14,6 +14,7 @@ So with layered dictionaries, we can calculate a little accuratery.
     ./tools corpus wordlist.txt < data.txt
     ./tools toc wordlist.txt dictionaries ... -toc topics ... < data.txt
     ./tools redig wordlist.txt < data.txt
+    ./tools stat wordlist.txt dictionaries ... < data.txt
     ./tools reconstruct wordlist.txt < data.txt
     ./tools diff wordlist.txt -dict ... -dict2 ... < data.txt
 
@@ -67,7 +68,7 @@ Please pseudo-login with e-mail address - salt pair.
     std::cout << cstat0.toc(details, detailwords, details, tocwords, tocs, 10);
     
 # Tips
-These programs have a algorithm that is not carefully confirmed.  
+These programs may have a algorithm that is not carefully confirmed.  
 abbrev function is not ideal definition, so in fact, it is needed to be the inverse of withDetail function, but now, not so.  
 serialize function is not ideal definition, so in fact, it is needed to be the inverse of corpushl(corpus(...)) but now, not so.  
 This is from simply interest, so don't use this for the reason other than standing under the context.  
