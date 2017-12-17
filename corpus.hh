@@ -146,12 +146,25 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input, 
   string work;
   vector<int> matchwidx;
   vector<int> matchidxs;
+  int dM(0);
+  for(int i = 0; i < delimiter.size(); i ++)
+    dM = max(dM, int(delimiter[i].size()));
+  vector<string> workd;
+  for(int i = 0; i < dM; i ++) {
+    workd.push_back(string(""));
+    for(int j = i; j < dM; j ++)
+      workd[i] += string(" ");
+  }
   int i(0);
   for( ; input[i]; i ++) {
     work += input[i];
-    for(int j = 0; j < delimiter.size(); j ++)
-      if(work == delimiter[j] && i != pdelim[pdelim.size() - 1])
-        pdelim.push_back(i);
+    for(int ii = 0; ii < workd.size(); ii ++) {
+      workd[ii]  = workd[ii].substr(1, workd[ii].size() - 1);
+      workd[ii] += input[i];
+      for(int j = 0; j < delimiter.size(); j ++)
+        if(workd[ii] == delimiter[j] && i != pdelim[pdelim.size() - 1])
+          pdelim.push_back(i);
+    }
     auto lo(words0.begin() + distance(words0.begin(), upper_bound(words0.begin(), words0.end(), work, lessEqualStrClip<string>)));
     auto up(words0.begin() + distance(words0.begin(), upper_bound(words0.begin(), words0.end(), work, lessNotEqualStrClip<string>)));
     bool match(false);
