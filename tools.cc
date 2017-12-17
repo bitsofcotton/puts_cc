@@ -389,26 +389,46 @@ int main(int argc, const char* argv[]) {
         for(int j = 0; j < cstat0.size(); j ++)
           for(int k = 0; k < details[i].size(); k ++)
             cstat0[j] = cstat0[j].withDetail(detailwords[i], details[i][k]);
-      std::vector<std::pair<std::pair<double, std::pair<int, int> >, corpushl<double, char> > > cstats;
-      for(int i = 0; i < cstat0.size(); i ++)
+      std::vector<std::vector<std::pair<double, int> > > cstats;
+      for(int i = 0; i < cstat0.size(); i ++) {
+        cstats.push_back(std::vector<std::pair<double, int> >());
+        for(int j = 0; j < i; j ++)
+          cstats[i].push_back(cstats[j][i]);
         for(int j = i; j < cstat0.size(); j ++) {
           std::cerr << "." << std::flush;
-          cstats.push_back(std::make_pair(std::make_pair(cstat0[i].distanceInUnion(cstat0[j]), std::make_pair(i, j)), cstat0[i].match2relPseudo(cstat0[j])));
+          cstats[i].push_back(std::make_pair(cstat0[i].distanceInUnion(cstat0[j]), j));
         }
-      std::sort(cstats.begin(), cstats.end());
+      }
+      for(int i = 0; i < cstats.size(); i ++)
+        std::sort(cstats[i].begin(), cstats[i].end());
       std::vector<int> phrases;
-      for(int i = 0; i < cstats.size(); i ++) {
-        const int ii(cstats.size() - i - 1);
-        if(std::binary_search(phrases.begin(), phrases.end(), cstats[ii].first.second.first) ||
-           std::binary_search(phrases.begin(), phrases.end(), cstats[ii].first.second.second))
-          continue;
-        std::cout << cstats[ii].second.serialize(.9, .0001) << std::endl;
-        phrases.push_back(cstats[ii].first.second.first);
-        phrases.push_back(cstats[ii].first.second.second);
+      const int depth(6);
+      for(int i = 0; i < depth; i ++) {
+        std::vector<std::pair<double, int> > work;
+        std::vector<std::vector<int> >       idxs;
+        for(int j = 0; j < cstats.size(); j ++) {
+          double score(0);
+          idxs.push_back(std::vector<int>());
+          for(int k = 0, kk = 0; k < cstats.size() && kk < cstats.size() / depth; k ++) {
+            const int k0(cstats.size() - k - 1);
+            if(!std::binary_search(phrases.begin(), phrases.end(), cstats[j][k0].second)) {
+              score += cstats[j][k0].first;
+              idxs[j].push_back(cstats[j][k0].second);
+              kk ++;
+            }
+          }
+          work.push_back(std::make_pair(score, j));
+        }
+        sort(work.begin(), work.end());
+        const int jj(work[work.size() - 1].second);
+        corpushl<double, char> cs(cstat0[jj]);
+        for(int j = 0; j < idxs[jj].size(); j ++) {
+          phrases.push_back(idxs[jj][idxs[jj].size() - j - 1]);
+          cs = cs.match2relPseudo(cstat0[idxs[jj][idxs[jj].size() - j - 1]]);
+        }
+        std::cout << cs.serialize(.9, .0001) << std::endl;
         std::sort(phrases.begin(), phrases.end());
         phrases.erase(std::unique(phrases.begin(), phrases.end()), phrases.end());
-        if(phrases.size() > 12)
-          break;
       }
     }
     break;
