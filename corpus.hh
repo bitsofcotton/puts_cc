@@ -12,8 +12,6 @@ using std::endl;
 using std::flush;
 using std::string;
 using std::vector;
-using std::copy;
-using std::back_inserter;
 using std::sort;
 using std::distance;
 using std::equal_range;
@@ -618,41 +616,48 @@ template <typename T, typename U> const string corpushl<T, U>::serializeSub(cons
     return string();
   if(idxs.size() <= 1)
     return words[idxs[0]];
+  if(idxs.size() <= 2)
+    return words[idxs[0]] + words[idxs[1]];
   vector<pair<T, int> > score;
   for(int i = 0; i < idxs.size(); i ++)
     score.push_back(make_pair(0., - 1));
-  for(int i = 0; i < idxs.size(); i ++) if(0 <= idxs[i] && idxs[i] < corpust.rows())
-    for(int j = 0; j < idxs.size(); j ++) if(0 <= idxs[j] && idxs[j] < corpust.cols()) {
+  for(int i = 0; i < idxs.size(); i ++) if(0 <= idxs[i] && idxs[i] < corpust.rows()) {
+    for(int j = 0; j < corpust.rows(); j ++) {
       // corpust(i0, i2)[i1].
       // left-wins: sum corpust(i0, k)[i1] > sum corpust(k, i1)[i0].
       T tl(0), tr(0);
       for(int k = 0; k < idxs.size(); k ++) {
         if(0 <= idxs[k] && idxs[k] < corpust.cols() &&
-           idxs[j] < corpust(idxs[i], idxs[k]).size())
-          tl += corpust(idxs[i], idxs[k])[idxs[j]];
+           j < corpust(idxs[i], idxs[k]).size())
+          tl += corpust(idxs[i], idxs[k])[j];
         if(0 <= idxs[k] && idxs[k] < corpust.rows() &&
-           idxs[i] < corpust(idxs[k], idxs[i]).size())
-          tr += corpust(idxs[k], idxs[i])[idxs[j]];
+           j < corpust(idxs[k], idxs[i]).size())
+          tr += corpust(idxs[k], idxs[i])[j];
       }
       const T lscore(tl / tr);
-      if(isfinite(lscore))
+      if(isfinite(lscore) && isfinite(T(1) / lscore))
         score[i].first += lscore;
       score[i].second ++;
     }
+  }
   for(int i = 0; i < score.size(); i ++)
     if(0 <= score[i].second) {
       score[i].first /= score[i].second;
       score[i].second = idxs[i];
     }
   sort(score.begin(), score.end());
-  vector<int> left, right;
-  for(int i = 0; i < score.size() / 2; i ++)
+  vector<int> left, middle, right;
+  int i(0);
+  for( ; i < score.size() / 3; i ++)
     if(0 <= score[i].second)
       left.push_back(score[i].second);
-  for(int i = score.size() / 2; i < score.size(); i ++)
+  for( ; i < score.size() / 3 * 2; i ++)
+    if(0 <= score[i].second)
+      middle.push_back(score[i].second);
+  for( ; i < score.size(); i ++)
     if(0 <= score[i].second)
       right.push_back(score[i].second);
-  return serializeSub(left) + serializeSub(right);
+  return serializeSub(left) + serializeSub(middle) + serializeSub(right);
 }
 
 template <typename T, typename U> const string corpushl<T, U>::summary(const vector<string>& words, const vector<corpushl<T, U> >& meanings, const T& thresh) const {
