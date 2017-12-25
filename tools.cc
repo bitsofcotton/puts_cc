@@ -177,7 +177,7 @@ int main(int argc, const char* argv[]) {
         cstat0.push_back(corpushl<double, char>(cstat));
       }
       for(int i = 0; i < cstat0.size(); i ++)
-        std::cout << cstat0[i].serialize(.9, .01) << std::endl;
+        std::cout << cstat0[i].serialize() << std::endl;
       std::cerr << "analysing input text." << std::endl;
       for(int i = 0; i < details.size(); i ++)
         for(int j = 0; j < cstat0.size(); j ++)
@@ -224,7 +224,7 @@ int main(int argc, const char* argv[]) {
       stat.init(wordbuf.c_str(), 0, 120);
       stat.compute(input.c_str(), delimiter);
       corpushl<double, char> recons(stat);
-      std::cout << recons.serialize(.9, .01);
+      std::cout << recons.serialize();
     }
     break;
   case 4:
@@ -252,7 +252,7 @@ int main(int argc, const char* argv[]) {
           stat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
           corpushl<double, char> recons(stat);
           recons.reDig(emph[ei]);
-          std::cout << recons.serialize(.9, pow(.01, emph[ei])) << std::endl;
+          std::cout << recons.serialize() << std::endl;
         }
         std::cout << std::endl << std::endl;
       }
@@ -320,7 +320,7 @@ int main(int argc, const char* argv[]) {
         cstat0 = corpushl<double, char>(cstat);
       }
       corpushl<double, char> cstat1(cstat0), cstat2(cstat0);
-      std::cout << cstat0.serialize(.9, .01, .001) << std::endl;
+      std::cout << cstat0.serialize() << std::endl;
       std::cerr << "analysing input text." << std::endl;
       for(int i = 0; i < details.size(); i ++)
         cstat0 = cstat0.withDetail(detailwords[i] , details[i]);
@@ -329,7 +329,7 @@ int main(int argc, const char* argv[]) {
       cstat0.reDig(double(4));
       cstat1.reDig(double(4));
       auto diff(cstat0 - cstat1);
-      std::cout << diff.serialize(.9, .01, .001) << std::endl;
+      std::cout << diff.serialize() << std::endl;
       std::cout << cstat2.toc(details2, detailwords2, std::vector<corpushl<double, char> >(), std::string(), 0, .8) << std::endl;
     }
     break;
@@ -427,7 +427,7 @@ int main(int argc, const char* argv[]) {
           cs += cstat0[idxs[jj][idxs[jj].size() - j - 1]];
         }
         cs *= (double(1) / idxs[jj].size());
-        std::cout << cs.serialize(.75, .00001) << std::endl;
+        std::cout << cs.serialize() << std::endl;
         std::sort(phrases.begin(), phrases.end());
         phrases.erase(std::unique(phrases.begin(), phrases.end()), phrases.end());
       }
