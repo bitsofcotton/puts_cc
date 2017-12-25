@@ -12,7 +12,7 @@ void usage() {
   std::cout << "tools (lword|corpus|toc|redig|stat|reconstruct|diff)" << std::endl;
 }
 
-const int szwindow(300);
+const int szwindow(200);
 std::vector<std::string> delimiter;
 
 int main(int argc, const char* argv[]) {
@@ -402,7 +402,7 @@ int main(int argc, const char* argv[]) {
       for(int i = 0; i < cstats.size(); i ++)
         std::sort(cstats[i].begin(), cstats[i].end());
       std::vector<int> phrases;
-      const int depth(6);
+      const int depth(12);
       for(int i = 0; i < depth; i ++) {
         std::vector<std::pair<double, int> > work;
         std::vector<std::vector<int> >       idxs;
