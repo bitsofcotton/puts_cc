@@ -648,15 +648,18 @@ template <typename T, typename U> const string corpushl<T, U>::serializeSub(cons
   sort(score.begin(), score.end());
   vector<int> left, middle, right;
   int i(0);
-  for( ; i < score.size() / 3; i ++)
-    if(0 <= score[i].second)
-      left.push_back(score[i].second);
-  for( ; i < score.size() / 3 * 2; i ++)
+  for( ; i < score.size() / 6; i ++)
     if(0 <= score[i].second)
       middle.push_back(score[i].second);
-  for( ; i < score.size(); i ++)
+  for( ; i < score.size() / 2; i ++)
+    if(0 <= score[i].second)
+      left.push_back(score[i].second);
+  for( ; i < score.size() * 5 / 6; i ++)
     if(0 <= score[i].second)
       right.push_back(score[i].second);
+  for( ; i < score.size(); i ++)
+    if(0 <= score[i].second)
+      middle.push_back(score[i].second);
   return serializeSub(left) + serializeSub(middle) + serializeSub(right);
 }
 
