@@ -199,14 +199,14 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input, 
       matchidxs = vector<int>();
     }
   }
+  vector<int> head, tail;
   words = vector<string>();
   words.push_back(string("^"));
-  vector<int> head, tail;
   head.push_back(0);
   ptrs.push_back(head);
   for(auto itr = words0.begin(); itr != words0.end(); ++ itr) {
     const int idx = distance(words0.begin(), itr);
-    if(ptrs0[idx].size()) {
+    if(itr->size() && ptrs0[idx].size()) {
       words.push_back(*itr);
       ptrs.push_back(ptrs0[idx]);
     }
@@ -226,15 +226,13 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
 #endif
   for(int i = 0; i < words.size(); i ++) {
     cerr << "." << flush;
-    if(!ptrs[i].size())
-      continue;
     for(int j = 0; j < words.size(); j ++) {
       int kk(0);
-      if(!ptrs[j].size())
-        continue;
       corpust(i, j) = Vec(words.size());
       for(int k = 0; k < corpust(i, j).size(); k ++)
         corpust(i, j)[k] = 0;
+      if(!ptrs[i].size() || !ptrs[j].size())
+        continue;
       for(int k = 0; k < words.size(); k ++) {
         if(!ptrs[k].size())
           continue;
@@ -398,19 +396,22 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int i = 0; i < result.corpust.rows(); i ++)
-    for(int j = 0; j < result.corpust.cols(); j ++) {
+  for(int i = 0; i < result.corpust.rows(); i ++) if(0 <= ridx0[i])
+    for(int j = 0; j < result.corpust.cols(); j ++) if(0 <= ridx0[j]) {
       result.corpust(i, j) = Vec(result.words.size());
-      assert((0 <= ridx0[i] && 0 <= ridx0[j]) ||
-             (0 <= ridx1[i] && 0 <= ridx1[j]));
       for(int k = 0; k < result.corpust(i, j).size(); k ++) {
         result.corpust(i, j)[k] = 0.;
-        if(0 <= ridx0[i] && 0 <= ridx0[j] && 0 <= ridx0[k])
+        if(0 <= ridx0[k] && ridx0[k] < corpust(ridx0[i], ridx0[j]).size())
           result.corpust(i, j)[k] += corpust(ridx0[i], ridx0[j])[ridx0[k]];
-        if(0 <= ridx1[i] && 0 <= ridx1[j] && 0 <= ridx1[k])
-          result.corpust(i, j)[k] += other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
       }
     }
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
+  for(int i = 0; i < result.corpust.rows(); i ++) if(0 <= ridx1[i])
+    for(int j = 0; j < result.corpust.cols(); j ++) if(0 <= ridx1[j])
+      for(int k = 0; k < result.corpust(i, j).size(); k ++) if(0 <= ridx1[k] && ridx1[k] < other.corpust(ridx1[i], ridx1[j]).size())
+        result.corpust(i, j)[k] += other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
   return result;
 }
 
