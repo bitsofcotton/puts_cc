@@ -424,9 +424,10 @@ int main(int argc, const char* argv[]) {
         corpushl<double, char> cs(cstat0[jj]);
         for(int j = 0; j < idxs[jj].size(); j ++) {
           phrases.push_back(idxs[jj][idxs[jj].size() - j - 1]);
-          cs = cs.match2relPseudo(cstat0[idxs[jj][idxs[jj].size() - j - 1]]);
+          cs += cstat0[idxs[jj][idxs[jj].size() - j - 1]];
         }
-        std::cout << cs.serialize(.9, .0001) << std::endl;
+        cs *= (double(1) / idxs[jj].size());
+        std::cout << cs.serialize(.75, .00001) << std::endl;
         std::sort(phrases.begin(), phrases.end());
         phrases.erase(std::unique(phrases.begin(), phrases.end()), phrases.end());
       }
