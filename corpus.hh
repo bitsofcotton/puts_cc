@@ -296,7 +296,6 @@ public:
   const vector<T>       prej(const vector<corpushl<T, U> >& prejs) const;
   const T               culturalConflicts(const corpushl<T, U>& base) const;
   const corpushl<T, U>  conflictPart();
-  const string          optToc();
   const vector<string>& getWords() const;
   const Tensor&         getCorpus() const;
   const string          serialize() const;
@@ -583,13 +582,6 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::conflictP
   return;
 }
 
-template <typename T, typename U> const string corpushl<T, U>::optToc() {
-  string result;
-  // optimize corpust to make minimized toc.
-  // stub.
-  return result;
-}
-
 template <typename T, typename U> const string corpushl<T, U>::serialize() const {
   cerr << "serialize" << endl;
   if(corpust.rows() < 1 || corpust.cols() < 1)
@@ -867,6 +859,89 @@ template <typename T, typename U> const vector<string>& corpushl<T, U>::getWords
 
 template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dynamic, 1>, Eigen::Dynamic, Eigen::Dynamic>& corpushl<T, U>::getCorpus() const {
   return corpust;
+}
+
+
+
+
+template <typename T, typename U> const string optimizeTOC(const string& input, const U* words, const vector<string>& dict, vector<string>& detailwords, const vector<string>& delimiter, const int& szwindow, const int& depth, const T& redig = T(1)) {
+  // prepare dictionaries:
+  cerr << "optimizeToc: parsing input" << flush;
+  vector<vector<corpushl<T, U> > > details;
+  assert(dict.size() == detailwords.size());
+  for(int i = 0; i < dict.size(); i ++) {
+    cerr << "." << flush;
+    details.push_back(vector<corpushl<double, char> >());
+    for(int j = 0; j < dict[i].size() / szwindow + 1; j ++) {
+      corpus<double, char> cstat;
+      cstat.init(words, 0, 120);
+      cstat.compute(dict[i].substr(j * szwindow, szwindow).c_str(), delimiter);
+      details[details.size() - 1].push_back(corpushl<double, char>(cstat));
+    }
+  }
+  vector<corpushl<double, char> > cstat0;
+  for(int i = 0; i < input.size() / szwindow + 1; i ++) {
+    corpus<double, char> cstat;
+    cstat.init(words, 0, 120);
+    cstat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
+    cstat0.push_back(corpushl<double, char>(cstat));
+  }
+  
+  cerr << "analysing input text." << flush;
+  for(int i = 0; i < details.size(); i ++) {
+    cerr << "." << flush;
+    for(int j = 0; j < cstat0.size(); j ++)
+      for(int k = 0; k < details[i].size(); k ++)
+        cstat0[j] = cstat0[j].withDetail(detailwords[i], details[i][k]);
+  }
+  vector<vector<pair<double, int> > > cstats;
+  for(int i = 0; i < cstat0.size(); i ++) {
+    cerr << "." << flush;
+    cstats.push_back(vector<pair<double, int> >());
+    for(int j = 0; j < i; j ++)
+      cstats[i].push_back(cstats[j][i]);
+    for(int j = i; j < cstat0.size(); j ++) {
+      cerr << "." << flush;
+      cstats[i].push_back(make_pair(cstat0[i].distanceInUnion(cstat0[j]), j));
+    }
+  }
+  for(int i = 0; i < cstats.size(); i ++)
+    sort(cstats[i].begin(), cstats[i].end());
+  
+  cerr << "OK, making outputs." << flush;
+  string result;
+  vector<int> phrases;
+  for(int i = 0; i < depth; i ++) {
+    cerr << "." << flush;
+    vector<pair<double, int> > work;
+    vector<vector<int> >       idxs;
+    for(int j = 0; j < cstats.size(); j ++) {
+      double score(0);
+      idxs.push_back(vector<int>());
+      for(int k = 0, kk = 0; k < cstats.size() && kk < cstats.size() / depth; k ++) {
+        const int k0(cstats.size() - k - 1);
+        if(!binary_search(phrases.begin(), phrases.end(), cstats[j][k0].second)) {
+          score += cstats[j][k0].first;
+          idxs[j].push_back(cstats[j][k0].second);
+          kk ++;
+        }
+      }
+      work.push_back(make_pair(score, j));
+    }
+    sort(work.begin(), work.end());
+    const int jj(work[work.size() - 1].second);
+    corpushl<double, char> cs(cstat0[jj]);
+    for(int j = 0; j < idxs[jj].size(); j ++) {
+      phrases.push_back(idxs[jj][idxs[jj].size() - j - 1]);
+      cs += cstat0[idxs[jj][idxs[jj].size() - j - 1]];
+    }
+    cs *= (double(1) / idxs[jj].size());
+    cs.reDig(redig);
+    result += cs.serialize() + string("\n");
+    sort(phrases.begin(), phrases.end());
+    phrases.erase(unique(phrases.begin(), phrases.end()), phrases.end());
+  }
+  return result;
 }
 
 #define _CORPUS_
