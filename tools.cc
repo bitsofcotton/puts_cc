@@ -347,8 +347,8 @@ int main(int argc, const char* argv[]) {
         }
         input2.close();
       }
-      std::vector<std::vector<corpushl<double, char> > > details;
-      std::vector<std::string> detailwords;
+      std::vector<std::string> rdetails;
+      std::vector<std::string> rdetailwords;
       for(int iidx = 3; iidx < argc; iidx ++) {
         std::string   inbuf, line;
         std::ifstream input2;
@@ -368,69 +368,12 @@ int main(int argc, const char* argv[]) {
         slash ++;
         for(int j = slash; j < wbuf.size(); j ++)
           wwbuf += wbuf[j];
-        details.push_back(std::vector<corpushl<double, char> >());
-        detailwords.push_back(wwbuf);
-        for(int i = 0; i < inbuf.size() / szwindow + 1; i ++) {
-          corpus<double, char> cstat;
-          cstat.init(wordbuf.c_str(), 0, 120);
-          cstat.compute(inbuf.substr(i * szwindow, szwindow).c_str(), delimiter);
-          details[details.size() - 1].push_back(corpushl<double, char>(cstat));
-        }
+        rdetails.push_back(inbuf);
+        rdetailwords.push_back(wwbuf);
       }
-      std::vector<corpushl<double, char> > cstat0;
-      for(int i = 0; i < input.size() / szwindow + 1; i ++) {
-        corpus<double, char> cstat;
-        cstat.init(wordbuf.c_str(), 0, 120);
-        cstat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
-        cstat0.push_back(corpushl<double, char>(cstat));
-      }
-      std::cerr << "analysing input text." << std::endl;
-      for(int i = 0; i < details.size(); i ++)
-        for(int j = 0; j < cstat0.size(); j ++)
-          for(int k = 0; k < details[i].size(); k ++)
-            cstat0[j] = cstat0[j].withDetail(detailwords[i], details[i][k]);
-      std::vector<std::vector<std::pair<double, int> > > cstats;
-      for(int i = 0; i < cstat0.size(); i ++) {
-        cstats.push_back(std::vector<std::pair<double, int> >());
-        for(int j = 0; j < i; j ++)
-          cstats[i].push_back(cstats[j][i]);
-        for(int j = i; j < cstat0.size(); j ++) {
-          std::cerr << "." << std::flush;
-          cstats[i].push_back(std::make_pair(cstat0[i].distanceInUnion(cstat0[j]), j));
-        }
-      }
-      for(int i = 0; i < cstats.size(); i ++)
-        std::sort(cstats[i].begin(), cstats[i].end());
-      std::vector<int> phrases;
-      const int depth(12);
-      for(int i = 0; i < depth; i ++) {
-        std::vector<std::pair<double, int> > work;
-        std::vector<std::vector<int> >       idxs;
-        for(int j = 0; j < cstats.size(); j ++) {
-          double score(0);
-          idxs.push_back(std::vector<int>());
-          for(int k = 0, kk = 0; k < cstats.size() && kk < cstats.size() / depth; k ++) {
-            const int k0(cstats.size() - k - 1);
-            if(!std::binary_search(phrases.begin(), phrases.end(), cstats[j][k0].second)) {
-              score += cstats[j][k0].first;
-              idxs[j].push_back(cstats[j][k0].second);
-              kk ++;
-            }
-          }
-          work.push_back(std::make_pair(score, j));
-        }
-        sort(work.begin(), work.end());
-        const int jj(work[work.size() - 1].second);
-        corpushl<double, char> cs(cstat0[jj]);
-        for(int j = 0; j < idxs[jj].size(); j ++) {
-          phrases.push_back(idxs[jj][idxs[jj].size() - j - 1]);
-          cs += cstat0[idxs[jj][idxs[jj].size() - j - 1]];
-        }
-        cs *= (double(1) / idxs[jj].size());
-        std::cout << cs.serialize() << std::endl;
-        std::sort(phrases.begin(), phrases.end());
-        phrases.erase(std::unique(phrases.begin(), phrases.end()), phrases.end());
-      }
+      std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, 12, .125) << std::endl;
+      std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, 12, 1.) << std::endl;
+      std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, 12, 8.) << std::endl;
     }
     break;
   }
