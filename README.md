@@ -1,9 +1,9 @@
 # Puts_CC
-Cluster large documents from small elementary document sets.
+Cluster large documents from small elementary document sets and collect a TOC and make links to medium sized set of documents.
 
-This program aims to cluster and collect TOC and make links to medium sized set of documents.  
-And this is NOT the program that judges it is true or false, this IS ONLY the program that seines
-the score that seems to be true or that seems to be false FROM INPUT (with no deductions for logics).  
+This IS NOT the program that judges it is true or false, this IS ONLY the program that seines
+the score that seems to be true or that seems to be false FROM INPUT (with no deductions for logics).
+
 Statistics definition needs to be not dense.
 If it's dense, the context we get from statistics may say nothing.
 So with layered dictionaries, we can calculate a little accuratery.
