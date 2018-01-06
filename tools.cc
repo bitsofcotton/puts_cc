@@ -371,9 +371,10 @@ int main(int argc, const char* argv[]) {
         rdetails.push_back(inbuf);
         rdetailwords.push_back(wwbuf);
       }
-      std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, 12, .125) << std::endl;
-      std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, 12, 1.) << std::endl;
-      std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, 12, 8.) << std::endl;
+      const int tot_cont(min(12, int(input.size()) / szwindow));
+      std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, .125) << std::endl;
+      std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 1.) << std::endl;
+      std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8.) << std::endl;
     }
     break;
   }

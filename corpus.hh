@@ -256,6 +256,8 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
           // XXX configure me:
           const T buf0(log(T(abs(*itr + .5 - ptrs[i][ctru])) * T(2) * exp(T(1))));
           const T buf1(log(T(abs(*itr + .5 - ptrs[j][ctrv])) * T(2) * exp(T(1))));
+          // const T buf0(abs(*itr + .5 - ptrs[i][ctru]));
+          // const T buf1(abs(*itr + .5 - ptrs[j][ctrv]));
           const T work(buf0 * buf0 + buf1 * buf1);
           if(isfinite(work))
             corpust(i, j)[k] += sqrt(work) / Midx;
@@ -610,48 +612,55 @@ template <typename T, typename U> const string corpushl<T, U>::serializeSub(cons
     return words[idxs[0]];
   if(idxs.size() <= 2)
     return words[idxs[0]] + words[idxs[1]];
-  vector<pair<T, int> > score;
+  vector<pair<T, int> > score, cscore;
   for(int i = 0; i < idxs.size(); i ++)
-    score.push_back(make_pair(0., - 1));
-  for(int i = 0; i < idxs.size(); i ++) if(0 <= idxs[i] && idxs[i] < corpust.rows()) {
-    for(int j = 0; j < corpust.rows(); j ++) {
-      // corpust(i0, i2)[i1].
-      // left-wins: sum corpust(i0, k)[i1] > sum corpust(k, i1)[i0].
-      T tl(0), tr(0);
-      for(int k = 0; k < idxs.size(); k ++) {
-        if(0 <= idxs[k] && idxs[k] < corpust.cols() &&
-           j < corpust(idxs[i], idxs[k]).size())
-          tl += corpust(idxs[i], idxs[k])[j];
-        if(0 <= idxs[k] && idxs[k] < corpust.rows() &&
-           j < corpust(idxs[k], idxs[i]).size())
-          tr += corpust(idxs[k], idxs[i])[j];
-      }
-      const T lscore(tl / tr);
-      if(isfinite(lscore) && isfinite(T(1) / lscore))
-        score[i].first += lscore;
-      score[i].second ++;
-    }
-  }
-  for(int i = 0; i < score.size(); i ++)
-    if(0 <= score[i].second) {
-      score[i].first /= score[i].second;
-      score[i].second = idxs[i];
+    if(0 <= idxs[i] && idxs[i] < corpust.rows()) {
+      T tl(0), tc(0), tr(0);
+      for(int j = 0; j < idxs.size(); j ++)
+        // corpust(i0, i2)[i1].
+        // left-wins: sum corpust(i0, k)[i1] > sum corpust(k, i0)[i1].
+        for(int k = 0; k < idxs.size(); k ++) {
+          if(0 <= idxs[k] && idxs[k] < corpust.cols() &&
+             0 <= idxs[j] && idxs[j] < corpust(idxs[i], idxs[k]).size())
+            tl += pow(corpust(idxs[i], idxs[k])[idxs[j]], T(2));
+          if(0 <= idxs[j] && idxs[j] < corpust.rows() &&
+             0 <= idxs[k] && idxs[k] < corpust.cols() &&
+             0 <= idxs[i] && idxs[i] < corpust(idxs[j], idxs[k]).size())
+            tc += pow(corpust(idxs[j], idxs[k])[idxs[i]], T(2));
+          if(0 <= idxs[k] && idxs[k] < corpust.rows() &&
+             0 <= idxs[j] && idxs[j] < corpust(idxs[k], idxs[i]).size())
+            tr += pow(corpust(idxs[k], idxs[i])[idxs[j]], T(2));
+        }
+      score.push_back(make_pair((tr + 1) / (tl + 1), idxs[i]));
+      cscore.push_back(make_pair(max(tr, tl) / (tc + 1), idxs[i]));
     }
   sort(score.begin(), score.end());
+  sort(cscore.begin(), cscore.end());
   vector<int> left, middle, right;
+  middle.push_back(cscore[0].second);
   int i(0);
-  for( ; i < score.size() / 6; i ++)
-    if(0 <= score[i].second)
-      middle.push_back(score[i].second);
-  for( ; i < score.size() / 2; i ++)
-    if(0 <= score[i].second)
+  for(int cnt = 0; cnt < score.size() / 2 && i < score.size(); i ++) {
+    bool flag(false);
+    for(int j = 0; j < middle.size(); j ++)
+      if(middle[j] == score[i].second) {
+        flag = true;
+        break;
+      }
+    if(!flag) {
       left.push_back(score[i].second);
-  for( ; i < score.size() * 5 / 6; i ++)
-    if(0 <= score[i].second)
+      cnt ++;
+    }
+  }
+  for( ; i < score.size(); i ++) {
+    bool flag(false);
+    for(int j = 0; j < middle.size(); j ++)
+      if(middle[j] == score[i].second) {
+        flag = true;
+        break;
+      }
+    if(!flag)
       right.push_back(score[i].second);
-  for( ; i < score.size(); i ++)
-    if(0 <= score[i].second)
-      middle.push_back(score[i].second);
+  }
   return serializeSub(left) + serializeSub(middle) + serializeSub(right);
 }
 
