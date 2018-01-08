@@ -305,7 +305,7 @@ public:
   const string          summary(const vector<string>& words, const vector<corpushl<T, U> >& meanings, const T& thresh) const;
   const corpushl<T, U>  abbrev(const string word, const corpushl<T, U>& mean);
   const vector<string>  reverseLink(const corpushl<T, U>& orig) const;
-  const pair<T, T>      compareStructure(const corpushl<T, U>& src, const T& thresh = T(1)) const;
+  const pair<T, T>      compareStructure(const corpushl<T, U>& src, const T& thresh = T(1e-4)) const;
   const corpushl<T, U>  reDig(const T& ratio);
   const corpushl<T, U>  simpleThresh(const T& ratio);
 private:
@@ -730,13 +730,13 @@ template <typename T, typename U> const pair<T, T> corpushl<T, U>::compareStruct
   for(int i = 0; i < S0.rows(); i ++)
     for(int j = 0; j < S0.cols(); j ++) {
       S0(i, j) = s0[i] / s0[j];
-      if(!isfinite(S0(i, j)) || T(1) / thresh < abs(S0(i, j)))
+      if(!isfinite(S0(i, j)) || T(1) / thresh / thresh < abs(S0(i, j)))
         S0(i, j) = T(0);
     }
   for(int i = 0; i < S1.rows(); i ++)
     for(int j = 0; j < S1.cols(); j ++) {
       S1(i, j) = s1[i] / s1[j];
-      if(!isfinite(S1(i, j)) || T(1) / thresh < abs(S1(i, j)))
+      if(!isfinite(S1(i, j)) || T(1) / thresh / thresh < abs(S1(i, j)))
         S1(i, j) = T(0);
     }
   Eigen::JacobiSVD<Mat> svd0(S0, 0);
