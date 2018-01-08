@@ -721,25 +721,24 @@ template <typename T, typename U> const vector<string> corpushl<T, U>::reverseLi
 
 template <typename T, typename U> const pair<T, T> corpushl<T, U>::compareStructure(const corpushl<T, U>& src, const T& thresh) const {
   // get H-SVD singular values for each of them and sort:
-  const Vec singular0(singularValues()), singular1(src.singularValues());
-  vector<T> s0, s1;
-  for(int i = 0; i < singular0.size(); i ++)
-    s0.push_back(singular0[i]);
-  for(int i = 0; i < singular1.size(); i ++)
-    s1.push_back(singular1[i]);
-  sort(s0.begin(), s0.end());
-  sort(s1.begin(), s1.end());
+  const Vec s0(singularValues()), s1(src.singularValues());
   
   // get compared.
   pair<T, T> result;
   result.first = result.second = T(0);
   Mat S0(s0.size(), s0.size()), S1(s1.size(), s1.size());
   for(int i = 0; i < S0.rows(); i ++)
-    for(int j = 0; j < S0.cols(); j ++)
+    for(int j = 0; j < S0.cols(); j ++) {
       S0(i, j) = s0[i] / s0[j];
+      if(!isfinite(S0(i, j)))
+        S0(i, j) = T(0);
+    }
   for(int i = 0; i < S1.rows(); i ++)
-    for(int j = 0; j < S1.cols(); j ++)
+    for(int j = 0; j < S1.cols(); j ++) {
       S1(i, j) = s1[i] / s1[j];
+      if(!isfinite(S1(i, j)))
+        S1(i, j) = T(0);
+    }
   Eigen::JacobiSVD<Mat> svd0(S0, 0);
   Eigen::JacobiSVD<Mat> svd1(S1, 0);
   const Vec ss0(svd0.singularValues());
