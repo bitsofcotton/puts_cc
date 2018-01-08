@@ -730,13 +730,13 @@ template <typename T, typename U> const pair<T, T> corpushl<T, U>::compareStruct
   for(int i = 0; i < S0.rows(); i ++)
     for(int j = 0; j < S0.cols(); j ++) {
       S0(i, j) = s0[i] / s0[j];
-      if(!isfinite(S0(i, j)))
+      if(!isfinite(S0(i, j)) || T(1) / thresh < abs(S0(i, j)))
         S0(i, j) = T(0);
     }
   for(int i = 0; i < S1.rows(); i ++)
     for(int j = 0; j < S1.cols(); j ++) {
       S1(i, j) = s1[i] / s1[j];
-      if(!isfinite(S1(i, j)))
+      if(!isfinite(S1(i, j)) || T(1) / thresh < abs(S1(i, j)))
         S1(i, j) = T(0);
     }
   Eigen::JacobiSVD<Mat> svd0(S0, 0);
