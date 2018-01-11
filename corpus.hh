@@ -294,8 +294,8 @@ public:
   const corpushl<T, U>  withDetail(const string& word, const corpushl<T, U>& other);
   const T               distanceInUnion(const corpushl<T, U>& other) const;
   const corpushl<T, U>  match2relPseudo(const corpushl<T, U>& other) const;
-  const string          toc(const vector<corpushl<T, U> >& base, const vector<string>& words, const vector<corpushl<T, U> >& meanings, const string& mwords, const int& nloop, const T& thresh) const;
-  const string          toc(const vector<vector<corpushl<T, U> > >& base, const vector<string>& words, const vector<corpushl<T, U> >& meanings, const string& mwords, const int& nloop, const T& thresh) const;
+  const string          toc(const vector<corpushl<T, U> >& base, const vector<string>& words, const string& mwords) const;
+  const string          toc(const vector<vector<corpushl<T, U> > >& base, const vector<string>& words, const string& mwords) const;
   const vector<T>       prej(const vector<corpushl<T, U> >& prejs) const;
   const T               culturalConflicts(const corpushl<T, U>& base) const;
   const corpushl<T, U>  conflictPart();
@@ -305,7 +305,7 @@ public:
   const string          summary(const vector<string>& words, const vector<corpushl<T, U> >& meanings, const T& thresh) const;
   const corpushl<T, U>  abbrev(const string word, const corpushl<T, U>& mean);
   const vector<string>  reverseLink(const corpushl<T, U>& orig) const;
-  const pair<T, T>      compareStructure(const corpushl<T, U>& src, const T& thresh = T(1e-4)) const;
+  const pair<T, T>      compareStructure(const corpushl<T, U>& src, const T& thresh = T(1e-4), const T& thresh2 = T(.125)) const;
   const corpushl<T, U>  reDig(const T& ratio);
   const corpushl<T, U>  simpleThresh(const T& ratio);
 private:
@@ -527,30 +527,30 @@ template <typename T, typename U> const T corpushl<T, U>::distanceInUnion(const 
   return res;
 }
 
-template <typename T, typename U> const string corpushl<T, U>::toc(const vector<corpushl<T, U> >& base, const vector<string>& words, const vector<corpushl<T, U> >& meanings, const string& mwords, const int& nloop, const T& thresh) const {
+template <typename T, typename U> const string corpushl<T, U>::toc(const vector<corpushl<T, U> >& base, const vector<string>& words, const string& mwords) const {
   vector<vector<corpushl<T, U> > > basev;
   for(int i = 0; i < base.size(); i ++) {
     vector<corpushl<T, U> > work;
     work.push_back(base[i]);
     basev.push_back(work);
   }
-  return toc(basev, words, meanings, mwords, nloop, thresh);
+  return toc(basev, words, mwords);
 }
 
-template <typename T, typename U> const string corpushl<T, U>::toc(const vector<vector<corpushl<T, U> > >& base, const vector<string>& words, const vector<corpushl<T, U> >& meanings, const string& mwords, const int& nloop, const T& thresh) const {
+template <typename T, typename U> const string corpushl<T, U>::toc(const vector<vector<corpushl<T, U> > >& base, const vector<string>& words, const string& mwords) const {
   string result;
-  corpushl<T, U> work0(*this);
   result += mwords + string(" : ");
   vector<pair<T, string> > mlist;
-  for(int j = 0; j < meanings.size(); j ++) {
-    corpushl<T, U> work(this->match2relPseudo(meanings[j]));
-    work0 -= work;
-    for(int k = 0; k < base.size(); k ++)
-      for(int l = 0; l < base.size(); l ++)
-        work = work.abbrev(words[k], base[k][l]);
+  for(int k = 0; k < base.size(); k ++) {
+    corpushl<T, U> work(*this);
+    for(int l = 0; l < base[k].size(); l ++)
+      work = work.abbrev(words[k], base[k][l]);
     pair<T, T> cr(compareStructure(work));
-    mlist.push_back(make_pair(work.distanceInUnion(work) /
-                              distanceInUnion(*this),
+    const T ncr(sqrt(cr.first * cr.first + cr.second * cr.second));
+    cr.first  /= ncr;
+    cr.second /= ncr;
+    mlist.push_back(make_pair(work.distanceInUnion(*this) /
+                              sqrt(distanceInUnion(*this)),
                               work.serialize() + string("(sr:)") +
                               to_string(cr.first) + string(", ") +
                               to_string(cr.second) ) );
@@ -609,13 +609,7 @@ template <typename T, typename U> const string corpushl<T, U>::serialize() const
 
 template <typename T, typename U> const string corpushl<T, U>::serializeSub(const vector<int>& idxs) const {
   cerr << "." << flush;
-  if(idxs.size() <= 0)
-    return string();
-  if(idxs.size() <= 1)
-    return words[idxs[0]];
-  if(idxs.size() <= 2)
-    return words[idxs[0]] + words[idxs[1]];
-  vector<pair<T, int> > score, cscore;
+  vector<pair<T, int> > cscore;
   for(int i = 0; i < idxs.size(); i ++)
     if(0 <= idxs[i] && idxs[i] < corpust.rows()) {
       T tl(0), tc(0), tr(0);
@@ -634,37 +628,38 @@ template <typename T, typename U> const string corpushl<T, U>::serializeSub(cons
              0 <= idxs[j] && idxs[j] < corpust(idxs[k], idxs[i]).size())
             tr += pow(corpust(idxs[k], idxs[i])[idxs[j]], T(2));
         }
-      score.push_back(make_pair((tr + 1) / (tl + 1), idxs[i]));
-      cscore.push_back(make_pair(max(tr, tl) / (tc + 1), idxs[i]));
+      const T lscore(max(tr, tl) / (tc + 1));
+      if(isfinite(lscore))
+        cscore.push_back(make_pair(lscore, idxs[i]));
+    }
+  if(cscore.size() <= 0)
+    return string();
+  if(cscore.size() <= 1)
+    return words[cscore[0].second];
+  if(cscore.size() <= 2)
+    return words[cscore[0].second] + words[cscore[1].second];
+  for(int i = 0; i < cscore.size(); i ++)
+    cerr << cscore[i].first << endl;
+  sort(cscore.begin(), cscore.end());
+  vector<int> left, right;
+  const int& middle(cscore[0].second);
+  vector<pair<T, int> > score;
+  for(int i = 0; i < idxs.size(); i ++)
+    if(idxs[i] != middle && 0 <= idxs[i] && idxs[i] < corpust.rows()) {
+      T lscore(0);
+      for(int j = 0; j < idxs.size(); j ++)
+        if(idxs[j] != middle && 0 <= idxs[j] && idxs[j] < corpust.cols()) {
+          lscore += corpust(idxs[i], idxs[j])[middle];
+          lscore -= corpust(idxs[j], idxs[i])[middle];
+        }
+      score.push_back(make_pair(lscore, idxs[i]));
     }
   sort(score.begin(), score.end());
-  sort(cscore.begin(), cscore.end());
-  vector<int> left, middle, right;
-  middle.push_back(cscore[0].second);
-  int i(0);
-  for(int cnt = 0; cnt < score.size() / 2 && i < score.size(); i ++) {
-    bool flag(false);
-    for(int j = 0; j < middle.size(); j ++)
-      if(middle[j] == score[i].second) {
-        flag = true;
-        break;
-      }
-    if(!flag) {
-      left.push_back(score[i].second);
-      cnt ++;
-    }
-  }
-  for( ; i < score.size(); i ++) {
-    bool flag(false);
-    for(int j = 0; j < middle.size(); j ++)
-      if(middle[j] == score[i].second) {
-        flag = true;
-        break;
-      }
-    if(!flag)
-      right.push_back(score[i].second);
-  }
-  return serializeSub(left) + serializeSub(middle) + serializeSub(right);
+  for(int i = 0; i < score.size() / 2; i ++)
+    left.push_back(score[i].second);
+  for(int i = score.size() / 2; i < score.size(); i ++)
+    right.push_back(score[i].second);
+  return serializeSub(left) + words[middle] + serializeSub(right);
 }
 
 template <typename T, typename U> const string corpushl<T, U>::summary(const vector<string>& words, const vector<corpushl<T, U> >& meanings, const T& thresh) const {
@@ -719,7 +714,7 @@ template <typename T, typename U> const vector<string> corpushl<T, U>::reverseLi
   return res;
 }
 
-template <typename T, typename U> const pair<T, T> corpushl<T, U>::compareStructure(const corpushl<T, U>& src, const T& thresh) const {
+template <typename T, typename U> const pair<T, T> corpushl<T, U>::compareStructure(const corpushl<T, U>& src, const T& thresh, const T& thresh2) const {
   // get H-SVD singular values for each of them and sort:
   const Vec s0(singularValues()), s1(src.singularValues());
   
@@ -730,13 +725,13 @@ template <typename T, typename U> const pair<T, T> corpushl<T, U>::compareStruct
   for(int i = 0; i < S0.rows(); i ++)
     for(int j = 0; j < S0.cols(); j ++) {
       S0(i, j) = s0[i] / s0[j];
-      if(!isfinite(S0(i, j)) || T(1) / thresh / thresh < abs(S0(i, j)))
+      if(!isfinite(S0(i, j)) || T(1) / thresh < abs(S0(i, j)))
         S0(i, j) = T(0);
     }
   for(int i = 0; i < S1.rows(); i ++)
     for(int j = 0; j < S1.cols(); j ++) {
       S1(i, j) = s1[i] / s1[j];
-      if(!isfinite(S1(i, j)) || T(1) / thresh / thresh < abs(S1(i, j)))
+      if(!isfinite(S1(i, j)) || T(1) / thresh < abs(S1(i, j)))
         S1(i, j) = T(0);
     }
   Eigen::JacobiSVD<Mat> svd0(S0, 0);
@@ -745,11 +740,11 @@ template <typename T, typename U> const pair<T, T> corpushl<T, U>::compareStruct
   const Vec ss1(svd1.singularValues());
   int i(0), j(0);
   for( ; i < ss0.size() && j < ss1.size(); )
-    if(abs(ss0[i] - ss1[j]) < thresh) {
+    if(abs(ss0[i] - ss1[j]) / max(abs(ss0[i]), abs(ss1[i])) < thresh2) {
       result.first  += ss0[i] * ss0[i] + ss1[j] * ss1[j];
       i ++, j ++;
     } else {
-      result.second += pow(ss0[i] - ss1[j], T(2));
+      result.second += ss0[i] * ss0[i] + ss1[j] * ss1[j];
       if(ss0[i] > ss1[j])
         i ++;
       else
@@ -977,7 +972,6 @@ template <typename T, typename U> const string optimizeTOC(const string& input, 
     sort(cstats[i].begin(), cstats[i].end());
   
   cerr << "OK, making outputs." << flush;
-  string result;
   vector<int> phrases;
   cerr << "." << flush;
   vector<pair<double, int> > work;
@@ -990,24 +984,24 @@ template <typename T, typename U> const string optimizeTOC(const string& input, 
       if(!binary_search(phrases.begin(), phrases.end(), cstats[j][k0].second)) {
         score += cstats[j][k0].first;
         idxs[j].push_back(cstats[j][k0].second);
+        phrases.push_back(cstats[j][k0].second);
+        sort(phrases.begin(), phrases.end());
         kk ++;
       }
     }
     work.push_back(make_pair(score, j));
   }
   sort(work.begin(), work.end());
+  string result;
   for(int j = 0; j < work.size(); j ++) {
     const int jj(work[work.size() - j - 1].second);
+    if(idxs[jj].size() <= 0)
+      break;
     corpushl<double, char> cs(cstat0[jj]);
-    for(int j = 0; j < idxs[jj].size(); j ++) {
-      phrases.push_back(idxs[jj][idxs[jj].size() - j - 1]);
+    for(int j = 0; j < idxs[jj].size(); j ++)
       cs += cstat0[idxs[jj][idxs[jj].size() - j - 1]];
-    }
-    cs *= (double(1) / idxs[jj].size());
     cs.reDig(redig);
     result += cs.serialize() + string("\n");
-    sort(phrases.begin(), phrases.end());
-    phrases.erase(unique(phrases.begin(), phrases.end()), phrases.end());
   }
   return result;
 }
