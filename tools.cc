@@ -190,9 +190,8 @@ int main(int argc, const char* argv[]) {
             for(int l = 0; l < details[j].size(); l ++)
               tocs[i][k] = tocs[i][k].withDetail(detailwords[j], details[j][l]);
       std::cerr << "getting toc." << std::endl;
-      for(int j = 0; j < tocs.size(); j ++)
-        for(int i = 0; i < cstat0.size(); i ++)
-          std::cout << cstat0[i].toc(details, detailwords, tocs[j], tocwords[j], 0, .8);
+      for(int i = 0; i < cstat0.size(); i ++)
+        std::cout << cstat0[i].toc(tocs, tocwords, 0, .8);
       std::cout << std::endl << std::endl;
       std::vector<corpushl<double, char> > summ(cstat0);
       for(int i = 0; i < summ.size(); i ++)
