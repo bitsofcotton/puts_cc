@@ -191,7 +191,7 @@ int main(int argc, const char* argv[]) {
               tocs[i][k] = tocs[i][k].withDetail(detailwords[j], details[j][l]);
       std::cerr << "getting toc." << std::endl;
       for(int i = 0; i < cstat0.size(); i ++)
-        std::cout << cstat0[i].toc(tocs, tocwords, 0, .8);
+        std::cout << cstat0[i].toc(tocs, tocwords, cstat0[i].serialize());
       std::cout << std::endl << std::endl;
       std::vector<corpushl<double, char> > summ(cstat0);
       for(int i = 0; i < summ.size(); i ++)
@@ -325,11 +325,10 @@ int main(int argc, const char* argv[]) {
         cstat0 = cstat0.withDetail(detailwords[i] , details[i]);
       for(int i = 0; i < details2.size(); i ++)
         cstat1 = cstat1.withDetail(detailwords2[i], details2[i]);
-      cstat0.reDig(double(4));
       cstat1.reDig(double(4));
-      auto diff(cstat0 - cstat1);
+      cstat2.reDig(double(4));
+      auto diff(cstat1 - cstat2);
       std::cout << diff.serialize() << std::endl;
-      std::cout << cstat2.toc(details2, detailwords2, std::vector<corpushl<double, char> >(), std::string(), 0, .8) << std::endl;
     }
     break;
   case 6:
@@ -370,7 +369,7 @@ int main(int argc, const char* argv[]) {
         rdetails.push_back(inbuf);
         rdetailwords.push_back(wwbuf);
       }
-      const int tot_cont(min(12, int(input.size()) / szwindow));
+      const int tot_cont(max(min(12, int(input.size()) / szwindow), 1));
       std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, .125) << std::endl;
       std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 1.) << std::endl;
       std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8.) << std::endl;
