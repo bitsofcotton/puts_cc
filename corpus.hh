@@ -638,8 +638,6 @@ template <typename T, typename U> const string corpushl<T, U>::serializeSub(cons
     return words[cscore[0].second];
   if(cscore.size() <= 2)
     return words[cscore[0].second] + words[cscore[1].second];
-  for(int i = 0; i < cscore.size(); i ++)
-    cerr << cscore[i].first << endl;
   sort(cscore.begin(), cscore.end());
   vector<int> left, right;
   const int& middle(cscore[0].second);
@@ -652,7 +650,8 @@ template <typename T, typename U> const string corpushl<T, U>::serializeSub(cons
           lscore += corpust(idxs[i], idxs[j])[middle];
           lscore -= corpust(idxs[j], idxs[i])[middle];
         }
-      score.push_back(make_pair(lscore, idxs[i]));
+      if(isfinite(lscore))
+        score.push_back(make_pair(lscore, idxs[i]));
     }
   sort(score.begin(), score.end());
   for(int i = 0; i < score.size() / 2; i ++)
@@ -668,7 +667,9 @@ template <typename T, typename U> const string corpushl<T, U>::summary(const vec
   for(int i = 0; i < words.size(); i ++) {
     corpushl<T, U> mn(*this);
     mn = mn.abbrev(words[i], meanings[i]) - *this;
-    score.push_back(make_pair(mn.distanceInUnion(mn), words[i]));
+    const T lscore(mn.distanceInUnion(mn));
+    if(isfinite(lscore))
+      score.push_back(make_pair(lscore, words[i]));
   }
   sort(score.begin(), score.end());
   for(int i = 0; i < score.size(); i ++) {
@@ -907,8 +908,21 @@ template <typename T, typename U> const Eigen::Matrix<T, Eigen::Dynamic, 1> corp
   Mat planes(corpust.rows(), corpust.cols());
   for(int i = 0; i < corpust.rows(); i ++) {
     Mat buf(corpust.rows(), corpust.cols());
-    for(int j = 0; j < corpust.cols(); j ++)
-      buf.col(j) = corpust(i, j);
+    for(int j = 0; j < corpust.cols(); j ++) {
+      for(int k = 0; k < corpust(i, j).size(); k ++) {
+        if(!isfinite(corpust(i, j)[k])) {
+          cerr << "singularValues() : nan" << endl;
+          for(int i = 0; i < planes.rows(); i ++)
+            for(int j = 0; j < planes.cols(); j ++)
+              planes(i, j) = T(0);
+          Eigen::JacobiSVD<Mat> svd(planes, 0);
+          return svd.singularValues();
+        }
+        buf(k, j) = corpust(i, j)[k];
+      }
+      for(int k = corpust(i, j).size(); k < buf.rows(); k ++)
+        buf(k, j) = T(0);
+    }
     Eigen::JacobiSVD<Mat> svd(buf, 0);
     planes.col(i) = svd.singularValues();
   }
