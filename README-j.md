@@ -65,7 +65,7 @@ https://services.limpid-intensity.info/puts.php にサンプルがあります�
     // cstat0 is detailed corpus.
     
     // sample output for toc.
-    std::cout << cstat0.toc(details, detailwords, details, tocwords, tocs, 10);
+    std::cout << cstat0.toc(tocwords, tocs, cstat0.serialize());
     
 # Tips
 これらのプログラムはまだよく検証されたアルゴリズムを使用して*いない可能性があります*。  
