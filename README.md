@@ -66,7 +66,7 @@ Please pseudo-login with e-mail address - salt pair.
     // cstat0 is detailed corpus.
     
     // sample output for toc.
-    std::cout << cstat0.toc(details, detailwords, details, tocwords, tocs, 10);
+    std::cout << cstat0.toc(tocwords, tocs);
     
 # Tips
 These programs may have a algorithm that is not carefully confirmed.  
