@@ -294,8 +294,8 @@ public:
   const corpushl<T, U>  withDetail(const string& word, const corpushl<T, U>& other);
   const T               distanceInUnion(const corpushl<T, U>& other) const;
   const corpushl<T, U>  match2relPseudo(const corpushl<T, U>& other) const;
-  const string          toc(const vector<corpushl<T, U> >& base, const vector<string>& words, const string& mwords) const;
-  const string          toc(const vector<vector<corpushl<T, U> > >& base, const vector<string>& words, const string& mwords) const;
+  const string          toc(const vector<corpushl<T, U> >& base, const vector<string>& words) const;
+  const string          toc(const vector<vector<corpushl<T, U> > >& base, const vector<string>& words) const;
   const vector<T>       prej(const vector<corpushl<T, U> >& prejs) const;
   const T               culturalConflicts(const corpushl<T, U>& base) const;
   const corpushl<T, U>  conflictPart();
@@ -403,12 +403,12 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
   for(int i = 0; i < result.corpust.rows(); i ++)
     for(int j = 0; j < result.corpust.cols(); j ++) {
       result.corpust(i, j) = Vec(result.words.size());
+      for(int k = 0; k < result.corpust(i, j).size(); k ++)
+        result.corpust(i, j)[k] = T(0);
       if(0 <= ridx0[i] && 0 <= ridx0[j])
-        for(int k = 0; k < result.corpust(i, j).size(); k ++) {
-          result.corpust(i, j)[k] = 0.;
+        for(int k = 0; k < result.corpust(i, j).size(); k ++)
           if(0 <= ridx0[k])
             result.corpust(i, j)[k] += corpust(ridx0[i], ridx0[j])[ridx0[k]];
-        }
       if(0 <= ridx1[i] && 0 <= ridx1[j])
         for(int k = 0; k < result.corpust(i, j).size(); k ++)
           if(0 <= ridx1[k])
@@ -502,17 +502,22 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2rel
   for(int i = 0; i < words.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0)
     for(int j = 0; j < words.size(); j ++) if(ridx0[j] >= 0 && ridx1[j] >= 0)
       for(int k = 0; k < words.size(); k ++) if(ridx0[k] >= 0) {
-        mul(ridx0[i], ridx0[j])[ridx0[k]] = 1.;
-        mul(ridx0[j], ridx0[k])[ridx0[i]] = 1.;
-        mul(ridx0[k], ridx0[i])[ridx0[j]] = 1.;
+        if(ridx0[k] < mul(ridx0[i], ridx0[j]).size())
+          mul(ridx0[i], ridx0[j])[ridx0[k]] = 1.;
+        if(ridx0[i] < mul(ridx0[j], ridx0[k]).size())
+          mul(ridx0[j], ridx0[k])[ridx0[i]] = 1.;
+        if(ridx0[j] < mul(ridx0[k], ridx0[i]).size())
+          mul(ridx0[k], ridx0[i])[ridx0[j]] = 1.;
       }
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int i = 0; i < result.corpust.rows(); i ++)
-    for(int j = 0; j < result.corpust.cols(); j ++)
-      for(int k = 0; k < result.corpust(i, j).size(); k ++)
-        result.corpust(i, j)[k] *= mul(i, j)[k];
+  for(int i = 0; i < result.corpust.rows(); i ++) if(0 <= ridx0[i])
+    for(int j = 0; j < result.corpust.cols(); j ++) if(0 <= ridx0[j])
+      for(int k = 0; k < result.corpust(i, j).size(); k ++) if(0 <= ridx0[k] &&
+          ridx0[k] < result.corpust(ridx0[i], ridx0[j]).size())
+        result.corpust(ridx0[i], ridx0[j])[ridx0[k]] *=
+          mul(ridx0[i], ridx0[j])[ridx0[k]];
   return result;
 }
 
@@ -522,24 +527,25 @@ template <typename T, typename U> const T corpushl<T, U>::distanceInUnion(const 
   vector<string> drop(gatherWords(words, other.words, ridx0, ridx1));
   for(int i = 0; i < drop.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0)
     for(int j = 0; j < drop.size(); j ++) if(ridx0[j] >= 0 && ridx1[j] >= 0)
-      for(int k = 0; k < drop.size(); k ++) if(ridx0[k] >= 0 && ridx1[k] >= 0)
+      for(int k = 0; k < drop.size(); k ++) if(ridx0[k] >= 0 && ridx1[k] >= 0 &&
+          ridx0[k] < corpust(ridx0[i], ridx0[j]).size() &&
+          ridx1[k] < other.corpust(ridx1[i], ridx1[j]).size())
         res += corpust(ridx0[i], ridx0[j])[ridx0[k]] * other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
   return res;
 }
 
-template <typename T, typename U> const string corpushl<T, U>::toc(const vector<corpushl<T, U> >& base, const vector<string>& words, const string& mwords) const {
+template <typename T, typename U> const string corpushl<T, U>::toc(const vector<corpushl<T, U> >& base, const vector<string>& words) const {
   vector<vector<corpushl<T, U> > > basev;
   for(int i = 0; i < base.size(); i ++) {
     vector<corpushl<T, U> > work;
     work.push_back(base[i]);
     basev.push_back(work);
   }
-  return toc(basev, words, mwords);
+  return toc(basev, words);
 }
 
-template <typename T, typename U> const string corpushl<T, U>::toc(const vector<vector<corpushl<T, U> > >& base, const vector<string>& words, const string& mwords) const {
+template <typename T, typename U> const string corpushl<T, U>::toc(const vector<vector<corpushl<T, U> > >& base, const vector<string>& words) const {
   string result;
-  result += mwords + string(" : ");
   vector<pair<T, string> > mlist;
   for(int k = 0; k < base.size(); k ++) {
     corpushl<T, U> work(*this);
@@ -551,6 +557,7 @@ template <typename T, typename U> const string corpushl<T, U>::toc(const vector<
     cr.second /= ncr;
     mlist.push_back(make_pair(work.distanceInUnion(*this) /
                               sqrt(distanceInUnion(*this)),
+                              words[k] + string(" : ") +
                               work.serialize() + string("(sr:)") +
                               to_string(cr.first) + string(", ") +
                               to_string(cr.second) ) );
@@ -631,6 +638,8 @@ template <typename T, typename U> const string corpushl<T, U>::serializeSub(cons
       const T lscore(max(tr, tl) / (tc + 1));
       if(isfinite(lscore))
         cscore.push_back(make_pair(lscore, idxs[i]));
+      else
+        cerr << "nan" << flush;
     }
   if(cscore.size() <= 0)
     return string();
@@ -652,11 +661,14 @@ template <typename T, typename U> const string corpushl<T, U>::serializeSub(cons
         }
       if(isfinite(lscore))
         score.push_back(make_pair(lscore, idxs[i]));
+      else
+        cerr << "nan" << flush;
     }
   sort(score.begin(), score.end());
-  for(int i = 0; i < score.size() / 2; i ++)
+  int i(0);
+  for( ; i < score.size() && score[i].first < T(0); i ++)
     left.push_back(score[i].second);
-  for(int i = score.size() / 2; i < score.size(); i ++)
+  for( ; i < score.size(); i ++)
     right.push_back(score[i].second);
   return serializeSub(left) + words[middle] + serializeSub(right);
 }
@@ -688,12 +700,13 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(co
   corpushl<T, U> work(match2relPseudo(mean));
   // XXX fixme: need to add abbreved word for work.
   cerr << "abbrev 1/2" << endl;
-  const T t(distanceInUnion(work) / work.distanceInUnion(work));
+  const T tn(distanceInUnion(work)), td(work.distanceInUnion(work));
   cerr << "abbrev 2/2" << endl;
-  if(isfinite(t))
-    return *this - (work * t);
+  if(isfinite(tn / td))
+    return *this - (work * (tn / td));
   // can't abbrev.
-  cerr << "abbrev : XXX : nan" << endl;
+  if(td != T(0))
+    cerr << "abbrev : XXX : nan" << endl;
   return *this;
 }
 
@@ -909,17 +922,13 @@ template <typename T, typename U> const Eigen::Matrix<T, Eigen::Dynamic, 1> corp
   for(int i = 0; i < corpust.rows(); i ++) {
     Mat buf(corpust.rows(), corpust.cols());
     for(int j = 0; j < corpust.cols(); j ++) {
-      for(int k = 0; k < corpust(i, j).size(); k ++) {
-        if(!isfinite(corpust(i, j)[k])) {
-          cerr << "singularValues() : nan" << endl;
-          for(int i = 0; i < planes.rows(); i ++)
-            for(int j = 0; j < planes.cols(); j ++)
-              planes(i, j) = T(0);
-          Eigen::JacobiSVD<Mat> svd(planes, 0);
-          return svd.singularValues();
+      for(int k = 0; k < corpust(i, j).size(); k ++)
+        if(isfinite(corpust(i, j)[k]))
+          buf(k, j) = corpust(i, j)[k];
+        else {
+          cerr << "nan" << flush;
+          buf(k, j) = T(0);
         }
-        buf(k, j) = corpust(i, j)[k];
-      }
       for(int k = corpust(i, j).size(); k < buf.rows(); k ++)
         buf(k, j) = T(0);
     }

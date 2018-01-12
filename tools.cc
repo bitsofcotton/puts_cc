@@ -191,7 +191,7 @@ int main(int argc, const char* argv[]) {
               tocs[i][k] = tocs[i][k].withDetail(detailwords[j], details[j][l]);
       std::cerr << "getting toc." << std::endl;
       for(int i = 0; i < cstat0.size(); i ++)
-        std::cout << cstat0[i].toc(tocs, tocwords, cstat0[i].serialize());
+        std::cout << cstat0[i].toc(tocs, tocwords);
       std::cout << std::endl << std::endl;
       std::vector<corpushl<double, char> > summ(cstat0);
       for(int i = 0; i < summ.size(); i ++)
