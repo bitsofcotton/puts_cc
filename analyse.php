@@ -9,8 +9,8 @@ foreach(new DirectoryIterator('./datas/') as $fileInfo) {
     if($fileInfoSub->isDot())
       continue;
     $pathb2 = $pathb . $fileInfoSub->getFilename() . "/";
-    echo $pathb2;
     if(file_exists($pathb2 . "orig-ref.txt") && !file_exists($pathb2 . ".lock")) {
+      echo $pathb2;
       system('touch ' . $pathb2 . '/.lock');
       $name = $pathb2 . "orig-ref.txt";
       $f = fopen($pathb2 . "orig-ref-dicts.txt", "r");
@@ -41,7 +41,7 @@ foreach(new DirectoryIterator('./datas/') as $fileInfo) {
       $f2 = fopen($pathb2 . "comm.txt", "w");
       fwrite($f2, "cmd:" . $buf);
       fclose($f2);
-      $process = proc_open('cd ' . $pathb . '../ && ../../puts diff ' . 'words.txt ' . $buf, $descriptorspec, $pipes, $cwd, $env);
+      $process = proc_open('cd ' . $pathb . '../ && ../../puts diff words.txt ' . $buf, $descriptorspec, $pipes, $cwd, $env);
       if (is_resource($process)) {
         fwrite($pipes[0], $text . "\n");
         fclose($pipes[0]);
@@ -50,7 +50,6 @@ foreach(new DirectoryIterator('./datas/') as $fileInfo) {
     } else if(file_exists($pathb2 . "orig.txt") && !file_exists($pathb2 . ".lock")) {
       system('touch ' . $pathb2 . '/.lock');
       $name = $pathb2 . "orig.txt";
-      echo $name . "\n";
       $text = "";
       $file = fopen($name, "r");
       while(($buf = fgets($file)) !== false)
@@ -86,7 +85,7 @@ foreach(new DirectoryIterator('./datas/') as $fileInfo) {
         1 => array("file", $pathb2 . "detail.txt", "w"),  // stdout.
         2 => array("file", $pathb2 . "detail-error.txt", "w") // stderr.
       );
-      $process = proc_open('cd ' . $pathb . '../ && ../../puts toc ' . 'words.txt ' . $buf, $descriptorspec, $pipes, $cwd, $env);
+      $process = proc_open('cd ' . $pathb . '../ && ../../puts toc words.txt ' . $buf, $descriptorspec, $pipes, $cwd, $env);
       
       if (is_resource($process)) {
         fwrite($pipes[0], $text . "\n");
@@ -132,15 +131,15 @@ foreach(new DirectoryIterator('./datas/') as $fileInfo) {
 foreach(new DirectoryIterator('./datas/') as $fileInfo) {
   if(!is_dir('./datas/' . $fileInfo->getFilename()))
     continue;
-  $pathb = "./datas/" . $fileInfo->getFilename() . "/stack/";
+  $pathb = "./datas/" . $fileInfo->getFilename() . "/web/";
   if(!file_exists($pathb))
     continue;
   foreach(new DirectoryIterator($pathb) as $fileInfoSub) {
     if($fileInfoSub->isDot())
       continue;
     $pathb2 = $pathb . $fileInfoSub->getFilename();
-    preg_match("<(-summary(-error)?|-redig(-error)?)\.txt$>", $pathb2, $match);
-    if(count($match) == 0 && !file_exists($pathb2 . "-redig-error")) {
+    preg_match("/\d+\.txt$/", $pathb2, $match);
+    if(count($match) > 0 && !file_exists($pathb2 . "-redig.txt")) {
       echo $pathb2;
       $buf = "";
       foreach (new DirectoryIterator($pathb . '../dicts') as $fileInfo) {

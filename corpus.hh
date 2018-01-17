@@ -555,12 +555,12 @@ template <typename T, typename U> const string corpushl<T, U>::toc(const vector<
     const T ncr(sqrt(cr.first * cr.first + cr.second * cr.second));
     cr.first  /= ncr;
     cr.second /= ncr;
-    mlist.push_back(make_pair(work.distanceInUnion(*this) /
+    mlist.push_back(make_pair(     distanceInUnion(work) /
                               sqrt(distanceInUnion(*this)),
-                              words[k] + string(" : ") +
-                              work.serialize() + string("(sr:)") +
-                              to_string(cr.first) + string(", ") +
-                              to_string(cr.second) ) );
+                              words[k]             + string(" : ")   +
+                              work.serialize()     + string("(sr: ") +
+                              to_string(cr.first)  + string(" / ")   +
+                              to_string(cr.second) + string(")") ) );
   }
   sort(mlist.begin(), mlist.end());
   result += to_string(mlist[mlist.size() - 1].first) + string(":") +

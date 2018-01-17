@@ -2,21 +2,26 @@ import mechanize
 import re
 import ipaddress
 import socket
+import os
+import datetime
+import glob
 
 mechanize._sockettimeout._GLOBAL_DEFAULT_TIMEOUT = 100
 
-ipranges = [[u"150.147.0.0", u"150.147.255.255"],
-            [u"150.246.0.0", u"150.246.255.255"],
-            [u"150.249.0.0", u"150.249.255.255"],
-            [u"150.120.0.0", u"150.120.127.255"],
-            [u"153.120.128.0", u"153.120.191.255"],
-            [u"153.120.192.0", u"153.120.221.255"],
-            [u"153.120.222.0", u"153.120.223.255"],
-            [u"153.120.224.0", u"153.120.255.255"],
-            [u"153.121.0.0",   u"153.121.31.255"],
-            [u"153.121.32.0",  u"153.121.63.255"],
-            [u"153.121.64.0",  u"152.121.95.255"],
-            [u"153.121.96.0",  u"153.121.127.255"]]
+ipranges = [#[u"150.147.0.0", u"150.147.255.255"],
+            #[u"150.246.0.0", u"150.246.255.255"],
+            #[u"150.249.0.0", u"150.249.255.255"],
+            #[u"150.120.0.0", u"150.120.127.255"],
+            #[u"153.120.128.0", u"153.120.191.255"],
+            #[u"153.120.192.0", u"153.120.221.255"],
+            #[u"153.120.222.0", u"153.120.223.255"],
+            #[u"153.120.224.0", u"153.120.255.255"],
+            #[u"153.121.0.0",   u"153.121.31.255"],
+            #[u"153.121.32.0",  u"153.121.63.255"],
+            #[u"153.121.64.0",  u"152.121.95.255"],
+            #[u"153.121.96.0",  u"153.121.127.255"]
+            ]
+inbase   = '~/Sites/datas/*/urls.txt'
 outbase  = '~/Downloads'
 
 urls  = re.compile(r'href=[\"\']([^\"\']+)[\"\']')
@@ -35,7 +40,7 @@ def initBrowser():
   return br
 
 def cutLinks(html):
-  urlf = urls.findall(html)
+  urlf  = urls.findall(html)
   urlfr = urlsr.findall(html)
   items = []
   for item in urlf:
@@ -68,10 +73,52 @@ def ping80(host):
   try:
     result = sock.connect_ex((host, 80))
   except:
-    False
+    return False
   if result != 0:
     return False
   return True
+
+def writeSub(str, f):
+  html = ""
+  try:
+    br   = initBrowser()
+    r    = br.open(str)
+    html = r.read()
+  except:
+    print "mechanize error @ " + str
+    return
+  try:
+    f.write(innerHTMLs(html))
+  except:
+    print "file open error."
+  return
+
+inurls = glob.glob(inbase)
+for addr in inurls:
+  lbase = os.path.dirname(addr) + "/web/" + datetime.datetime.now().strftime("%Y%m%d%H") + ".txt"
+  print lbase
+  f     = open(addr, "r")
+  strs  = f.readlines()
+  f.close()
+  f     = open(lbase, "w")
+  for str0 in strs:
+    str, num = str0.split(" ")
+    if(int(num) > 0):
+      html = ""
+      try:
+        br   = initBrowser()
+        r    = br.open(str)
+        list = []
+        for l in br.links():
+          list.append(l.url)
+      except:
+        print "mechanize error @ " + str
+        continue
+      for strs in list:
+        writeSub(strs, f)
+    else:
+      writeSub(str, f)  
+  f.close()
 
 for iprange in ipranges:
   start  = int(ipaddress.IPv4Address(iprange[0]))
@@ -102,7 +149,7 @@ for iprange in ipranges:
       f.close()
       f = open(dir + ips + "-links.txt", "w")
       f.write(cutLinks(html))
-      f.clos()
+      f.close()
     except:
       print "file open error."
 
