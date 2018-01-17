@@ -76,7 +76,7 @@ This is from simply interest, so don't use this for the reason other than standi
 And this algorithm have a specification that edges remains as obscure, to get clear edge, we should use this with morphological analysis softwares. This algorithm only sees the word distances and orders that causes rough image of what is on the table.  
 This program only sees what is said in the input, not the not said.  
 If there's large numbers of the sets that correctly defined texts, it may optimizable out to get opposite side's claim, but this is only the what's able to be said, so this isn't what's the matter.  
-It is a probability that this program scores what's lack of the table, but it IS NOT the score that actually should.
+It is a probability that this program scores what's lack of the table of that related to some on the table, but it IS NOT the score that actually should.
 
 # Another downloads
 * https://ja.osdn.net/projects/puts-cc/
