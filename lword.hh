@@ -17,7 +17,6 @@ using std::flush;
 using std::max;
 using std::min;
 
-// be careful to use if memory corruption.
 template <typename T> class word_t {
 public:
   T   str;
@@ -41,7 +40,6 @@ public:
   }
 };
 
-// be careful ditto.
 template <typename T> class gram_t {
 public:
   T           str;
@@ -104,9 +102,9 @@ template <typename T, typename U> lword<T, U>::~lword() {
 }
 
 template <typename T, typename U> void lword<T, U>::init(const int& loop, const int& mthresh, const int& Mthresh) {
-  this->mthresh  = mthresh;
-  this->Mthresh  = Mthresh;
-  dicts          = vector<vector<gram_t<U> > >();
+  this->mthresh = mthresh;
+  this->Mthresh = Mthresh;
+  dicts         = vector<vector<gram_t<U> > >();
   for(int i = 0; i < loop; i ++)
     dicts.push_back(vector<gram_t<U> >());
   return;

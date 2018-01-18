@@ -196,12 +196,14 @@ int main(int argc, const char* argv[]) {
       std::vector<corpushl<double, char> > summ(cstat0);
       for(int i = 0; i < summ.size(); i ++)
         summ[i].simpleThresh(.8);
-      for(int i = 0; i < tocs.size(); i ++)
-        for(int j = 0; j < tocs[i].size(); j ++) {
-          std::vector<std::string> work(summ[i].reverseLink(tocs[i][j]));
+      for(int ii = 0; ii < summ.size(); ii ++)
+        for(int i = 0; i < tocs.size(); i ++) {
           std::cout << tocwords[i] << " : " << std::endl;
-          for(int k = 0; k < work.size(); k ++)
-            std::cout << work[k] << std::endl;
+          for(int j = 0; j < tocs[i].size(); j ++) {
+            std::vector<std::string> work(summ[ii].reverseLink(tocs[i][j]));
+            for(int k = 0; k < work.size(); k ++)
+              std::cout << work[k] << std::endl;
+          }
         }
     }
     break;
