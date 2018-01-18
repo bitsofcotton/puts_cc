@@ -302,7 +302,6 @@ public:
   const vector<string>& getWords() const;
   const Tensor&         getCorpus() const;
   const string          serialize() const;
-  const string          summary(const vector<string>& words, const vector<corpushl<T, U> >& meanings, const T& thresh) const;
   const corpushl<T, U>  abbrev(const string word, const corpushl<T, U>& mean);
   const vector<string>  reverseLink(const corpushl<T, U>& orig) const;
   const pair<T, T>      compareStructure(const corpushl<T, U>& src, const T& thresh = T(1e-4), const T& thresh2 = T(.125)) const;
@@ -551,12 +550,12 @@ template <typename T, typename U> const string corpushl<T, U>::toc(const vector<
     corpushl<T, U> work(*this);
     for(int l = 0; l < base[k].size(); l ++)
       work = work.abbrev(words[k], base[k][l]);
+    work = *this - work;
     pair<T, T> cr(compareStructure(work));
     const T ncr(sqrt(cr.first * cr.first + cr.second * cr.second));
     cr.first  /= ncr;
     cr.second /= ncr;
-    mlist.push_back(make_pair(     distanceInUnion(work) /
-                              sqrt(distanceInUnion(*this)),
+    mlist.push_back(make_pair(distanceInUnion(work) / distanceInUnion(*this),
                               words[k]             + string(" : ")   +
                               work.serialize()     + string("(sr: ") +
                               to_string(cr.first)  + string(" / ")   +
@@ -673,28 +672,6 @@ template <typename T, typename U> const string corpushl<T, U>::serializeSub(cons
   return serializeSub(left) + words[middle] + serializeSub(right);
 }
 
-template <typename T, typename U> const string corpushl<T, U>::summary(const vector<string>& words, const vector<corpushl<T, U> >& meanings, const T& thresh) const {
-  string                   result;
-  vector<pair<T, string> > score;
-  for(int i = 0; i < words.size(); i ++) {
-    corpushl<T, U> mn(*this);
-    mn = mn.abbrev(words[i], meanings[i]) - *this;
-    const T lscore(mn.distanceInUnion(mn));
-    if(isfinite(lscore))
-      score.push_back(make_pair(lscore, words[i]));
-  }
-  sort(score.begin(), score.end());
-  for(int i = 0; i < score.size(); i ++) {
-    const int ii(score.size() - i - 1);
-    if(score[ii].first > thresh) {
-      result += score[ii].second;
-      result += string("(") + to_string(score[ii].first) + string(")");
-    }
-  }
-  result += string("\n");
-  return result;
-}
-
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(const string word, const corpushl<T, U>& mean) {
   cerr << "abbrev 0/2" << endl;
   corpushl<T, U> work(match2relPseudo(mean));
@@ -721,9 +698,9 @@ template <typename T, typename U> const vector<string> corpushl<T, U>::reverseLi
       for(int k = 0; k < rwords.size(); k ++)
         if(ridx0[k] >= 0 && ridx1[k] >= 0 &&
            abs(work.corpust(ridx1[i], ridx1[j])[ridx1[k]]) != T(0) )
-          res.push_back(work.words[i] + string("-") +
-                        work.words[j] + string("-") +
-                        work.words[k] + string(" @ ") +
+          res.push_back(rwords[i] + string("-") +
+                        rwords[j] + string("-") +
+                        rwords[k] + string(" @ ") +
                         to_string(work.corpust(ridx1[i], ridx1[j])[ridx1[k]]));
   return res;
 }
