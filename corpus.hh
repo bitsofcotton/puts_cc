@@ -259,7 +259,7 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
           const T buf1(log(T(abs(*itr + .5 - ptrs[j][ctrv])) * T(2) * exp(T(1))));
           // const T buf0(abs(*itr + .5 - ptrs[i][ctru]));
           // const T buf1(abs(*itr + .5 - ptrs[j][ctrv]));
-          const T work(buf0 * buf0 + buf1 * buf1);
+          const T work(T(1) / (buf0 * buf0 + buf1 * buf1));
           if(isfinite(work))
             corpust(i, j)[k] += sqrt(work) / Midx;
         }
