@@ -370,12 +370,9 @@ int main(int argc, const char* argv[]) {
         rdetailwords.push_back(wwbuf);
       }
       const int tot_cont(max(min(12, int(input.size()) / szwindow), 1));
-      const int tocsize(8000);
-      for(int i = 0; i < input.size() / tocsize; i ++) {
-        std::cout << optimizeTOC<double, char>(input.substr(i * tocsize, tocsize), wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, .125) << std::endl;
-        std::cout << optimizeTOC<double, char>(input.substr(i * tocsize, tocsize), wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 1.) << std::endl;
-        std::cout << optimizeTOC<double, char>(input.substr(i * tocsize, tocsize), wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8.) << std::endl;
-      }
+      std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8, .125) << std::endl;
+      std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8, 1.) << std::endl;
+      std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8, 8.) << std::endl;
     }
     break;
   }
