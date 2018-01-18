@@ -141,6 +141,11 @@ foreach(new DirectoryIterator('./datas/') as $fileInfo) {
     preg_match("/\d+\.txt$/", $pathb2, $match);
     if(count($match) > 0 && !file_exists($pathb2 . "-redig.txt")) {
       echo $pathb2;
+      $text = "";
+      $file = fopen($pathb2, "r");
+      while(($buf = fgets($file)) !== false)
+        $text .= $buf;
+      fclose($file);
       $buf = "";
       foreach (new DirectoryIterator($pathb . '../dicts') as $fileInfo) {
         if($fileInfo->isDot()) continue;
