@@ -950,7 +950,7 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
 
 
 
-template <typename T, typename U> const string optimizeTOC(const string& input, const U* words, const vector<string>& dict, vector<string>& detailwords, const vector<string>& delimiter, const int& szwindow, const int& depth, const T& redig = T(1)) {
+template <typename T, typename U> const string optimizeTOC(const string& input, const U* words, const vector<string>& dict, vector<string>& detailwords, const vector<string>& delimiter, const int& szwindow, const int& depth, const int& Mgather = 8, const T& redig = T(1)) {
   // prepare dictionaries:
   cerr << "optimizeToc: parsing input" << flush;
   vector<vector<corpushl<T, U> > > details;
@@ -1020,11 +1020,13 @@ template <typename T, typename U> const string optimizeTOC(const string& input, 
     const int jj(work[work.size() - j - 1].second);
     if(idxs[jj].size() <= 0)
       break;
-    corpushl<double, char> cs(cstat0[jj]);
-    for(int j = 0; j < idxs[jj].size(); j ++)
-      cs += cstat0[idxs[jj][idxs[jj].size() - j - 1]];
-    cs.reDig(redig);
-    result += cs.serialize() + string("\n");
+    for(int k = 0; k < idxs[jj].size() / Mgather + 1; k ++) {
+      corpushl<double, char> cs(cstat0[jj]);
+      for(int j = k * Mgather; j < min((k + 1) * Mgather, int(idxs[jj].size())); j ++)
+        cs += cstat0[idxs[jj][idxs[jj].size() - j - 1]];
+      cs.reDig(redig);
+      result += cs.serialize() + string("\n");
+    }
   }
   return result;
 }
