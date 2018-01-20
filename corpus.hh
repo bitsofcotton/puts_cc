@@ -292,11 +292,12 @@ public:
   const corpushl<T, U>  operator *  (const T& t)                  const;
   const corpushl<T, U>& operator =  (const corpushl<T, U>& other);
   const corpushl<T, U>  withDetail(const string& word, const corpushl<T, U>& other);
-  const T               distanceInUnion(const corpushl<T, U>& other) const;
+  const T               cdot(const corpushl<T, U>& other) const;
   const corpushl<T, U>  match2relPseudo(const corpushl<T, U>& other) const;
   const string          toc(const vector<corpushl<T, U> >& base, const vector<string>& words) const;
   const string          toc(const vector<vector<corpushl<T, U> > >& base, const vector<string>& words) const;
   const vector<T>       prej(const vector<corpushl<T, U> >& prejs) const;
+  const corpushl<T, U>  lackOfInsist() const;
   const T               culturalConflicts(const corpushl<T, U>& base) const;
   const corpushl<T, U>  conflictPart();
   const vector<string>& getWords() const;
@@ -465,6 +466,16 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
     else if(ridx1[i] >= 0 && ridx2[i] >= 0)
       result.words.push_back(other.words[ridx1[i]]);
 #if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
+  for(int i = 0; i < result.corpust.rows(); i ++) {
+    for(int j = 0; j < result.corpust.cols(); j ++) {
+      result.corpust(i, j) = Vec(workwords.size() - 1);
+      for(int k = 0; k < result.corpust(i, j).size(); k ++)
+        result.corpust(i, j)[k] = T(0);
+    }
+  }
+#if defined(_OPENMP)
 #pragma omp paralell for schedule(static, 1)
 #endif
   for(int i = 0; i < workwords.size(); i ++) if(0 <= ridx2[i])
@@ -520,7 +531,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2rel
   return result;
 }
 
-template <typename T, typename U> const T corpushl<T, U>::distanceInUnion(const corpushl<T, U>& other) const {
+template <typename T, typename U> const T corpushl<T, U>::cdot(const corpushl<T, U>& other) const {
   T res(0);
   vector<int>    ridx0, ridx1;
   vector<string> drop(gatherWords(words, other.words, ridx0, ridx1));
@@ -555,7 +566,7 @@ template <typename T, typename U> const string corpushl<T, U>::toc(const vector<
     const T ncr(sqrt(cr.first * cr.first + cr.second * cr.second));
     cr.first  /= ncr;
     cr.second /= ncr;
-    mlist.push_back(make_pair(distanceInUnion(work) / distanceInUnion(*this),
+    mlist.push_back(make_pair(cdot(work) / cdot(*this),
                               words[k]             + string(" : ")   +
                               work.serialize()     + string("(sr: ") +
                               to_string(cr.first)  + string(" / ")   +
@@ -569,21 +580,30 @@ template <typename T, typename U> const string corpushl<T, U>::toc(const vector<
 
 template <typename T, typename U> const vector<T> corpushl<T, U>::prej(const vector<corpushl<T, U> >& prejs) const {
   vector<T> result;
+  cerr << "XXX confirm me: corpushl<T, U>::prej" << endl;
   for(int i = 0; i < prejs.size(); i ++)
     // XXX confirm me: need some other counting methods?
     // XXX fixme: amount of the word that is not said in the context is
     //            also important.
-    result.push_back(distanceInUnion(match2relPseudo(prejs[i])) / distanceInUnion(*this));
+    result.push_back(cdot(match2relPseudo(prejs[i])) / cdot(*this));
+  return result;
+}
+
+template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::lackOfInsist() const {
+  corpushl<T, U> result;
+  // stub.
+  cerr << "STUB LACK OF INSIST." << endl;
   return result;
 }
 
 template <typename T, typename U> const T corpushl<T, U>::culturalConflicts(const corpushl<T, U>& base) const {
+  cerr << "XXX broken method: culturalConflicts" << endl;
   corpushl<T, U> work(match2relPseudo(base));
   corpushl<T, U> workc(base.match2relPseudo(*this));
   corpushl<T, U> dwork(*this - work);
   corpushl<T, U> dworkc(base - workc);
   // XXX this is broken method. DO NOT USE THIS ONLY.: fixme...
-  return (dwork.distanceInUnion(dwork) - dworkc.distanceInUnion(dworkc) + work.distanceInUnion(work) + workc.distanceInUnion(workc)) / (this->distanceInUnion(*this) + base.distanceInUnion(base));
+  return (dwork.cdot(dwork) - dworkc.cdot(dworkc) + work.cdot(work) + workc.cdot(workc)) / (cdot(*this) + base.cdot(base));
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::conflictPart() {
@@ -677,7 +697,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(co
   corpushl<T, U> work(match2relPseudo(mean));
   // XXX fixme: need to add abbreved word for work.
   cerr << "abbrev 1/2" << endl;
-  const T tn(distanceInUnion(work)), td(work.distanceInUnion(work));
+  const T tn(cdot(work)), td(work.cdot(work));
   cerr << "abbrev 2/2" << endl;
   if(isfinite(tn / td))
     return *this - (work * (tn / td));
@@ -692,7 +712,7 @@ template <typename T, typename U> const vector<string> corpushl<T, U>::reverseLi
   vector<int>    ridx0, ridx1;
   corpushl<T, U> work(match2relPseudo(orig));
   vector<string> rwords(gatherWords(words, work.words, ridx0, ridx1));
-  res.push_back(string(" (") + to_string(work.distanceInUnion(work)) + string(")"));
+  res.push_back(string(" (") + to_string(work.cdot(work)) + string(")"));
   for(int i = 0; i < rwords.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0)
     for(int j = 0; j < rwords.size(); j ++) if(ridx0[j] >= 0 && ridx1[j] >= 0)
       for(int k = 0; k < rwords.size(); k ++)
@@ -965,7 +985,7 @@ template <typename T, typename U> const string optimizeTOC(const string& input, 
       cstats[i].push_back(cstats[j][i]);
     for(int j = i; j < cstat0.size(); j ++) {
       cerr << "." << flush;
-      cstats[i].push_back(make_pair(cstat0[i].distanceInUnion(cstat0[j]), j));
+      cstats[i].push_back(make_pair(cstat0[i].cdot(cstat0[j]), j));
     }
   }
   for(int i = 0; i < cstats.size(); i ++)
@@ -999,9 +1019,11 @@ template <typename T, typename U> const string optimizeTOC(const string& input, 
       break;
     for(int k = 0; k < idxs[jj].size() / Mgather + 1; k ++) {
       corpushl<double, char> cs(cstat0[jj]);
-      for(int j = k * Mgather; j < min((k + 1) * Mgather, int(idxs[jj].size())); j ++)
-        cs += cstat0[idxs[jj][idxs[jj].size() - j - 1]];
-      cs.reDig(redig);
+      for(int j = k * Mgather; j < min((k + 1) * Mgather, int(idxs[jj].size())); j ++) {
+        corpushl<T, U> objr(cstat0[idxs[jj][idxs[jj].size() - j - 1]]);
+        objr.reDig(redig);
+        cs += objr;
+      }
       result += cs.serialize() + string("\n");
     }
   }
