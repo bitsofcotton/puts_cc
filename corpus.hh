@@ -636,30 +636,20 @@ template <typename T, typename U> const string corpushl<T, U>::serialize() const
 template <typename T, typename U> const string corpushl<T, U>::serializeSub(const vector<int>& idxs) const {
   cerr << "." << flush;
   vector<pair<T, int> > cscore;
-  for(int i = 0; i < idxs.size(); i ++)
-    if(0 <= idxs[i] && idxs[i] < corpust.rows()) {
-      T tl(0), tc(0), tr(0);
-      for(int j = 0; j < idxs.size(); j ++)
-        // corpust(i0, i2)[i1].
-        // left-wins: sum corpust(i0, k)[i1] > sum corpust(k, i0)[i1].
-        for(int k = 0; k < idxs.size(); k ++) {
-          if(0 <= idxs[k] && idxs[k] < corpust.cols() &&
-             0 <= idxs[j] && idxs[j] < corpust(idxs[i], idxs[k]).size())
-            tl += pow(corpust(idxs[i], idxs[k])[idxs[j]], T(2));
-          if(0 <= idxs[j] && idxs[j] < corpust.rows() &&
-             0 <= idxs[k] && idxs[k] < corpust.cols() &&
-             0 <= idxs[i] && idxs[i] < corpust(idxs[j], idxs[k]).size())
-            tc += pow(corpust(idxs[j], idxs[k])[idxs[i]], T(2));
-          if(0 <= idxs[k] && idxs[k] < corpust.rows() &&
-             0 <= idxs[j] && idxs[j] < corpust(idxs[k], idxs[i]).size())
-            tr += pow(corpust(idxs[k], idxs[i])[idxs[j]], T(2));
-        }
-      const T lscore(max(tr, tl) / (tc + 1));
-      if(isfinite(lscore))
-        cscore.push_back(make_pair(lscore, idxs[i]));
-      else
-        cerr << "nan" << flush;
-    }
+  // corpust(i0, i2)[i1].
+  for(int i = 0; i < idxs.size(); i ++) {
+    T tc(0);
+    for(int j = 0; j < idxs.size(); j ++) if(0 <= idxs[j] && idxs[j] < corpust.rows())
+      for(int k = 0; k < idxs.size(); k ++)
+        if(0 <= idxs[k] && idxs[k] < corpust.cols() &&
+           0 <= idxs[i] && idxs[i] < corpust(idxs[j], idxs[k]).size())
+          tc += pow(corpust(idxs[j], idxs[k])[idxs[i]], T(2));
+    const T lscore(tc == T(0) ? T(0) : T(1) / (tc + 1));
+    if(isfinite(lscore))
+      cscore.push_back(make_pair(lscore, idxs[i]));
+    else
+      cerr << "nan" << flush;
+  }
   if(cscore.size() <= 0)
     return string();
   if(cscore.size() <= 1)
@@ -668,15 +658,15 @@ template <typename T, typename U> const string corpushl<T, U>::serializeSub(cons
     return words[cscore[0].second] + words[cscore[1].second];
   sort(cscore.begin(), cscore.end());
   vector<int> left, right;
-  const int& middle(cscore[0].second);
+  const int& middle(cscore[cscore.size() - 1].second);
   vector<pair<T, int> > score;
   for(int i = 0; i < idxs.size(); i ++)
     if(idxs[i] != middle && 0 <= idxs[i] && idxs[i] < corpust.rows()) {
       T lscore(0);
       for(int j = 0; j < idxs.size(); j ++)
         if(idxs[j] != middle && 0 <= idxs[j] && idxs[j] < corpust.cols()) {
-          lscore += corpust(idxs[i], idxs[j])[middle];
-          lscore -= corpust(idxs[j], idxs[i])[middle];
+          lscore -= corpust(idxs[i], idxs[j])[middle];
+          lscore += corpust(idxs[j], idxs[i])[middle];
         }
       if(isfinite(lscore))
         score.push_back(make_pair(lscore, idxs[i]));
