@@ -5,6 +5,7 @@ import socket
 import os
 import datetime
 import glob
+import hashlib
 
 mechanize._sockettimeout._GLOBAL_DEFAULT_TIMEOUT = 100
 
@@ -78,12 +79,13 @@ def ping80(host):
     return False
   return True
 
-def writeSub(str, f):
+def writeSub(str, f, flog):
   html = ""
   try:
     br   = initBrowser()
     r    = br.open(str)
     html = r.read()
+    flog.write(str + " (" + datetime.datetime.now().strftime("%c") + ") : " + hashlib.sha256(html).hexdigest() + "\n")
   except:
     print "mechanize error @ " + str
     return
@@ -96,29 +98,33 @@ def writeSub(str, f):
 inurls = glob.glob(inbase)
 for addr in inurls:
   lbase = os.path.dirname(addr) + "/web/" + datetime.datetime.now().strftime("%Y%m%d%H") + ".txt"
+  rbase = os.path.dirname(addr) + "/webhash.txt"
   print lbase
   f     = open(addr, "r")
   strs  = f.readlines()
   f.close()
+  flog  = open(rbase, "a")
   f     = open(lbase, "w")
   for str0 in strs:
     str, num = str0.split(" ")
     if(int(num) > 0):
       html = ""
       try:
-        br   = initBrowser()
-        r    = br.open(str)
-        list = []
+        br = initBrowser()
+        r  = br.open(str)
+        li = []
         for l in br.links():
-          list.append(l.url)
+          li.append(l.url)
+        li = list(set(li))
       except:
         print "mechanize error @ " + str
         continue
-      for strs in list:
-        writeSub(strs, f)
+      for strs in li:
+        writeSub(strs, f, flog)
     else:
-      writeSub(str, f)  
+      writeSub(str, f, flog)
   f.close()
+  flog.close()
 
 for iprange in ipranges:
   start  = int(ipaddress.IPv4Address(iprange[0]))
