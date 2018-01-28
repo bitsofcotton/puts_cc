@@ -298,6 +298,7 @@ public:
   const string          toc(const vector<vector<corpushl<T, U> > >& base, const vector<string>& words) const;
   const vector<T>       prej(const vector<corpushl<T, U> >& prejs) const;
   const corpushl<T, U>  lackOfInsist() const;
+  const corpushl<T, U>  invertInsist() const;
   const T               culturalConflicts(const corpushl<T, U>& base) const;
   const corpushl<T, U>  conflictPart();
   const vector<string>& getWords() const;
@@ -593,6 +594,13 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::lackOfIns
   corpushl<T, U> result;
   // stub.
   cerr << "STUB LACK OF INSIST." << endl;
+  return result;
+}
+
+template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::invertInsist() const {
+  corpushl<T, U> result;
+  // stub.
+  cerr << "STUB INVERT INSIST." << endl;
   return result;
 }
 
