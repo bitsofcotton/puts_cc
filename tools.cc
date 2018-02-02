@@ -202,7 +202,8 @@ int main(int argc, const char* argv[]) {
           for(int j = 0; j < tocs[i].size(); j ++) {
             std::vector<std::string> work(summ[ii].reverseLink(tocs[i][j]));
             for(int k = 0; k < work.size(); k ++)
-              std::cout << work[k] << std::endl;
+              std::cout << work[k] << ", ";
+            std::cout << std::endl;
           }
         }
     }
@@ -372,9 +373,12 @@ int main(int argc, const char* argv[]) {
         rdetailwords.push_back(wwbuf);
       }
       const int tot_cont(max(min(12, int(input.size()) / szwindow), 1));
+      std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
+      std::cout << std::string("<body>");
       std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8, .125) << std::endl;
       std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8, 1.) << std::endl;
       std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8, 8.) << std::endl;
+      std::cout << std::string("</body>");
     }
     break;
   }

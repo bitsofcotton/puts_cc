@@ -1,0 +1,25 @@
+/*
+ * thanks to http://raining.bear-life.com/css/css%E3%81%A7%E7%B0%A1%E5%8D%98%E3%81%AA%E3%83%84%E3%83%BC%E3%83%AB%E3%83%81%E3%83%83%E3%83%97%E3%82%92%E4%BD%9C%E6%88%90%E3%81%99%E3%82%8B%E6%96%B9%E6%B3%95
+ */
+div.tooltip span {
+    display: none;
+    width: 600px;
+    padding: 5px;
+    margin: 10px 0 0 -10px;
+}
+
+div.tooltip:hover span{
+    display: inline; 
+    position: absolute; 
+    border: 1px solid #CCC; 
+    border-radius: 5px;
+    background: #F7F7F7;
+    color: #666;
+    font-size: 12px;
+    line-height: 1.6em;
+}
+
+font.match {
+    color: red;
+}
+

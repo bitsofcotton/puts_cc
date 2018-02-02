@@ -19,6 +19,8 @@
     exec("mkdir " . $pathb . "web");
     if(!file_exists($pathb . "words.txt"))
       exec("cp ./words.txt " . $pathb);
+    if(!file_exists($pathb . "style.css"))
+      exec("cp ./style.css " . $pathb);
     exec("touch " . $pathb . "urls.txt");
     file_put_contents($pathb . "email.txt", $_REQUEST["email"]);
   } else
@@ -224,7 +226,8 @@ Scrap URL list:<br/>
   }
   fclose($file);
 ?></textarea><br/>
-<a href="javascript: ;" onClick="updateURLs();">update</a><br/>
+<a href="javascript: ;" onClick="updateURLs();">update</a> | 
+<a href="<?php echo $pathb; ?>/web">Per 6 hours</a><br/>
 <input type="file" id="scrap" name="scrap">
 <a href="javascript: uploadScrap();">upload</a>
 </p>
