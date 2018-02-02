@@ -318,33 +318,27 @@ int main(int argc, const char* argv[]) {
           detailwords.push_back(wwbuf);
         }
       }
-      std::vector<corpus<double, char> > cstatorig;
-      std::vector<corpushl<double, char> > cstat0;
-      for(int i = 0; i < input.size() / szwindow + 1; i ++) {
-        corpus<double, char> cstat;
-        cstat.init(wordbuf.c_str(), 0, 120);
-        cstat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
-        cstatorig.push_back(cstat);
-        cstat0.push_back(corpushl<double, char>(cstat));
-      }
-      std::vector<corpushl<double, char> > cstat1(cstat0);
       std::cerr << "analysing input text." << std::endl;
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
-      for(int j = 0; j < cstat0.size(); j ++) {
+      for(int i = 0; i < input.size() / szwindow + 1; i ++) {
+        corpus<double, char> cstatorig;
+        cstatorig.init(wordbuf.c_str(), 0, 120);
+        cstatorig.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
+        corpushl<double, char> cstat0(cstatorig), cstat1(cstatorig);
         for(int i = 0; i < details.size(); i ++)
-          cstat0[j] = cstat0[j].withDetail(detailwords[i] , details[i]);
-        cstat0[j].reDig(double(4));
+          cstat0 = cstat0.withDetail(detailwords[i] , details[i]);
+        cstat0.reDig(double(4));
         for(int i = 0; i < details2.size(); i ++)
-          cstat1[j] = cstat1[j].withDetail(detailwords2[i], details2[i]);
-        cstat1[j].reDig(double(4));
-        if(cstat0[j] != cstat1[j]) {
-          auto diff(cstat0[j] - cstat1[j]);
+          cstat1 = cstat1.withDetail(detailwords2[i], details2[i]);
+        cstat1.reDig(double(4));
+        if(cstat0 != cstat1) {
+          auto diff(cstat0 - cstat1);
           diff.simpleThresh(1);
-          std::cout << cstat0[j].serialize() << "<br/>" << std::endl;
-          std::cout << cstat1[j].serialize() << "<br/>" << std::endl;
+          std::cout << cstat0.serialize() << "<br/>" << std::endl;
+          std::cout << cstat1.serialize() << "<br/>" << std::endl;
           std::cout << diff.serialize()      << "<br/>" << std::endl;
-          std::cout << diff.reverseLink(cstatorig[j]) << std::endl;
+          std::cout << diff.reverseLink(cstatorig) << std::endl;
           std::cout << std::endl;
         }
       }
