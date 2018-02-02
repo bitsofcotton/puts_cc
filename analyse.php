@@ -36,7 +36,7 @@ foreach(new DirectoryIterator('./datas/') as $fileInfo) {
       }
       $descriptorspec = array(
         0 => array("pipe", "r"),  // stdin.
-        1 => array("file", $pathb2 . "diff.txt", "w"),  // stdout.
+        1 => array("file", $pathb2 . "diff.html", "w"),  // stdout.
         2 => array("file", $pathb2 . "diff-error.txt", "w") // stderr.
       );
       $f2 = fopen($pathb2 . "comm.txt", "w");

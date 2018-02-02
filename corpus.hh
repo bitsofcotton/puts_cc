@@ -18,6 +18,7 @@ using std::distance;
 using std::equal_range;
 using std::upper_bound;
 using std::unique;
+using std::find;
 using std::pair;
 using std::make_pair;
 using std::to_string;
@@ -327,6 +328,8 @@ public:
   const corpushl<T, U>  operator -  (const corpushl<T, U>& other) const;
   const corpushl<T, U>  operator *  (const T& t)                  const;
   const corpushl<T, U>& operator =  (const corpushl<T, U>& other);
+  const bool            operator == (const corpushl<T, U>& other) const;
+  const bool            operator != (const corpushl<T, U>& other) const;
   const corpushl<T, U>  withDetail(const string& word, const corpushl<T, U>& other);
   const T               cdot(const corpushl<T, U>& other) const;
   const corpushl<T, U>  match2relPseudo(const corpushl<T, U>& other) const;
@@ -381,7 +384,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::cast(cons
   vector<int>    idxs;
   sort(sword.begin(), sword.end());
   for(int i = 0; i < sword.size(); i ++) {
-    auto p(upper_bound(words.begin(), words.end(), sword[i]));
+    auto p(find(words.begin(), words.end(), sword[i]));
     if(*p == sword[i]) {
       idxs.push_back(distance(words.begin(), p));
       result.words.push_back(*p);
@@ -404,6 +407,14 @@ template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator
   words   = vector<string>(other.words);
   corpust = Tensor(other.corpust);
   return *this;
+}
+
+template <typename T, typename U> const bool corpushl<T, U>::operator == (const corpushl<T, U>& other) const {
+  return ! (*this != other);
+}
+
+template <typename T, typename U> const bool corpushl<T, U>::operator != (const corpushl<T, U>& other) const {
+  return words != other.words || corpust != other.corpust;
 }
 
 template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator += (const corpushl<T, U>& other) {
@@ -475,11 +486,11 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
   cerr << "withDetail : enter" << endl;
   if(words.size() <= 0 || other.words.size() <= 0)
     return *this;
-  auto itr(upper_bound(words.begin(), words.end(), word));
-  int fidx(distance(words.begin(), itr));
+  auto itr(find(words.begin(), words.end(), word));
+  int  fidx(distance(words.begin(), itr));
   if(!(0 <= fidx && fidx < words.size() && *itr == word))
     return *this;
-  std::cout << *itr << ", " << word << ": " << itr->size() << " / " << word.size() << endl;
+  cerr << *itr << ", " << word << ": " << itr->size() << " / " << word.size() << endl;
   corpushl<T, U> result;
   vector<int>    ridx0, ridx1, ridx2;
   vector<string> workwords(gatherWords(words, other.words, ridx0, ridx1));
@@ -920,9 +931,9 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int i = 0; i < workwords.size(); i ++) if(ridx2[i] >= 0)
-    for(int j = 0; j < workwords.size(); j ++) if(ridx2[j] >= 0) {
-      for(int k = 0; k < workwords.size(); k ++) {
+  for(int i = 0; i < workwords.size(); i ++) if(ridx0[i] >= 0 && ridx2[i] >= 0)
+    for(int j = 0; j < workwords.size(); j ++) if(ridx0[j] >= 0 && ridx2[j] >= 0) {
+      for(int k = 0; k < workwords.size(); k ++) if(ridx0[k] >= 0) {
         const T ratio(corpust(ridx0[i], ridx0[j])[ridx0[k]]);
         if(ridx2[k] >= 0 && ridx1[k] >= 0 && ridx1[i] >= 0 && ridx1[j] >= 0)
           res(ridx2[i], ridx2[j])[ridx2[k]] +=
@@ -949,7 +960,7 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
                 r1 * other.corpust(ridx1[j], ridx1[kk])[ ridx1[k]];
             }
         // if only other have words defined, just add.
-        } else if(ridx1[j] >= 0 && ridx1[k] >= 0) {
+        } else if(ridx1[j] >= 0 && ridx1[k] >= 0 && ridx2[i] >= 0) {
           res(ridx2[i], ridx2[j])[ridx2[k]] += other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
           res(ridx2[j], ridx2[i])[ridx2[k]] += other.corpust(ridx1[j], ridx1[i])[ridx1[k]];
         }
