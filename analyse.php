@@ -103,7 +103,7 @@ foreach(new DirectoryIterator('./datas/') as $fileInfo) {
       
       $descriptorspec = array(
         0 => array("pipe", "r"),  // stdin.
-        1 => array("file", $pathb2 . "stat.txt", "w"),  // stdout.
+        1 => array("file", $pathb2 . "stat.html", "w"),  // stdout.
         2 => array("file", $pathb2 . "stat-error.txt", "w") // stderr.
       );
       $process = proc_open('../../puts stat words.txt ' . $buf, $descriptorspec, $pipes, $cwd, $env);

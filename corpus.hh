@@ -55,9 +55,11 @@ public:
   void init(const U* words, const int& nthresh, const int& Nthresh, const int& Mwords = 150);
   corpus<T, U>&         operator = (const corpus<T, U>& other);
   const void            compute(const U* input, const vector<string>& delimiter = vector<string>());
+  const string          getAttributed(const vector<string>& highlight) const;
   const vector<string>& getWords() const;
   const Tensor&         getCorpus() const;
 private:
+  string               orig;
   vector<string>       words0;
   vector<string>       words;
   vector<vector<int> > ptrs0;
@@ -87,6 +89,7 @@ template <typename T, typename U> void corpus<T,U>::init(const U* words, const i
   for(int i = 0; words[i]; i ++) {
     if(words[i] == ',' || words[i] == '\n' || words[i] == '\r') {
       if(buf.size()) {
+        this->ptrs0.push_back(vector<int>());
         switch(buf[buf.size() - 1]) {
         case '\n': case '\r': case ' ': case '\t': case ',':
           this->words0.push_back(buf.substr(0, buf.size() - 1));
@@ -94,7 +97,6 @@ template <typename T, typename U> void corpus<T,U>::init(const U* words, const i
         default:
           this->words0.push_back(buf);
         }
-        this->ptrs0.push_back(vector<int>());
       }
       buf = string();
       continue;
@@ -132,6 +134,37 @@ template <typename T, typename U> const void corpus<T,U>::compute(const U* input
   return;
 }
 
+template <typename T, typename U> const string corpus<T,U>::getAttributed(const vector<string>& highlight) const {
+  vector<int> idxs;
+  for(int i = 0; i < highlight.size(); i ++)
+    if(highlight[i] != string("^") && highlight[i] != string("$"))
+      for(int j = 0; j < words.size(); j ++)
+        if(highlight[i] == words[j]) {
+          idxs.push_back(j);
+          break;
+        }
+  sort(idxs.begin(), idxs.end());
+  idxs.erase(unique(idxs.begin(), idxs.end()), idxs.end());
+  string result;
+  int    i;
+  for(i = 0; i < orig.size(); ) {
+    int idx(- 1);
+    for(int j = 0; j < idxs.size(); j ++)
+      if(binary_search(ptrs[idxs[j]].begin(), ptrs[idxs[j]].end(), i - 1)) {
+        idx = idxs[j];
+        break;
+      }
+    if(0 <= idx) {
+      result += string("<font class=\"match\">");
+      result += words[idx];
+      result += string("</font>");
+      i      += words[idx].size();
+    } else
+      result += orig[i ++];
+  }
+  return result;
+}
+
 template <typename T, typename U> const vector<string>& corpus<T,U>::getWords() const {
   return words;
 }
@@ -156,29 +189,31 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input, 
     for(int j = i; j < dM; j ++)
       workd[i] += string(" ");
   }
-  int i(0);
+  orig = string("");
+  for(int i = 0; input[i]; i ++)
+    orig += input[i];
+  int i(0), i0(0);
   for( ; input[i]; i ++) {
     work += input[i];
     for(int ii = 0; ii < workd.size(); ii ++) {
       workd[ii]  = workd[ii].substr(1, workd[ii].size() - 1);
       workd[ii] += input[i];
       for(int j = 0; j < delimiter.size(); j ++)
-        if(workd[ii] == delimiter[j] && i != pdelim[pdelim.size() - 1])
+        if(workd[ii] == delimiter[j] && pdelim[pdelim.size() - 1] < i)
           pdelim.push_back(i);
     }
     auto lo(words0.begin() + distance(words0.begin(), upper_bound(words0.begin(), words0.end(), work, lessEqualStrClip<string>)));
     auto up(words0.begin() + distance(words0.begin(), upper_bound(words0.begin(), words0.end(), work, lessNotEqualStrClip<string>)));
     bool match(false);
-    for(auto itr(lo); itr < up; ++ itr) {
+    for(auto itr(lo); itr < up; ++ itr)
       if(equalStrClip<string>(work, *itr)) {
         if(work.size() >= itr->size()) {
           matchwidx.push_back(distance(words0.begin(), itr));
-          matchidxs.push_back(i);
+          matchidxs.push_back(i0);
           match = true;
         } else if(work.size() < itr->size())
           match = true;
       }
-    }
     if(match && input[i + 1])
       continue;
     if(matchwidx.size() > 0) {
@@ -189,6 +224,7 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input, 
       matchidxs = vector<int>();
     }
     i   -= work.size() - 1;
+    i0   = i;
     work = string();
   }
   {
@@ -306,6 +342,7 @@ public:
   const string          serialize() const;
   const corpushl<T, U>  abbrev(const string word, const corpushl<T, U>& mean);
   const vector<string>  reverseLink(const corpushl<T, U>& orig) const;
+  const string          reverseLink(const corpus<T, U>& orig) const;
   const pair<T, T>      compareStructure(const corpushl<T, U>& src, const T& thresh = T(1e-4), const T& thresh2 = T(.125)) const;
   const corpushl<T, U>  reDig(const T& ratio);
   const corpushl<T, U>  simpleThresh(const T& ratio);
@@ -708,8 +745,11 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(co
 template <typename T, typename U> const vector<string> corpushl<T, U>::reverseLink(const corpushl<T, U>& orig) const {
   vector<string> res;
   vector<int>    ridx0, ridx1;
-  corpushl<T, U> work(match2relPseudo(orig));
+  corpushl<T, U> work(match2relPseudo(corpushl<T, U>(orig)));
   vector<string> rwords(gatherWords(words, work.words, ridx0, ridx1));
+  return rwords;
+/*
+  // for debugging purpose:
   res.push_back(string(" (") + to_string(work.cdot(work)) + string(")"));
   for(int i = 0; i < rwords.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0)
     for(int j = 0; j < rwords.size(); j ++) if(ridx0[j] >= 0 && ridx1[j] >= 0)
@@ -721,6 +761,13 @@ template <typename T, typename U> const vector<string> corpushl<T, U>::reverseLi
                         rwords[k] + string(" @ ") +
                         to_string(work.corpust(ridx1[i], ridx1[j])[ridx1[k]]));
   return res;
+ */
+}
+
+template <typename T, typename U> const string corpushl<T, U>::reverseLink(const corpus<T, U>& orig) const {
+  vector<int>    ridx0, ridx1;
+  corpushl<T, U> work(match2relPseudo(orig));
+  return orig.getAttributed(gatherWords(words, work.words, ridx0, ridx1));
 }
 
 template <typename T, typename U> const pair<T, T> corpushl<T, U>::compareStructure(const corpushl<T, U>& src, const T& thresh, const T& thresh2) const {
@@ -949,6 +996,7 @@ template <typename T, typename U> const string optimizeTOC(const string& input, 
   // prepare dictionaries:
   cerr << "optimizeToc: parsing input" << flush;
   vector<vector<corpushl<T, U> > > details;
+  vector<string> cstat1;
   assert(dict.size() == detailwords.size());
   for(int i = 0; i < dict.size(); i ++) {
     cerr << "." << flush;
@@ -960,11 +1008,13 @@ template <typename T, typename U> const string optimizeTOC(const string& input, 
       details[details.size() - 1].push_back(corpushl<double, char>(cstat));
     }
   }
+  vector<corpus<double, char> >   cstat0orig;
   vector<corpushl<double, char> > cstat0;
   for(int i = 0; i < input.size() / szwindow + 1; i ++) {
     corpus<double, char> cstat;
     cstat.init(words, 0, 120);
     cstat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
+    cstat0orig.push_back(cstat);
     cstat0.push_back(corpushl<double, char>(cstat));
   }
   
@@ -1022,7 +1072,15 @@ template <typename T, typename U> const string optimizeTOC(const string& input, 
         objr.reDig(redig);
         cs += objr;
       }
-      result += cs.serialize() + string("\n");
+      result += string("<div class=\"tooltip\" href=\"#\">");
+      result += cs.serialize();
+      result += string("<span class=\"tooltip\">");
+      for(int j = k * Mgather; j < min((k + 1) * Mgather, int(idxs[jj].size())); j ++) {
+        result += to_string(idxs[jj][idxs[jj].size() - j - 1]) + string(" - ");
+        result += cs.reverseLink(cstat0orig[idxs[jj][idxs[jj].size() - j - 1]]);
+        result += string("<br/>");
+      }
+      result += string("</span></div>");
     }
   }
   return result;
