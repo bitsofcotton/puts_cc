@@ -193,19 +193,23 @@ int main(int argc, const char* argv[]) {
       for(int i = 0; i < cstat0.size(); i ++)
         std::cout << cstat0[i].toc(tocs, tocwords);
       std::cout << std::endl << std::endl;
-      std::vector<corpushl<double, char> > summ(cstat0);
-      for(int i = 0; i < summ.size(); i ++)
-        summ[i].simpleThresh(.8);
-      for(int ii = 0; ii < summ.size(); ii ++)
+      std::vector<corpushl<double, char> >& summ(cstat0);
+      for(int ii = 0; ii < summ.size(); ii ++) {
+        summ[ii].simpleThresh(.8);
         for(int i = 0; i < tocs.size(); i ++) {
-          std::cout << tocwords[i] << " : " << std::endl;
+          std::cout << ii << " - " <<  tocwords[i] << " : " << std::endl;
+          std::vector<std::string> workb;
           for(int j = 0; j < tocs[i].size(); j ++) {
             std::vector<std::string> work(summ[ii].reverseLink(tocs[i][j]));
-            for(int k = 0; k < work.size(); k ++)
-              std::cout << work[k] << ", ";
-            std::cout << std::endl;
+            if(work != workb) {
+              for(int k = 0; k < work.size(); k ++)
+                std::cout << work[k] << ", ";
+              std::cout << std::endl;
+              workb = work;
+            }
           }
         }
+      }
     }
     break;
   case 3:
@@ -298,7 +302,7 @@ int main(int argc, const char* argv[]) {
         cstat.init(wordbuf.c_str(), 0, 120);
         cstat.compute(inbuf.c_str(), delimiter);
         std::string wbuf(argv[iidx]);
-        int slash = - 1;
+        int slash(- 1);
         for(int j = 0; j < wbuf.size(); j ++)
           if(wbuf[j] == '/')
             slash = j;
@@ -314,24 +318,37 @@ int main(int argc, const char* argv[]) {
           detailwords.push_back(wwbuf);
         }
       }
-      corpushl<double, char> cstat0;
-      {
+      std::vector<corpus<double, char> > cstatorig;
+      std::vector<corpushl<double, char> > cstat0;
+      for(int i = 0; i < input.size() / szwindow + 1; i ++) {
         corpus<double, char> cstat;
         cstat.init(wordbuf.c_str(), 0, 120);
-        cstat.compute(input.c_str(), delimiter);
-        cstat0 = corpushl<double, char>(cstat);
+        cstat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
+        cstatorig.push_back(cstat);
+        cstat0.push_back(corpushl<double, char>(cstat));
       }
-      corpushl<double, char> cstat1(cstat0), cstat2(cstat0);
-      std::cout << cstat0.serialize() << std::endl;
+      std::vector<corpushl<double, char> > cstat1(cstat0);
       std::cerr << "analysing input text." << std::endl;
-      for(int i = 0; i < details.size(); i ++)
-        cstat0 = cstat0.withDetail(detailwords[i] , details[i]);
-      for(int i = 0; i < details2.size(); i ++)
-        cstat1 = cstat1.withDetail(detailwords2[i], details2[i]);
-      cstat1.reDig(double(4));
-      cstat2.reDig(double(4));
-      auto diff(cstat1 - cstat2);
-      std::cout << diff.serialize() << std::endl;
+      std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
+      std::cout << std::string("<body>");
+      for(int j = 0; j < cstat0.size(); j ++) {
+        for(int i = 0; i < details.size(); i ++)
+          cstat0[j] = cstat0[j].withDetail(detailwords[i] , details[i]);
+        cstat0[j].reDig(double(4));
+        for(int i = 0; i < details2.size(); i ++)
+          cstat1[j] = cstat1[j].withDetail(detailwords2[i], details2[i]);
+        cstat1[j].reDig(double(4));
+        if(cstat0[j] != cstat1[j]) {
+          auto diff(cstat0[j] - cstat1[j]);
+          diff.simpleThresh(1);
+          std::cout << cstat0[j].serialize() << "<br/>" << std::endl;
+          std::cout << cstat1[j].serialize() << "<br/>" << std::endl;
+          std::cout << diff.serialize()      << "<br/>" << std::endl;
+          std::cout << diff.reverseLink(cstatorig[j]) << std::endl;
+          std::cout << std::endl;
+        }
+      }
+      std::cout << "</body></html>" << std::endl;
     }
     break;
   case 6:
@@ -378,7 +395,7 @@ int main(int argc, const char* argv[]) {
       std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8, .125) << std::endl;
       std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8, 1.) << std::endl;
       std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8, 8.) << std::endl;
-      std::cout << std::string("</body>");
+      std::cout << std::string("</body></html>");
     }
     break;
   }
