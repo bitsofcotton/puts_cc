@@ -336,6 +336,7 @@ public:
   const string          toc(const vector<corpushl<T, U> >& base, const vector<string>& words) const;
   const string          toc(const vector<vector<corpushl<T, U> > >& base, const vector<string>& words) const;
   const vector<T>       prej(const vector<corpushl<T, U> >& prejs) const;
+  const T               prej2(const vector<corpushl<T, U> >& prej0, const vector<corpushl<T, U> >& prej1, const T& thresh) const;
   const corpushl<T, U>  lackOfInsist() const;
   const corpushl<T, U>  invertInsist() const;
   const T               culturalConflicts(const corpushl<T, U>& base) const;
@@ -348,7 +349,8 @@ public:
   const string          reverseLink(const corpus<T, U>& orig) const;
   const pair<T, T>      compareStructure(const corpushl<T, U>& src, const T& thresh = T(1e-4), const T& thresh2 = T(.125)) const;
   const corpushl<T, U>  reDig(const T& ratio);
-  const corpushl<T, U>  simpleThresh(const T& ratio);
+  const corpushl<T, U>  simpleThresh(const T& ratio) const;
+
 private:
   const string          serializeSub(const vector<int>& idxs) const;
   const Vec             singularValues() const;
@@ -517,26 +519,20 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int i = 0; i < result.corpust.rows(); i ++) {
+  for(int i = 0; i < result.corpust.rows(); i ++)
     for(int j = 0; j < result.corpust.cols(); j ++) {
       result.corpust(i, j) = Vec(workwords.size() - 1);
       for(int k = 0; k < result.corpust(i, j).size(); k ++)
         result.corpust(i, j)[k] = T(0);
     }
-  }
 #if defined(_OPENMP)
 #pragma omp paralell for schedule(static, 1)
 #endif
   for(int i = 0; i < workwords.size(); i ++) if(0 <= ridx2[i])
-    for(int j = 0; j < workwords.size(); j ++) if(0 <= ridx2[j]) {
-      result.corpust(ridx2[i], ridx2[j]) = Vec(workwords.size() - 1);
-      for(int k = 0; k < result.corpust(ridx2[i], ridx2[j]).size(); k ++) if(ridx2[k] >= 0) {
+    for(int j = 0; j < workwords.size(); j ++) if(0 <= ridx2[j])
+      for(int k = 0; k < result.corpust(ridx2[i], ridx2[j]).size(); k ++) if(ridx2[k] >= 0)
         if(ridx0[i] >= 0 && ridx0[j] >= 0 && ridx0[k] >= 0)
           result.corpust(ridx2[i], ridx2[j])[ridx2[k]] = corpust(ridx0[i], ridx0[j])[ridx0[k]];
-        else
-          result.corpust(ridx2[i], ridx2[j])[ridx2[k]] = T(0);
-      }
-    }
   cerr << "withDetail: adding detail table." << endl;
   result.corpust += prepareDetail(other, workwords, eidx, ridx0, ridx1, ridx2);
   return result;
@@ -638,9 +634,25 @@ template <typename T, typename U> const vector<T> corpushl<T, U>::prej(const vec
   return result;
 }
 
+template <typename T, typename U> const T corpushl<T, U>::prej2(const vector<corpushl<T, U> >& prej0, const vector<corpushl<T, U> >& prej1, const T& thresh) const {
+  // XXX confirm me: is this correct counting method?
+  // XXX fixme: also with prej func.
+  cerr << "XXX confirm me: corpushl<T, U>::prej2" << endl;
+  corpushl<T, U> p0(*this), p1(*this);
+  for(int i = 0; i < prej0.size(); i ++)
+    p0 = p0.abbrev(string("P") + to_string(i), prej0[i]);
+  for(int i = 0; i < prej1.size(); i ++)
+    p1 = p1.abbrev(string("Q") + to_string(i), prej1[i]);
+  p0 = p0.simpleThresh(thresh);
+  p1 = p1.simpleThresh(thresh);
+  return T(p0.words.size() - prej0.size()) / T(p1.words.size() - prej1.size());
+}
+
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::lackOfInsist() const {
   corpushl<T, U> result;
   // stub.
+  // XXX confirm me: this method can only count what's on the table.
+  //                 so the things that isn't on the table will not be counted.
   cerr << "STUB LACK OF INSIST." << endl;
   return result;
 }
@@ -648,6 +660,8 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::lackOfIns
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::invertInsist() const {
   corpushl<T, U> result;
   // stub.
+  // XXX confirm me: this method cannot calculate in logically correct
+  //                 because of it's method.
   cerr << "STUB INVERT INSIST." << endl;
   return result;
 }
@@ -666,6 +680,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::conflictP
   corpushl<T, U> result;
   // search conflict parts.
   // dictionary base of the word 'NOT' is needed.
+  cerr << "STUB of corpushl<T, U>::conflictPart." << endl;
   return;
 }
 
@@ -835,19 +850,40 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::reDig(con
   return *this;
 }
 
-template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThresh(const T& ratio) {
+template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThresh(const T& ratio) const {
   T absmax(0);
   for(int i = 0; i < corpust.rows(); i ++)
     for(int j = 0; j < corpust.cols(); j ++)
       for(int k = 0; k < corpust(i, j).size(); k ++)
         if(absmax < corpust(i, j)[k])
           absmax = abs(corpust(i, j)[k]);
+  Tensor work(corpust);
   for(int i = 0; i < corpust.rows(); i ++)
     for(int j = 0; j < corpust.cols(); j ++)
       for(int k = 0; k < corpust(i, j).size(); k ++)
         if(abs(corpust(i, j)[k]) < absmax * ratio)
-          corpust(i, j)[k] = T(0);
-  return *this;
+          work(i, j)[k] = T(0);
+  vector<int> okidx;
+  for(int i = 0; i < corpust.rows(); i ++) {
+    bool flag(true);
+    for(int j = 0; j < corpust.rows(); j ++)
+      if(work(i, j).dot(work(i, j)) != T(0) ||
+         work(j, i).dot(work(j, i)) != T(0)) {
+        flag = false;
+        break;
+      }
+    if(! flag)
+      okidx.push_back(i);
+  }
+  corpushl<T, U> result;
+  result.words   = vector<string>();
+  result.corpust = Tensor(okidx.size(), okidx.size());
+  for(int i = 0; i < okidx.size(); i ++) {
+    result.words.push_back(words[okidx[i]]);
+    for(int j = 0; j < okidx.size(); j ++)
+      result.corpust(i, j) = corpust(okidx[i], okidx[j]);
+  }
+  return result;
 }
 
 template <typename T, typename U> vector<string> corpushl<T, U>::gatherWords(const vector<string>& in0, const vector<string>& in1, vector<int>& ridx0, vector<int>& ridx1) const {
@@ -932,20 +968,19 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < workwords.size(); i ++) if(ridx0[i] >= 0 && ridx2[i] >= 0)
-    for(int j = 0; j < workwords.size(); j ++) if(ridx0[j] >= 0 && ridx2[j] >= 0) {
+    for(int j = 0; j < workwords.size(); j ++) if(ridx0[j] >= 0 && ridx2[j] >= 0)
       for(int k = 0; k < workwords.size(); k ++) if(ridx0[k] >= 0) {
         const T ratio(corpust(ridx0[i], ridx0[j])[ridx0[k]]);
         if(ridx2[k] >= 0 && ridx1[k] >= 0 && ridx1[i] >= 0 && ridx1[j] >= 0)
           res(ridx2[i], ridx2[j])[ridx2[k]] +=
             ratio * other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
       }
-    }
 
   // Sum-up words defined in definition row, col without crossing point.
   {
     const int i(eidx);
     for(int j = 0; j < workwords.size(); j ++) if(ridx2[j] >= 0) {
-      cerr << "prepareDetail 1/2 " << i << "/" << workwords.size() << endl;
+      cerr << "prepareDetail 1/2 " << j << "/" << workwords.size() << endl;
       for(int k = 0; k < workwords.size(); k ++) if(ridx2[k] >= 0) {
         // if all side exists on both corpust, weight and add.
         if(ridx0[i] >= 0 && ridx0[j] >= 0 && ridx0[k] >= 0 &&
