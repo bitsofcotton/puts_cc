@@ -9,7 +9,7 @@
 #include "file2eigen.hh"
 
 void usage() {
-  std::cout << "tools (lword|corpus|toc|redig|stat|reconstruct|diff)" << std::endl;
+  std::cout << "tools (lword|corpus|toc|redig|stat|reconstruct|diff|getdict)" << std::endl;
 }
 
 const int szwindow(200);
@@ -46,6 +46,8 @@ int main(int argc, const char* argv[]) {
     mode = 3;
   else if(std::strcmp(argv[1], "diff") == 0 && argc > 2)
     mode = 5;
+  else if(std::strcmp(argv[1], "getdict") == 0 && argc > 2)
+    mode = 7;
   else {
     usage();
     return - 2;
@@ -59,6 +61,7 @@ int main(int argc, const char* argv[]) {
   }
   switch(mode) {
   case 0:
+    // lword
     {
 #if 1
       lword<char32_t, std::u32string> stat;
@@ -88,6 +91,7 @@ int main(int argc, const char* argv[]) {
       break;
     }
   case 1:
+    // corpus
     {
       std::string          wordsbuf;
       std::string          line;
@@ -111,6 +115,7 @@ int main(int argc, const char* argv[]) {
     }
     break;
   case 2:
+    // toc
     {
       std::string wordbuf;
       {
@@ -195,7 +200,7 @@ int main(int argc, const char* argv[]) {
       std::cout << std::endl << std::endl;
       std::vector<corpushl<double, char> >& summ(cstat0);
       for(int ii = 0; ii < summ.size(); ii ++) {
-        summ[ii].simpleThresh(.8);
+        summ[ii] = summ[ii].simpleThresh(.8);
         for(int i = 0; i < tocs.size(); i ++) {
           std::cout << ii << " - " <<  tocwords[i] << " : " << std::endl;
           std::vector<std::string> workb;
@@ -213,6 +218,7 @@ int main(int argc, const char* argv[]) {
     }
     break;
   case 3:
+    // reconstruct
     {
       std::string wordbuf;
       {
@@ -234,6 +240,7 @@ int main(int argc, const char* argv[]) {
     }
     break;
   case 4:
+    // redig
     {
       std::string wordbuf;
       { 
@@ -265,6 +272,7 @@ int main(int argc, const char* argv[]) {
     }
     break;
   case 5:
+    // diff
     {
       std::string wordbuf;
       {
@@ -334,18 +342,17 @@ int main(int argc, const char* argv[]) {
         cstat1.reDig(double(4));
         if(cstat0 != cstat1) {
           auto diff(cstat0 - cstat1);
-          diff.simpleThresh(1);
-          std::cout << cstat0.serialize() << "<br/>" << std::endl;
-          std::cout << cstat1.serialize() << "<br/>" << std::endl;
-          std::cout << diff.serialize()      << "<br/>" << std::endl;
+          diff = diff.simpleThresh(1);
+          std::cout << diff.serialize() << "<br/>" << std::endl;
           std::cout << diff.reverseLink(cstatorig) << std::endl;
-          std::cout << std::endl;
+          std::cout << "<br/><br/>" << std::endl;
         }
       }
       std::cout << "</body></html>" << std::endl;
     }
     break;
   case 6:
+    // stat
     {
       std::string wordbuf;
       {
@@ -390,6 +397,11 @@ int main(int argc, const char* argv[]) {
       std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8, 1.) << std::endl;
       std::cout << optimizeTOC<double, char>(input, wordbuf.c_str(), rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8, 8.) << std::endl;
       std::cout << std::string("</body></html>");
+    }
+    break;
+  case 7:
+    // get dict.
+    {
     }
     break;
   }
