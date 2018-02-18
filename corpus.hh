@@ -209,7 +209,7 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input, 
     bool match(false);
     for(auto itr(lo); itr < up; ++ itr)
       if(equalStrClip<string>(work, *itr)) {
-        if(work.size() >= itr->size()) {
+        if(work.size() == itr->size()) {
           matchwidx.push_back(distance(words0.begin(), itr));
           matchidxs.push_back(i0);
         } else if(work.size() < itr->size())
