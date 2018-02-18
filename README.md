@@ -14,6 +14,7 @@ This program uses large amount of region on the memory.
 # Usage
     make tools
     ./tools lword < data.txt
+    ./tools lword prepared_word_list.txt < data.txt
     ./tools corpus wordlist.txt < data.txt
     ./tools toc wordlist.txt dictionaries ... -toc topics ... < data.txt
     ./tools redig wordlist.txt < data.txt
