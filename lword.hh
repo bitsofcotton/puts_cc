@@ -214,7 +214,7 @@ template <typename T, typename U> U lword<T, U>::eliminate(const U& input, const
     bool match(false);
     for(auto itr(lo); itr < up; ++ itr)
       if(equalStrClip<U>(work, *itr)) {
-        if(work.size() >= itr->size())
+        if(work.size() == itr->size())
           ii = i;
         else if(work.size() < itr->size())
           match = true;
@@ -227,7 +227,9 @@ template <typename T, typename U> U lword<T, U>::eliminate(const U& input, const
       result += work;
       i0 = i;
     }
+    i0 ++;
     ii = i = i0;
+    i --;
     work   = U();
   }
   result += work;
