@@ -61,7 +61,7 @@ foreach(new DirectoryIterator('./datas/') as $fileInfo) {
         1 => array("file", $pathb2 . "lword.txt", "w"),  // stdout.
         2 => array("file", $pathb2 . "lword-error.txt", "w") // stderr.
       );
-      $process = proc_open('../../puts lword', $descriptorspec, $pipes, $cwd, $env);
+      $process = proc_open('../../puts lword words.txt', $descriptorspec, $pipes, $cwd, $env);
       if (is_resource($process)) {
         fwrite($pipes[0], $text . "\n");
         fclose($pipes[0]);
