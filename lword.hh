@@ -227,7 +227,9 @@ template <typename T, typename U> U lword<T, U>::eliminate(const U& input, const
       result += work;
       i0 = i;
     }
+    i0 ++;
     ii = i = i0;
+    i --;
     work   = U();
   }
   result += work;
