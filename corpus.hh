@@ -25,6 +25,7 @@ using std::to_string;
 using std::isfinite;
 using std::sqrt;
 using std::min;
+using std::max;
 using std::abs;
 using std::exp;
 using std::log;
@@ -193,7 +194,7 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input, 
   orig = string("");
   for(int i = 0; input[i]; i ++)
     orig += input[i];
-  int i(0), i0(0);
+  int  i(0), i0(0);
   for( ; input[i]; i ++) {
     work += input[i];
     for(int ii = 0; ii < workd.size(); ii ++) {
@@ -211,7 +212,6 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input, 
         if(work.size() >= itr->size()) {
           matchwidx.push_back(distance(words0.begin(), itr));
           matchidxs.push_back(i0);
-          match = true;
         } else if(work.size() < itr->size())
           match = true;
       }
@@ -224,9 +224,9 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input, 
       matchwidx = vector<int>();
       matchidxs = vector<int>();
     }
-    i   -= work.size() - 1;
-    i0   = i;
-    work = string();
+    i     -= work.size() - 1;
+    i0     = i;
+    work   = string();
   }
   {
     if(matchwidx.size() > 0) {
