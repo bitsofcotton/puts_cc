@@ -13,6 +13,7 @@
 # 使い方
     make tools
     ./tools lword < data.txt
+    ./tools lword prepared_word_list.txt < data.txt
     ./tools corpus wordlist.txt < data.txt
     ./tools toc wordlist.txt dictionaries ... -toc topics ... < data.txt
     ./tools redig wordlist.txt < data.txt
