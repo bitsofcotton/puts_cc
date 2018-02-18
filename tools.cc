@@ -63,6 +63,21 @@ int main(int argc, const char* argv[]) {
   case 0:
     // lword
     {
+      if(2 <= argc) {
+        std::string   buf;
+        std::string   elimbuf;
+        std::ifstream input2;
+        input2.open(argv[2]);
+        while(getline(input2, buf)) {
+          elimbuf += buf + std::string("\n");
+          if(input2.eof() || input2.bad())
+            break;
+        }
+        input2.close();
+        lword<char, std::string> eliminater;
+        input = eliminater.eliminate(input, elimbuf);
+        std::cerr << input << std::endl;
+      }
 #if 1
       lword<char32_t, std::u32string> stat;
       std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
