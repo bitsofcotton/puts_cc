@@ -203,6 +203,9 @@ template <typename T, typename U> U lword<T, U>::eliminate(const U& input, const
       continue;
     buf += words[i];
   }
+  words0.push_back(string(" "));
+  words0.push_back(string("\r"));
+  words0.push_back(string("\n"));
   // duplicate to corpus::getWordPtrs
   sort(words0.begin(), words0.end());
   U    result, work;
