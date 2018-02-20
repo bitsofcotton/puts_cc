@@ -14,6 +14,7 @@
     make tools
     ./tools lword < data.txt
     ./tools lword prepared_word_list.txt < data.txt
+    ./tools lbalance wordlist.txt < data.txt
     ./tools corpus wordlist.txt < data.txt
     ./tools toc wordlist.txt dictionaries ... -toc topics ... < data.txt
     ./tools redig wordlist.txt < data.txt
@@ -50,9 +51,10 @@ https://services.limpid-intensity.info/puts.php にサンプルがあります�
     }
     
     std::string wordlist;
-    // ... initialize wordlist (\t or \n separated).
+    std::vector<std::string> csvelim, csvdelim;
+    // ... initialize wordlist and csvelim and csvdelim.
     corpus<double, char> cstat;
-    cstat.init(wordlist.c_str(), 0, 120);
+    cstat.init(cutText(wordlist, csvelim, csvdelim), 0, 120);
     cstat.compute(input.c_str());
     
     corpushl<double, char> cstats;
@@ -71,11 +73,11 @@ https://services.limpid-intensity.info/puts.php にサンプルがあります�
     
 # Tips
 これらのプログラムはまだよく検証されたアルゴリズムを使用して*いない可能性があります*。  
+このプログラムを形態要素解析と一緒に使うときちんとした結果が得られますが、現状そうして*いません*。このプログラムは単語同士の距離と順序のみを問題としています、これは何が着目されているかに大まかにつながるものです。  
+このプログラムは何が言われたかについて着目するものであり、何が言われていないか、について着目するものではありません。  
 abbrev 関数は、理想的には withDetail 関数の逆の最適化となっていることが望ましいですが、現状そうなっていません。  
 serialize 関数は、理想的には corpushl(corpus(...)) イニシャライザの逆の最適化となっていることが望ましいですが、現状そうなっていません。  
 純粋な興味で作られたプログラムですので、文脈を理解する際の補助として以外には使用しないでください。  
-このプログラムを形態要素解析と一緒に使うときちんとした結果が得られますが、現状そうして*いません*。このプログラムは単語同士の距離と順序のみを問題としています、これは何が着目されているかに大まかにつながるものです。  
-このプログラムは何が言われたかについて着目するものであり、何が言われていないか、について着目するものではありません。  
 もし大きなよく記述されたテキストと辞書があれば、自分の主張と反対の主張を演繹することができますが、これは何が文脈から言えるかであり、何が実際の問題かということではありません。  
 
 # その他のダウンロードサイト
