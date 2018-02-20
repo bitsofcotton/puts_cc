@@ -7,12 +7,13 @@ CXXFLAGS+=	-Ofast -g0
 CXXFLAGS+=	-std=c++11
 LDFLAGS+=	-lstdc++
 
-CLEANFILES= *.o tools
+CLEANFILES= *.o tools test
 
-all:	tools
+all:	tools test
 
 clean:
 	@rm -rf ${CLEANFILES}
 
 tools.o:        tools.cc corpus.hh file2eigen.hh lword.hh
+test.o:		test.cc corpus.hh file2eigen.hh lword.hh
 

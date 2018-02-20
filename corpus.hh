@@ -54,7 +54,7 @@ public:
   corpus();
   ~corpus();
   
-  void init(const U* words, const int& nthresh, const int& Nthresh, const int& Mwords = 150);
+  void init(const vector<string>& words, const int& nthresh, const int& Nthresh, const int& Mwords = 150);
   corpus<T, U>&         operator = (const corpus<T, U>& other);
   const void            compute(const U* input, const vector<string>& delimiter = vector<string>());
   const string          getAttributed(const vector<string>& highlight) const;
@@ -86,26 +86,11 @@ template <typename T, typename U> corpus<T,U>::~corpus() {
   ;
 }
 
-template <typename T, typename U> void corpus<T,U>::init(const U* words, const int& nthresh, const int& Nthresh, const int& Mwords) {
-  string buf;
-  for(int i = 0; words[i]; i ++) {
-    if(words[i] == ',' || words[i] == '\n' || words[i] == '\r') {
-      if(buf.size()) {
-        this->ptrs0.push_back(vector<int>());
-        switch(buf[buf.size() - 1]) {
-        case '\n': case '\r': case ' ': case '\t': case ',':
-          this->words0.push_back(buf.substr(0, buf.size() - 1));
-          break;
-        default:
-          this->words0.push_back(buf);
-        }
-      }
-      buf = string();
-      continue;
-    } else if(words[i] == ' ' || words[i] == '\t')
-      continue;
-    buf += words[i];
-  }
+template <typename T, typename U> void corpus<T,U>::init(const vector<string>& words, const int& nthresh, const int& Nthresh, const int& Mwords) {
+  words0        = words;
+  ptrs0         = vector<vector<int> >();
+  for(int i = 0; i < words0.size(); i ++)
+    ptrs0.push_back(vector<int>());
   this->nthresh = nthresh;
   this->Nthresh = Nthresh;
   this->Midx    = 1;
@@ -1038,7 +1023,7 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
 
 
 
-template <typename T, typename U> const string optimizeTOC(const string& input, const U* words, const vector<string>& dict, vector<string>& detailwords, const vector<string>& delimiter, const int& szwindow, const int& depth, const int& Mgather = 8, const T& redig = T(1)) {
+template <typename T, typename U> const string optimizeTOC(const string& input, const vector<string>& words, const vector<string>& dict, vector<string>& detailwords, const vector<string>& delimiter, const int& szwindow, const int& depth, const int& Mgather = 8, const T& redig = T(1)) {
   // prepare dictionaries:
   cerr << "optimizeToc: parsing input" << flush;
   vector<vector<corpushl<T, U> > > details;
