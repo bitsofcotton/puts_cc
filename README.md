@@ -75,11 +75,11 @@ Please pseudo-login with e-mail address - salt pair.
     
 # Tips
 These programs may have a algorithm that is not carefully confirmed.  
+And this algorithm have a specification that edges remains as obscure, to get clear edge, we should use this with morphological analysis softwares. This algorithm only sees the word distances and orders that causes rough image of what is on the table.  
 This program only sees what is said in the input, not the not said.  
 abbrev is needed to be the inverse of withDetail function, but now, NOT so.  
 serialize function is needed to be the inverse of corpushl(corpus(...)) but now, NOT so.  
 This is from simply interest, so don't use this for the reason other than standing under the context.  
-And this algorithm have a specification that edges remains as obscure, to get clear edge, we should use this with morphological analysis softwares. This algorithm only sees the word distances and orders that causes rough image of what is on the table.  
 If there's large numbers of the sets that correctly defined texts, it may optimizable out to get opposite side's claim, but this is only the what's able to be said, so this isn't what's the matter.  
 
 # Another downloads
