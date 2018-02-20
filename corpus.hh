@@ -872,7 +872,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThr
 }
 
 template <typename T, typename U> vector<string> corpushl<T, U>::gatherWords(const vector<string>& in0, const vector<string>& in1, vector<int>& ridx0, vector<int>& ridx1) const {
-  cerr << "gatherWords" << endl;
+  cerr << "g" << flush;
   vector<string> result;
   ridx0 = vector<int>();
   ridx1 = vector<int>();
@@ -902,8 +902,8 @@ template <typename T, typename U> vector<string> corpushl<T, U>::gatherWords(con
     ridx0.push_back(- 1);
     ridx1.push_back(- 1);
   }
-  int j = 0;
-  for(int i = 0; i < sin0.size(); i ++) {
+  int i(0), j(0);
+  for( ; i < sin0.size(); i ++) {
     for(; i < sin0.size() && j < sin1.size(); j ++) {
       if(sin0[i] == sin1[j]) {
         result.push_back(string(sin0[i]));
