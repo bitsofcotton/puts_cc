@@ -15,6 +15,7 @@ This program uses large amount of region on the memory.
     make tools
     ./tools lword < data.txt
     ./tools lword prepared_word_list.txt < data.txt
+    ./tools lbalance wordlist.txt < data.txt
     ./tools corpus wordlist.txt < data.txt
     ./tools toc wordlist.txt dictionaries ... -toc topics ... < data.txt
     ./tools redig wordlist.txt < data.txt
@@ -52,9 +53,10 @@ Please pseudo-login with e-mail address - salt pair.
     }
     
     std::string wordlist;
-    // ... initialize wordlist (\t or \n separated).
+    std::vector<std::string> csvelim, csvdelim;
+    // ... initialize wordlist and csvelim and csvdelim.
     corpus<double, char> cstat;
-    cstat.init(wordlist.c_str(), 0, 120);
+    cstat.init(cutText(wordlist, csvelim, csvdelim), 0, 120);
     cstat.compute(input.c_str());
     
     corpushl<double, char> cstats;
@@ -73,11 +75,11 @@ Please pseudo-login with e-mail address - salt pair.
     
 # Tips
 These programs may have a algorithm that is not carefully confirmed.  
-abbrev function is not ideal definition, so in fact, it is needed to be the inverse of withDetail function, but now, not so.  
-serialize function is not ideal definition, so in fact, it is needed to be the inverse of corpushl(corpus(...)) but now, not so.  
+This program only sees what is said in the input, not the not said.  
+abbrev is needed to be the inverse of withDetail function, but now, NOT so.  
+serialize function is needed to be the inverse of corpushl(corpus(...)) but now, NOT so.  
 This is from simply interest, so don't use this for the reason other than standing under the context.  
 And this algorithm have a specification that edges remains as obscure, to get clear edge, we should use this with morphological analysis softwares. This algorithm only sees the word distances and orders that causes rough image of what is on the table.  
-This program only sees what is said in the input, not the not said.  
 If there's large numbers of the sets that correctly defined texts, it may optimizable out to get opposite side's claim, but this is only the what's able to be said, so this isn't what's the matter.  
 
 # Another downloads
