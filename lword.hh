@@ -13,11 +13,14 @@ using std::vector;
 using std::map;
 using std::lower_bound;
 using std::sort;
+using std::unique;
 using std::cerr;
 using std::endl;
 using std::flush;
 using std::max;
 using std::min;
+
+template <typename T> vector<T> cutText(const T& input, const vector<T>& eliminate0, const vector<T>& delimiter0);
 
 template <typename T> class word_t {
 public:
@@ -77,7 +80,6 @@ public:
   void init(const int& loop, const int& mthresh, const int& Mthresh);
   
   const vector<word_t<U> >& compute(const T* input);
-  U eliminate(const U& input, const U& dict) const;
 private:
   vector<T>                   dict0;
   vector<vector<gram_t<U> > > dicts;
@@ -177,66 +179,6 @@ template <typename T, typename U> void lword<T, U>::assign(const gram_t<U>& val)
   } else if(dict.begin() <= p && p < dict.end() && p->str == val.str)
     dict.erase(p);
   return;
-}
-
-template <typename T, typename U> U lword<T, U>::eliminate(const U& input, const U& words) const {
-  // duplicate to corpus::init
-  U buf;
-  vector<U> words0;
-  for(int i = 0; words[i]; i ++) {
-    if(words[i] == ',' || words[i] == '\n' || words[i] == '\r') {
-      if(buf.size()) {
-        string adding;
-        switch(buf[buf.size() - 1]) {
-        case '\n': case '\r': case ' ': case '\t': case ',':
-          adding = buf.substr(0, buf.size() - 1);
-          break;
-        default:
-          adding = buf;
-        }
-        if(adding.size())
-          words0.push_back(adding);
-      }
-      buf = string();
-      continue;
-    } else if(words[i] == ' ' || words[i] == '\t')
-      continue;
-    buf += words[i];
-  }
-  words0.push_back(string(" "));
-  words0.push_back(string("\r"));
-  words0.push_back(string("\n"));
-  // duplicate to corpus::getWordPtrs
-  sort(words0.begin(), words0.end());
-  U    result, work;
-  int  i(0), i0(0), ii(0);
-  for( ; input[i]; i ++) {
-    work += input[i];
-    auto lo(words0.begin() + distance(words0.begin(), upper_bound(words0.begin(), words0.end(), work, lessEqualStrClip<U>)));
-    auto up(words0.begin() + distance(words0.begin(), upper_bound(words0.begin(), words0.end(), work, lessNotEqualStrClip<U>)));
-    bool match(false);
-    for(auto itr(lo); itr < up; ++ itr)
-      if(equalStrClip<U>(work, *itr)) {
-        if(work.size() == itr->size())
-          ii = i;
-        else if(work.size() < itr->size())
-          match = true;
-      }
-    if(match && input[i + 1])
-      continue;
-    if(i0 < ii)
-      i0 = ii;
-    else {
-      result += work;
-      i0 = i;
-    }
-    i0 ++;
-    ii = i = i0;
-    i --;
-    work   = U();
-  }
-  result += work;
-  return result;
 }
 
 template <typename T, typename U> const vector<word_t<U> >& lword<T, U>::compute(const T* input) {
@@ -383,6 +325,94 @@ template <typename T, typename U> void lword<T, U>::makeWords() {
   }
   sort(words.begin(), words.end());
   return;
+}
+
+
+// some functions.
+template <typename T> vector<T> cutText(const T& input, const vector<T>& eliminate0, const vector<T>& delimiter0) {
+  vector<T> delimiter(delimiter0);
+  vector<T> eliminate(eliminate0);
+  sort(delimiter.begin(), delimiter.end());
+  sort(eliminate.begin(), eliminate.end());
+  delimiter.erase(unique(delimiter.begin(), delimiter.end()), delimiter.end());
+  eliminate.erase(unique(eliminate.begin(), eliminate.end()), eliminate.end());
+  vector<T> result;
+  T         workbuf;
+  for(int i = 0; i < input.size(); i ++) {
+    workbuf += input[i];
+    bool flag(false);
+    for(int j = 0; j < delimiter.size(); j ++)
+      if(workbuf.size() >= delimiter[j].size() &&
+         workbuf.substr(workbuf.size() - delimiter[j].size(), delimiter[j].size()) == delimiter[j]) {
+        if(workbuf.size() - delimiter[j].size()) {
+          result.push_back(workbuf.substr(0, workbuf.size() - delimiter[j].size()));
+          sort(result.begin(), result.end());
+          result.erase(unique(result.begin(), result.end()), result.end());
+        }
+        workbuf = T();
+        flag = true;
+        break;
+      }
+    if(flag) continue;
+    for(int j = 0; j < eliminate.size(); j ++)
+      if(workbuf.size() >= eliminate[j].size() &&
+        workbuf.substr(workbuf.size() - eliminate[j].size(), eliminate[j].size()) == eliminate[j]) {
+        workbuf = workbuf.substr(0, workbuf.size() - eliminate[j].size());
+        break;
+      }
+  }
+  if(workbuf.size())
+    result.push_back(workbuf);
+  return result;
+}
+
+template <typename T, typename U> Eigen::Matrix<T, Eigen::Dynamic, 1> countWords(const U& orig, const vector<U>& words) {
+  Eigen::Matrix<T, Eigen::Dynamic, 1> result(words.size());
+  for(int i = 0; i < result.size(); i ++)
+    result[i] = T(0);
+  for(int i = 0; i < orig.size(); i ++) {
+    const U work(orig.substr(i, orig.size() - i - 1));
+    for(int j = 0; j < words.size(); j ++)
+      if(equalStrClip<U>(work, words[j]) && work.size() >= words[j].size())
+        result[j] = T(1);
+  }
+  return result;
+}
+
+// XXX very pseudo, this cannot be applied with simple DP.
+template <typename T, typename U> vector<int> pseudoWordsBalance(const vector<U>& orig, const vector<U>& words0, int nloop = - 1) {
+  cerr << "pseudoWordsBalance initializing matrix with initial words " << orig.size() << ", " << words0.size() << flush;
+  vector<U> words(words0);
+  sort(words.begin(), words.end());
+  words.erase(unique(words.begin(), words.end()), words.end());
+  
+  Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> result(words.size(), orig.size());
+  for(int i = 0; i < orig.size(); i ++)
+    result.col(i) = countWords<T, U>(orig[i], words);
+  
+  vector<int> vres;
+  if(nloop <= 0)
+    nloop = result.cols();
+  
+  cerr << "pseudo-balancing..." << flush;
+  for(int i = 0; i < min(int(result.cols()), nloop); i ++) {
+    vector<pair<T, int> > scores;
+    for(int j = 0; j < result.cols(); j ++)
+      scores.push_back(make_pair(- result.col(j).dot(result.col(j)), j));
+    sort(scores.begin(), scores.end());
+    if(scores[0].first == T(0))
+      break;
+    const int& idx(scores[0].second);
+    vres.push_back(idx);
+    for(int k = 0; k < result.rows(); k ++)
+      if(result(k, idx) != T(0))
+        result.row(k) *= T(0);
+    T sum(0);
+    for(int j = 0; j < result.rows(); j ++)
+      sum += result.row(j).dot(result.row(j));
+    cerr << sum << ":" << flush;
+  }
+  return vres;
 }
 
 #define _LWORD_
