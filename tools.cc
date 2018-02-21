@@ -100,6 +100,8 @@ int main(int argc, const char* argv[]) {
       if(2 <= argc) {
         auto elimlist(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
         elimlist.insert(elimlist.end(), csvelim.begin(), csvelim.end());
+        elimlist.push_back(std::string("\r"));
+        elimlist.push_back(std::string("\n"));
         input = cutText(input, elimlist, vector<std::string>())[0];
         std::cerr << input << std::endl;
       }
