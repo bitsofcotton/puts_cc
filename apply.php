@@ -1,7 +1,7 @@
 <?php
 session_start();
 $M_COUNT = 300;
-$M_STR   = 800000;
+$M_STR   = 80000;
 if(!isset($_SESSION["email"]) || !isset($_SESSION["salt"])) {
   echo "Please login.";
   return;
