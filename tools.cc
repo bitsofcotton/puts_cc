@@ -183,7 +183,10 @@ int main(int argc, const char* argv[]) {
           detailwords.push_back(work.first);
         }
       }
+      std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
+      std::cout << std::string("<body>");
       std::cout << preparedTOC<double, char>(input, words0, detailwords, details, tocwords, tocs, delimiter, szwindow, 8, .125) << std::endl;
+      std::cout << std::string("</body></html>");
     }
     break;
   case 3:
