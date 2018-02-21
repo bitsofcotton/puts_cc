@@ -1155,12 +1155,13 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
       corpushl<T, U> cs(cstat[j]);
       for(int l = k * Mgather; l < min((k + 1) * Mgather, int(idt.size())); l ++)
         cs += cstat[idt[l]];
-      result += string("<div href=\"#\">");
-      result += string("<span class=\"small\">");
+      result += string("<div href=\"#\"><span class=\"small\">");
       result += to_string(work[jj].first) + string("<br/>");
       result += cs.serialize();
-      result += string("</span><br/>");
-      result += string("<span class=\"small\">");
+      result += string("</span><br/><span class=\"small\">");
+      result += string("base : ") + to_string(j) + string(" - ");
+      result += cs.reverseLink(cstat0[j]);
+      result += string("<br/>");
       for(int l = k * Mgather; l < min((k + 1) * Mgather, int(idt.size())); l ++) {
         result += to_string(idt[l]) + string(" : ");
         result += to_string(cstats(j, idt[l])) + string(" - ");
