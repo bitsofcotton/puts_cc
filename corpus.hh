@@ -1130,12 +1130,14 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
   vector<int>           phrases;
   vector<pair<T, int> > work;
   vector<vector<int> >  idxs;
+  vector<vector<int> >  idxs0;
   for(int j = 0; j < cstats.size(); j ++) {
     T score(0);
     idxs.push_back(vector<int>());
     for(int k = 0, kk = 0; k < cstats.size() && kk < cstats.size() / depth; k ++)
       if(!binary_search(phrases.begin(), phrases.end(), cstats[j][k].second)) {
         score += cstats[j][k].first;
+        idxs0[j].push_back(k);
         idxs[j].push_back(cstats[j][k].second);
         phrases.push_back(cstats[j][k].second);
         sort(phrases.begin(), phrases.end());
@@ -1161,7 +1163,8 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
       result += string("</span><br/>");
       result += string("<span class=\"small\">");
       for(int l = k * Mgather; l < min((k + 1) * Mgather, int(idxs[j].size())); l ++) {
-        result += to_string(idxs[j][l]) + string(" - ");
+        result += to_string(idxs[j][l]) + string(" : ");
+        result += to_string(cstats[j][idxs0[j][l]].first) + string(" - ");
         result += cs.reverseLink(cstat0[idxs[j][l]]);
         result += string("<br/>");
       }
@@ -1180,7 +1183,7 @@ template <typename T, typename U> string diff(const string& input, const vector<
   getDetailed<T, U>(cstat0, cstat, input, words, detailtitle0, detail0, delimiter, szwindow);
   getDetailed<T, U>(dstat0, dstat, input, words, detailtitle1, detail1, delimiter, szwindow);
   
-  cerr << "Diff: making diffs" << endl;
+  cerr << " making diffs" << endl;
   vector<corpushl<T, U> > diffs;
   for(int i = 0; i < cstat.size(); i ++) {
     cstat[i].reDig(redig);
@@ -1191,6 +1194,7 @@ template <typename T, typename U> string diff(const string& input, const vector<
   }
   getAbbreved(diffs, words, detailtitle0, detail0, delimiter, szwindow);
   
+  cerr << " making outputs." << flush;
   string result;
   for(int i = 0; i < cstat.size(); i ++) {
     if(diffs[i].cdot(diffs[i]) != T(0)) {
