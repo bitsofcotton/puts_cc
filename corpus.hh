@@ -1126,7 +1126,7 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
   for(int i = 0; i < cstats.size(); i ++)
     sort(cstats[i].begin(), cstats[i].end());
   
-  cerr << "OK, making outputs." << flush;
+  cerr << "OK, sorting phrases." << flush;
   vector<int>           phrases;
   vector<pair<T, int> > work;
   vector<vector<int> >  idxs;
@@ -1146,6 +1146,7 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
   }
   sort(work.begin(), work.end());
   
+  cerr << "making outputs" << flush;
   string result;
   for(int jj = 0; jj < work.size(); jj ++) {
     const int& j(work[jj].second);
@@ -1157,7 +1158,7 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
       result += string("<span class=\"small\">");
       result += to_string(work[jj].first) + string("<br/>");
       result += cs.serialize();
-      result += string("</span>");
+      result += string("</span><br/>");
       result += string("<span class=\"small\">");
       for(int l = k * Mgather; l < min((k + 1) * Mgather, int(idxs[j].size())); l ++) {
         result += to_string(idxs[j][l]) + string(" - ");
