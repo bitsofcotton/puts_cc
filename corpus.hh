@@ -324,7 +324,7 @@ public:
   const corpushl<T, U>  withDetail(const string& word, const corpushl<T, U>& other);
   const T               cdot(const corpushl<T, U>& other) const;
   const corpushl<T, U>  match2relPseudo(const corpushl<T, U>& other) const;
-  const vector<T>       prej(const vector<corpushl<T, U> >& prejs) const;
+  const T               prej(const corpushl<T, U>& prejs) const;
   const T               prej2(const vector<corpushl<T, U> >& prej0, const vector<corpushl<T, U> >& prej1, const T& thresh) const;
   const corpushl<T, U>  lackOfInsist() const;
   const corpushl<T, U>  invertInsist() const;
@@ -579,15 +579,12 @@ template <typename T, typename U> const T corpushl<T, U>::cdot(const corpushl<T,
   return res;
 }
 
-template <typename T, typename U> const vector<T> corpushl<T, U>::prej(const vector<corpushl<T, U> >& prejs) const {
-  vector<T> result;
-  cerr << "XXX confirm me: corpushl<T, U>::prej" << endl;
-  for(int i = 0; i < prejs.size(); i ++)
-    // XXX confirm me: need some other counting methods?
-    // XXX fixme: amount of the word that is not said in the context is
-    //            also important.
-    result.push_back(cdot(match2relPseudo(prejs[i])) / cdot(*this));
-  return result;
+template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T, U>& prejs) const {
+  cerr << "XXX : confirm me prej function." << endl;
+  // XXX confirm me: need some other counting methods?
+  // XXX fixme: amount of the word that is not said in the context is
+  //            also important.
+  return cdot(match2relPseudo(prejs)) / cdot(*this);
 }
 
 template <typename T, typename U> const T corpushl<T, U>::prej2(const vector<corpushl<T, U> >& prej0, const vector<corpushl<T, U> >& prej1, const T& thresh) const {
@@ -629,7 +626,7 @@ template <typename T, typename U> const T corpushl<T, U>::culturalConflicts(cons
   const auto dwork(*this - work);
   const auto dworkc(base - workc);
   // XXX this is broken method. DO NOT USE THIS ONLY.: fixme...
-  const T score(sqrt((dwork.cdot(dwork) + dworkc.cdot(dworkc))) / cdot(base) / T(words.size() + base.words.size()));
+  const T score((dwork.cdot(dwork) + dworkc.cdot(dworkc)) / cdot(base) / T(words.size() + base.words.size()));
   if(isfinite(score))
     return score;
   cerr << "culturalConflicts: nan" << endl;
@@ -1123,29 +1120,30 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
     for(int j = i; j < cstat.size(); j ++)
       cstats[i].push_back(make_pair(abs(cstat[i].culturalConflicts(cstat[j])), j));
   }
-  for(int i = 0; i < cstats.size(); i ++)
-    sort(cstats[i].begin(), cstats[i].end());
   
   cerr << "OK, sorting phrases." << flush;
   vector<int>           phrases;
   vector<pair<T, int> > work;
   vector<vector<int> >  idxs;
-  vector<vector<int> >  idxs0;
   for(int j = 0; j < cstats.size(); j ++) {
-    T score(0);
-    idxs0.push_back(vector<int>());
+    work.push_back(make_pair(T(0), j));
     idxs.push_back(vector<int>());
-    for(int k = 0, kk = 0; k < cstats.size() && kk < cstats.size() / depth; k ++)
-      if(!binary_search(phrases.begin(), phrases.end(), cstats[j][k].second)) {
-        score += cstats[j][k].first;
-        idxs0[j].push_back(k);
-        idxs[j].push_back(cstats[j][k].second);
-        phrases.push_back(cstats[j][k].second);
-        sort(phrases.begin(), phrases.end());
-        kk ++;
-      }
-    if(idxs[j].size())
-      work.push_back(make_pair(score, j));
+  }
+  for(int i = 0; i < cstat.size(); i ++) {
+    pair<T, pair<int, int>> mscore(make_pair(T(0), make_pair(- 1, - 1)));
+    for(int j = 0; j < cstats.size(); j ++) if(idxs[j].size() < cstats.size() / depth)
+      for(int k = 0; k < cstats.size(); k ++) if(j != k &&
+        !binary_search(phrases.begin(), phrases.end(), k) &&
+        (mscore.second.first < 0 || cstats[j][k].first < mscore.first))
+          mscore = make_pair(cstats[j][k].first, make_pair(j, k));
+    if(0 <= mscore.second.first) {
+      const int& jj(mscore.second.first);
+      const int& kk(mscore.second.second);
+      work[jj].first += cstats[jj][kk].first;
+      idxs[jj].push_back(kk);
+      phrases.push_back(kk);
+      sort(phrases.begin(), phrases.end());
+    }
   }
   sort(work.begin(), work.end());
   
@@ -1165,7 +1163,7 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
       result += string("<span class=\"small\">");
       for(int l = k * Mgather; l < min((k + 1) * Mgather, int(idxs[j].size())); l ++) {
         result += to_string(idxs[j][l]) + string(" : ");
-        result += to_string(cstats[j][idxs0[j][l]].first) + string(" - ");
+        result += to_string(cstats[j][idxs[j][l]].first) + string(" - ");
         result += cs.reverseLink(cstat0[idxs[j][l]]);
         result += string("<br/>");
       }
