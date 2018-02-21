@@ -272,7 +272,7 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
           if(ctru >= ptrs[i].size())
             continue;
           while(ctrv < ptrs[j].size() && ptrs[j][ctrv] < *itr) ctrv ++;
-          if(ptrs[j][ctrv] < *itr)
+          if(ctrv >= ptrs[j].size() || ptrs[j][ctrv] < *itr)
             break;
           for( ; kk < pdelim.size() - 1; kk ++)
             if(pdelim[kk] <= *itr && *itr <= pdelim[kk + 1])
