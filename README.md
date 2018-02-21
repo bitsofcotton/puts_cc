@@ -82,7 +82,7 @@ If there's large numbers of the sets that correctly defined texts, it may optimi
 # Sample working methods
 Detect unknown words with lword command, and add words.txt by human or machine learning. Then, get rough block by stat command, and add to dictionary.
 
-However, the data we get with this method is only a technic collection, not the structure itself.
+However, the data we get with this method is only a technique collection, not the structure itself.
 
 # Another downloads
 * https://ja.osdn.net/projects/puts-cc/
