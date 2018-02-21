@@ -163,7 +163,7 @@ int main(int argc, const char* argv[]) {
   case 2:
     // toc
     {
-      std::vector<std::string> words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
+      const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
       std::vector<std::string> details;
       std::vector<std::string> tocs;
       std::vector<std::string> detailwords;
@@ -189,7 +189,7 @@ int main(int argc, const char* argv[]) {
   case 3:
     // reconstruct
     {
-      std::string wordbuf(loadbuf(argv[2]).second);
+      auto wordbuf(loadbuf(argv[2]).second);
       corpus<double, char> stat;
       stat.init(cutText(wordbuf, csvelim, csvdelim), 0, 120);
       stat.compute(input.c_str(), delimiter);
@@ -200,7 +200,7 @@ int main(int argc, const char* argv[]) {
   case 4:
     // redig
     {
-      std::vector<std::string> words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
+      const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
       std::vector<double> emph;
       emph.push_back(4.);
       emph.push_back(1.);
@@ -221,7 +221,7 @@ int main(int argc, const char* argv[]) {
   case 5:
     // diff
     {
-      std::vector<std::string> words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));;
+      const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));;
       std::vector<std::string> details, details2;
       std::vector<std::string> detailwords, detailwords2;
       bool second(false);
@@ -242,7 +242,6 @@ int main(int argc, const char* argv[]) {
           detailwords.push_back(work.first);
         }
       }
-      std::cerr << "analysing input text." << std::endl;
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
       std::cout << diff<double, char>(input, words0, details, detailwords, details2, detailwords2, delimiter, szwindow) << std::endl;
@@ -252,7 +251,7 @@ int main(int argc, const char* argv[]) {
   case 6:
     // stat
     {
-      std::vector<std::string> words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));;
+      const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));;
       std::vector<std::string> rdetails;
       std::vector<std::string> rdetailwords;
       for(int iidx = 3; iidx < argc; iidx ++) {

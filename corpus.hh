@@ -54,7 +54,7 @@ public:
   corpus();
   ~corpus();
   
-  void init(const vector<string>& words, const int& nthresh, const int& Nthresh, const int& Mwords = 150);
+  void init(const vector<string>& words0, const int& nthresh, const int& Nthresh, const int& Mwords = 150);
   corpus<T, U>&         operator = (const corpus<T, U>& other);
   const void            compute(const U* input, const vector<string>& delimiter = vector<string>());
   const string          getAttributed(const vector<string>& highlight) const;
@@ -88,7 +88,7 @@ template <typename T, typename U> corpus<T,U>::~corpus() {
 
 template <typename T, typename U> void corpus<T,U>::init(const vector<string>& words0, const int& nthresh, const int& Nthresh, const int& Mwords) {
   this->orig    = string();
-  this->words0  = words;
+  this->words0  = words0;
   this->words   = vector<string>();
   this->ptrs0   = vector<vector<int> >();
   for(int i = 0; i < words0.size(); i ++)
