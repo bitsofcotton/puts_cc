@@ -997,6 +997,32 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
 
 
 
+template <typename T, typename U> void getAbbreved(vector<corpushl<T, U> >& cstat, const vector<string>& words, const vector<string>& detailtitle, const vector<string>& detail, const vector<string>& delimiter, const int& szwindow) {
+  assert(detailtitle.size() == detail.size());
+  cerr << "getAbbreved : preparing datas";
+  vector<vector<corpushl<T, U> > > details;
+  for(int i = 0; i < detail.size(); i ++) {
+    cerr << "." << flush;
+    details.push_back(vector<corpushl<T, U> >());
+    for(int j = 0; j < detail[i].size() / szwindow + 1; j ++) {
+      corpus<T, U> lstat;
+      lstat.init(words, 0, 120);
+      lstat.compute(detail[i].substr(j * szwindow, szwindow).c_str(), delimiter);
+      details[details.size() - 1].push_back(corpushl<T, U>(lstat));
+    }
+  }
+  
+  cerr << " getting abbrevs";
+  for(int i = 0; i < details.size(); i ++) {
+    cerr << "." << flush;
+    for(int j = 0; j < cstat.size(); j ++)
+      for(int k = 0; k < details[i].size(); k ++)
+        cstat[j] = cstat[j].abbrev(detailtitle[i], details[i][k]);
+  }
+  cerr << endl;
+  return;
+}
+
 template <typename T, typename U> void getDetailed(vector<corpus<T, U> >& cstat0, vector<corpushl<T, U> >& cstat, const string& input, const vector<string>& words, const vector<string>& detailtitle, const vector<string>& detail, const vector<string>& delimiter, const int& szwindow) {
   assert(detailtitle.size() == detail.size());
   cerr << "getDetailed : preparing datas";
@@ -1148,7 +1174,7 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
   return result;
 }
 
-template <typename T, typename U> string diff(const string& input, const vector<string>& words, const vector<string>& detail0, const vector<string>& detailtitle0, const vector<string>& detail1, const vector<string>& detailtitle1, const vector<string>& delimiter, const int& szwindow, const T& redig = T(1)) {
+template <typename T, typename U> string diff(const string& input, const vector<string>& words, const vector<string>& detail0, const vector<string>& detailtitle0, const vector<string>& detail1, const vector<string>& detailtitle1, const vector<string>& delimiter, const int& szwindow, const T& thresh = T(20), const T& redig = T(1)) {
   cerr << "Diff: preparing inputs..." << endl;
   vector<corpus<T, U> >   cstat0;
   vector<corpus<T, U> >   dstat0;
@@ -1158,19 +1184,27 @@ template <typename T, typename U> string diff(const string& input, const vector<
   getDetailed<T, U>(dstat0, dstat, input, words, detailtitle1, detail1, delimiter, szwindow);
   
   cerr << "Diff: making diffs" << endl;
+  vector<corpushl<T, U> > diffs;
+  for(int i = 0; i < cstat.size(); i ++) {
+    cstat[i].reDig(redig);
+    dstat[i].reDig(redig);
+    auto diff(cstat[i] - dstat[i]);
+    diff.reDig(redig);
+    diffs.push_back(diff);
+  }
+  getAbbreved(diffs, words, detailtitle0, detail0, delimiter, szwindow);
+  
   string result;
   for(int i = 0; i < cstat.size(); i ++) {
-    if(cstat[i] != dstat[i]) {
-      cstat[i].reDig(redig);
-      dstat[i].reDig(redig);
-      auto diff(cstat[i] - dstat[i]);
-      diff = diff.reDig(redig);
-      diff = diff.simpleThresh(1);
+    if(diffs[i].cdot(diffs[i]) != T(0)) {
+      auto& diff(diffs[i]);
+      diff    = diff.simpleThresh(thresh);
       result += diff.serialize() + string("<br/>\n");
       result += diff.reverseLink(cstat0[i]) + string("<br/>\n");
       result += diff.reverseLink(dstat0[i]) + string("<br/><br/><br/>\n");
     }
   }
+  result += string("Done");
   return result;
 }
 
