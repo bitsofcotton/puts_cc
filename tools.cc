@@ -17,6 +17,31 @@ std::vector<std::string> delimiter;
 std::vector<std::string> csvelim;
 std::vector<std::string> csvdelim;
 
+std::pair<std::string, std::string> loadbuf(const char* filename) {
+  std::ifstream input;
+  std::string   line;
+  std::string   inbuf;
+  input.open(filename);
+  while(getline(input, line)) {
+    inbuf += line + std::string("\n");
+    if(input.eof() || input.bad())
+      break;
+  }
+  input.close();
+  
+  std::string name0(filename);
+  int slash = - 1;
+  for(int j = 0; j < name0.size(); j ++)
+    if(name0[j] == '/')
+      slash = j;
+  std::string name;
+  slash ++;
+  for(int j = slash; j < name0.size(); j ++)
+    name += name0[j];
+  
+  return std::make_pair(name, inbuf);
+}
+
 int main(int argc, const char* argv[]) {
   delimiter.push_back(string("."));
   delimiter.push_back(string(","));
@@ -73,17 +98,7 @@ int main(int argc, const char* argv[]) {
     // lword
     {
       if(2 <= argc) {
-        std::string   buf;
-        std::string   elimbuf;
-        std::ifstream input2;
-        input2.open(argv[2]);
-        while(getline(input2, buf)) {
-          elimbuf += buf + std::string("\n");
-          if(input2.eof() || input2.bad())
-            break;
-        }
-        input2.close();
-        auto elimlist(cutText(elimbuf, csvelim, csvdelim));
+        auto elimlist(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
         elimlist.insert(elimlist.end(), csvelim.begin(), csvelim.end());
         input = cutText(input, elimlist, vector<std::string>())[0];
         std::cerr << input << std::endl;
@@ -119,17 +134,8 @@ int main(int argc, const char* argv[]) {
     // lbalance.
     {
       std::string workbuf;
-      if(2 < argc) {
-        std::string   buf;
-        std::ifstream input2;
-        input2.open(argv[2]);
-        while(getline(input2, buf)) {
-          workbuf += buf + std::string("\n");
-          if(input2.eof() || input2.bad())
-            break;
-        }
-        input2.close();
-      }
+      if(2 < argc)
+        workbuf = loadbuf(argv[2]).second;
       auto elims(csvelim);
       elims.insert(elims.end(), csvdelim.begin(), csvdelim.end());
       auto inputs(cutText(input, elims, delimiter));
@@ -142,18 +148,8 @@ int main(int argc, const char* argv[]) {
   case 1:
     // corpus
     {
-      std::string   wordsbuf;
-      std::string   line;
-      std::ifstream input2;
-      input2.open(argv[2]);
-      while(getline(input2, line)) {
-        wordsbuf += line + std::string("\n");
-        if(input2.eof() || input2.bad())
-          break;
-      }
-      input2.close();
       corpus<double, char> stat;
-      const auto words0(cutText(wordsbuf, csvelim, csvdelim));
+      const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
       for(int i = 0; i < input.size() / szwindow + 1; i ++) {
         stat.init(words0, 0, 120);
         const std::vector<std::string>& words(stat.getWords());
@@ -167,22 +163,9 @@ int main(int argc, const char* argv[]) {
   case 2:
     // toc
     {
-      std::vector<std::string> words0;
-      {
-        std::string wordbuf;
-        std::string   line;
-        std::ifstream input2;
-        input2.open(argv[2]);
-        while(getline(input2, line)) {
-          wordbuf += line + std::string("\n");
-          if(input2.eof() || input2.bad())
-            break;
-        }
-        input2.close();
-        words0 = cutText(wordbuf, csvelim, csvdelim);
-      }
-      std::vector<std::vector<corpushl<double, char> > > details;
-      std::vector<std::vector<corpushl<double, char> > > tocs;
+      std::vector<std::string> words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
+      std::vector<std::string> details;
+      std::vector<std::string> tocs;
       std::vector<std::string> detailwords;
       std::vector<std::string> tocwords;
       bool toc(false);
@@ -191,99 +174,22 @@ int main(int argc, const char* argv[]) {
           toc = true;
           continue;
         }
-        std::string   inbuf, line;
-        std::ifstream input2;
-        input2.open(argv[iidx]);
-        while(getline(input2, line)) {
-          inbuf += line + std::string("\n");
-          if(input2.eof() || input2.bad())
-            break;
-        }
-        input2.close();
-        std::string wbuf(argv[iidx]);
-        int slash = - 1;
-        for(int j = 0; j < wbuf.size(); j ++)
-          if(wbuf[j] == '/')
-            slash = j;
-        std::string wwbuf;
-        slash ++;
-        for(int j = slash; j < wbuf.size(); j ++)
-          wwbuf += wbuf[j];
+        const auto work(loadbuf(argv[iidx]));
         if(toc) {
-          tocs.push_back(std::vector<corpushl<double, char> >());
-          tocwords.push_back(wwbuf);
+          tocs.push_back(work.second);
+          tocwords.push_back(work.first);
         } else {
-          details.push_back(std::vector<corpushl<double, char> >());
-          detailwords.push_back(wwbuf);
-        }
-        for(int i = 0; i < inbuf.size() / szwindow + 1; i ++) {
-          corpus<double, char> cstat;
-          cstat.init(words0, 0, 120);
-          cstat.compute(inbuf.substr(i * szwindow, szwindow).c_str(), delimiter);
-          if(toc)
-            tocs[tocs.size() - 1].push_back(corpushl<double, char>(cstat));
-          else
-            details[details.size() - 1].push_back(corpushl<double, char>(cstat));
+          details.push_back(work.second);
+          detailwords.push_back(work.first);
         }
       }
-      std::vector<corpushl<double, char> > cstat0;
-      for(int i = 0; i < input.size() / szwindow + 1; i ++) {
-        corpus<double, char> cstat;
-        cstat.init(words0, 0, 120);
-        cstat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
-        cstat0.push_back(corpushl<double, char>(cstat));
-      }
-      for(int i = 0; i < cstat0.size(); i ++)
-        std::cout << cstat0[i].serialize() << std::endl;
-      std::cerr << "analysing input text." << std::endl;
-      for(int i = 0; i < details.size(); i ++)
-        for(int j = 0; j < cstat0.size(); j ++)
-          for(int k = 0; k < details[i].size(); k ++)
-            cstat0[j] = cstat0[j].withDetail(detailwords[i], details[i][k]);
-      std::cerr << "analysing topics text." << std::endl;
-      for(int i = 0; i < tocs.size(); i ++)
-        for(int j = 0; j < details.size(); j ++)
-          for(int k = 0; k < tocs[i].size(); k ++)
-            for(int l = 0; l < details[j].size(); l ++)
-              tocs[i][k] = tocs[i][k].withDetail(detailwords[j], details[j][l]);
-      std::cerr << "getting toc." << std::endl;
-      for(int i = 0; i < cstat0.size(); i ++)
-        std::cout << cstat0[i].toc(tocs, tocwords);
-      std::cout << std::endl << std::endl;
-      std::vector<corpushl<double, char> >& summ(cstat0);
-      for(int ii = 0; ii < summ.size(); ii ++) {
-        summ[ii] = summ[ii].simpleThresh(.8);
-        for(int i = 0; i < tocs.size(); i ++) {
-          std::cout << ii << " - " <<  tocwords[i] << " : " << std::endl;
-          std::vector<std::string> workb;
-          for(int j = 0; j < tocs[i].size(); j ++) {
-            std::vector<std::string> work(summ[ii].reverseLink(tocs[i][j]));
-            if(work != workb) {
-              for(int k = 0; k < work.size(); k ++)
-                std::cout << work[k] << ", ";
-              std::cout << std::endl;
-              workb = work;
-            }
-          }
-        }
-      }
+      std::cout << preparedTOC<double, char>(input, words0, detailwords, details, tocwords, tocs, delimiter, szwindow, 8, .125) << std::endl;
     }
     break;
   case 3:
     // reconstruct
     {
-      std::string wordbuf;
-      {
-        std::string   line;
-        std::ifstream input2;
-        input2.open(argv[2]);
-        while(getline(input2, line)) {
-          wordbuf += line + std::string("\n");
-          if(input2.eof() || input2.bad())
-            break;
-        }
-        input2.close();
-      }
+      std::string wordbuf(loadbuf(argv[2]).second);
       corpus<double, char> stat;
       stat.init(cutText(wordbuf, csvelim, csvdelim), 0, 120);
       stat.compute(input.c_str(), delimiter);
@@ -294,20 +200,7 @@ int main(int argc, const char* argv[]) {
   case 4:
     // redig
     {
-      std::vector<std::string> words0;
-      { 
-        std::string wordbuf;
-        std::string   line;
-        std::ifstream input2;
-        input2.open(argv[2]); 
-        while(getline(input2, line)) {
-          wordbuf += line + std::string("\n");
-          if(input2.eof() || input2.bad())
-            break;
-        }
-        input2.close();
-        words0 = cutText(wordbuf, csvelim, csvdelim);
-      }
+      std::vector<std::string> words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
       std::vector<double> emph;
       emph.push_back(4.);
       emph.push_back(1.);
@@ -328,22 +221,9 @@ int main(int argc, const char* argv[]) {
   case 5:
     // diff
     {
-      std::vector<std::string> words0;
-      {
-        std::string wordbuf;
-        std::string   line;
-        std::ifstream input2;
-        input2.open(argv[2]);
-        while(getline(input2, line)) {
-          wordbuf += line + std::string("\n");
-          if(input2.eof() || input2.bad())
-            break;
-        }
-        input2.close();
-        words0 = cutText(wordbuf, csvelim, csvdelim);
-      }
-      std::vector<corpushl<double, char> > details, details2;
-      std::vector<std::string>             detailwords, detailwords2;
+      std::vector<std::string> words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));;
+      std::vector<std::string> details, details2;
+      std::vector<std::string> detailwords, detailwords2;
       bool second(false);
       for(int iidx = 3; iidx < argc; iidx ++) {
         if(std::string(argv[iidx]) == std::string("-dict")) {
@@ -353,100 +233,32 @@ int main(int argc, const char* argv[]) {
           second = true;
           continue;
         }
-        std::string   inbuf, line;
-        std::ifstream input2;
-        input2.open(argv[iidx]);
-        while(getline(input2, line)) {
-          inbuf += line + std::string("\n");
-          if(input2.eof() || input2.bad())
-            break;
-        }
-        input2.close();
-        corpus<double, char> cstat;
-        cstat.init(words0, 0, 120);
-        cstat.compute(inbuf.c_str(), delimiter);
-        std::string wbuf(argv[iidx]);
-        int slash(- 1);
-        for(int j = 0; j < wbuf.size(); j ++)
-          if(wbuf[j] == '/')
-            slash = j;
-        std::string wwbuf;
-        slash ++;
-        for(int j = slash; j < wbuf.size(); j ++)
-          wwbuf += wbuf[j];
+        const auto work(loadbuf(argv[iidx]));
         if(second) {
-          details2.push_back(corpushl<double, char>(cstat));
-          detailwords2.push_back(wwbuf);
+          details2.push_back(work.second);
+          detailwords2.push_back(work.first);
         } else {
-          details.push_back(corpushl<double, char>(cstat));
-          detailwords.push_back(wwbuf);
+          details.push_back(work.second);
+          detailwords.push_back(work.first);
         }
       }
       std::cerr << "analysing input text." << std::endl;
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
-      for(int i = 0; i < input.size() / szwindow + 1; i ++) {
-        corpus<double, char> cstatorig;
-        cstatorig.init(words0, 0, 120);
-        cstatorig.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
-        corpushl<double, char> cstat0(cstatorig), cstat1(cstatorig);
-        for(int i = 0; i < details.size(); i ++)
-          cstat0 = cstat0.withDetail(detailwords[i] , details[i]);
-        cstat0.reDig(double(4));
-        for(int i = 0; i < details2.size(); i ++)
-          cstat1 = cstat1.withDetail(detailwords2[i], details2[i]);
-        cstat1.reDig(double(4));
-        if(cstat0 != cstat1) {
-          auto diff(cstat0 - cstat1);
-          diff = diff.simpleThresh(1);
-          std::cout << diff.serialize() << "<br/>" << std::endl;
-          std::cout << diff.reverseLink(cstatorig) << std::endl;
-          std::cout << "<br/><br/>" << std::endl;
-        }
-      }
+      std::cout << diff<double, char>(input, words0, details, detailwords, details2, detailwords2, delimiter, szwindow) << std::endl;
       std::cout << "</body></html>" << std::endl;
     }
     break;
   case 6:
     // stat
     {
-      std::vector<std::string> words0;
-      {
-        std::string wordbuf;
-        std::string   line;
-        std::ifstream input2;
-        input2.open(argv[2]);
-        while(getline(input2, line)) {
-          wordbuf += line + std::string("\n");
-          if(input2.eof() || input2.bad())
-            break;
-        }
-        input2.close();
-        words0 = cutText(wordbuf, csvelim, csvdelim);
-      }
+      std::vector<std::string> words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));;
       std::vector<std::string> rdetails;
       std::vector<std::string> rdetailwords;
       for(int iidx = 3; iidx < argc; iidx ++) {
-        std::string   inbuf, line;
-        std::ifstream input2;
-        input2.open(argv[iidx]);
-        while(getline(input2, line)) {
-          inbuf += line + std::string("\n");
-          if(input2.eof() || input2.bad())
-            break;
-        }
-        input2.close();
-        std::string wbuf(argv[iidx]);
-        int slash = - 1;
-        for(int j = 0; j < wbuf.size(); j ++)
-          if(wbuf[j] == '/')
-            slash = j;
-        std::string wwbuf;
-        slash ++;
-        for(int j = slash; j < wbuf.size(); j ++)
-          wwbuf += wbuf[j];
-        rdetails.push_back(inbuf);
-        rdetailwords.push_back(wwbuf);
+        const auto work(loadbuf(argv[iidx]));
+        rdetails.push_back(work.second);
+        rdetailwords.push_back(work.first);
       }
       const int tot_cont(max(min(12, int(input.size()) / szwindow), 1));
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
