@@ -1198,7 +1198,7 @@ template <typename T, typename U> string diff(const string& input, const vector<
   for(int i = 0; i < cstat.size(); i ++) {
     if(diffs[i].cdot(diffs[i]) != T(0)) {
       auto& diff(diffs[i]);
-      diff    = diff.simpleThresh(1);
+      diff    = diff.simpleThresh(thresh);
       result += diff.serialize() + string("<br/>\n");
       result += diff.reverseLink(cstat0[i]) + string("<br/>\n");
       result += diff.reverseLink(dstat0[i]) + string("<br/><br/><br/>\n");
