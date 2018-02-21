@@ -475,14 +475,13 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetail(const string& word, const corpushl<T, U>& other) {
-  cerr << "withDetail : enter" << endl;
   if(words.size() <= 0 || other.words.size() <= 0)
     return *this;
   auto itr(find(words.begin(), words.end(), word));
   int  fidx(distance(words.begin(), itr));
   if(!(0 <= fidx && fidx < words.size() && *itr == word))
     return *this;
-  cerr << *itr << ", " << word << ": " << itr->size() << " / " << word.size() << endl;
+  cerr << "withDetail : " << *itr << ", " << word << ": " << itr->size() << " / " << word.size() << endl;
   corpushl<T, U> result;
   vector<int>    ridx0, ridx1, ridx2;
   vector<string> workwords(gatherWords(words, other.words, ridx0, ridx1));
@@ -523,7 +522,6 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
       for(int k = 0; k < result.corpust(ridx2[i], ridx2[j]).size(); k ++) if(ridx2[k] >= 0)
         if(ridx0[i] >= 0 && ridx0[j] >= 0 && ridx0[k] >= 0)
           result.corpust(ridx2[i], ridx2[j])[ridx2[k]] = corpust(ridx0[i], ridx0[j])[ridx0[k]];
-  cerr << "withDetail: adding detail table." << endl;
   result.corpust += prepareDetail(other, workwords, eidx, ridx0, ridx1, ridx2);
   return result;
 }
@@ -908,7 +906,7 @@ template <typename T, typename U> vector<string> corpushl<T, U>::gatherWords(con
 }
 
 template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dynamic, 1>, Eigen::Dynamic, Eigen::Dynamic> corpushl<T, U>::prepareDetail(const corpushl<T, U>& other, const vector<string>& workwords, const int& eidx, const vector<int>& ridx0, const vector<int>& ridx1, const vector<int>& ridx2) {
-  cerr << "prepareDetail 0/2" << endl;
+  cerr << "p" << flush;
   // initialize result tensor with 0.
   Tensor res(workwords.size() - 1, workwords.size() - 1);
 #if defined(_OPENMP)
@@ -937,7 +935,6 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
   {
     const int i(eidx);
     for(int j = 0; j < workwords.size(); j ++) if(ridx2[j] >= 0) {
-      cerr << "prepareDetail 1/2 " << j << "/" << workwords.size() << endl;
       for(int k = 0; k < workwords.size(); k ++) if(ridx2[k] >= 0) {
         // if all side exists on both corpust, weight and add.
         if(ridx0[i] >= 0 && ridx0[j] >= 0 && ridx0[k] >= 0 &&
@@ -1135,8 +1132,8 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
     idxs.push_back(vector<int>());
     vector<pair<T, int> > scores;
     for(int j = 0; j < cstat.size(); j ++)
-      if(!binary_search(phrases.begin(), phrases.end(), j))
-        scores.push_back(make_pair(cstats(ii, j), j));
+      if(i != j && !binary_search(phrases.begin(), phrases.end(), j))
+        scores.push_back(make_pair(cstats(i, j), j));
     sort(scores.begin(), scores.end());
     T score(0);
     for(int j = 0; j < min(depth, int(scores.size())); j ++) {
