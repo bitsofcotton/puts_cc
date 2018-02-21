@@ -5,10 +5,6 @@ And this program is implemented with a deterministic way.
 This IS NOT the program that judges it is true or false, this IS ONLY the program that seines
 the score that seems to be true or that seems to be false FROM INPUT (with no deductions for logics).
 
-Statistics definition needs to be not dense.
-If it's dense, the context we get from statistics may say nothing.
-So with layered dictionaries, we can calculate a little accuratery.
-
 This program uses large amount of region on the memory.
 
 # Usage
@@ -75,12 +71,18 @@ Please pseudo-login with e-mail address - salt pair.
     
 # Tips
 These programs may have a algorithm that is not carefully confirmed.  
+Statistics definition needs to be not dense. If it's dense, the context we get from statistics may say nothing. So with layered dictionaries, we can calculate a little accuratery.  
 And this algorithm have a specification that edges remains as obscure, to get clear edge, we should use this with morphological analysis softwares. This algorithm only sees the word distances and orders that causes rough image of what is on the table.  
 This program only sees what is said in the input, not the not said.  
 abbrev is needed to be the inverse of withDetail function, but now, NOT so.  
 serialize function is needed to be the inverse of corpushl(corpus(...)) but now, NOT so.  
 This is from simply interest, so don't use this for the reason other than standing under the context.  
 If there's large numbers of the sets that correctly defined texts, it may optimizable out to get opposite side's claim, but this is only the what's able to be said, so this isn't what's the matter.  
+
+# Sample working methods
+Detect unknown words with lword command, and add words.txt by human or machine learning. Then, get rough block by stat command, and add to dictionary.
+
+However, the data we get with this method is only a technique collection, not the structure itself.
 
 # Another downloads
 * https://ja.osdn.net/projects/puts-cc/
