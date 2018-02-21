@@ -1142,14 +1142,14 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
         sort(phrases.begin(), phrases.end());
         kk ++;
       }
-    work.push_back(make_pair(score, j));
+    if(idxs[j].size())
+      work.push_back(make_pair(score, j));
   }
   sort(work.begin(), work.end());
   
   string result;
-  for(int j = 0; j < work.size(); j ++) {
-    if(idxs[j].size() <= 0)
-      break;
+  for(int jj = 0; jj < work.size(); jj ++) {
+    const int& j(work[jj].second);
     for(int k = 0; k < idxs[j].size() / Mgather + 1; k ++) {
       corpushl<T, U> cs(cstat[j]);
       for(int l = k * Mgather; l < min((k + 1) * Mgather, int(idxs[j].size())); l ++)
