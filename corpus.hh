@@ -115,13 +115,13 @@ template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator = (const 
 }
 
 template <typename T, typename U> const void corpus<T,U>::compute(const U* input, const vector<string>& delimiter) {
-  cerr << "Getting word pointers." << endl;
+  cerr << "Getting word pointers " << flush;
   getWordPtrs(input, delimiter);
   if(Mwords < words.size()) {
     cerr << "exceeds Mwords." << endl;
     return;
   }
-  cerr << "Corpus" << endl;
+  cerr << "Corpus" << flush;
   corpusEach();
   return;
 }
@@ -624,12 +624,16 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::invertIns
 
 template <typename T, typename U> const T corpushl<T, U>::culturalConflicts(const corpushl<T, U>& base) const {
   cerr << "XXX broken method: culturalConflicts" << endl;
-  corpushl<T, U> work(match2relPseudo(base));
-  corpushl<T, U> workc(base.match2relPseudo(*this));
-  corpushl<T, U> dwork(*this - work);
-  corpushl<T, U> dworkc(base - workc);
+  const corpushl<T, U> work(match2relPseudo(base));
+  const corpushl<T, U> workc(base.match2relPseudo(*this));
+  const corpushl<T, U> dwork(*this - work);
+  const corpushl<T, U> dworkc(base - workc);
   // XXX this is broken method. DO NOT USE THIS ONLY.: fixme...
-  return (dwork.cdot(dwork) - dworkc.cdot(dworkc) + work.cdot(work) + workc.cdot(workc)) / (cdot(*this) + base.cdot(base));
+  const T score((dwork.cdot(dwork) - dworkc.cdot(dworkc) + work.cdot(work) + workc.cdot(workc)) / (cdot(*this) + base.cdot(base)));
+  if(isfinite(score))
+    return score;
+  cerr << "culturalConflicts: nan" << endl;
+  return T(0);
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::conflictPart() {
