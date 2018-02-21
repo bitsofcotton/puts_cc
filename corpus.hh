@@ -624,13 +624,12 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::invertIns
 
 template <typename T, typename U> const T corpushl<T, U>::culturalConflicts(const corpushl<T, U>& base) const {
   cerr << "XXX broken method: culturalConflicts" << endl;
-  const corpushl<T, U> work(match2relPseudo(base));
-  const corpushl<T, U> workc(base.match2relPseudo(*this));
-  const corpushl<T, U> dwork(*this - work);
-  const corpushl<T, U> dworkc(base - workc);
-  const corpushl<T, U> delta(*this - base);
+  const auto work(match2relPseudo(base));
+  const auto workc(base.match2relPseudo(*this));
+  const auto dwork(*this - work);
+  const auto dworkc(base - workc);
   // XXX this is broken method. DO NOT USE THIS ONLY.: fixme...
-  const T score((dwork.cdot(dwork) + dworkc.cdot(dworkc) + delta.cdot(delta)) / (cdot(*this) + base.cdot(base)));
+  const T score(sqrt((dwork.cdot(dwork) + dworkc.cdot(dworkc))) / cdot(base) / T(words.size() + base.words.size()));
   if(isfinite(score))
     return score;
   cerr << "culturalConflicts: nan" << endl;
@@ -1079,7 +1078,7 @@ template <typename T, typename U> string preparedTOC(const string& input, const 
      vector<pair<T, pair<int, int> > > scores;
      for(int j = 0; j < tstat.size(); j ++)
        for(int k = 0; k < cstat.size(); k ++)
-         scores.push_back(make_pair(cstat[k].culturalConflicts(tstat[j]),
+         scores.push_back(make_pair(abs(cstat[k].culturalConflicts(tstat[j])),
                                     make_pair(j, k)));
      sort(scores.begin(), scores.end());
      result += topictitle[i] + string(" : (") + to_string(scores[0].first);
@@ -1122,7 +1121,7 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
     for(int j = 0; j < i; j ++)
       cstats[i].push_back(cstats[j][i]);
     for(int j = i; j < cstat.size(); j ++)
-      cstats[i].push_back(make_pair(cstat[i].culturalConflicts(cstat[j]), j));
+      cstats[i].push_back(make_pair(abs(cstat[i].culturalConflicts(cstat[j])), j));
   }
   for(int i = 0; i < cstats.size(); i ++)
     sort(cstats[i].begin(), cstats[i].end());
