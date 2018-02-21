@@ -1156,7 +1156,7 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
         cs += cstat[idxs[j][l]];
       result += string("<div href=\"#\">");
       result += string("<span class=\"small\">");
-      result += to_string(work[work.size() - j - 1].first) + string("<br/>");
+      result += to_string(work[jj].first) + string("<br/>");
       result += cs.serialize();
       result += string("</span>");
       result += string("<span class=\"small\">");
