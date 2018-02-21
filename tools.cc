@@ -142,7 +142,7 @@ int main(int argc, const char* argv[]) {
       auto idxs(pseudoWordsBalance<double, std::string>(inputs, cutText(workbuf, csvelim, csvdelim), 20));
       std::cout << idxs.size() << "sets." << std::endl;
       for(int i = 0; i < idxs.size(); i ++)
-        std::cout << inputs[i] << std::endl;
+        std::cout << inputs[idxs[i]] << std::endl;
     }
     break;
   case 1:

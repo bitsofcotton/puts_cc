@@ -83,7 +83,7 @@ foreach(new DirectoryIterator('./datas/') as $fileInfo) {
       
       $descriptorspec = array(
         0 => array("pipe", "r"),  // stdin.
-        1 => array("file", $pathb2 . "detail.txt", "w"),  // stdout.
+        1 => array("file", $pathb2 . "detail.html", "w"),  // stdout.
         2 => array("file", $pathb2 . "detail-error.txt", "w") // stderr.
       );
       $process = proc_open('../../puts toc words.txt ' . $buf, $descriptorspec, $pipes, $cwd, $env);
