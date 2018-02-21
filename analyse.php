@@ -139,7 +139,7 @@ foreach(new DirectoryIterator('./datas/') as $fileInfo) {
       continue;
     $pathb2 = $pathb . $fileInfoSub->getFilename() . '/';
     $cwd    = $pathb . '../';
-    preg_match("/\d+\.txt$/", $pathb2, $match);
+    preg_match("/\d+\.txt\.[0-9a-zA-Z][0-9a-zA-Z]$/", $pathb2, $match);
     if(count($match) > 0 && !file_exists($pathb2 . "-redig.txt")) {
       echo $pathb2;
       $text = "";

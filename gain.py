@@ -125,6 +125,8 @@ for addr in inurls:
       writeSub(str, f, flog)
   f.close()
   flog.close()
+  os.system("split -b 80k -a 2 " + lbase + " " + lbase + ".")
+  os.system("rm -f " + lbase)
 
 for iprange in ipranges:
   start  = int(ipaddress.IPv4Address(iprange[0]))
