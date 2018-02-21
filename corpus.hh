@@ -1078,7 +1078,7 @@ template <typename T, typename U> string preparedTOC(const string& input, const 
      vector<pair<T, pair<int, int> > > scores;
      for(int j = 0; j < tstat.size(); j ++)
        for(int k = 0; k < cstat.size(); k ++)
-         scores.push_back(make_pair(cstat[k].culturalConflicts(tstat[j]),
+         scores.push_back(make_pair(abs(cstat[k].culturalConflicts(tstat[j])),
                                     make_pair(j, k)));
      sort(scores.begin(), scores.end());
      result += topictitle[i] + string(" : (") + to_string(scores[0].first);
@@ -1121,7 +1121,7 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
     for(int j = 0; j < i; j ++)
       cstats[i].push_back(cstats[j][i]);
     for(int j = i; j < cstat.size(); j ++)
-      cstats[i].push_back(make_pair(cstat[i].culturalConflicts(cstat[j]), j));
+      cstats[i].push_back(make_pair(abs(cstat[i].culturalConflicts(cstat[j])), j));
   }
   for(int i = 0; i < cstats.size(); i ++)
     sort(cstats[i].begin(), cstats[i].end());
