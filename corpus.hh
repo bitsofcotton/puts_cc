@@ -1127,7 +1127,7 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
   vector<int>           phrases;
   vector<pair<T, int> > work;
   vector<vector<int> >  idxs;
-  for(int ii = 0; ii < cstat.size() && work.size() < depth; ii ++) {
+  for(int ii = 0; ii < cstat.size() && work.size() < cstat.size() / depth; ii ++) {
     const int i(cidxs[ii].second);
     idxs.push_back(vector<int>());
     vector<pair<T, int> > scores;
