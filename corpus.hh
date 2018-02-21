@@ -1111,60 +1111,63 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
     cstat[i].reDig(redig);
 
   cerr << "optimizeToc: analysing input text." << flush;
-  vector<vector<pair<T, int> > > cstats;
+  Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> cstats(cstat.size(), cstat.size());
   for(int i = 0; i < cstat0.size(); i ++) {
     cerr << "." << flush;
-    cstats.push_back(vector<pair<T, int> >());
     for(int j = 0; j < i; j ++)
-      cstats[i].push_back(cstats[j][i]);
-    for(int j = i; j < cstat.size(); j ++)
-      cstats[i].push_back(make_pair(abs(cstat[i].culturalConflicts(cstat[j])), j));
+      cstats(i, j) = cstats(j, i);
+    cstats(i, i) = T(0);
+    for(int j = i + 1; j < cstat.size(); j ++)
+      cstats(i, j) = abs(cstat[i].culturalConflicts(cstat[j]));
   }
   
   cerr << "OK, sorting phrases." << flush;
+  vector<pair<T, int> > cidxs;
+  for(int i = 0; i < cstats.rows(); i ++)
+    cidxs.push_back(make_pair(cstats.row(i).dot(cstats.row(i)), i));
+  sort(cidxs.begin(), cidxs.end());
+  
   vector<int>           phrases;
   vector<pair<T, int> > work;
   vector<vector<int> >  idxs;
-  for(int j = 0; j < cstats.size(); j ++) {
-    work.push_back(make_pair(T(0), j));
+  for(int ii = 0; ii < cstat.size() && work.size() < depth; ii ++) {
+    const int i(cidxs[ii].second);
     idxs.push_back(vector<int>());
-  }
-  for(int i = 0; i < cstat.size(); i ++) {
-    pair<T, pair<int, int>> mscore(make_pair(T(0), make_pair(- 1, - 1)));
-    for(int j = 0; j < cstats.size(); j ++) if(idxs[j].size() < cstats.size() / depth)
-      for(int k = 0; k < cstats.size(); k ++) if(j != k &&
-        !binary_search(phrases.begin(), phrases.end(), k) &&
-        (mscore.second.first < 0 || cstats[j][k].first < mscore.first))
-          mscore = make_pair(cstats[j][k].first, make_pair(j, k));
-    if(0 <= mscore.second.first) {
-      const int& jj(mscore.second.first);
-      const int& kk(mscore.second.second);
-      work[jj].first += cstats[jj][kk].first;
-      idxs[jj].push_back(kk);
-      phrases.push_back(kk);
-      sort(phrases.begin(), phrases.end());
+    vector<pair<T, int> > scores;
+    for(int j = 0; j < cstat.size(); j ++)
+      if(!binary_search(phrases.begin(), phrases.end(), j))
+        scores.push_back(make_pair(cstats(ii, j), j));
+    sort(scores.begin(), scores.end());
+    T score(0);
+    for(int j = 0; j < min(depth, int(scores.size())); j ++) {
+      idxs[ii].push_back(scores[j].second);
+      phrases.push_back(scores[j].second);
+      score += scores[j].first;
     }
+    sort(phrases.begin(), phrases.end());
+    work.push_back(make_pair(score, i));
   }
   sort(work.begin(), work.end());
   
   cerr << "making outputs" << flush;
   string result;
   for(int jj = 0; jj < work.size(); jj ++) {
-    const int& j(work[jj].second);
-    for(int k = 0; k < idxs[j].size() / Mgather + 1; k ++) {
+    const int&         j(work[jj].second);
+    const vector<int>& idt(idxs[jj]);
+    for(int k = 0; k < idt.size() / Mgather + 1; k ++) {
       corpushl<T, U> cs(cstat[j]);
-      for(int l = k * Mgather; l < min((k + 1) * Mgather, int(idxs[j].size())); l ++)
-        cs += cstat[idxs[j][l]];
+      for(int l = k * Mgather; l < min((k + 1) * Mgather, int(idt.size())); l ++)
+        cs += cstat[idt[l]];
       result += string("<div href=\"#\">");
       result += string("<span class=\"small\">");
       result += to_string(work[jj].first) + string("<br/>");
       result += cs.serialize();
       result += string("</span><br/>");
       result += string("<span class=\"small\">");
-      for(int l = k * Mgather; l < min((k + 1) * Mgather, int(idxs[j].size())); l ++) {
-        result += to_string(idxs[j][l]) + string(" : ");
-        result += to_string(cstats[j][idxs[j][l]].first) + string(" - ");
-        result += cs.reverseLink(cstat0[idxs[j][l]]);
+      for(int l = k * Mgather; l < min((k + 1) * Mgather, int(idt.size())); l ++) {
+        result += to_string(idt[l]) + string(" : ");
+        result += to_string(cstats(j, idt[l])) + string(" - ");
+        result += cs.reverseLink(cstat0[idt[l]]);
         result += string("<br/>");
       }
       result += string("</span></div><br/>");
