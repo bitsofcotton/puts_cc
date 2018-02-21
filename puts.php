@@ -15,7 +15,6 @@
     exec("mkdir " . $pathb . "topics");
     exec("mkdir " . $pathb . "dicts");
     exec("mkdir " . $pathb . "output");
-    exec("mkdir " . $pathb . "stack");
     exec("mkdir " . $pathb . "web");
     if(!file_exists($pathb . "words.txt"))
       exec("cp ./words.txt " . $pathb);
@@ -54,14 +53,6 @@ function uploadAnalyse() {
   fd = new FormData();
   fd.append("cmd", "aa");
   fd.append("containt", document.getElementById("object").value);
-  asyncPost("./apply.php", fd);
-  return;
-}
-
-function uploadScrap() {
-  fd = new FormData();
-  fd.append("cmd", "scrap");
-  fd.append("scrap", document.getElementById("scrap").files[0]);
   asyncPost("./apply.php", fd);
   return;
 }
@@ -200,6 +191,7 @@ function deleteCache() {
 <p><form action="./puts.php" method="GET"><input type="submit" value="logout" /><input type="hidden" name="logout" /></form>
 <a href="javascript:;" onClick="deleteCache();">Delete cache</a>
 Your root path: <a href="<?php echo $pathb; ?>">here</a></p>
+</p>
 <p>
 Analyse text:<br/>
 <textarea maxlength="80000" rows="12" cols="80" name="object" id="object"></textarea><br/>
@@ -228,8 +220,6 @@ Scrap URL list:<br/>
 ?></textarea><br/>
 <a href="javascript: ;" onClick="updateURLs();">update</a> | 
 <a href="<?php echo $pathb; ?>/web">Per 6 hours</a><br/>
-<input type="file" id="scrap" name="scrap">
-<a href="javascript: uploadScrap();">upload</a>
 </p>
 <div style="display:inline-block;vertical-align:top;">
 Topics:<br/>

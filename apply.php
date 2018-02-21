@@ -57,10 +57,6 @@ case "aw":
 case "url":
   file_put_contents($pathb . "urls.txt", $containt);
   break;
-case "scrap":
-  move_uploaded_file($_FILES['scrap']['tmp_name'], $pathb . "stack/" . basename($_FILES['scrap']['name']) . ".txt");
-  exec("php ./analyse.php");
-  break;
 case "at":
   $fi = new FilesystemIterator($pathb . "topics/", FilesystemIterator::SKIP_DOTS);
   if(iterator_count($fi) < $M_COUNT && mb_strlen($containt) < $M_STR)
@@ -79,7 +75,6 @@ case "dd":
   break;
 case "da":
   exec("rm -fr " . $pathb . "/output && mkdir -p " . $pathb . "/output");
-  exec("rm -fr " . $pathb . "/stack && mkdir -p " . $pathb . "/stack");
   break;
 default:
   echo "invalid cmd.";
