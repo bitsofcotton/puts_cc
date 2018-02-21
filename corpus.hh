@@ -529,7 +529,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2relPseudo(const corpushl<T, U>& other) const {
-  cerr << "match2relPseudo : 0/2" << endl;
+  cerr << "m2r" << flush;
   corpushl<T, U> result(*this);
   vector<int>    ridx0, ridx1;
   vector<string> words(gatherWords(result.words, other.words, ridx0, ridx1));
