@@ -61,8 +61,7 @@ function relationDict() {
   fd = new FormData();
   fd.append("cmd", "ar");
   fd.append("containt", document.getElementById("object").value);
-  fd.append("remail",   document.getElementById("remail").value);
-  fd.append("rsalt",    document.getElementById("rsalt").value);
+  fd.append("reldir",   document.getElementById("reldir").value);
   asyncPost("./apply.php", fd);
   return;
 }
@@ -196,7 +195,8 @@ Your root path: <a href="<?php echo $pathb; ?>">here</a></p>
 Analyse text:<br/>
 <textarea maxlength="80000" rows="12" cols="80" name="object" id="object"></textarea><br/>
 <a href="javascript:;" onClick="uploadAnalyse();">upload analyse base.</a><br/>
-Differ: mail: <input type="text" id="remail" name="remail" /> salt: <input type="text" id="rsalt" name="rsalt" /><a href="javascript:;" onClick="relationDict();">Relative dicts</a>
+Differ: dirname(only hash): <input type="text" id="reldir" name="reldir" />
+<a href="javascript:;" onClick="relationDict();">Relative dicts</a>
 </p>
 <p>
 Word list:<br/>

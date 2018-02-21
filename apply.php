@@ -20,11 +20,17 @@ if(!isset($_REQUEST["cmd"])) {
 $cmd = $_REQUEST["cmd"];
 switch($cmd) {
 case "ar":
-  if(!isset($_REQUEST["remail"]) || !isset($_REQUEST["rsalt"])) {
+  if(!isset($_REQUEST["reldir"])) {
     echo "Invalid relation dictionary";
     return;
   }
-  $pathc = "./datas/" . hash("sha256", $_REQUEST["remail"] . $_REQUEST["rsalt"]) . "/";
+  preg_match('/[0-9a-z]+/', $_REQUEST["reldir"], $match);
+  if(0 < count($match) && strlen($match[0]) <= 512) {
+    $pathc = "./datas/" . $match[0] . "/";
+  } else {
+    echo "Invalid relation dictionary";
+    return;
+  }
   if(mb_strlen($containt) < $M_STR) {
     $pathb2 = '/output/' . hash("sha256", $containt) . "/";
     exec("mkdir -p " . $pathb . $pathb2);
