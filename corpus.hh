@@ -78,7 +78,7 @@ private:
 };
 
 template <typename T, typename U> corpus<T,U>::corpus() {
-  ;
+  init(vector<string>(), 1, 1, 1);
 }
 
 template <typename T, typename U> corpus<T,U>::~corpus() {
@@ -86,11 +86,16 @@ template <typename T, typename U> corpus<T,U>::~corpus() {
   ;
 }
 
-template <typename T, typename U> void corpus<T,U>::init(const vector<string>& words, const int& nthresh, const int& Nthresh, const int& Mwords) {
-  words0        = words;
-  ptrs0         = vector<vector<int> >();
+template <typename T, typename U> void corpus<T,U>::init(const vector<string>& words0, const int& nthresh, const int& Nthresh, const int& Mwords) {
+  this->orig    = string();
+  this->words0  = words;
+  this->words   = vector<string>();
+  this->ptrs0   = vector<vector<int> >();
   for(int i = 0; i < words0.size(); i ++)
     ptrs0.push_back(vector<int>());
+  this->ptrs    = vector<vector<int> >();
+  this->pdelim  = vector<int>();
+  this->corpust = Tensor();
   this->nthresh = nthresh;
   this->Nthresh = Nthresh;
   this->Midx    = 1;
@@ -116,7 +121,7 @@ template <typename T, typename U> const void corpus<T,U>::compute(const U* input
     cerr << "exceeds Mwords." << endl;
     return;
   }
-  cerr << "Corpus..." << endl;
+  cerr << "Corpus" << endl;
   corpusEach();
   return;
 }
@@ -222,8 +227,9 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U* input, 
       matchidxs = vector<int>();
     }
   }
-  vector<int> head, tail;
   words = vector<string>();
+  ptrs  = vector<vector<int> >();
+  vector<int> head, tail;
   words.push_back(string("^"));
   head.push_back(0);
   ptrs.push_back(head);
@@ -318,8 +324,6 @@ public:
   const corpushl<T, U>  withDetail(const string& word, const corpushl<T, U>& other);
   const T               cdot(const corpushl<T, U>& other) const;
   const corpushl<T, U>  match2relPseudo(const corpushl<T, U>& other) const;
-  const string          toc(const vector<corpushl<T, U> >& base, const vector<string>& words) const;
-  const string          toc(const vector<vector<corpushl<T, U> > >& base, const vector<string>& words) const;
   const vector<T>       prej(const vector<corpushl<T, U> >& prejs) const;
   const T               prej2(const vector<corpushl<T, U> >& prej0, const vector<corpushl<T, U> >& prej1, const T& thresh) const;
   const corpushl<T, U>  lackOfInsist() const;
@@ -347,7 +351,8 @@ private:
 };
 
 template <typename T, typename U> corpushl<T,U>::corpushl() {
-  ;
+  words   = vector<string>();
+  corpust = Tensor();
 }
 
 template <typename T, typename U> corpushl<T,U>::~corpushl() {
@@ -413,7 +418,7 @@ template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator
 }
 
 template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator *= (const T& t) {
-  cerr << "operator *=" << endl;
+  cerr << "*=" << flush;
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -432,7 +437,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
   vector<int>    ridx0, ridx1;
   result.words   = gatherWords(words, other.words, ridx0, ridx1);
   result.corpust = Tensor(result.words.size(), result.words.size());
-  cerr << "operator +" << endl;
+  cerr << "+" << flush;
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -454,7 +459,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator - () const {
-  cerr << "operator -" << endl;
+  cerr << "-" << flush;
   corpushl<T, U> result(*this);
   result.corpust = - result.corpust;
   return result;
@@ -574,40 +579,6 @@ template <typename T, typename U> const T corpushl<T, U>::cdot(const corpushl<T,
   return res;
 }
 
-template <typename T, typename U> const string corpushl<T, U>::toc(const vector<corpushl<T, U> >& base, const vector<string>& words) const {
-  vector<vector<corpushl<T, U> > > basev;
-  for(int i = 0; i < base.size(); i ++) {
-    vector<corpushl<T, U> > work;
-    work.push_back(base[i]);
-    basev.push_back(work);
-  }
-  return toc(basev, words);
-}
-
-template <typename T, typename U> const string corpushl<T, U>::toc(const vector<vector<corpushl<T, U> > >& base, const vector<string>& words) const {
-  string result;
-  vector<pair<T, string> > mlist;
-  for(int k = 0; k < base.size(); k ++) {
-    corpushl<T, U> work(*this);
-    for(int l = 0; l < base[k].size(); l ++)
-      work = work.abbrev(words[k], base[k][l]);
-    work = *this - work;
-    pair<T, T> cr(compareStructure(work));
-    const T ncr(sqrt(cr.first * cr.first + cr.second * cr.second));
-    cr.first  /= ncr;
-    cr.second /= ncr;
-    mlist.push_back(make_pair(cdot(work) / cdot(*this),
-                              words[k]             + string(" : ")   +
-                              work.serialize()     + string("(sr: ") +
-                              to_string(cr.first)  + string(" / ")   +
-                              to_string(cr.second) + string(")") ) );
-  }
-  sort(mlist.begin(), mlist.end());
-  result += to_string(mlist[mlist.size() - 1].first) + string(":") +
-            mlist[mlist.size() - 1].second + string("\n");
-  return result;
-}
-
 template <typename T, typename U> const vector<T> corpushl<T, U>::prej(const vector<corpushl<T, U> >& prejs) const {
   vector<T> result;
   cerr << "XXX confirm me: corpushl<T, U>::prej" << endl;
@@ -670,7 +641,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::conflictP
 }
 
 template <typename T, typename U> const string corpushl<T, U>::serialize() const {
-  cerr << "serialize" << endl;
+  cerr << "serialize" << flush;
   if(corpust.rows() < 1 || corpust.cols() < 1)
     return string("*NULL*");
   auto plus(*this), minus(*this);
@@ -1022,59 +993,117 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
 
 
 
-
-template <typename T, typename U> const string optimizeTOC(const string& input, const vector<string>& words, const vector<string>& dict, vector<string>& detailwords, const vector<string>& delimiter, const int& szwindow, const int& depth, const int& Mgather = 8, const T& redig = T(1)) {
-  // prepare dictionaries:
-  cerr << "optimizeToc: parsing input" << flush;
+template <typename T, typename U> void getDetailed(vector<corpus<T, U> >& cstat0, vector<corpushl<T, U> >& cstat, const string& input, const vector<string>& words, const vector<string>& detailtitle, const vector<string>& detail, const vector<string>& delimiter, const int& szwindow) {
+  assert(detailtitle.size() == detail.size());
+  cerr << "getDetailed : preparing datas";
   vector<vector<corpushl<T, U> > > details;
-  vector<string> cstat1;
-  assert(dict.size() == detailwords.size());
-  for(int i = 0; i < dict.size(); i ++) {
+  for(int i = 0; i < detail.size(); i ++) {
     cerr << "." << flush;
-    details.push_back(vector<corpushl<double, char> >());
-    for(int j = 0; j < dict[i].size() / szwindow + 1; j ++) {
-      corpus<double, char> cstat;
-      cstat.init(words, 0, 120);
-      cstat.compute(dict[i].substr(j * szwindow, szwindow).c_str(), delimiter);
-      details[details.size() - 1].push_back(corpushl<double, char>(cstat));
+    details.push_back(vector<corpushl<T, U> >());
+    for(int j = 0; j < detail[i].size() / szwindow + 1; j ++) {
+      corpus<T, U> lstat;
+      lstat.init(words, 0, 120);
+      lstat.compute(detail[i].substr(j * szwindow, szwindow).c_str(), delimiter);
+      details[details.size() - 1].push_back(corpushl<T, U>(lstat));
     }
   }
-  vector<corpus<double, char> >   cstat0orig;
-  vector<corpushl<double, char> > cstat0;
+  cstat0 = vector<corpus<T, U> >();
+  cstat  = vector<corpushl<T, U> >();
   for(int i = 0; i < input.size() / szwindow + 1; i ++) {
-    corpus<double, char> cstat;
-    cstat.init(words, 0, 120);
-    cstat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
-    cstat0orig.push_back(cstat);
-    cstat0.push_back(corpushl<double, char>(cstat));
+    corpus<T, U> lstat;
+    lstat.init(words, 0, 120);
+    lstat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
+    cstat0.push_back(lstat);
+    cstat.push_back(corpushl<T, U>(lstat));
   }
-  
-  cerr << "analysing input text." << flush;
+
+  cerr << " getting details";
   for(int i = 0; i < details.size(); i ++) {
     cerr << "." << flush;
     for(int j = 0; j < cstat0.size(); j ++)
       for(int k = 0; k < details[i].size(); k ++)
-        cstat0[j] = cstat0[j].withDetail(detailwords[i], details[i][k]);
+        cstat[j] = cstat[j].withDetail(detailtitle[i], details[i][k]);
   }
+  cerr << endl;
+  return;
+}
+
+template <typename T, typename U> string preparedTOC(const string& input, const vector<string>& words, const vector<string>& detailtitle, const vector<string>& detail, const vector<string>& topictitle, const vector<string>& topics, const vector<string>& delimiter, const int& szwindow, const int& depth, const T& redig = T(1)) {
+  cerr << "preparedToc: parsing input" << endl;
+  assert(detailtitle.size() == detail.size());
+  assert(topictitle.size()  == topics.size());
+  
+  vector<corpus<T, U> >   cstat0;
+  vector<corpushl<T, U> > cstat;
+  getDetailed<T, U>(cstat0, cstat, input, words, detailtitle, detail, delimiter, szwindow);
+  for(int i = 0; i < cstat0.size(); i ++)
+    cstat[i].reDig(redig);
+  
+  cerr << "preparedToc: analysing input text" << endl;
+  string result;
+  for(int i = 0; i < topics.size(); i ++) {
+     vector<corpus<T, U> >   tstat0;
+     vector<corpushl<T, U> > tstat;
+     getDetailed<T, U>(tstat0, tstat, topics[i], words, detailtitle, detail, delimiter, szwindow);
+     vector<pair<T, pair<int, int> > > scores;
+     for(int j = 0; j < tstat.size(); j ++)
+       for(int k = 0; k < cstat.size(); k ++)
+         scores.push_back(make_pair(cstat[k].culturalConflicts(tstat[j]),
+                                    make_pair(j, k)));
+     sort(scores.begin(), scores.end());
+     result += topictitle[i] + string(" : (") + to_string(scores[scores.size() - 1].first);
+     T   sump(0), summ(0);
+     int cntp(0), cntm(0);
+     for(int j = 0; j < scores.size(); j ++)
+       if(scores[j].first > T(0)) {
+         sump += scores[j].first;
+         cntp ++;
+       } else {
+         summ += scores[j].first;
+         cntm ++;
+       }
+     result += string(", ") + to_string(sump / cntp);
+     result += string(", ") + to_string(summ / cntm);
+     result += string(", ") + to_string(scores[0].first) + string(") ") + string("\n");;
+     for(int j = 0; j < depth; j ++) {
+        const int jj(scores.size() - j - 1);
+        const auto& work(cstat[scores[jj].second.second] + tstat[scores[jj].second.first]);
+        result += work.serialize() + string("\n");
+        result += work.reverseLink(cstat0[scores[jj].second.second]) + string("\n");
+        result += work.reverseLink(tstat0[scores[jj].second.first])  + string("\n");
+     }
+     result += string("\n");
+  }
+  return result;
+}
+
+template <typename T, typename U> string optimizeTOC(const string& input, const vector<string>& words, const vector<string>& detail, const vector<string>& detailtitle, const vector<string>& delimiter, const int& szwindow, const int& depth, const int& Mgather = 8, const T& redig = T(1)) {
+  // prepare dictionaries:
+  cerr << "optimizeToc: parsing input" << endl;
+  vector<corpus<T, U> >   cstat0;
+  vector<corpushl<T, U> > cstat;
+  getDetailed<T, U>(cstat0, cstat, input, words, detailtitle, detail, delimiter, szwindow);
+  
+  for(int i = 0; i < cstat0.size(); i ++)
+    cstat[i].reDig(redig);
+
+  cerr << "optimizeToc: analysing input text." << flush;
   vector<vector<pair<double, int> > > cstats;
   for(int i = 0; i < cstat0.size(); i ++) {
     cerr << "." << flush;
     cstats.push_back(vector<pair<double, int> >());
     for(int j = 0; j < i; j ++)
       cstats[i].push_back(cstats[j][i]);
-    for(int j = i; j < cstat0.size(); j ++) {
-      cerr << "." << flush;
-      cstats[i].push_back(make_pair(cstat0[i].cdot(cstat0[j]), j));
-    }
+    for(int j = i; j < cstat.size(); j ++)
+      cstats[i].push_back(make_pair(cstat[i].cdot(cstat[j]), j));
   }
   for(int i = 0; i < cstats.size(); i ++)
     sort(cstats[i].begin(), cstats[i].end());
   
   cerr << "OK, making outputs." << flush;
-  vector<int> phrases;
-  cerr << "." << flush;
-  vector<pair<double, int> > work;
-  vector<vector<int> >       idxs;
+  vector<int>           phrases;
+  vector<pair<T, int> > work;
+  vector<vector<int> >  idxs;
   for(int j = 0; j < cstats.size(); j ++) {
     double score(0);
     idxs.push_back(vector<int>());
@@ -1091,27 +1120,51 @@ template <typename T, typename U> const string optimizeTOC(const string& input, 
     work.push_back(make_pair(score, j));
   }
   sort(work.begin(), work.end());
+  
   string result;
   for(int j = 0; j < work.size(); j ++) {
     const int jj(work[work.size() - j - 1].second);
     if(idxs[jj].size() <= 0)
       break;
     for(int k = 0; k < idxs[jj].size() / Mgather + 1; k ++) {
-      corpushl<double, char> cs(cstat0[jj]);
-      for(int j = k * Mgather; j < min((k + 1) * Mgather, int(idxs[jj].size())); j ++) {
-        corpushl<T, U> objr(cstat0[idxs[jj][idxs[jj].size() - j - 1]]);
-        objr.reDig(redig);
-        cs += objr;
-      }
+      corpushl<T, U> cs(cstat[jj]);
+      for(int j = k * Mgather; j < min((k + 1) * Mgather, int(idxs[jj].size())); j ++)
+        cs += cstat[idxs[jj][idxs[jj].size() - j - 1]];
       result += string("<div class=\"tooltip\" href=\"#\">");
       result += cs.serialize();
       result += string("<span class=\"tooltip\">");
       for(int j = k * Mgather; j < min((k + 1) * Mgather, int(idxs[jj].size())); j ++) {
         result += to_string(idxs[jj][idxs[jj].size() - j - 1]) + string(" - ");
-        result += cs.reverseLink(cstat0orig[idxs[jj][idxs[jj].size() - j - 1]]);
+        result += cs.reverseLink(cstat0[idxs[jj][idxs[jj].size() - j - 1]]);
         result += string("<br/>");
       }
       result += string("</span></div>");
+    }
+  }
+  return result;
+}
+
+template <typename T, typename U> string diff(const string& input, const vector<string>& words, const vector<string>& detail0, const vector<string>& detailtitle0, const vector<string>& detail1, const vector<string>& detailtitle1, const vector<string>& delimiter, const int& szwindow, const T& redig = T(1)) {
+  cerr << "Diff: preparing inputs..." << endl;
+  vector<corpus<T, U> >   cstat0;
+  vector<corpus<T, U> >   dstat0;
+  vector<corpushl<T, U> > cstat;
+  vector<corpushl<T, U> > dstat;
+  getDetailed<T, U>(cstat0, cstat, input, words, detailtitle0, detail0, delimiter, szwindow);
+  getDetailed<T, U>(dstat0, dstat, input, words, detailtitle1, detail1, delimiter, szwindow);
+  
+  cerr << "Diff: making diffs" << endl;
+  string result;
+  for(int i = 0; i < cstat.size(); i ++) {
+    if(cstat[i] != dstat[i]) {
+      cstat[i].reDig(redig);
+      dstat[i].reDig(redig);
+      auto diff(cstat[i] - dstat[i]);
+      diff = diff.reDig(redig);
+      diff = diff.simpleThresh(1);
+      result += diff.serialize() + string("<br/>\n");
+      result += diff.reverseLink(cstat0[i]) + string("<br/>\n");
+      result += diff.reverseLink(dstat0[i]) + string("<br/><br/><br/>\n");
     }
   }
   return result;
