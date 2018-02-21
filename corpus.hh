@@ -628,8 +628,9 @@ template <typename T, typename U> const T corpushl<T, U>::culturalConflicts(cons
   const corpushl<T, U> workc(base.match2relPseudo(*this));
   const corpushl<T, U> dwork(*this - work);
   const corpushl<T, U> dworkc(base - workc);
+  const corpushl<T, U> delta(*this - base);
   // XXX this is broken method. DO NOT USE THIS ONLY.: fixme...
-  const T score((dwork.cdot(dwork) - dworkc.cdot(dworkc) + work.cdot(work) + workc.cdot(workc)) / (cdot(*this) + base.cdot(base)));
+  const T score((dwork.cdot(dwork) + dworkc.cdot(dworkc) + delta.cdot(delta)) / (cdot(*this) + base.cdot(base)));
   if(isfinite(score))
     return score;
   cerr << "culturalConflicts: nan" << endl;
@@ -1081,26 +1082,22 @@ template <typename T, typename U> string preparedTOC(const string& input, const 
          scores.push_back(make_pair(cstat[k].culturalConflicts(tstat[j]),
                                     make_pair(j, k)));
      sort(scores.begin(), scores.end());
-     result += topictitle[i] + string(" : (") + to_string(scores[scores.size() - 1].first);
-     T   sump(0), summ(0);
-     int cntp(0), cntm(0);
-     for(int j = 0; j < scores.size(); j ++)
-       if(scores[j].first > T(0)) {
-         sump += scores[j].first;
-         cntp ++;
-       } else {
-         summ += scores[j].first;
-         cntm ++;
-       }
-     result += string(", ") + to_string(sump / cntp);
-     result += string(", ") + to_string(summ / cntm);
-     result += string(", ") + to_string(scores[0].first) + string(") ") + string("\n");;
+     result += topictitle[i] + string(" : (") + to_string(scores[0].first);
+     T   sum(0);
+     int cnt(0);
+     for(int j = 0; j < scores.size(); j ++) {
+       sum += scores[j].first;
+       cnt ++;
+     }
+     result += string(", ") + to_string(sum / cnt);
+     result += string(", ") + to_string(scores[scores.size() - 1].first);
+     result += string(")\n");;
      for(int j = 0; j < depth; j ++) {
-        const int jj(scores.size() - j - 1);
-        const auto& work(cstat[scores[jj].second.second] + tstat[scores[jj].second.first]);
+        const auto& work(cstat[scores[j].second.second] + tstat[scores[j].second.first]);
+        result += to_string(scores[j].first) + string(" : ");
         result += work.serialize() + string("<br/>\n");
-        result += work.reverseLink(cstat0[scores[jj].second.second]) + string("<br/>\n");
-        result += work.reverseLink(tstat0[scores[jj].second.first])  + string("<br/><br/>\n");
+        result += work.reverseLink(cstat0[scores[j].second.second]) + string("<br/>\n");
+        result += work.reverseLink(tstat0[scores[j].second.first])  + string("<br/><br/>\n");
      }
      result += string("<br/><br/>\n");
   }
@@ -1118,14 +1115,14 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
     cstat[i].reDig(redig);
 
   cerr << "optimizeToc: analysing input text." << flush;
-  vector<vector<pair<double, int> > > cstats;
+  vector<vector<pair<T, int> > > cstats;
   for(int i = 0; i < cstat0.size(); i ++) {
     cerr << "." << flush;
-    cstats.push_back(vector<pair<double, int> >());
+    cstats.push_back(vector<pair<T, int> >());
     for(int j = 0; j < i; j ++)
       cstats[i].push_back(cstats[j][i]);
     for(int j = i; j < cstat.size(); j ++)
-      cstats[i].push_back(make_pair(cstat[i].cdot(cstat[j]), j));
+      cstats[i].push_back(make_pair(cstat[i].culturalConflicts(cstat[j]), j));
   }
   for(int i = 0; i < cstats.size(); i ++)
     sort(cstats[i].begin(), cstats[i].end());
@@ -1135,40 +1132,40 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
   vector<pair<T, int> > work;
   vector<vector<int> >  idxs;
   for(int j = 0; j < cstats.size(); j ++) {
-    double score(0);
+    T score(0);
     idxs.push_back(vector<int>());
-    for(int k = 0, kk = 0; k < cstats.size() && kk < cstats.size() / depth; k ++) {
-      const int k0(cstats.size() - k - 1);
-      if(!binary_search(phrases.begin(), phrases.end(), cstats[j][k0].second)) {
-        score += cstats[j][k0].first;
-        idxs[j].push_back(cstats[j][k0].second);
-        phrases.push_back(cstats[j][k0].second);
+    for(int k = 0, kk = 0; k < cstats.size() && kk < cstats.size() / depth; k ++)
+      if(!binary_search(phrases.begin(), phrases.end(), cstats[j][k].second)) {
+        score += cstats[j][k].first;
+        idxs[j].push_back(cstats[j][k].second);
+        phrases.push_back(cstats[j][k].second);
         sort(phrases.begin(), phrases.end());
         kk ++;
       }
-    }
     work.push_back(make_pair(score, j));
   }
   sort(work.begin(), work.end());
   
   string result;
   for(int j = 0; j < work.size(); j ++) {
-    const int jj(work[work.size() - j - 1].second);
-    if(idxs[jj].size() <= 0)
+    if(idxs[j].size() <= 0)
       break;
-    for(int k = 0; k < idxs[jj].size() / Mgather + 1; k ++) {
-      corpushl<T, U> cs(cstat[jj]);
-      for(int j = k * Mgather; j < min((k + 1) * Mgather, int(idxs[jj].size())); j ++)
-        cs += cstat[idxs[jj][idxs[jj].size() - j - 1]];
-      result += string("<div class=\"tooltip\" href=\"#\">");
+    for(int k = 0; k < idxs[j].size() / Mgather + 1; k ++) {
+      corpushl<T, U> cs(cstat[j]);
+      for(int l = k * Mgather; l < min((k + 1) * Mgather, int(idxs[j].size())); l ++)
+        cs += cstat[idxs[j][l]];
+      result += string("<div href=\"#\">");
+      result += string("<span class=\"small\">");
+      result += to_string(work[work.size() - j - 1].first) + string("<br/>");
       result += cs.serialize();
-      result += string("<span class=\"tooltip\">");
-      for(int j = k * Mgather; j < min((k + 1) * Mgather, int(idxs[jj].size())); j ++) {
-        result += to_string(idxs[jj][idxs[jj].size() - j - 1]) + string(" - ");
-        result += cs.reverseLink(cstat0[idxs[jj][idxs[jj].size() - j - 1]]);
+      result += string("</span>");
+      result += string("<span class=\"small\">");
+      for(int l = k * Mgather; l < min((k + 1) * Mgather, int(idxs[j].size())); l ++) {
+        result += to_string(idxs[j][l]) + string(" - ");
+        result += cs.reverseLink(cstat0[idxs[j][l]]);
         result += string("<br/>");
       }
-      result += string("</span></div>");
+      result += string("</span></div><br/>");
     }
   }
   return result;
