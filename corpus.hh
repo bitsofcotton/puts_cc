@@ -1133,6 +1133,7 @@ template <typename T, typename U> string optimizeTOC(const string& input, const 
   vector<vector<int> >  idxs0;
   for(int j = 0; j < cstats.size(); j ++) {
     T score(0);
+    idxs0.push_back(vector<int>());
     idxs.push_back(vector<int>());
     for(int k = 0, kk = 0; k < cstats.size() && kk < cstats.size() / depth; k ++)
       if(!binary_search(phrases.begin(), phrases.end(), cstats[j][k].second)) {
