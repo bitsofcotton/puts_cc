@@ -92,8 +92,8 @@ private:
   void constructNwords();
   void makeWords();
   
-  bool       isin(const U key);
-  gram_t<U>& find(const U key);
+  bool       isin(const U& key);
+  gram_t<U>& find(const U& key);
   void       assign(const gram_t<U>& val);
 };
 
@@ -117,7 +117,7 @@ template <typename T, typename U> void lword<T, U>::init(const int& loop, const 
   return;
 }
 
-template <typename T, typename U> bool lword<T, U>::isin(const U key) {
+template <typename T, typename U> bool lword<T, U>::isin(const U& key) {
   if(dicts.size() < key.size()) {
     cerr << "dictionary small" << endl;
     return false;
@@ -126,13 +126,13 @@ template <typename T, typename U> bool lword<T, U>::isin(const U key) {
   gram_t<U> key0;
   key0.str = key;
   auto p(lower_bound(dict.begin(), dict.end(), key0));
-  return !(p < dict.begin() || dict.end() <= p) && p->str == key;
+  return dict.begin() <= p && p < dict.end() && p->str == key;
 }
 
-template <typename T, typename U> gram_t<U>& lword<T, U>::find(const U key) {
+template <typename T, typename U> gram_t<U>& lword<T, U>::find(const U& key) {
+  static gram_t<U> dummy;
   if(dicts.size() < key.size()) {
     cerr << "XXX: find slips." << endl;
-    static gram_t<U> dummy;
     return dummy;
   }
   vector<gram_t<U> >& dict(dicts[key.size()]);
@@ -141,7 +141,6 @@ template <typename T, typename U> gram_t<U>& lword<T, U>::find(const U key) {
   auto p(lower_bound(dict.begin(), dict.end(), key0));
   if(p < dict.begin() || dict.end() <= p || p->str != key) {
     cerr << "XXX: slipping find." << endl;
-    static gram_t<U> dummy;
     return dummy;
   }
   return *p;
@@ -184,11 +183,11 @@ template <typename T, typename U> void lword<T, U>::assign(const gram_t<U>& val)
 }
 
 template <typename T, typename U> const vector<word_t<U> >& lword<T, U>::compute(const T* input) {
-  cerr << "bi-gramming..." << endl;
+  cerr << "bi-gramming." << flush;
   makeBigram(input);
-  cerr << "constructing longest words..." << endl;
+  cerr << " constructing longest words..." << endl;
   constructNwords();
-  cerr << "making word tables..." << endl;
+  cerr << "making word tables." << endl;
   makeWords();
   return words;
 }
@@ -221,7 +220,7 @@ template <typename T, typename U> void lword<T, U>::makeBigram(const T* input) {
 template <typename T, typename U> void lword<T, U>::constructNwords() {
   int i;
   for(i = 0; i < dicts.size(); i ++) {
-    cerr << "constructing " << i + 2 << " table";
+    cerr << i + 2 << ", " << flush;
     map<U, vector<int> > map0;
     map<U, vector<int> > map1;
     map<U, vector<int> > dmap;
@@ -264,12 +263,10 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
         const int diffM(max(idxkey.ptr0.size(), idxkey2.ptr0.size()) - idxwork[0].size());
         if(0 < diff && mthresh < diffM)
           continue;
-        for(int i = 0; i < idxwork[0].size(); i ++) {
-          map0[U(workkey)].push_back(idxwork[0][i]);
-          map1[U(workkey)].push_back(idxwork[1][i]);
-          dmap[U(idxkey.str)].push_back(idxwork[2][i]);
-          dmap[U(key2)].push_back(idxwork[3][i]);
-        }
+        map0[workkey].insert(map0[workkey].end(), idxwork[0].begin(), idxwork[0].end());
+        map1[workkey].insert(map1[workkey].end(), idxwork[1].begin(), idxwork[1].end());
+        dmap[idxkey.str].insert(dmap[idxkey.str].end(), idxwork[2].begin(), idxwork[2].end());
+        dmap[key2].insert(dmap[key2].end(), idxwork[3].begin(), idxwork[3].end());
       }
     }
     // delete this stage garbage.
@@ -279,18 +276,11 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
             gram_t<U>  after(before);
       after.ptr0 = vector<int>();
       after.ptr1 = vector<int>();
-      for(int j = 0; j < before.ptr1.size(); j ++) {
-        bool flag = false;
-        for(auto itr2 = itr->second.begin(); itr2 != itr->second.end(); ++ itr2)
-          if(*itr2 == j) {
-            flag = true;
-            break;
-          }
-        if(flag)
-          continue;
-        after.ptr0.push_back(before.ptr0[j]);
-        after.ptr1.push_back(before.ptr1[j]);
-      }
+      for(int j = 0; j < before.ptr1.size(); j ++)
+        if(!binary_search(itr->second.begin(), itr->second.end(), j)) {
+          after.ptr0.push_back(before.ptr0[j]);
+          after.ptr1.push_back(before.ptr1[j]);
+        }
       assign(after);
     }
     // construct next stage.
