@@ -1068,11 +1068,11 @@ template <typename T, typename U> string preparedTOC(const string& input, const 
      for(int j = 0; j < depth; j ++) {
         const int jj(scores.size() - j - 1);
         const auto& work(cstat[scores[jj].second.second] + tstat[scores[jj].second.first]);
-        result += work.serialize() + string("\n");
-        result += work.reverseLink(cstat0[scores[jj].second.second]) + string("\n");
-        result += work.reverseLink(tstat0[scores[jj].second.first])  + string("\n");
+        result += work.serialize() + string("<br/>\n");
+        result += work.reverseLink(cstat0[scores[jj].second.second]) + string("<br/>\n");
+        result += work.reverseLink(tstat0[scores[jj].second.first])  + string("<br/><br/>\n");
      }
-     result += string("\n");
+     result += string("<br/><br/>\n");
   }
   return result;
 }
