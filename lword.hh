@@ -130,7 +130,7 @@ template <typename T, typename U> bool lword<T, U>::isin(const U& key) {
 }
 
 template <typename T, typename U> gram_t<U>& lword<T, U>::find(const U& key) {
-  static gram]t<U> dummy;
+  static gram_t<U> dummy;
   if(dicts.size() < key.size()) {
     cerr << "XXX: find slips." << endl;
     return dummy;
@@ -139,7 +139,7 @@ template <typename T, typename U> gram_t<U>& lword<T, U>::find(const U& key) {
   gram_t<U> key0;
   key0.str = key;
   auto p(lower_bound(dict.begin(), dict.end(), key0));
-  if(p < dict.begin() || dict.end() <= p || p->str != key)) {
+  if(p < dict.begin() || dict.end() <= p || p->str != key) {
     cerr << "XXX: slipping find." << endl;
     return dummy;
   }
