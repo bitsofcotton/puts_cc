@@ -90,7 +90,7 @@ def writeSub(str, f, flog):
     print "mechanize error @ " + str
     return
   try:
-    f.write(innerHTMLs(html))
+    f.write(innerHTMLs(html).decode("utf-8"))
   except:
     print "file open error."
   return
@@ -153,7 +153,7 @@ for iprange in ipranges:
       print "mkdir error"
     try:
       f = open(dir + ips + "-inner.txt", "w")
-      f.write(innerHTMLs(html))
+      f.write(innerHTMLs(html).decode("utf-8"))
       f.close()
       f = open(dir + ips + "-links.txt", "w")
       f.write(cutLinks(html))
