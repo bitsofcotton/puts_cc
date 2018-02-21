@@ -624,13 +624,12 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::invertIns
 
 template <typename T, typename U> const T corpushl<T, U>::culturalConflicts(const corpushl<T, U>& base) const {
   cerr << "XXX broken method: culturalConflicts" << endl;
-  const corpushl<T, U> work(match2relPseudo(base));
-  const corpushl<T, U> workc(base.match2relPseudo(*this));
-  const corpushl<T, U> dwork(*this - work);
-  const corpushl<T, U> dworkc(base - workc);
-  const corpushl<T, U> delta(*this - base);
+  const auto work(match2relPseudo(base));
+  const auto workc(base.match2relPseudo(*this));
+  const auto dwork(*this - work);
+  const auto dworkc(base - workc);
   // XXX this is broken method. DO NOT USE THIS ONLY.: fixme...
-  const T score((dwork.cdot(dwork) + dworkc.cdot(dworkc) + delta.cdot(delta)) / (cdot(*this) + base.cdot(base)));
+  const T score(sqrt((dwork.cdot(dwork) + dworkc.cdot(dworkc))) / cdot(base) / T(words.size() + base.words.size()));
   if(isfinite(score))
     return score;
   cerr << "culturalConflicts: nan" << endl;
