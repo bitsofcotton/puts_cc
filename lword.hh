@@ -92,8 +92,8 @@ private:
   void constructNwords();
   void makeWords();
   
-  bool       isin(const U key);
-  gram_t<U>& find(const U key);
+  bool       isin(const U& key);
+  gram_t<U>& find(const U& key);
   void       assign(const gram_t<U>& val);
 };
 
