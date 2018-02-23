@@ -58,12 +58,11 @@ int main(int argc, const char* argv[]) {
   csvdelim.push_back(string(","));
   csvdelim.push_back(string("\r"));
   csvdelim.push_back(string("\n"));
-//  std::ios::sync_with_stdio(false);
+  int mode = - 1;
   if(argc < 2) {
     usage();
     return - 1;
   }
-  int mode = - 1;
   if(std::strcmp(argv[1], "lword") == 0)
     mode = 0;
   else if(std::strcmp(argv[1], "lbalance") == 0 && argc > 2)
@@ -105,31 +104,18 @@ int main(int argc, const char* argv[]) {
         input = cutText(input, elimlist, vector<std::string>())[0];
         std::cerr << input << std::endl;
       }
-#if 1
       lword<char32_t, std::u32string> stat;
       std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
       std::u32string itrans(converter.from_bytes(input));
       for(int i = 2; i < 20; i ++) {
         stat.init(60, i, i);
-        auto words(stat.compute(itrans.c_str()));
+        auto words(stat.compute(itrans));
         for(auto itr = words.begin(); itr != words.end(); ++ itr)
           if(itr->str.size() > 2 && itr->count >= i) {
             std::cout << converter.to_bytes(itr->str) << ", ";
             std::cout << itr->count << std::endl;
           }
       }
-#else
-      lword<char, std::string> stat;
-      for(int i = 2; i < 20; i ++) {
-        stat.init(60, i, i);
-        auto words(stat.compute(input.c_str()));
-        for(auto itr = words.begin(); itr != words.end(); ++ itr)
-          if(itr->str.size() > 2 && itr->count >= i) {
-            std::cout << itr->str << ", ";
-            std::cout << itr->count << std::endl;
-          }
-      }
-#endif
       break;
     }
   case 8:
@@ -150,13 +136,13 @@ int main(int argc, const char* argv[]) {
   case 1:
     // corpus
     {
-      corpus<double, char> stat;
+      corpus<double, std::string> stat;
       const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
       for(int i = 0; i < input.size() / szwindow + 1; i ++) {
         stat.init(words0, 0, 120);
-        const std::vector<std::string>& words(stat.getWords());
-        stat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
-        Eigen::Matrix<Eigen::Matrix<double, Eigen::Dynamic, 1>, Eigen::Dynamic, Eigen::Dynamic> corpus(stat.getCorpus());
+        const auto& words(stat.getWords());
+        stat.compute(input.substr(i * szwindow, szwindow), delimiter);
+        const auto& corpus(stat.getCorpus());
         std::cout << words  << std::endl;
         std::cout << corpus << std::endl;
       }
@@ -187,7 +173,7 @@ int main(int argc, const char* argv[]) {
       }
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
-      std::cout << preparedTOC<double, char>(input, words0, detailwords, details, tocwords, tocs, delimiter, szwindow, 8, .125) << std::endl;
+      std::cout << preparedTOC<double, std::string>(input, words0, detailwords, details, tocwords, tocs, delimiter, szwindow, 8, .125) << std::endl;
       std::cout << std::string("</body></html>");
     }
     break;
@@ -195,10 +181,10 @@ int main(int argc, const char* argv[]) {
     // reconstruct
     {
       auto wordbuf(loadbuf(argv[2]).second);
-      corpus<double, char> stat;
+      corpus<double, std::string> stat;
       stat.init(cutText(wordbuf, csvelim, csvdelim), 0, 120);
-      stat.compute(input.c_str(), delimiter);
-      corpushl<double, char> recons(stat);
+      stat.compute(input, delimiter);
+      corpushl<double, std::string> recons(stat);
       std::cout << recons.serialize();
     }
     break;
@@ -212,10 +198,10 @@ int main(int argc, const char* argv[]) {
       emph.push_back(.25);
       for(int ei = 0; ei < emph.size(); ei ++) {
         for(int i = 0; i < input.size() / szwindow + 1; i ++) {
-          corpus<double, char> stat; 
+          corpus<double, std::string> stat; 
           stat.init(words0, 0, 120);
-          stat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
-          corpushl<double, char> recons(stat);
+          stat.compute(input.substr(i * szwindow, szwindow), delimiter);
+          corpushl<double, std::string> recons(stat);
           recons.reDig(emph[ei]);
           std::cout << recons.serialize() << std::endl;
         }
@@ -249,7 +235,7 @@ int main(int argc, const char* argv[]) {
       }
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
-      std::cout << diff<double, char>(input, words0, details, detailwords, details2, detailwords2, delimiter, szwindow) << std::endl;
+      std::cout << diff<double, std::string>(input, words0, details, detailwords, details2, detailwords2, delimiter, szwindow) << std::endl;
       std::cout << "</body></html>" << std::endl;
     }
     break;
@@ -267,9 +253,7 @@ int main(int argc, const char* argv[]) {
       const int tot_cont(max(min(12, int(input.size()) / szwindow), 1));
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
-      std::cout << optimizeTOC<double, char>(input, words0, rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8, .125) << std::endl;
-      std::cout << optimizeTOC<double, char>(input, words0, rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8, 1.) << std::endl;
-      std::cout << optimizeTOC<double, char>(input, words0, rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8, 8.) << std::endl;
+      std::cout << optimizeTOC<double, std::string>(input, words0, rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8, 1.) << std::endl;
       std::cout << std::string("</body></html>");
     }
     break;

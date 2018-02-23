@@ -1,3 +1,15 @@
+/* BSD 3-Clause License:
+ * Copyright (c) 2018, bitsofcotton.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+ *
+ *    Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+ *    Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation or other materials provided with the distribution.
+ *    Neither the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 #if !defined(_LWORD_)
 
 #include <cstdio>
@@ -19,8 +31,6 @@ using std::endl;
 using std::flush;
 using std::max;
 using std::min;
-
-template <typename T> vector<T> cutText(const T& input, const vector<T>& eliminate0, const vector<T>& delimiter0);
 
 template <typename T> class word_t {
 public:
@@ -72,14 +82,13 @@ public:
   }
 };
 
-
 template <typename T, typename U> class lword {
 public:
   lword();
   ~lword();
   void init(const int& loop, const int& mthresh, const int& Mthresh);
   
-  const vector<word_t<U> >& compute(const T* input);
+  const vector<word_t<U> >& compute(const U& input);
 private:
   vector<T>                   dict0;
   vector<vector<gram_t<U> > > dicts;
@@ -88,9 +97,8 @@ private:
   int mthresh;
   int Mthresh;
   
-  void makeBigram(const T* input);
+  void makeBigram(const U& input);
   void constructNwords();
-  void makeWords();
   
   bool       isin(const U& key);
   gram_t<U>& find(const U& key);
@@ -157,6 +165,7 @@ template <typename T, typename U> void lword<T, U>::assign(const gram_t<U>& val)
     // delete duplicates:
     gram_t<U> work;
     work.str = val.str;
+    // XXX can spped up with sorting.
     for(int i = 0; i < val.ptr0.size(); i ++) {
       bool flag(false);
       for(int j = 0; j < work.ptr0.size(); j ++)
@@ -182,30 +191,48 @@ template <typename T, typename U> void lword<T, U>::assign(const gram_t<U>& val)
   return;
 }
 
-template <typename T, typename U> const vector<word_t<U> >& lword<T, U>::compute(const T* input) {
-  cerr << "bi-gramming." << flush;
+template <typename T, typename U> const vector<word_t<U> >& lword<T, U>::compute(const U& input) {
+  cerr << " bi-gram" << flush;
   makeBigram(input);
-  cerr << " constructing longest words..." << endl;
+  
+  cerr << " longest words" << endl;
   constructNwords();
+  
   cerr << "making word tables." << endl;
-  makeWords();
+  for(auto itr = dicts.begin(); itr != dicts.end(); ++ itr)
+    for(auto itr2 = itr->begin(); itr2 != itr->end(); ++ itr2) {
+      word_t<U> work;
+      work.count = itr2->ptr0.size();
+      if(!work.count)
+        continue;
+      work.str   = itr2->str;
+      // XXX fixme not here.
+      bool flag(false);
+      for(int i = 0; i < words.size(); i ++)
+        if(work.str == words[i].str) {
+          flag = true;
+          break;
+        }
+      if(flag) continue;
+      words.push_back(work);
+    }
+  sort(words.begin(), words.end());
   return words;
 }
 
-template <typename T, typename U> void lword<T, U>::makeBigram(const T* input) {
-  map<T, T> map0;
-  map<U, vector<int> > map;
-  for(int i = 1; input[i]; i ++) {
+template <typename T, typename U> void lword<T, U>::makeBigram(const U& input) {
+  map<U, vector<int> > mapw;
+  for(int i = 1; i < input.size(); i ++) {
     U work;
     work += T(input[i - 1]);
     work += T(input[i]);
-    map[work].push_back(i);
-    map0[input[i]] = input[i];
+    mapw[work].push_back(i);
+    if(!binary_search(dict0.begin(), dict0.end(), input[i])) {
+      dict0.push_back(input[i]);
+      sort(dict0.begin(), dict0.end());
+    }
   }
-  for(auto itr = map0.begin(); itr != map0.end(); ++ itr)
-    dict0.push_back(itr->first);
-  sort(dict0.begin(), dict0.end());
-  for(auto itr = map.begin(); itr != map.end(); ++ itr) {
+  for(auto itr = mapw.begin(); itr != mapw.end(); ++ itr) {
     gram_t<U> work;
     work.str = itr->first;
     for(auto itr2 = itr->second.begin(); itr2 != itr->second.end(); ++ itr2) {
@@ -219,8 +246,8 @@ template <typename T, typename U> void lword<T, U>::makeBigram(const T* input) {
 
 template <typename T, typename U> void lword<T, U>::constructNwords() {
   int i;
-  for(i = 0; i < dicts.size(); i ++) {
-    cerr << i + 2 << ", " << flush;
+  for(i = 2; i < dicts.size(); i ++) {
+    cerr << i << " " << flush;
     map<U, vector<int> > map0;
     map<U, vector<int> > map1;
     map<U, vector<int> > dmap;
@@ -236,7 +263,7 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
           continue;
         const gram_t<U>& idxkey2(find(key2));
         U workkey(idxkey.str);
-        workkey += T(*itr2);
+        workkey += *itr2;
         if(isin(workkey))
           continue;
         vector<int> idxwork[4];
@@ -261,7 +288,7 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
           continue;
         const int diff(min( idxkey.ptr0.size(), idxkey2.ptr0.size()) - idxwork[0].size());
         const int diffM(max(idxkey.ptr0.size(), idxkey2.ptr0.size()) - idxwork[0].size());
-        if(0 < diff && mthresh < diffM)
+        if(diff < 0 || mthresh < diffM)
           continue;
         map0[workkey].insert(map0[workkey].end(), idxwork[0].begin(), idxwork[0].end());
         map1[workkey].insert(map1[workkey].end(), idxwork[1].begin(), idxwork[1].end());
@@ -296,29 +323,6 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
   return;
 }
 
-template <typename T, typename U> void lword<T, U>::makeWords() {
-  for(auto itr = dicts.begin(); itr != dicts.end(); ++ itr) {
-    for(auto itr2 = itr->begin(); itr2 != itr->end(); ++ itr2) {
-      word_t<U> work;
-      work.count = itr2->ptr0.size();
-      if(!work.count)
-        continue;
-      work.str   = itr2->str;
-      // XXX fixme not here.
-      bool flag(false);
-      for(int i = 0; i < words.size(); i ++)
-        if(work.str == words[i].str) {
-          flag = true;
-          break;
-        }
-      if(flag) continue;
-      words.push_back(work);
-    }
-  }
-  sort(words.begin(), words.end());
-  return;
-}
-
 
 // some functions.
 template <typename T> vector<T> cutText(const T& input, const vector<T>& eliminate0, const vector<T>& delimiter0) {
@@ -336,11 +340,8 @@ template <typename T> vector<T> cutText(const T& input, const vector<T>& elimina
     for(int j = 0; j < delimiter.size(); j ++)
       if(workbuf.size() >= delimiter[j].size() &&
          workbuf.substr(workbuf.size() - delimiter[j].size(), delimiter[j].size()) == delimiter[j]) {
-        if(workbuf.size() - delimiter[j].size()) {
+        if(workbuf.size() - delimiter[j].size())
           result.push_back(workbuf.substr(0, workbuf.size() - delimiter[j].size()));
-          sort(result.begin(), result.end());
-          result.erase(unique(result.begin(), result.end()), result.end());
-        }
         workbuf = T();
         flag = true;
         break;
