@@ -592,17 +592,33 @@ template <typename T, typename U> const T corpushl<T, U>::cdot(const corpushl<T,
 }
 
 template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T, U>& prejs) const {
-  cerr << "XXX : confirm me prej function." << endl;
+  // XXX this is broken method. DO NOT USE THIS ONLY.: fixme...
+  cerr << "XXX : confirm me corpushl::prej function." << endl;
   // XXX confirm me: need some other counting methods?
   // XXX fixme: amount of the word that is not said in the context is
   //            also important.
-  return cdot(match2relPseudo(prejs)) / cdot(*this);
+  const auto n2this(cdot(*this));
+  if(n2this == T(0))
+    return - T(4);
+  const auto n2p(prejs.cdot(prejs));
+  if(n2p == T(0))
+    return T(0);
+  const auto ex0(*this - match2relPseudo(prejs));
+  const auto n2e0(ex0.cdot(ex0));
+  if(n2e0 == T(0))
+    return   T(4);
+  const auto ex1(prejs - prejs.match2relPseudo(*this));
+  const auto n2e1(ex1.cdot(ex1));
+  if(n2e1 == T(0))
+    return - T(4);
+  // XXX is sign correct?
+  return cdot(prejs) / sqrt(n2this * n2p) - ex0.cdot(ex1) / sqrt(n2e0 * n2e1);
 }
 
 template <typename T, typename U> const T corpushl<T, U>::prej2(const vector<corpushl<T, U> >& prej0, const vector<corpushl<T, U> >& prej1, const T& thresh) const {
+  cerr << "XXX confirm me: corpushl::prej2" << endl;
   // XXX confirm me: is this correct counting method?
   // XXX fixme: also with prej func.
-  cerr << "XXX confirm me: corpushl<T, U>::prej2" << endl;
   corpushl<T, U> p0(*this), p1(*this);
   for(int i = 0; i < prej0.size(); i ++)
     p0 = p0.abbrev(string("P") + to_string(i), prej0[i]);
@@ -614,47 +630,41 @@ template <typename T, typename U> const T corpushl<T, U>::prej2(const vector<cor
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::lackOfInsist() const {
-  corpushl<T, U> result;
-  // stub.
+  cerr << "XXX confirm me: corpushl::lackOfInsist" << endl;
+  assert(0);
   // XXX confirm me: this method can only count what's on the table.
   //                 so the things that isn't on the table will not be counted.
-  cerr << "STUB LACK OF INSIST." << endl;
+  corpushl<T, U> result;
   return result;
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::invertInsist() const {
-  corpushl<T, U> result;
-  // stub.
+  cerr << "XXX confirm me: corpushl::invertInsist" << endl;
+  assert(0);
   // XXX confirm me: this method cannot calculate in logically correct
   //                 because of it's method.
   cerr << "STUB INVERT INSIST." << endl;
+  corpushl<T, U> result;
   return result;
 }
 
 template <typename T, typename U> const T corpushl<T, U>::culturalConflicts(const corpushl<T, U>& base) const {
-  cerr << "XXX broken method: culturalConflicts" << endl;
-  const auto work(match2relPseudo(base));
-  const auto workc(base.match2relPseudo(*this));
-  const auto dwork(*this - work);
-  const auto dworkc(base - workc);
-  // XXX this is broken method. DO NOT USE THIS ONLY.: fixme...
-  const T score((dwork.cdot(dwork) + dworkc.cdot(dworkc)) / cdot(base) / T(words.size() + base.words.size()));
-  if(isfinite(score))
-    return score;
-  cerr << "culturalConflicts: nan" << endl;
+  cerr << "XXX confirm me: corpushl::culturalConflicts" << endl;
+  assert(0);
   return T(0);
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::conflictPart() {
-  corpushl<T, U> result;
+  cerr << "XXX confirm me: corpushl::conflictPart" << endl;
+  assert(0);
   // search conflict parts.
   // dictionary base of the word 'NOT' is needed.
-  cerr << "STUB of corpushl<T, U>::conflictPart." << endl;
-  return;
+  corpushl<T, U> result;
+  return result;
 }
 
 template <typename T, typename U> const U corpushl<T, U>::serialize() const {
-  cerr << "serialize" << flush;
+  cerr << " serialize" << flush;
   if(corpust.rows() < 1 || corpust.cols() < 1)
     return U("*NULL*");
   auto plus(*this), minus(*this);
@@ -723,17 +733,14 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(const U& word, const corpushl<T, U>& mean) {
-  cerr << "abbrev 0/2" << endl;
+  cerr << "a" << flush;
   corpushl<T, U> work(match2relPseudo(mean));
   // XXX fixme: need to add abbreved word for work.
-  cerr << "abbrev 1/2" << endl;
   const T tn(cdot(work)), td(work.cdot(work));
-  cerr << "abbrev 2/2" << endl;
   if(isfinite(tn / td))
     return *this - (work * (tn / td));
   // can't abbrev.
-  if(td != T(0))
-    cerr << "abbrev : XXX : nan" << endl;
+  assert(td == T(0));
   return *this;
 }
 
@@ -1073,7 +1080,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
      vector<pair<T, pair<int, int> > > scores;
      for(int j = 0; j < tstat.size(); j ++)
        for(int k = 0; k < cstat.size(); k ++)
-         scores.push_back(make_pair(abs(cstat[k].culturalConflicts(tstat[j])),
+         scores.push_back(make_pair(- cstat[k].prej(tstat[j]),
                                     make_pair(j, k)));
      sort(scores.begin(), scores.end());
      result += topictitle[i] + U(" : (") + to_string(scores[0].first);
@@ -1116,7 +1123,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
       cstats(i, j) = cstats(j, i);
     cstats(i, i) = T(0);
     for(int j = i + 1; j < cstat.size(); j ++)
-      cstats(i, j) = abs(cstat[i].culturalConflicts(cstat[j]));
+      cstats(i, j) = - cstat[i].prej(cstat[j]);
   }
   
   cerr << "OK, sorting phrases." << flush;
