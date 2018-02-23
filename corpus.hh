@@ -1079,9 +1079,12 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
      getDetailed<T, U>(tstat0, tstat, topics[i], words, detailtitle, detail, delimiter, szwindow);
      vector<pair<T, pair<int, int> > > scores;
      for(int j = 0; j < tstat.size(); j ++)
-       for(int k = 0; k < cstat.size(); k ++)
-         scores.push_back(make_pair(- cstat[k].prej(tstat[j]),
-                                    make_pair(j, k)));
+       for(int k = 0; k < cstat.size(); k ++) {
+         const auto score(- cstat[k].prej(tstat[j]));
+         // XXX: quick and dirty.
+         if(abs(score) < T(4))
+           scores.push_back(make_pair(score, make_pair(j, k)));
+       }
      sort(scores.begin(), scores.end());
      result += topictitle[i] + U(" : (") + to_string(scores[0].first);
      T   sum(0);
@@ -1122,8 +1125,14 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
     for(int j = 0; j < i; j ++)
       cstats(i, j) = cstats(j, i);
     cstats(i, i) = T(0);
-    for(int j = i + 1; j < cstat.size(); j ++)
-      cstats(i, j) = - cstat[i].prej(cstat[j]);
+    for(int j = i + 1; j < cstat.size(); j ++) {
+      const auto score(- cstat[i].prej(cstat[j]));
+      // XXX: quick and dirty.
+      if(abs(score) < T(4))
+        cstats(i, j) = score;
+      else
+        cstats(i, j) = T(8);
+    }
   }
   
   cerr << "OK, sorting phrases." << flush;
