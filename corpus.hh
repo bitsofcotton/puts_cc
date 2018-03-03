@@ -738,7 +738,19 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
     middle.push_back(score[i].second);
   for( ; i < score.size(); i ++)
     right.push_back(score[i].second);
-  return serializeSub(left) + serializeSub(middle) + serializeSub(right);
+  U result;
+  if(!left.size() && !right.size())
+    for(int i = 0; i < middle.size(); i ++)
+      result += words[middle[i]];
+  else if(!left.size() && !middle.size())
+    for(int i = 0; i < right.size(); i ++)
+      result += words[right[i]];
+  else if(!middle.size() && !right.size())
+    for(int i = 0; i < left.size(); i ++)
+      result += words[left[i]];
+  else
+    result = serializeSub(left) + serializeSub(middle) + serializeSub(right);
+  return result;
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(const U& word, const corpushl<T, U>& mean) {
