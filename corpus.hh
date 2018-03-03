@@ -740,7 +740,8 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(co
   if(isfinite(tn / td))
     return *this - (work * (tn / td));
   // can't abbrev.
-  assert(td == T(0));
+  cerr << "XXX: can't abbrev." << endl;
+  // assert(td == T(0));
   return *this;
 }
 
