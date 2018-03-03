@@ -679,44 +679,50 @@ template <typename T, typename U> const U corpushl<T, U>::serialize() const {
   vector<int> entire;
   for(int i = 0; i < corpust.rows(); i ++)
     entire.push_back(i);
-  return plus.serializeSub(entire)  + U(".\n-") +
+  return plus.serializeSub(entire) + U(".<br/>\n-") +
          minus.serializeSub(entire) + U(".");
 }
 
 template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vector<int>& idxs) const {
   cerr << "." << flush;
-  vector<pair<T, int> > cscore;
-  // corpust(i0, i2)[i1].
+  if(idxs.size() <= 1) {
+    if(idxs.size())
+      return words[idxs[0]];
+    return U();
+  }
+  vector<pair<T, int> > score;
+  // N.B. i0 - i1 - i2 is stored in corpust(i0, i2)[i1].
   for(int i = 0; i < idxs.size(); i ++) {
-    T tc(0);
-    for(int j = 0; j < idxs.size(); j ++) if(0 <= idxs[j] && idxs[j] < corpust.rows())
-      for(int k = 0; k < idxs.size(); k ++)
-        if(0 <= idxs[k] && idxs[k] < corpust.cols() &&
-           0 <= idxs[i] && idxs[i] < corpust(idxs[j], idxs[k]).size())
-          tc += pow(corpust(idxs[j], idxs[k])[idxs[i]], T(2));
-    const T lscore(tc == T(0) ? T(0) : T(1) / (tc + 1));
+    T lscore(0);
+    for(int j = 0; j < idxs.size(); j ++)
+      if(0 <= idxs[j] && idxs[j] < corpust.rows())
+        for(int k = 0; k < idxs.size(); k ++)
+          if(0 <= idxs[k] && idxs[k] < corpust.cols() &&
+             0 <= idxs[i] && idxs[i] < corpust(idxs[j], idxs[k]).size() &&
+             corpust(idxs[j], idxs[k])[idxs[i]] != T(0))
+            lscore -= T(1);
+            // XXX or use this?? : 
+            // lscore -= pow(corpust(idxs[j], idxs[k])[idxs[i]], - T(2));
     if(isfinite(lscore))
-      cscore.push_back(make_pair(lscore, idxs[i]));
+      score.push_back(make_pair(lscore, idxs[i]));
     else
       cerr << "nan" << flush;
   }
-  if(cscore.size() <= 0)
+  sort(score.begin(), score.end());
+  if(score.size() <= 0 || score[0].first == T(0))
     return U();
-  if(cscore.size() <= 1)
-    return words[cscore[0].second];
-  if(cscore.size() <= 2)
-    return words[cscore[0].second] + words[cscore[1].second];
-  sort(cscore.begin(), cscore.end());
-  vector<int> left, right;
-  const int& middle(cscore[cscore.size() - 1].second);
-  vector<pair<T, int> > score;
+  vector<int> middle;
+  middle.push_back(score[0].second);
+  score = vector<pair<T, int> >();
   for(int i = 0; i < idxs.size(); i ++)
-    if(idxs[i] != middle && 0 <= idxs[i] && idxs[i] < corpust.rows()) {
+    if(idxs[i] != middle[0] && 0 <= idxs[i] && idxs[i] < corpust.rows()) {
       T lscore(0);
       for(int j = 0; j < idxs.size(); j ++)
-        if(idxs[j] != middle && 0 <= idxs[j] && idxs[j] < corpust.cols()) {
-          lscore -= corpust(idxs[i], idxs[j])[middle];
-          lscore += corpust(idxs[j], idxs[i])[middle];
+        if(idxs[j] != middle[0] && 0 <= idxs[j] && idxs[j] < corpust.cols()) {
+          if(corpust(idxs[i], idxs[j])[middle[0]] != T(0))
+            lscore -= T(1);
+          if(corpust(idxs[j], idxs[i])[middle[0]] != T(0))
+            lscore += T(1);
         }
       if(isfinite(lscore))
         score.push_back(make_pair(lscore, idxs[i]));
@@ -724,12 +730,15 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
         cerr << "nan" << flush;
     }
   sort(score.begin(), score.end());
+  vector<int> left, right;
   int i(0);
   for( ; i < score.size() && score[i].first < T(0); i ++)
     left.push_back(score[i].second);
+  for( ; i < score.size() && score[i].first == T(0); i ++)
+    middle.push_back(score[i].second);
   for( ; i < score.size(); i ++)
     right.push_back(score[i].second);
-  return serializeSub(left) + words[middle] + serializeSub(right);
+  return serializeSub(left) + serializeSub(middle) + serializeSub(right);
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(const U& word, const corpushl<T, U>& mean) {
@@ -740,7 +749,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(co
   if(isfinite(tn / td))
     return *this - (work * (tn / td));
   // can't abbrev.
-  cerr << "XXX: can't abbrev." << endl;
+  cerr << "XXX: can't abbrev : " << td << endl;
   // assert(td == T(0));
   return *this;
 }
@@ -809,7 +818,8 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::reDig(con
   for(int i = 0; i < corpust.rows(); i ++)
     for(int j = 0; j < corpust.cols(); j ++)
       for(int k = 0; k < corpust(i, j).size(); k ++)
-        corpust(i, j)[k] = (corpust(i, j)[k] < T(0) ? - T(1) : T(1)) * exp(log(abs(corpust(i, j)[k])) * ratio);
+        if(corpust(i, j)[k] != T(0))
+          corpust(i, j)[k] = (corpust(i, j)[k] < T(0) ? - T(1) : T(1)) * exp(log(abs(corpust(i, j)[k])) * ratio);
   return *this;
 }
 
@@ -1137,30 +1147,38 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
   }
   
   cerr << "OK, sorting phrases." << flush;
-  vector<pair<T, int> > cidxs;
-  for(int i = 0; i < cstats.rows(); i ++)
-    cidxs.push_back(make_pair(cstats.row(i).dot(cstats.row(i)), i));
-  sort(cidxs.begin(), cidxs.end());
-  
   vector<int>           phrases;
   vector<pair<T, int> > work;
   vector<vector<int> >  idxs;
+  auto                  cstatsw(cstats);
   for(int ii = 0; ii < cstat.size() && work.size() < cstat.size() / depth; ii ++) {
-    const int i(cidxs[ii].second);
+    vector<pair<T, int> > cidxs;
+    for(int i = 0; i < cstatsw.rows(); i ++)
+      if(!binary_search(phrases.begin(), phrases.end(), i))
+        cidxs.push_back(make_pair(cstatsw.row(i).dot(cstatsw.row(i)), i));
+    sort(cidxs.begin(), cidxs.end());
+    const int i(cidxs[0].second);
+    phrases.push_back(i);
+    sort(phrases.begin(), phrases.end());
+    
     idxs.push_back(vector<int>());
     vector<pair<T, int> > scores;
     for(int j = 0; j < cstat.size(); j ++)
-      if(i != j && !binary_search(phrases.begin(), phrases.end(), j))
-        scores.push_back(make_pair(cstats(i, j), j));
+      if(!binary_search(phrases.begin(), phrases.end(), j))
+        scores.push_back(make_pair(cstatsw(i, j), j));
     sort(scores.begin(), scores.end());
     T score(0);
     for(int j = 0; j < min(depth, int(scores.size())); j ++) {
       idxs[ii].push_back(scores[j].second);
       phrases.push_back(scores[j].second);
       score += scores[j].first;
+      for(int k = 0; k < cstatsw.rows(); k ++)
+        cstatsw(k, scores[j].second) = cstatsw(scores[j].second, k) = T(0);
     }
     sort(phrases.begin(), phrases.end());
     work.push_back(make_pair(score, i));
+    for(int k = 0; k < cstatsw.rows(); k ++)
+      cstatsw(k, i) = cstatsw(i, k) = T(0);
   }
   sort(work.begin(), work.end());
   
