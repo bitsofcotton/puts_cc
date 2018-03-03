@@ -679,76 +679,62 @@ template <typename T, typename U> const U corpushl<T, U>::serialize() const {
   vector<int> entire;
   for(int i = 0; i < corpust.rows(); i ++)
     entire.push_back(i);
-  return plus.serializeSub(entire) + U(".<br/>\n-") +
+  return plus.serializeSub(entire)  + U(".<br/>\n-") +
          minus.serializeSub(entire) + U(".");
 }
 
 template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vector<int>& idxs) const {
   cerr << "." << flush;
-  if(idxs.size() <= 1) {
-    if(idxs.size())
-      return words[idxs[0]];
-    return U();
-  }
-  vector<pair<T, int> > score;
+  U result;
+  vector<pair<int, int> > score;
   // N.B. i0 - i1 - i2 is stored in corpust(i0, i2)[i1].
   for(int i = 0; i < idxs.size(); i ++) {
-    T lscore(0);
+    int lscore(0);
     for(int j = 0; j < idxs.size(); j ++)
-      if(0 <= idxs[j] && idxs[j] < corpust.rows())
+      if(0 <= idxs[j] && idxs[j] < corpust.rows()) {
         for(int k = 0; k < idxs.size(); k ++)
           if(0 <= idxs[k] && idxs[k] < corpust.cols() &&
              0 <= idxs[i] && idxs[i] < corpust(idxs[j], idxs[k]).size() &&
              corpust(idxs[j], idxs[k])[idxs[i]] != T(0))
-            lscore -= T(1);
-            // XXX or use this?? : 
-            // lscore -= pow(corpust(idxs[j], idxs[k])[idxs[i]], - T(2));
-    if(isfinite(lscore))
-      score.push_back(make_pair(lscore, idxs[i]));
-    else
-      cerr << "nan" << flush;
+            lscore --;
+      }
+    score.push_back(make_pair(lscore, idxs[i]));
   }
   sort(score.begin(), score.end());
-  if(score.size() <= 0 || score[0].first == T(0))
-    return U();
+  if(score.size() <= 0 || !score[0].first) {
+    cerr << "0" << flush;
+    return result;
+  }
   vector<int> middle;
   middle.push_back(score[0].second);
-  score = vector<pair<T, int> >();
+  score = vector<pair<int, int> >();
   for(int i = 0; i < idxs.size(); i ++)
     if(idxs[i] != middle[0] && 0 <= idxs[i] && idxs[i] < corpust.rows()) {
-      T lscore(0);
+      int lscore(0);
       for(int j = 0; j < idxs.size(); j ++)
         if(idxs[j] != middle[0] && 0 <= idxs[j] && idxs[j] < corpust.cols()) {
           if(corpust(idxs[i], idxs[j])[middle[0]] != T(0))
-            lscore -= T(1);
+            lscore --;
           if(corpust(idxs[j], idxs[i])[middle[0]] != T(0))
-            lscore += T(1);
+            lscore ++;
         }
-      if(isfinite(lscore))
-        score.push_back(make_pair(lscore, idxs[i]));
-      else
-        cerr << "nan" << flush;
+      score.push_back(make_pair(lscore, idxs[i]));
     }
   sort(score.begin(), score.end());
   vector<int> left, right;
   int i(0);
-  for( ; i < score.size() && score[i].first < T(0); i ++)
+  for( ; i < score.size() && score[i].first < 0; i ++)
     left.push_back(score[i].second);
-  for( ; i < score.size() && score[i].first == T(0); i ++)
+  for( ; i < score.size() && !score[i].first; i ++)
     middle.push_back(score[i].second);
   for( ; i < score.size(); i ++)
     right.push_back(score[i].second);
-  U result;
-  if(!left.size() && !right.size())
+  if(!left.size() && !right.size()) {
+    if(1 < middle.size())
+      cerr << "!" << middle.size() << "!" << flush;
     for(int i = 0; i < middle.size(); i ++)
       result += words[middle[i]];
-  else if(!left.size() && !middle.size())
-    for(int i = 0; i < right.size(); i ++)
-      result += words[right[i]];
-  else if(!middle.size() && !right.size())
-    for(int i = 0; i < left.size(); i ++)
-      result += words[left[i]];
-  else
+  } else
     result = serializeSub(left) + serializeSub(middle) + serializeSub(right);
   return result;
 }
@@ -840,7 +826,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThr
   for(int i = 0; i < corpust.rows(); i ++)
     for(int j = 0; j < corpust.cols(); j ++)
       for(int k = 0; k < corpust(i, j).size(); k ++)
-        if(absmax < corpust(i, j)[k])
+        if(absmax < abs(corpust(i, j)[k]))
           absmax = abs(corpust(i, j)[k]);
   Tensor work(corpust);
   for(int i = 0; i < corpust.rows(); i ++)
@@ -851,13 +837,21 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThr
   vector<int> okidx;
   for(int i = 0; i < corpust.rows(); i ++) {
     bool flag(true);
-    for(int j = 0; j < corpust.rows(); j ++)
+    for(int j = 0; j < corpust.rows(); j ++) {
       if(work(i, j).dot(work(i, j)) != T(0) ||
          work(j, i).dot(work(j, i)) != T(0)) {
         flag = false;
         break;
       }
-    if(! flag)
+      for(int k = 0; k < corpust.cols(); k ++)
+        if(i < work(j, k).size() && work(j, k)[i] != T(0)) {
+          flag = false;
+          break;
+        }
+      if(!flag)
+        break;
+    }
+    if(!flag)
       okidx.push_back(i);
   }
   corpushl<T, U> result;
@@ -865,8 +859,11 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThr
   result.corpust = Tensor(okidx.size(), okidx.size());
   for(int i = 0; i < okidx.size(); i ++) {
     result.words.push_back(words[okidx[i]]);
-    for(int j = 0; j < okidx.size(); j ++)
-      result.corpust(i, j) = corpust(okidx[i], okidx[j]);
+    for(int j = 0; j < okidx.size(); j ++) {
+      result.corpust(i, j) = Vec(okidx.size());
+      for(int k = 0; k < okidx.size(); k ++)
+        result.corpust(i, j)[k] = corpust(okidx[i], okidx[j])[okidx[k]];
+    }
   }
   return result;
 }
@@ -921,9 +918,7 @@ template <typename T, typename U> vector<U> corpushl<T, U>::gatherWords(const ve
         if(0 <= d1 && d1 < in1.size())
           ridx1[result.size() - 1] = d1;
         continue;
-      } else
-        j --;
-      j ++;
+      }
       break;
     }
     if(sin0.size() <= i) break;
@@ -1222,7 +1217,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
   return result;
 }
 
-template <typename T, typename U> U diff(const U& input, const vector<U>& words, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const T& thresh = T(20), const T& redig = T(1)) {
+template <typename T, typename U> U diff(const U& input, const vector<U>& words, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const T& thresh = T(0), const T& redig = T(1)) {
   cerr << "Diff: preparing inputs..." << endl;
   vector<corpus<T, U> >   cstat0;
   vector<corpus<T, U> >   dstat0;
@@ -1244,15 +1239,15 @@ template <typename T, typename U> U diff(const U& input, const vector<U>& words,
   
   cerr << " making outputs." << flush;
   U result;
-  for(int i = 0; i < cstat.size(); i ++) {
+  for(int i = 0; i < cstat.size(); i ++)
     if(diffs[i].cdot(diffs[i]) != T(0)) {
       auto& diff(diffs[i]);
       diff    = diff.simpleThresh(thresh);
       result += diff.serialize() + U("<br/>\n");
+      result += cstat[i].reverseLink(cstat0[i]) + U("<br/>\n");
       result += diff.reverseLink(cstat0[i]) + U("<br/>\n");
       result += diff.reverseLink(dstat0[i]) + U("<br/><br/><br/>\n");
     }
-  }
   result += U("Done");
   return result;
 }
