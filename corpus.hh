@@ -283,10 +283,11 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
         int ctrv = 0;
         for(auto itr = ptrs[k].begin(); itr != ptrs[k].end(); ++ itr) {
           while(ctru < ptrs[i].size() && ptrs[i][ctru] < *itr) ctru ++;
-          if(ctru >= ptrs[i].size())
+          ctru --;
+          if(ctru < 0 || ptrs[i].size() <= ctru)
             continue;
           while(ctrv < ptrs[j].size() && ptrs[j][ctrv] < *itr) ctrv ++;
-          if(ctrv >= ptrs[j].size() || ptrs[j][ctrv] < *itr)
+          if(ptrs[j].size() <= ctrv || ptrs[j][ctrv] < *itr)
             break;
           for( ; kk < pdelim.size() - 1; kk ++)
             if(pdelim[kk] <= *itr && *itr <= pdelim[kk + 1])
@@ -685,58 +686,62 @@ template <typename T, typename U> const U corpushl<T, U>::serialize() const {
 
 template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vector<int>& idxs) const {
   cerr << "." << flush;
-  U result;
-  vector<pair<int, int> > score;
+  if(idxs.size() <= 1) {
+    if(idxs.size())
+      return words[idxs[0]];
+    return U();
+  }
+  vector<pair<int, int> > cscore;
   // N.B. i0 - i1 - i2 is stored in corpust(i0, i2)[i1].
   for(int i = 0; i < idxs.size(); i ++) {
     int lscore(0);
     for(int j = 0; j < idxs.size(); j ++)
       if(0 <= idxs[j] && idxs[j] < corpust.rows()) {
         for(int k = 0; k < idxs.size(); k ++)
-          if(0 <= idxs[k] && idxs[k] < corpust.cols() &&
+          if(j != k &&
+             0 <= idxs[k] && idxs[k] < corpust.cols() &&
              0 <= idxs[i] && idxs[i] < corpust(idxs[j], idxs[k]).size() &&
              corpust(idxs[j], idxs[k])[idxs[i]] != T(0))
             lscore --;
       }
-    score.push_back(make_pair(lscore, idxs[i]));
+    cscore.push_back(make_pair(lscore, idxs[i]));
   }
-  sort(score.begin(), score.end());
-  if(score.size() <= 0 || !score[0].first) {
-    cerr << "0" << flush;
-    return result;
-  }
-  vector<int> middle;
-  middle.push_back(score[0].second);
-  score = vector<pair<int, int> >();
-  for(int i = 0; i < idxs.size(); i ++)
-    if(idxs[i] != middle[0] && 0 <= idxs[i] && idxs[i] < corpust.rows()) {
-      int lscore(0);
-      for(int j = 0; j < idxs.size(); j ++)
-        if(idxs[j] != middle[0] && 0 <= idxs[j] && idxs[j] < corpust.cols()) {
-          if(corpust(idxs[i], idxs[j])[middle[0]] != T(0))
-            lscore --;
-          if(corpust(idxs[j], idxs[i])[middle[0]] != T(0))
-            lscore ++;
-        }
-      score.push_back(make_pair(lscore, idxs[i]));
+  sort(cscore.begin(), cscore.end());
+  for(int si = 0; si < cscore.size(); si ++) {
+    vector<int> middle, left, right;
+    middle.push_back(cscore[si].second);
+    if(!cscore[si].first) {
+      string result;
+      for(int i = 0; i < cscore.size(); i ++)
+        if(cscore[i].first != T(0))
+          result += words[cscore[i].second];
+      return result;
     }
-  sort(score.begin(), score.end());
-  vector<int> left, right;
-  int i(0);
-  for( ; i < score.size() && score[i].first < 0; i ++)
-    left.push_back(score[i].second);
-  for( ; i < score.size() && !score[i].first; i ++)
-    middle.push_back(score[i].second);
-  for( ; i < score.size(); i ++)
-    right.push_back(score[i].second);
-  if(!left.size() && !right.size()) {
-    if(1 < middle.size())
-      cerr << "!" << middle.size() << "!" << flush;
-    for(int i = 0; i < middle.size(); i ++)
-      result += words[middle[i]];
-  } else
-    result = serializeSub(left) + serializeSub(middle) + serializeSub(right);
-  return result;
+    vector<pair<int, int> > score;
+    for(int i = 0; i < idxs.size(); i ++)
+      if(idxs[i] != middle[0] && 0 <= idxs[i] && idxs[i] < corpust.rows()) {
+        int lscore(0);
+        for(int j = 0; j < idxs.size(); j ++)
+          if(idxs[j] != middle[0] && 0 <= idxs[j] && idxs[j] < corpust.cols()) {
+            if(corpust(idxs[i], idxs[j])[middle[0]] != T(0))
+              lscore --;
+            if(corpust(idxs[j], idxs[i])[middle[0]] != T(0))
+              lscore ++;
+          }
+        score.push_back(make_pair(lscore, idxs[i]));
+      }
+    sort(score.begin(), score.end());
+    int i(0);
+    for( ; i < score.size() && score[i].first < 0; i ++)
+      left.push_back(score[i].second);
+    for( ; i < score.size() && !score[i].first; i ++)
+      middle.push_back(score[i].second);
+    for( ; i < score.size(); i ++)
+      right.push_back(score[i].second);
+    if(left.size() || right.size())
+      return serializeSub(left) + serializeSub(middle) + serializeSub(right);
+  }
+  return U("SYMMETRIC");
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(const U& word, const corpushl<T, U>& mean) {
