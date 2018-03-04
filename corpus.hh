@@ -1085,7 +1085,7 @@ template <typename T, typename U> void getDetailed(vector<corpus<T, U> >& cstat0
   return;
 }
 
-template <typename T, typename U> U preparedTOC(const U& input, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& topictitle, const vector<U>& topics, const vector<U>& delimiter, const int& szwindow, const int& depth, const T& redig = T(1)) {
+template <typename T, typename U> U preparedTOC(const U& input, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& topictitle, const vector<U>& topics, const vector<U>& delimiter, const int& szwindow, const T& thresh, const T& redig = T(1)) {
   cerr << "preparedToc: parsing input" << endl;
   assert(detailtitle.size() == detail.size());
   assert(topictitle.size()  == topics.size());
@@ -1122,7 +1122,9 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
      result += U(", ") + to_string(sum / cnt);
      result += U(", ") + to_string(scores[scores.size() - 1].first);
      result += U(")<br/><span class=\"small\">\n");;
-     for(int j = 0; j < depth; j ++) {
+     for(int j = 0; j < scores.size(); j ++) {
+        if(- scores[j].first < thresh)
+          break;
         const auto& work(cstat[scores[j].second.second] + tstat[scores[j].second.first]);
         result += to_string(scores[j].first) + U(" : ");
         result += work.serialize() + U("<br/>\n");
@@ -1169,10 +1171,14 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
   for(int ii = 0; ii < cstat.size() && work.size() < cstat.size() / depth; ii ++) {
     vector<pair<T, int> > cidxs;
     for(int i = 0; i < cstatsw.rows(); i ++)
-      if(!binary_search(phrases.begin(), phrases.end(), i))
-        cidxs.push_back(make_pair(cstatsw.row(i).dot(cstatsw.row(i)), i));
+      if(!binary_search(phrases.begin(), phrases.end(), i)) {
+        T lscore(0);
+        for(int j = 0; j < cstatsw.rows(); j ++)
+          lscore += cstatsw(j, i);
+        cidxs.push_back(make_pair(lscore, i));
+      }
     sort(cidxs.begin(), cidxs.end());
-    const int i(cidxs[0].second);
+    const int& i(cidxs[0].second);
     phrases.push_back(i);
     sort(phrases.begin(), phrases.end());
     

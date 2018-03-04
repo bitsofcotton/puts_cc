@@ -173,7 +173,7 @@ int main(int argc, const char* argv[]) {
       }
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
-      std::cout << preparedTOC<double, std::string>(input, words0, detailwords, details, tocwords, tocs, delimiter, szwindow, 8, .125) << std::endl;
+      std::cout << preparedTOC<double, std::string>(input, words0, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.25), .125) << std::endl;
       std::cout << std::string("</body></html>");
     }
     break;
