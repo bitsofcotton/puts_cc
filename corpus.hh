@@ -1181,6 +1181,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
         cidxs.push_back(make_pair(lscore, i));
       }
     sort(cidxs.begin(), cidxs.end());
+    if(!cidxs.size()) break;
     const int& i(cidxs[0].second);
     phrases.push_back(i);
     sort(phrases.begin(), phrases.end());
