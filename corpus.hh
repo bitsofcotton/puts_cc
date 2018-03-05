@@ -603,7 +603,7 @@ template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T,
   //            also important.
   const auto n2this(cdot(*this));
   if(n2this == T(0))
-    return - T(4);
+    return T(0);
   const auto n2p(prejs.cdot(prejs));
   if(n2p == T(0))
     return T(0);
@@ -1136,7 +1136,8 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
   return result;
 }
 
-template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>& words, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const int& szwindow, const int& depth, const int& Mgather = 8, const T& redig = T(1)) {
+template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>& words, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const int& szwindow, const int& depth, const T& redig = T(1)) {
+  const int& Mgather(depth);
   // prepare dictionaries:
   cerr << "optimizeToc: parsing input" << endl;
   vector<corpus<T, U> >   cstat0;
@@ -1209,6 +1210,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
     const int&         j(work[jj].second);
     const vector<int>& idt(idxs[jj]);
     for(int k = 0; k < idt.size() / Mgather + 1; k ++) {
+      if(idt.size() <= k * Mgather) continue;
       corpushl<T, U> cs(cstat[j]);
       for(int l = k * Mgather; l < min((k + 1) * Mgather, int(idt.size())); l ++)
         cs += cstat[idt[l]];

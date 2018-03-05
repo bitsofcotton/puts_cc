@@ -250,10 +250,9 @@ int main(int argc, const char* argv[]) {
         rdetails.push_back(work.second);
         rdetailwords.push_back(work.first);
       }
-      const int tot_cont(max(min(12, int(input.size()) / szwindow), 1));
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
-      std::cout << optimizeTOC<double, std::string>(input, words0, rdetails, rdetailwords, delimiter, szwindow, tot_cont, 8, 1.) << std::endl;
+      std::cout << optimizeTOC<double, std::string>(input, words0, rdetails, rdetailwords, delimiter, szwindow, 8, 1.) << std::endl;
       std::cout << std::string("</body></html>");
     }
     break;
