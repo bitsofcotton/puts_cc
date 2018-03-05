@@ -1169,7 +1169,9 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
   vector<pair<T, int> > work;
   vector<vector<int> >  idxs;
   auto                  cstatsw(cstats);
-  for(int ii = 0; ii < cstat.size() && work.size() < cstat.size() / depth; ii ++) {
+  for(int i = 0; i < cstat.size(); i ++)
+    idxs.push_back(vector<int>());
+  for(int ii = 0; ii <= cstat.size() / depth; ii ++) {
     vector<pair<T, int> > cidxs;
     for(int i = 0; i < cstatsw.rows(); i ++)
       if(!binary_search(phrases.begin(), phrases.end(), i)) {
@@ -1183,15 +1185,15 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
     phrases.push_back(i);
     sort(phrases.begin(), phrases.end());
     
-    idxs.push_back(vector<int>());
     vector<pair<T, int> > scores;
     for(int j = 0; j < cstat.size(); j ++)
       if(!binary_search(phrases.begin(), phrases.end(), j))
         scores.push_back(make_pair(cstatsw(i, j), j));
     sort(scores.begin(), scores.end());
+    
     T score(0);
     for(int j = 0; j < min(depth, int(scores.size())); j ++) {
-      idxs[ii].push_back(scores[j].second);
+      idxs[i].push_back(scores[j].second);
       phrases.push_back(scores[j].second);
       score += scores[j].first;
       for(int k = 0; k < cstatsw.rows(); k ++)
@@ -1208,7 +1210,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
   U result;
   for(int jj = 0; jj < work.size(); jj ++) {
     const int&         j(work[jj].second);
-    const vector<int>& idt(idxs[jj]);
+    const vector<int>& idt(idxs[j]);
     for(int k = 0; k < idt.size() / Mgather + 1; k ++) {
       if(idt.size() <= k * Mgather) continue;
       corpushl<T, U> cs(cstat[j]);
