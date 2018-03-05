@@ -610,7 +610,7 @@ template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T,
   const auto ex0(*this - match2relPseudo(prejs));
   const auto n2e0(ex0.cdot(ex0));
   if(n2e0 == T(0))
-    return   T(4);
+    return - T(4);
   const auto ex1(prejs - prejs.match2relPseudo(*this));
   const auto n2e1(ex1.cdot(ex1));
   if(n2e1 == T(0))
