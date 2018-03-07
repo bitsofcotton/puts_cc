@@ -1168,7 +1168,8 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
       cstats(i, j) = cstats(j, i);
     cstats(i, i) = T(0);
     for(int j = i + 1; j < cstat.size(); j ++)
-      cstats(i, j) = - cstat[i].prej(cstat[j]);
+      if(! (cstat[j].cdot(cstat[j]) <= T(0)))
+        cstats(i, j) = - cstat[i].prej(cstat[j]);
   }
   
   cerr << "OK, sorting phrases." << flush;
