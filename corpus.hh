@@ -1050,7 +1050,7 @@ template <typename T, typename U> void getAbbreved(vector<corpushl<T, U> >& csta
   return;
 }
 
-template <typename T, typename U> void getDetailed(vector<corpus<T, U> >& cstat0, vector<corpushl<T, U> >& cstat, const U& input, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow) {
+template <typename T, typename U> void getDetailed(vector<corpus<T, U> >& cstat0, vector<corpushl<T, U> >& cstat, U& tagged, const U& input, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow) {
   assert(detailtitle.size() == detail.size());
   cerr << "getDetailed : preparing datas";
   vector<vector<corpushl<T, U> > > details;
@@ -1072,6 +1072,9 @@ template <typename T, typename U> void getDetailed(vector<corpus<T, U> >& cstat0
     lstat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
     cstat0.push_back(lstat);
     cstat.push_back(corpushl<T, U>(lstat));
+    tagged += U("<span id=\"") + to_string(i) + U("\">");
+    tagged += cstat[i].reverseLink(cstat0[i]);
+    tagged += U("</span><br/>");
   }
 
   cerr << " getting details";
@@ -1092,7 +1095,8 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
   
   vector<corpus<T, U> >   cstat0;
   vector<corpushl<T, U> > cstat;
-  getDetailed<T, U>(cstat0, cstat, input, words, detailtitle, detail, delimiter, szwindow);
+  U tagged;
+  getDetailed<T, U>(cstat0, cstat, tagged, input, words, detailtitle, detail, delimiter, szwindow);
   for(int i = 0; i < cstat0.size(); i ++)
     cstat[i].reDig(redig);
   
@@ -1102,7 +1106,8 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
      cerr << "." << flush;
      vector<corpus<T, U> >   tstat0;
      vector<corpushl<T, U> > tstat;
-     getDetailed<T, U>(tstat0, tstat, topics[i], words, detailtitle, detail, delimiter, szwindow);
+     U sute;
+     getDetailed<T, U>(tstat0, tstat, sute, topics[i], words, detailtitle, detail, delimiter, szwindow);
      vector<pair<T, pair<int, int> > > scores;
      for(int j = 0; j < tstat.size(); j ++)
        for(int k = 0; k < cstat.size(); k ++) {
@@ -1127,12 +1132,14 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
           break;
         const auto& work(cstat[scores[j].second.second] + tstat[scores[j].second.first]);
         result += to_string(scores[j].first) + U(" : ");
-        result += work.serialize() + U("<br/>\n");
+        result += U("<a href=\"#") + to_string(scores[j].second.second) + U("\">");
+        result += work.serialize() + U("</a><br/>\n");
         result += work.reverseLink(cstat0[scores[j].second.second]) + U("<br/>\n");
         result += work.reverseLink(tstat0[scores[j].second.first])  + U("<br/><br/>\n");
      }
      result += U("</span><br/>\n");
   }
+  result += U("<br/><br/>Original:<br/>") + tagged + U("<br/><br/>");
   return result;
 }
 
@@ -1142,7 +1149,8 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
   cerr << "optimizeToc: parsing input" << endl;
   vector<corpus<T, U> >   cstat0;
   vector<corpushl<T, U> > cstat;
-  getDetailed<T, U>(cstat0, cstat, input, words, detailtitle, detail, delimiter, szwindow);
+  U tagged;
+  getDetailed<T, U>(cstat0, cstat, tagged, input, words, detailtitle, detail, delimiter, szwindow);
   
   for(int i = 0; i < cstat0.size(); i ++)
     cstat[i].reDig(redig);
@@ -1221,11 +1229,13 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
       result += to_string(work[jj].first) + U("<br/>");
       result += cs.serialize();
       result += U("</span><br/><span class=\"small\">");
-      result += U("base : ") + to_string(j) + U(" - ");
+      result += U("base : <a href=\"#") + to_string(j) + U("\">");
+      result += to_string(j) + U("</a> - ");
       result += cs.reverseLink(cstat0[j]);
       result += U("<br/>");
       for(int l = k * Mgather; l < min((k + 1) * Mgather, int(idt.size())); l ++) {
-        result += to_string(idt[l]) + U(" : ");
+        result += U("<a href=\"#") + to_string(idt[l]) + U("\">");
+        result += to_string(idt[l]) + U("</a> : ");
         result += to_string(cstats(j, idt[l])) + U(" - ");
         result += cs.reverseLink(cstat0[idt[l]]);
         result += U("<br/>");
@@ -1233,6 +1243,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
       result += U("</span></div><br/>");
     }
   }
+  result += U("<br/><br/>Original:<br/>") + tagged + U("<br/>");
   return result;
 }
 
@@ -1242,8 +1253,9 @@ template <typename T, typename U> U diff(const U& input, const vector<U>& words,
   vector<corpus<T, U> >   dstat0;
   vector<corpushl<T, U> > cstat;
   vector<corpushl<T, U> > dstat;
-  getDetailed<T, U>(cstat0, cstat, input, words, detailtitle0, detail0, delimiter, szwindow);
-  getDetailed<T, U>(dstat0, dstat, input, words, detailtitle1, detail1, delimiter, szwindow);
+  U sute;
+  getDetailed<T, U>(cstat0, cstat, sute, input, words, detailtitle0, detail0, delimiter, szwindow);
+  getDetailed<T, U>(dstat0, dstat, sute, input, words, detailtitle1, detail1, delimiter, szwindow);
   
   cerr << " making diffs" << endl;
   vector<corpushl<T, U> > diffs;
