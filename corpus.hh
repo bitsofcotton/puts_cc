@@ -1110,12 +1110,9 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
      getDetailed<T, U>(tstat0, tstat, sute, topics[i], words, detailtitle, detail, delimiter, szwindow);
      vector<pair<T, pair<int, int> > > scores;
      for(int j = 0; j < tstat.size(); j ++)
-       for(int k = 0; k < cstat.size(); k ++) {
-         const auto score(- cstat[k].prej(tstat[j]));
-         // XXX: quick and dirty.
-         if(abs(score) < T(4))
-           scores.push_back(make_pair(score, make_pair(j, k)));
-       }
+       for(int k = 0; k < cstat.size(); k ++)
+         if(! (cstat[k].cdot(cstat[k]) <= T(0)))
+           scores.push_back(make_pair(- cstat[k].prej(tstat[j]), make_pair(j, k)));
      sort(scores.begin(), scores.end());
      result += topictitle[i] + U(" : (") + to_string(scores[0].first);
      T   sum(0);
@@ -1124,6 +1121,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
        sum += scores[j].first;
        cnt ++;
      }
+     if(!cnt) continue;
      result += U(", ") + to_string(sum / cnt);
      result += U(", ") + to_string(scores[scores.size() - 1].first);
      result += U(")<br/><span class=\"small\">\n");;
@@ -1159,17 +1157,18 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
   Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> cstats(cstat.size(), cstat.size());
   for(int i = 0; i < cstat0.size(); i ++) {
     cerr << "." << flush;
+    if(cstat[i].cdot(cstat[i]) <= T(0)) {
+      for(int j = 0; j < cstat0.size(); j ++) {
+        cstats(i, j) = T(8);
+        cstats(j, i) = T(8);
+      }
+      continue;
+    }
     for(int j = 0; j < i; j ++)
       cstats(i, j) = cstats(j, i);
     cstats(i, i) = T(0);
-    for(int j = i + 1; j < cstat.size(); j ++) {
-      const auto score(- cstat[i].prej(cstat[j]));
-      // XXX: quick and dirty.
-      if(abs(score) < T(4))
-        cstats(i, j) = score;
-      else
-        cstats(i, j) = T(8);
-    }
+    for(int j = i + 1; j < cstat.size(); j ++)
+      cstats(i, j) = - cstat[i].prej(cstat[j]);
   }
   
   cerr << "OK, sorting phrases." << flush;
