@@ -35,9 +35,9 @@ foreach(new DirectoryIterator($bpath) as $fileInfo) {
       fclose($file);
       
       doexecp($pathb2 . "lword.txt", $pathb2 . "lword-error.txt",
-              "/bin/puts lword words.txt", $text, $cwd, $env);
+              "../../puts lword words.txt", $text, $cwd, $env);
       doexecp($pathb2 . "lbalance.txt", $pathb2 . "lbalance-error.txt",
-              "/bin/puts lbalance words.txt", $text, $cwd, $env);
+              "../../puts lbalance words.txt", $text, $cwd, $env);
       
       $buf = "";
       foreach (new DirectoryIterator($pathb . '../dicts') as $fileInfo) {
@@ -52,7 +52,7 @@ foreach(new DirectoryIterator($bpath) as $fileInfo) {
         $buf .= "\"topics/" . $name . "\" ";
       }
       doexecp($pathb2 . "detail.html", $pathb2 . "detail-error.txt",
-              "/bin/puts toc words.txt " . $buf, $text, $cwd, $env);
+              "../../puts toc words.txt " . $buf, $text, $cwd, $env);
 
       $buf = "";
       foreach (new DirectoryIterator($pathb . '../dicts') as $fileInfo) {
@@ -61,7 +61,7 @@ foreach(new DirectoryIterator($bpath) as $fileInfo) {
         $buf .= "\"dicts/" . $name . "\" ";
       }
       doexecp($pathb2 . "stat.html", $pathb2 . "stat-error.txt",
-              "/bin/puts stat words.txt " . $buf, $text, $cwd, $env);
+              "../../puts stat words.txt " . $buf, $text, $cwd, $env);
       
       $differs = "";
       $file = fopen($pathb . "../sentry.txt", "r");
@@ -87,7 +87,7 @@ foreach(new DirectoryIterator($bpath) as $fileInfo) {
             $buf .= "\"" . $pathc . "/dicts/" . $name . "\" ";
           }
           doexecp($pathb2 . $df . "diff.html", $pathb2 . $df . "diff-error.txt",
-              "/bin/puts diff words.txt " . $buf, $text, $pathb . "../", $env);
+              "../../puts diff words.txt " . $buf, $text, $pathb . "../", $env);
         }
       }
     }
