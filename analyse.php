@@ -68,7 +68,7 @@ foreach(new DirectoryIterator($bpath) as $fileInfo) {
       while(($buf = fgets($file)) !== false)
         $differs .= $buf;
       fclose($file);
-      if(!preg_match_all("/([0-9a-f]{64,64})m/", $differs, $match)) {
+      if(!preg_match_all("/([0-9a-f]{64,64})/m", $differs, $match)) {
         continue;
       }
       foreach($match[0] as $df) {
@@ -87,7 +87,7 @@ foreach(new DirectoryIterator($bpath) as $fileInfo) {
             $buf .= "\"" . $pathc . "/dicts/" . $name . "\" ";
           }
           doexecp($pathb2 . $df . "diff.html", $pathb2 . $df . "diff-error.txt",
-              "../../puts diff words.txt " . $buf, $text, $pathb . "../", $env);
+              "../../puts diff words.txt " . $buf, $text, $cwd, $env);
         }
       }
     }
