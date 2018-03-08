@@ -26,7 +26,7 @@ case "aa":
     file_put_contents($pathb . $pathb2 . "/orig.txt", $containt);
     exec("rm -f " . $pathb . $pathb2 . "/.lock");
     echo "Your path is <a href=\"" . $pathb . $pathb2 . "\">Here</a>";
-    exec("php ./analyse.sh");
+    exec("php ./analyse.php");
   }
   break;
 case "aw":

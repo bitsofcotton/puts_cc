@@ -13,7 +13,7 @@ function doexecp($so, $se, $cmd, $text, $cwd, $env) {
   return;
 }
 
-$bpath = "./";
+$bpath = "./datas/";
 foreach(new DirectoryIterator($bpath) as $fileInfo) {
   if(!is_dir($bpath . $fileInfo->getFilename()))
     continue;
