@@ -16,10 +16,14 @@
     exec("mkdir " . $pathb . "dicts");
     exec("mkdir " . $pathb . "output");
     exec("mkdir " . $pathb . "web");
+    exec("mkdir " . $pathb . "crawl");
+    exec("rm -f " . $pathb . "puts.core");
     if(!file_exists($pathb . "words.txt"))
       exec("cp ./words.txt " . $pathb);
     if(!file_exists($pathb . "style.css"))
       exec("cp ./style.css " . $pathb);
+    if(!file_exists($pathb . "sentry.txt"))
+      exec("touch " . $pathb . "sentry.txt");
     exec("touch " . $pathb . "urls.txt");
     file_put_contents($pathb . "email.txt", $_REQUEST["email"]);
   } else
@@ -57,19 +61,18 @@ function uploadAnalyse() {
   return;
 }
 
-function relationDict() {
+function updateWords() {
   fd = new FormData();
-  fd.append("cmd", "ar");
-  fd.append("containt", document.getElementById("object").value);
-  fd.append("reldir",   document.getElementById("reldir").value);
+  fd.append("cmd", "aw");
+  fd.append("containt", document.getElementById("words").value);
   asyncPost("./apply.php", fd);
   return;
 }
 
-function updateWords() {
+function updateSentryList() {
   fd = new FormData();
-  fd.append("cmd", "aw");
-  fd.append("containt", document.getElementById("words").value);1
+  fd.append("cmd", "st");
+  fd.append("containt", document.getElementById("sentry_list").value);
   asyncPost("./apply.php", fd);
   return;
 }
@@ -168,6 +171,13 @@ function deleteCache() {
   asyncPost("./apply.php", fd);
   return;
 }
+
+function archive() {
+  fd = new FormData();
+  fd.append("cmd", "ta");
+  asyncPost("./apply.php", fd);
+  return;
+}
 </script>
 </head>
 <body>
@@ -187,16 +197,17 @@ function deleteCache() {
 <?php
   } else {
 ?>
-<p><form action="./puts.php" method="GET"><input type="submit" value="logout" /><input type="hidden" name="logout" /></form>
-<a href="javascript:;" onClick="deleteCache();">Delete cache</a>
-Your root path: <a href="<?php echo $pathb; ?>">here</a></p>
+<p>
+<form action="./puts.php" method="GET"><input type="submit" value="logout" /><input type="hidden" name="logout" /></form>
+<a href="javascript:;" onClick="deleteCache();">Delete cache</a> |
+<a href="<?php echo $pathb; ?>">Your root path</a> |
+<a href="<?php echo $pathb; ?>/web">Per 6 hours news</a> |
+<a href="javascript:;" onClick="archive();">Archive all</a></p>
 </p>
 <p>
 Analyse text:<br/>
 <textarea maxlength="80000" rows="12" cols="80" name="object" id="object"></textarea><br/>
-<a href="javascript:;" onClick="uploadAnalyse();">upload analyse base.</a><br/>
-Differ: dirname(only hash): <input type="text" id="reldir" name="reldir" />
-<a href="javascript:;" onClick="relationDict();">Relative dicts</a>
+<a href="javascript:;" onClick="uploadAnalyse();">upload analyse base.</a>
 </p>
 <p>
 Word list:<br/>
@@ -208,7 +219,9 @@ Word list:<br/>
   }
   fclose($file);
 ?></textarea><br/>
-<a href="javascript: ;" onClick="updateWords();">update</a> <br/>
+<a href="javascript: ;" onClick="updateWords();">update</a>
+</p>
+<p>
 Scrap URL list:<br/>
 <textarea rows="12" cols="80" name="urls" id="urls">
 <?php
@@ -218,8 +231,19 @@ Scrap URL list:<br/>
   }
   fclose($file);
 ?></textarea><br/>
-<a href="javascript: ;" onClick="updateURLs();">update</a> | 
-<a href="<?php echo $pathb; ?>/web">Per 6 hours</a><br/>
+<a href="javascript: ;" onClick="updateURLs();">update</a>
+</p>
+<p>
+Sentry Dictionary Directory List (Hash only):<br/>
+<textarea rows="8" cols="80" name="sentry_list" id="sentry_list">
+<?php
+  $file = fopen($pathb . "sentry.txt", "r");
+  while(($buf = fgets($file)) !== false) {
+    echo $buf;
+  }
+  fclose($file);
+?></textarea><br/>
+<a href="javascript: ;" onClick="updateSentryList();">update</a>
 </p>
 <div style="display:inline-block;vertical-align:top;">
 Topics:<br/>

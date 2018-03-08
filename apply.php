@@ -19,30 +19,6 @@ if(!isset($_REQUEST["cmd"])) {
 }
 $cmd = $_REQUEST["cmd"];
 switch($cmd) {
-case "ar":
-  if(!isset($_REQUEST["reldir"])) {
-    echo "Invalid relation dictionary";
-    return;
-  }
-  preg_match('/[0-9a-z]+/', $_REQUEST["reldir"], $match);
-  if(0 < count($match) && strlen($match[0]) <= 512) {
-    $pathc = "./datas/" . $match[0] . "/";
-  } else {
-    echo "Invalid relation dictionary";
-    return;
-  }
-  if(mb_strlen($containt) < $M_STR) {
-    $pathb2 = '/output/' . hash("sha256", $containt) . "/";
-    exec("mkdir -p " . $pathb . $pathb2);
-    file_put_contents($pathb . $pathb2 . "/orig-ref.txt", $containt);
-    $f = fopen($pathb . $pathb2 . "/orig-ref-dicts.txt", "w");
-    fputs($f, $pathc);
-    fclose($f);
-    exec("rm -f " . $pathb . $pathb2 . "/.lock");
-    echo "Your path is <a href=\"" . $pathb . $pathb2 . "\">Here</a>";
-    exec("php ./analyse.php");
-  }
-  break;
 case "aa":
   if(mb_strlen($containt) < $M_STR) {
     $pathb2 = '/output/' . hash("sha256", $containt) . "/";
@@ -50,7 +26,7 @@ case "aa":
     file_put_contents($pathb . $pathb2 . "/orig.txt", $containt);
     exec("rm -f " . $pathb . $pathb2 . "/.lock");
     echo "Your path is <a href=\"" . $pathb . $pathb2 . "\">Here</a>";
-    exec("php ./analyse.php");
+    exec("php ./analyse.sh");
   }
   break;
 case "aw":
@@ -62,6 +38,22 @@ case "aw":
   break;
 case "url":
   file_put_contents($pathb . "urls.txt", $containt);
+  break;
+case "st":
+  $pathc = "";
+  $ctr   = 0;
+  if(preg_match_all("/([0-9a-f]{64,64})/m", $containt, $match)) {
+    foreach($match[0] as $m) {
+      if(file_exists($pathb . "../" . $m)) {
+        $pathc .= $m . "\n";
+        $ctr   += 1;
+        if($ctr >= 8) {
+           break;
+        }
+      }
+    }
+  }
+  file_put_contents($pathb . "sentry.txt", $pathc);
   break;
 case "at":
   $fi = new FilesystemIterator($pathb . "topics/", FilesystemIterator::SKIP_DOTS);
@@ -81,6 +73,9 @@ case "dd":
   break;
 case "da":
   exec("rm -fr " . $pathb . "/output && mkdir -p " . $pathb . "/output");
+  break;
+case "ta":
+  exec("cd " . $pathb . " && rm -f archive.tar.gz && tar cfz archive.tar.gz .");
   break;
 default:
   echo "invalid cmd.";

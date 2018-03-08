@@ -607,16 +607,16 @@ template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T,
   const auto n2p(prejs.cdot(prejs));
   if(n2p == T(0))
     return T(0);
-  const auto ex0(*this - match2relPseudo(prejs));
+  const auto ex0(*this - match2relPseudo(prejs) + *this - prejs);
   const auto n2e0(ex0.cdot(ex0));
   if(n2e0 == T(0))
     return T(4);
-  const auto ex1(prejs - prejs.match2relPseudo(*this));
+  const auto ex1(prejs - prejs.match2relPseudo(*this) + prejs - *this);
   const auto n2e1(ex1.cdot(ex1));
   if(n2e1 == T(0))
     return T(4);
   // XXX is sign correct?
-  return cdot(prejs) / sqrt(n2this * n2p) + ex0.cdot(ex1) / sqrt(n2e0 * n2e1);
+  return cdot(prejs) / sqrt(n2this * n2p) - ex0.cdot(ex1) / sqrt(n2e0 * n2e1) - T(1);
 }
 
 template <typename T, typename U> const T corpushl<T, U>::prej2(const vector<corpushl<T, U> >& prej0, const vector<corpushl<T, U> >& prej1, const T& thresh) const {
