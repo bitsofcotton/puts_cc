@@ -177,7 +177,7 @@ int main(int argc, const char* argv[]) {
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
       for(int i = 0; i <= input.size() / szblock; i ++)
-        std::cout << preparedTOC<double, std::string>(input.substr(i * szblock, szblock), words0, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.25), .125) << std::string("<hr/>") << std::endl;
+        std::cout << preparedTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.25), .125) << std::string("<hr/>") << std::endl;
       std::cout << std::string("</body></html>");
     }
     break;
@@ -240,7 +240,7 @@ int main(int argc, const char* argv[]) {
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
       for(int i = 0; i <= input.size() / szblock; i ++)
-        std::cout << diff<double, std::string>(input.substr(i * szblock, szblock), words0, details, detailwords, details2, detailwords2, delimiter, szwindow) << std::string("<hr/>") << std::endl;
+        std::cout << diff<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, details, detailwords, details2, detailwords2, delimiter, szwindow) << std::string("<hr/>") << std::endl;
       std::cout << "</body></html>" << std::endl;
     }
     break;
@@ -258,7 +258,7 @@ int main(int argc, const char* argv[]) {
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
       for(int i = 0; i <= input.size() / szblock; i ++)
-        std::cout << optimizeTOC<double, std::string>(input.substr(i * szblock, szblock), words0, rdetails, rdetailwords, delimiter, szwindow, 8, 1.) << std::string("<hr/>") << std::endl;
+        std::cout << optimizeTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, rdetails, rdetailwords, delimiter, szwindow, 8, 1.) << std::string("<hr/>") << std::endl;
       std::cout << std::string("</body></html>");
     }
     break;
