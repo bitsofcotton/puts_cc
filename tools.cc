@@ -13,6 +13,8 @@ void usage() {
 }
 
 const int szwindow(200);
+const int szblock(200 * 200);
+const int Mbalance(40);
 std::vector<std::string> delimiter;
 std::vector<std::string> csvelim;
 std::vector<std::string> csvdelim;
@@ -107,15 +109,16 @@ int main(int argc, const char* argv[]) {
       lword<char32_t, std::u32string> stat;
       std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
       std::u32string itrans(converter.from_bytes(input));
-      for(int i = 2; i < 20; i ++) {
-        stat.init(60, i, i);
-        auto words(stat.compute(itrans));
-        for(auto itr = words.begin(); itr != words.end(); ++ itr)
-          if(itr->str.size() > 2 && itr->count >= i) {
-            std::cout << converter.to_bytes(itr->str) << ", ";
-            std::cout << itr->count << std::endl;
-          }
-      }
+      for(int i0 = 0; i0 <= input.size() / szblock; i0 ++)
+        for(int i = 2; i < 20; i ++) {
+          stat.init(60, i, i);
+          auto words(stat.compute(itrans.substr(i0 * szblock, szblock)));
+          for(auto itr = words.begin(); itr != words.end(); ++ itr)
+            if(itr->str.size() > 2 && itr->count >= i) {
+              std::cout << converter.to_bytes(itr->str) << ", ";
+              std::cout << itr->count << std::endl;
+            }
+        }
       break;
     }
   case 8:
@@ -127,7 +130,7 @@ int main(int argc, const char* argv[]) {
       auto elims(csvelim);
       elims.insert(elims.end(), csvdelim.begin(), csvdelim.end());
       auto inputs(cutText(input, elims, delimiter));
-      auto idxs(pseudoWordsBalance<double, std::string>(inputs, cutText(workbuf, csvelim, csvdelim), 20));
+      auto idxs(pseudoWordsBalance<double, std::string>(inputs, cutText(workbuf, csvelim, csvdelim), Mbalance));
       std::cout << idxs.size() << "sets." << std::endl;
       for(int i = 0; i < idxs.size(); i ++)
         std::cout << inputs[idxs[i]] << std::endl;
@@ -173,7 +176,8 @@ int main(int argc, const char* argv[]) {
       }
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
-      std::cout << preparedTOC<double, std::string>(input, words0, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.25), .125) << std::endl;
+      for(int i = 0; i <= input.size() / szblock; i ++)
+        std::cout << preparedTOC<double, std::string>(input.substr(i * szblock, szblock), words0, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.25), .125) << std::string("<hr/>") << std::endl;
       std::cout << std::string("</body></html>");
     }
     break;
@@ -235,7 +239,8 @@ int main(int argc, const char* argv[]) {
       }
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
-      std::cout << diff<double, std::string>(input, words0, details, detailwords, details2, detailwords2, delimiter, szwindow) << std::endl;
+      for(int i = 0; i <= input.size() / szblock; i ++)
+        std::cout << diff<double, std::string>(input.substr(i * szblock, szblock), words0, details, detailwords, details2, detailwords2, delimiter, szwindow) << std::string("<hr/>") << std::endl;
       std::cout << "</body></html>" << std::endl;
     }
     break;
@@ -252,7 +257,8 @@ int main(int argc, const char* argv[]) {
       }
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
-      std::cout << optimizeTOC<double, std::string>(input, words0, rdetails, rdetailwords, delimiter, szwindow, 8, 1.) << std::endl;
+      for(int i = 0; i <= input.size() / szblock; i ++)
+        std::cout << optimizeTOC<double, std::string>(input.substr(i * szblock, szblock), words0, rdetails, rdetailwords, delimiter, szwindow, 8, 1.) << std::string("<hr/>") << std::endl;
       std::cout << std::string("</body></html>");
     }
     break;
