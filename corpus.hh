@@ -1142,14 +1142,12 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
 }
 
 template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>& words, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const int& szwindow, const int& depth, const T& redig = T(1)) {
-  const int& Mgather(depth);
   // prepare dictionaries:
   cerr << "optimizeToc: parsing input" << endl;
   vector<corpus<T, U> >   cstat0;
   vector<corpushl<T, U> > cstat;
   U tagged;
   getDetailed<T, U>(cstat0, cstat, tagged, input, words, detailtitle, detail, delimiter, szwindow);
-  
   for(int i = 0; i < cstat0.size(); i ++)
     cstat[i].reDig(redig);
 
@@ -1186,34 +1184,31 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
       if(!binary_search(phrases.begin(), phrases.end(), i)) {
         vector<pair<T, int> > lscores;
         for(int j = 0; j < cstatsw.rows(); j ++)
-          lscores.push_back(make_pair(cstatsw(j, i), j));
+          if(i != j && !binary_search(phrases.begin(), phrases.end(), j))
+            lscores.push_back(make_pair(cstatsw(j, i), j));
         sort(lscores.begin(), lscores.end());
         T lscore(0);
         for(int j = 0; j < min(depth, int(lscores.size())); j ++)
           lscore += lscores[j].first;
         cidxs.push_back(make_pair(lscore, i));
         scores0.push_back(lscores);
-      }
+      } else
+        scores0.push_back(vector<pair<T, int> >());
     sort(cidxs.begin(), cidxs.end());
     if(!cidxs.size()) break;
     const int& i(cidxs[0].second);
-    phrases.push_back(i);
-    sort(phrases.begin(), phrases.end());
-    
     const vector<pair<T, int> >& scores(scores0[i]);
-    
-    T score(0);
-    for(int j = 0; j < scores.size(); j ++) {
+    for(int j = 0; j < min(depth, int(scores.size())); j ++) {
       idxs[i].push_back(scores[j].second);
       phrases.push_back(scores[j].second);
-      score += scores[j].first;
       for(int k = 0; k < cstatsw.rows(); k ++)
         cstatsw(k, scores[j].second) = cstatsw(scores[j].second, k) = T(0);
     }
-    sort(phrases.begin(), phrases.end());
-    work.push_back(make_pair(score, i));
     for(int k = 0; k < cstatsw.rows(); k ++)
       cstatsw(k, i) = cstatsw(i, k) = T(0);
+    phrases.push_back(i);
+    sort(phrases.begin(), phrases.end());
+    work.push_back(make_pair(cidxs[0].first, i));
   }
   sort(work.begin(), work.end());
   
@@ -1222,28 +1217,26 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
   for(int jj = 0; jj < work.size(); jj ++) {
     const int&         j(work[jj].second);
     const vector<int>& idt(idxs[j]);
-    for(int k = 0; k < idt.size() / Mgather + 1; k ++) {
-      if(idt.size() <= k * Mgather) continue;
-      corpushl<T, U> cs(cstat[j]);
-      for(int l = k * Mgather; l < min((k + 1) * Mgather, int(idt.size())); l ++)
-        cs += cstat[idt[l]];
-      result += U("<div href=\"#\"><span class=\"small\">");
-      result += to_string(work[jj].first) + U("<br/>");
-      result += cs.serialize();
-      result += U("</span><br/><span class=\"small\">");
-      result += U("base : <a href=\"#") + to_string(j) + U("\">");
-      result += to_string(j) + U("</a> - ");
-      result += cs.reverseLink(cstat0[j]);
+    if(idt.size() <= 0) continue;
+    corpushl<T, U> cs(cstat[j]);
+    for(int l = 0; l < idt.size(); l ++)
+      cs += cstat[idt[l]];
+    result += U("<div href=\"#\"><span class=\"small\">");
+    result += to_string(work[jj].first) + U("<br/>");
+    result += cs.serialize();
+    result += U("</span><br/><span class=\"small\">");
+    result += U("base : <a href=\"#") + to_string(j) + U("\">");
+    result += to_string(j) + U("</a> - ");
+    result += cs.reverseLink(cstat0[j]);
+    result += U("<br/>");
+    for(int l = 0; l < idt.size(); l ++) {
+      result += U("<a href=\"#") + to_string(idt[l]) + U("\">");
+      result += to_string(idt[l]) + U("</a> : ");
+      result += to_string(cstats(j, idt[l])) + U(" - ");
+      result += cs.reverseLink(cstat0[idt[l]]);
       result += U("<br/>");
-      for(int l = k * Mgather; l < min((k + 1) * Mgather, int(idt.size())); l ++) {
-        result += U("<a href=\"#") + to_string(idt[l]) + U("\">");
-        result += to_string(idt[l]) + U("</a> : ");
-        result += to_string(cstats(j, idt[l])) + U(" - ");
-        result += cs.reverseLink(cstat0[idt[l]]);
-        result += U("<br/>");
-      }
-      result += U("</span></div><br/>");
     }
+    result += U("</span></div><br/>");
   }
   result += U("<br/><br/>Original:<br/>") + tagged + U("<br/>");
   return result;
