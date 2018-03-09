@@ -1180,13 +1180,19 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
   for(int i = 0; i < cstat.size(); i ++)
     idxs.push_back(vector<int>());
   for(int ii = 0; ii <= cstat.size() / depth; ii ++) {
+    vector<vector<pair<T, int> > > scores0;
     vector<pair<T, int> > cidxs;
     for(int i = 0; i < cstatsw.rows(); i ++)
       if(!binary_search(phrases.begin(), phrases.end(), i)) {
-        T lscore(0);
+        vector<pair<T, int> > lscores;
         for(int j = 0; j < cstatsw.rows(); j ++)
-          lscore += cstatsw(j, i);
+          lscores.push_back(make_pair(cstatsw(j, i), j));
+        sort(lscores.begin(), lscores.end());
+        T lscore(0);
+        for(int j = 0; j < min(depth, int(lscores.size())); j ++)
+          lscore += lscores[j].first;
         cidxs.push_back(make_pair(lscore, i));
+        scores0.push_back(lscores);
       }
     sort(cidxs.begin(), cidxs.end());
     if(!cidxs.size()) break;
@@ -1194,14 +1200,10 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
     phrases.push_back(i);
     sort(phrases.begin(), phrases.end());
     
-    vector<pair<T, int> > scores;
-    for(int j = 0; j < cstat.size(); j ++)
-      if(!binary_search(phrases.begin(), phrases.end(), j))
-        scores.push_back(make_pair(cstatsw(i, j), j));
-    sort(scores.begin(), scores.end());
+    const vector<pair<T, int> >& scores(scores0[i]);
     
     T score(0);
-    for(int j = 0; j < min(depth, int(scores.size())); j ++) {
+    for(int j = 0; j < scores.size(); j ++) {
       idxs[i].push_back(scores[j].second);
       phrases.push_back(scores[j].second);
       score += scores[j].first;
