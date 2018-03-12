@@ -1230,7 +1230,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     result += cs.reverseLink(cstat0[j]);
     result += U("<br/>");
     for(int l = 0; l < idt.size(); l ++) {
-      result += U("<a href=\"#") + to_string(idt[l]) + U("\">");
+      result += U("<a href=\"#") + name + to_string(idt[l]) + U("\">");
       result += to_string(idt[l]) + U("</a> : ");
       result += to_string(cstats(j, idt[l])) + U(" - ");
       result += cs.reverseLink(cstat0[idt[l]]);

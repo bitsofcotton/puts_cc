@@ -83,6 +83,18 @@ int main(int argc, const char* argv[]) {
     mode = 5;
   else if(std::strcmp(argv[1], "getdict") == 0 && argc > 2)
     mode = 7;
+  else if(std::strcmp(argv[1], "optdict") == 0 && argc > 2)
+    mode = 9;
+  else if(std::strcmp(argv[1], "conflict") == 0 && argc > 2)
+    mode = 10;
+  else if(std::strcmp(argv[1], "negate") == 0 && argc > 2)
+    mode = 11;
+  else if(std::strcmp(argv[1], "lack") == 0 && argc > 2)
+    mode = 12;
+  else if(std::strcmp(argv[1], "consistency") == 0 && argc > 2)
+    mode = 13;
+  else if(std::strcmp(argv[1], "logiccheck") == 0 && argc > 2)
+    mode = 14;
   else {
     usage();
     return - 2;
@@ -214,7 +226,7 @@ int main(int argc, const char* argv[]) {
     }
     break;
   case 5:
-    // diff
+    // diff : differ.
     {
       const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));;
       std::vector<std::string> details, details2;
@@ -245,7 +257,7 @@ int main(int argc, const char* argv[]) {
     }
     break;
   case 6:
-    // stat
+    // stat : statistics with optimized TOC with link to original articles.
     {
       const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));;
       std::vector<std::string> rdetails;
@@ -264,6 +276,40 @@ int main(int argc, const char* argv[]) {
     break;
   case 7:
     // get dict.
+    // get dicts from input.
+    {
+    }
+    break;
+  case 9:
+    // opt dict.
+    // group dicts.
+    {
+    }
+    break;
+  case 10:
+    // conflict.
+    // sign and abs amount check.
+    {
+    }
+    break;
+  case 11:
+    // negate elementary sets of dictionaries is needed.
+    {
+    }
+    break;
+  case 12:
+    // lack large amounts of dictionaries is needed.
+    {
+    }
+    break;
+  case 13:
+    // consistancy elementary sets of dictionaries and logical check is needed.
+    // some another implementation is needed.
+    {
+    }
+    break;
+  case 14:
+    // logic check another implementation is needed.
     {
     }
     break;
