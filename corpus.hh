@@ -1050,7 +1050,7 @@ template <typename T, typename U> void getAbbreved(vector<corpushl<T, U> >& csta
   return;
 }
 
-template <typename T, typename U> void getDetailed(const U& name, vector<corpus<T, U> >& cstat0, vector<corpushl<T, U> >& cstat, U& tagged, const U& input, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow) {
+template <typename T, typename U> vector<U> getDetailed(const U& name, vector<corpus<T, U> >& cstat0, vector<corpushl<T, U> >& cstat, const U& input, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow) {
   assert(detailtitle.size() == detail.size());
   cerr << "getDetailed : preparing datas";
   vector<vector<corpushl<T, U> > > details;
@@ -1066,15 +1066,17 @@ template <typename T, typename U> void getDetailed(const U& name, vector<corpus<
   }
   cstat0 = vector<corpus<T, U> >();
   cstat  = vector<corpushl<T, U> >();
+  vector<U> result;
   for(int i = 0; i < input.size() / szwindow + 1; i ++) {
     corpus<T, U> lstat;
     lstat.init(words, 0, 120);
     lstat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
     cstat0.push_back(lstat);
     cstat.push_back(corpushl<T, U>(lstat));
-    tagged += U("<span id=\"") + name + to_string(i) + U("\">");
+    U tagged(U("<span id=\"") + name + to_string(i) + U("\">"));
     tagged += cstat[i].reverseLink(cstat0[i]);
     tagged += U("</span><br/>");
+    result.push_back(tagged);
   }
 
   cerr << " getting details";
@@ -1085,7 +1087,7 @@ template <typename T, typename U> void getDetailed(const U& name, vector<corpus<
         cstat[j] = cstat[j].withDetail(detailtitle[i], details[i][k]);
   }
   cerr << endl;
-  return;
+  return result;
 }
 
 template <typename T, typename U> U preparedTOC(const U& input, const U& name, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& topictitle, const vector<U>& topics, const vector<U>& delimiter, const int& szwindow, const T& thresh, const T& redig = T(1)) {
@@ -1095,19 +1097,18 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
   
   vector<corpus<T, U> >   cstat0;
   vector<corpushl<T, U> > cstat;
-  U tagged;
-  getDetailed<T, U>(name, cstat0, cstat, tagged, input, words, detailtitle, detail, delimiter, szwindow);
+  const auto tagged(getDetailed<T, U>(name, cstat0, cstat, input, words, detailtitle, detail, delimiter, szwindow));
   for(int i = 0; i < cstat0.size(); i ++)
     cstat[i].reDig(redig);
   
   cerr << "preparedToc: analysing input text" << flush;
+  vector<int> matched;
   U result;
   for(int i = 0; i < topics.size(); i ++) {
      cerr << "." << flush;
      vector<corpus<T, U> >   tstat0;
      vector<corpushl<T, U> > tstat;
-     U sute;
-     getDetailed<T, U>(name, tstat0, tstat, sute, topics[i], words, detailtitle, detail, delimiter, szwindow);
+     getDetailed<T, U>(name, tstat0, tstat, topics[i], words, detailtitle, detail, delimiter, szwindow);
      vector<pair<T, pair<int, int> > > scores;
      for(int j = 0; j < tstat.size(); j ++)
        for(int k = 0; k < cstat.size(); k ++)
@@ -1128,6 +1129,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
      for(int j = 0; j < scores.size(); j ++) {
         if(- scores[j].first < thresh)
           break;
+        matched.push_back(scores[j].second.second);
         const auto& work(cstat[scores[j].second.second] + tstat[scores[j].second.first]);
         result += to_string(scores[j].first) + U(" : ");
         result += U("<a href=\"#") + name + to_string(scores[j].second.second) + U("\">");
@@ -1137,7 +1139,12 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
      }
      result += U("</span><br/>\n");
   }
-  result += U("<br/><br/>Original:<br/>") + tagged + U("<br/><br/>");
+  sort(matched.begin(), matched.end());
+  matched.erase(unique(matched.begin(), matched.end()), matched.end());
+  result += U("<br/><br/>Original:<br/>");
+  for(int i = 0; i < matched.size(); i ++)
+    result += tagged[matched[i]];
+  result += U("<br/><br/>");
   return result;
 }
 
@@ -1146,8 +1153,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
   cerr << "optimizeToc: parsing input" << endl;
   vector<corpus<T, U> >   cstat0;
   vector<corpushl<T, U> > cstat;
-  U tagged;
-  getDetailed<T, U>(name, cstat0, cstat, tagged, input, words, detailtitle, detail, delimiter, szwindow);
+  const auto tagged(getDetailed<T, U>(name, cstat0, cstat, input, words, detailtitle, detail, delimiter, szwindow));
   for(int i = 0; i < cstat0.size(); i ++)
     cstat[i].reDig(redig);
 
@@ -1238,7 +1244,10 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     }
     result += U("</span></div><br/>");
   }
-  result += U("<br/><br/>Original:<br/>") + tagged + U("<br/>");
+  result += U("<br/><br/>Original:<br/>");
+  for(int i = 0; i < tagged.size(); i ++)
+    result += tagged[i];
+  result += U("<br/>");
   return result;
 }
 
@@ -1248,9 +1257,8 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
   vector<corpus<T, U> >   dstat0;
   vector<corpushl<T, U> > cstat;
   vector<corpushl<T, U> > dstat;
-  U sute;
-  getDetailed<T, U>(name, cstat0, cstat, sute, input, words, detailtitle0, detail0, delimiter, szwindow);
-  getDetailed<T, U>(name, dstat0, dstat, sute, input, words, detailtitle1, detail1, delimiter, szwindow);
+  getDetailed<T, U>(name, cstat0, cstat, input, words, detailtitle0, detail0, delimiter, szwindow);
+  getDetailed<T, U>(name, dstat0, dstat, input, words, detailtitle1, detail1, delimiter, szwindow);
   
   cerr << " making diffs" << endl;
   vector<corpushl<T, U> > diffs;
