@@ -1031,10 +1031,10 @@ template <typename T, typename U> void getAbbreved(vector<corpushl<T, U> >& csta
   for(int i = 0; i < detail.size(); i ++) {
     cerr << "." << flush;
     details.push_back(vector<corpushl<T, U> >());
-    for(int j = 0; j < detail[i].size() / szwindow + 1; j ++) {
+    for(int j = 0; j < detail[i].size() / szwindow * 2 + 1; j ++) {
       corpus<T, U> lstat;
       lstat.init(words, 0, 120);
-      lstat.compute(detail[i].substr(j * szwindow, szwindow).c_str(), delimiter);
+      lstat.compute(detail[i].substr(j * szwindow / 2, szwindow).c_str(), delimiter);
       details[details.size() - 1].push_back(corpushl<T, U>(lstat));
     }
   }
@@ -1057,20 +1057,20 @@ template <typename T, typename U> vector<U> getDetailed(const U& name, vector<co
   for(int i = 0; i < detail.size(); i ++) {
     cerr << "." << flush;
     details.push_back(vector<corpushl<T, U> >());
-    for(int j = 0; j < detail[i].size() / szwindow + 1; j ++) {
+    for(int j = 0; j < detail[i].size() / szwindow * 2 + 1; j ++) {
       corpus<T, U> lstat;
       lstat.init(words, 0, 120);
-      lstat.compute(detail[i].substr(j * szwindow, szwindow).c_str(), delimiter);
+      lstat.compute(detail[i].substr(j * szwindow / 2, szwindow).c_str(), delimiter);
       details[details.size() - 1].push_back(corpushl<T, U>(lstat));
     }
   }
   cstat0 = vector<corpus<T, U> >();
   cstat  = vector<corpushl<T, U> >();
   vector<U> result;
-  for(int i = 0; i < input.size() / szwindow + 1; i ++) {
+  for(int i = 0; i < input.size() / szwindow * 2 + 1; i ++) {
     corpus<T, U> lstat;
     lstat.init(words, 0, 120);
-    lstat.compute(input.substr(i * szwindow, szwindow).c_str(), delimiter);
+    lstat.compute(input.substr(i * szwindow / 2, szwindow).c_str(), delimiter);
     cstat0.push_back(lstat);
     cstat.push_back(corpushl<T, U>(lstat));
     U tagged(U("<span id=\"") + name + to_string(i) + U("\">"));
@@ -1126,17 +1126,17 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
      result += U(", ") + to_string(sum / cnt);
      result += U(", ") + to_string(scores[scores.size() - 1].first);
      result += U(")<br/><span class=\"small\">\n");;
-     for(int j = 0; j < scores.size(); j ++) {
-        if(- scores[j].first < thresh)
-          break;
-        matched.push_back(scores[j].second.second);
-        const auto& work(cstat[scores[j].second.second] + tstat[scores[j].second.first]);
-        result += to_string(scores[j].first) + U(" : ");
-        result += U("<a href=\"#") + name + to_string(scores[j].second.second) + U("\">");
-        result += work.serialize() + U("</a><br/>\n");
-        result += work.reverseLink(cstat0[scores[j].second.second]) + U("<br/>\n");
-        result += work.reverseLink(tstat0[scores[j].second.first])  + U("<br/><br/>\n");
-     }
+     for(int j = 0; j < scores.size(); j ++)
+        if(- scores[j].first <= - T(1) + thresh ||
+                      thresh <= - scores[j].first) {
+          matched.push_back(scores[j].second.second);
+          const auto& work(cstat[scores[j].second.second] + tstat[scores[j].second.first]);
+          result += to_string(scores[j].first) + U(" : ");
+          result += U("<a href=\"#") + name + to_string(scores[j].second.second) + U("\">");
+          result += work.serialize() + U("</a><br/>\n");
+          result += work.reverseLink(cstat0[scores[j].second.second]) + U("<br/>\n");
+          result += work.reverseLink(tstat0[scores[j].second.first])  + U("<br/><br/>\n");
+       }
      result += U("</span><br/>\n");
   }
   sort(matched.begin(), matched.end());
@@ -1180,10 +1180,11 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
   vector<int>           phrases;
   vector<pair<T, int> > work;
   vector<vector<int> >  idxs;
+  vector<pair<T, int> > residue;
   auto                  cstatsw(cstats);
   for(int i = 0; i < cstat.size(); i ++)
     idxs.push_back(vector<int>());
-  for(int ii = 0; ii <= cstat.size() / depth; ii ++) {
+  for(int ii = 0; phrases.size() <= cstatsw.rows(); ii ++) {
     vector<vector<pair<T, int> > > scores0;
     vector<pair<T, int> > cidxs;
     for(int i = 0; i < cstatsw.rows(); i ++)
@@ -1191,7 +1192,8 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
         vector<pair<T, int> > lscores;
         for(int j = 0; j < cstatsw.rows(); j ++)
           if(i != j && !binary_search(phrases.begin(), phrases.end(), j))
-            lscores.push_back(make_pair(cstatsw(j, i), j));
+            if(cstatsw(j, i) < T(0))
+              lscores.push_back(make_pair(cstatsw(j, i), j));
         sort(lscores.begin(), lscores.end());
         T lscore(0);
         for(int j = 0; j < min(depth, int(lscores.size())); j ++)
@@ -1202,6 +1204,16 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
         scores0.push_back(vector<pair<T, int> >());
     sort(cidxs.begin(), cidxs.end());
     if(!cidxs.size()) break;
+    if(cidxs[0].first == T(0)) {
+      for(int j = 0; j < phrases.size(); j ++)
+        if(!binary_search(phrases.begin(), phrases.end(), j)) {
+          T mm(0);
+          for(int k = 0; k < cstatsw.rows(); k ++)
+            mm = min(mm, cstatsw(j, k));
+          residue.push_back(make_pair(mm, j));
+        }
+      break;
+    }
     const int& i(cidxs[0].second);
     const vector<pair<T, int> >& scores(scores0[i]);
     for(int j = 0; j < min(depth, int(scores.size())); j ++) {
@@ -1217,6 +1229,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     work.push_back(make_pair(cidxs[0].first, i));
   }
   sort(work.begin(), work.end());
+  sort(residue.begin(), residue.end());
   
   cerr << "making outputs" << flush;
   U result;
@@ -1243,6 +1256,18 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
       result += U("<br/>");
     }
     result += U("</span></div><br/>");
+  }
+  for(int i = 0; i < residue.size(); i ++) {
+    const int& j(residue[i].second);
+    corpushl<T, U> cs(cstat[j]);
+    result += U("<div><span class=\"small\">");
+    result += to_string(residue[i].first) + U("<br/>");
+    result += cs.serialize();
+    result += U("</span><br/><span class=\"small\">");
+    result += U("no match : <a href=\"#") + name + to_string(j) + U("\">");
+    result += to_string(j) + U("</a> - ");
+    result += cs.reverseLink(cstat0[j]);
+    result += U("<br/>");
   }
   result += U("<br/><br/>Original:<br/>");
   for(int i = 0; i < tagged.size(); i ++)
