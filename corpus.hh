@@ -1112,10 +1112,12 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
      vector<pair<T, pair<int, int> > > scores;
      for(int j = 0; j < tstat.size(); j ++)
        for(int k = 0; k < cstat.size(); k ++)
-         if(! (cstat[k].cdot(cstat[k]) <= T(0)))
-           scores.push_back(make_pair(- cstat[k].prej(tstat[j]), make_pair(j, k)));
+         if(! (cstat[k].cdot(cstat[k]) <= T(0))) {
+           const T lscore(cstat[k].prej(tstat[j]));
+           if(lscore <= - T(1) + thresh || thresh <= lscore)
+             scores.push_back(make_pair(- lscore, make_pair(j, k)));
+         }
      sort(scores.begin(), scores.end());
-     result += topictitle[i] + U(" : (") + to_string(scores[0].first);
      T   sum(0);
      int cnt(0);
      for(int j = 0; j < scores.size(); j ++) {
@@ -1123,20 +1125,19 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
        cnt ++;
      }
      if(!cnt) continue;
+     result += topictitle[i] + U(" : (") + to_string(scores[0].first);
      result += U(", ") + to_string(sum / cnt);
      result += U(", ") + to_string(scores[scores.size() - 1].first);
      result += U(")<br/><span class=\"small\">\n");;
-     for(int j = 0; j < scores.size(); j ++)
-        if(- scores[j].first <= - T(1) + thresh ||
-                      thresh <= - scores[j].first) {
-          matched.push_back(scores[j].second.second);
-          const auto& work(cstat[scores[j].second.second] + tstat[scores[j].second.first]);
-          result += to_string(scores[j].first) + U(" : ");
-          result += U("<a href=\"#") + name + to_string(scores[j].second.second) + U("\">");
-          result += work.serialize() + U("</a><br/>\n");
-          result += work.reverseLink(cstat0[scores[j].second.second]) + U("<br/>\n");
-          result += work.reverseLink(tstat0[scores[j].second.first])  + U("<br/><br/>\n");
-       }
+     for(int j = 0; j < scores.size(); j ++) {
+       matched.push_back(scores[j].second.second);
+       const auto& work(cstat[scores[j].second.second] + tstat[scores[j].second.first]);
+       result += to_string(scores[j].first) + U(" : ");
+       result += U("<a href=\"#") + name + to_string(scores[j].second.second) + U("\">");
+       result += work.serialize() + U("</a><br/>\n");
+       result += work.reverseLink(cstat0[scores[j].second.second]) + U("<br/>\n");
+       result += work.reverseLink(tstat0[scores[j].second.first])  + U("<br/><br/>\n");
+     }
      result += U("</span><br/>\n");
   }
   sort(matched.begin(), matched.end());
@@ -1307,7 +1308,6 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
       result += diff.reverseLink(cstat0[i]) + U("<br/>\n");
       result += diff.reverseLink(dstat0[i]) + U("<br/><br/><br/>\n");
     }
-  result += U("Done");
   return result;
 }
 
