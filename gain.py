@@ -1,3 +1,6 @@
+#! /usr/bin/env python2.7
+# -*- coding: utf-8 -*-
+
 import mechanize
 import re
 import ipaddress
@@ -6,8 +9,13 @@ import os
 import datetime
 import glob
 import hashlib
+import sys
 
+reload(sys)
+sys.setdefaultencoding("utf-8")
 mechanize._sockettimeout._GLOBAL_DEFAULT_TIMEOUT = 100
+textmime = re.compile(r"(\.(txt|html|htm|shtml|shtm|xml|mml)$|/[\/\.]*$)")
+elimiter = r"[ \t]+"
 
 ipranges = [#[u"150.147.0.0", u"150.147.255.255"],
             #[u"150.246.0.0", u"150.246.255.255"],
@@ -22,9 +30,9 @@ ipranges = [#[u"150.147.0.0", u"150.147.255.255"],
             #[u"153.121.64.0",  u"152.121.95.255"],
             #[u"153.121.96.0",  u"153.121.127.255"]
             ]
-inbase   = '~/Sites/datas/*/urls.txt'
-outbase  = '~/Downloads'
 
+inbase   = '~/Sites/datas/*/urls.txt'
+outbase  = '~/Downloads/'
 urls  = re.compile(r'href=[\"\']([^\"\']+)[\"\']')
 urlsr = re.compile(r"([a-zA-Z0-9\.\-\_]+(:[0-9]+)?/[a-zA-Z0-9\=\?\~/\-\_\.\&]+)")
 replscriptstart = re.compile(r"<script")
@@ -37,7 +45,7 @@ def initBrowser():
   br.set_handle_redirect(True)
   br.set_handle_referer(True)
   br.user_agent_alias = 'Windows IE 9'
-  br.set_handle_robots(False)
+  br.set_handle_robots(True)
   return br
 
 def cutLinks(html):
@@ -79,20 +87,23 @@ def ping80(host):
     return False
   return True
 
-def writeSub(str, f, flog):
+def writeSub(stra, f, flog):
+  if(not textmime.search(stra)):
+    return
   html = ""
   try:
     br   = initBrowser()
-    r    = br.open(str)
+    r    = br.open(stra)
     html = r.read()
-    flog.write(str + " (" + datetime.datetime.now().strftime("%c") + ") : " + hashlib.sha256(html).hexdigest() + "\n")
+    flog.write(datetime.datetime.now().strftime("%c") + stra + " : " + hashlib.sha256(html).hexdigest() + "\n")
+    f.write(re.sub(elimiter, '', innerHTMLs(html).decode("utf-8")))
+  except Exception as inst:
+    sinst = str(repr(inst))
+    if(re.search(r"robots\.txt", sinst)):
+       return
+    print "mechanize err @ " + stra
   except:
-    print "mechanize error @ " + str
-    return
-  try:
-    f.write(innerHTMLs(html).decode("utf-8"))
-  except:
-    print "file open error."
+    print "mechanize error @ " + stra
   return
 
 inurls = glob.glob(inbase)
@@ -106,36 +117,53 @@ for addr in inurls:
   flog  = open(rbase, "a")
   f     = open(lbase, "w")
   for str0 in strs:
-    str, num = str0.split(" ")
+    stra, num = str0.split(" ")
     if(int(num) > 0):
       html = ""
       try:
         br = initBrowser()
-        r  = br.open(str)
+        r  = br.open(stra)
         li = []
         for l in br.links():
           li.append(l.url)
         li = list(set(li))
       except:
-        print "mechanize error @ " + str
+        print "mechanize error @ " + stra
         continue
-      for strs in li:
-        writeSub(strs, f, flog)
+      for strs1 in li:
+        writeSub(strs1, f, flog)
     else:
-      writeSub(str, f, flog)
-  f.close()
+      writeSub(stra, f, flog)
   flog.close()
-  os.system("split -b 80k -a 2 " + lbase + " " + lbase + ".")
-  os.system("rm -f " + lbase)
+  f.close()
 
+lbase = outbase + "/" + datetime.datetime.now().strftime("%Y%m%d%H")
+fn    = open(outbase + "count.txt", "r")
+num   = fn.readlines()
+fn.close()
+cnt   = int(num[0])
+num0  = cnt
+num   = 100
+numl  = num
+f     = open(lbase + ".txt",     "w")
+fl    = open(lbase + "link.txt", "w")
 for iprange in ipranges:
+  if(num <= 0):
+    break
   start  = int(ipaddress.IPv4Address(iprange[0]))
   end    = int(ipaddress.IPv4Address(iprange[1]))
-  while(start < end):
-    ips  = str(ipaddress.IPv4Address(start))
+  if(end - start <= cnt):
+    cnt -= end - start
+    continue
+  start += cnt
+  cnt    = 0
+  while(start < end and cnt < num):
+    ips    = str(ipaddress.IPv4Address(start))
+    print ips, cnt, num
+    num   -= 1
     start += 1
     if(not ping80(ips)):
-      print "no response from:",  ips
+      f.write("\n\n" + ips + "\nno response from : " + ips)
       continue
     html = ""
     try:
@@ -145,19 +173,20 @@ for iprange in ipranges:
     except:
       print "mechanize error @ " + ips
       continue
-    # saves.
     try:
-      dir = outbase
-      os.system("mkdir -p " + dir)
-    except:
-      print "mkdir error"
-    try:
-      f = open(dir + ips + "-inner.txt", "w")
-      f.write(innerHTMLs(html).decode("utf-8"))
-      f.close()
-      f = open(dir + ips + "-links.txt", "w")
-      f.write(cutLinks(html))
-      f.close()
+      f.write("\n\n" + ips + "\n")
+      f.write(re.sub(elimiter, '', innerHTMLs(html).decode("utf-8")))
+      fl.write("\n\n" + ips + "\n")
+      fl.write(cutLinks(html))
     except:
       print "file open error."
+f.close()
+fl.close()
+fn = open(outbase + "count.txt", "w")
+if(cnt < num):
+  fn.write("0")
+else:
+  fn.write(str(num0 + numl))
+fn.close()
+  
 
