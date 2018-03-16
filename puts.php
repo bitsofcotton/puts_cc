@@ -42,7 +42,7 @@ function asyncPost(addr, data) {
       if(req.status == 200) {
         result.innerHTML = req.responseText + " " + req.status;
       } else {
-        result.innerHTML = "Some error occured." + req.status;
+        result.innerHTML = "Some error had be occur." + req.status;
       }
     } else {
       result.innerHTML = "Connecting...";
