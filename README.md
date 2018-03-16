@@ -5,7 +5,7 @@ And this program is implemented with a deterministic way.
 This IS NOT the program that judges it is true or false, this IS ONLY the program that seines
 the score that seems to be true or that seems to be false FROM INPUT (with no deductions for logics).
 
-This program uses large amount of region on the memory.
+This program uses large amount of region on the memory. And, very slow because of scans sometimes on large regions.
 
 # Usage
     make tools
@@ -70,9 +70,9 @@ Please pseudo-login with e-mail address - salt pair.
     std::cout << cstat0.toc(tocwords, tocs);
     
 # Tips
-These programs may have a algorithm that is not carefully confirmed.  
+These programs may have a algorithm that is *not carefully confirmed*.  
 Statistics definition needs to be not dense. If it's dense, the context we get from statistics may say nothing. So with layered dictionaries, we can calculate a little accuratery.  
-And this algorithm have a specification that edges remains as obscure, to get clear edge, we should use this with morphological analysis softwares. This algorithm only sees the word distances and orders that causes rough image of what is on the table.  
+And this algorithm have a specification that edges remains as obscure, to get clear edges, we should use this with morphological analysis softwares. This algorithm only sees the word distances and orders that causes rough image of what is on the table.  
 This program only sees what is said in the input, not the not said.  
 abbrev is needed to be the inverse of withDetail function, but now, NOT so.  
 serialize function is needed to be the inverse of corpushl(corpus(...)) but now, NOT so.  
