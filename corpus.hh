@@ -1142,10 +1142,12 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
   }
   sort(matched.begin(), matched.end());
   matched.erase(unique(matched.begin(), matched.end()), matched.end());
-  result += U("<br/><br/>Original:<br/>");
-  for(int i = 0; i < matched.size(); i ++)
-    result += tagged[matched[i]];
-  result += U("<br/><br/>");
+  if(matched.size()) {
+    result += U("<br/><br/>Original:<br/>");
+    for(int i = 0; i < matched.size(); i ++)
+      result += tagged[matched[i]];
+    result += U("<br/><br/>");
+  }
   return result;
 }
 
