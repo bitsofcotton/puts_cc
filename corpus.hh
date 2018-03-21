@@ -357,13 +357,14 @@ public:
   const corpushl<T, U>  simpleThresh(const T& ratio) const;
 
 private:
-  const U               serializeSub(const vector<int>& idxs) const;
-  const Vec             singularValues() const;
-  vector<U>             words;
-  Tensor                corpust;
-   
-  vector<U>      gatherWords(const vector<U>& in0, const vector<U>& in1, vector<int>& ridx0, vector<int>& ridx1) const;
-  const Tensor   prepareDetail(const corpushl<T, U>& other, const vector<U>& workwords, const int& eidx, const vector<int>& ridx0, const vector<int>& ridx1, const vector<int>& ridx2);
+  const U      serializeSub(const vector<int>& idxs) const;
+  const Vec    singularValues() const;
+  const int    reverseLookup(const vector<int>& src, const int& idx) const;
+  vector<U>    gatherWords(const vector<U>& in0, const vector<U>& in1, vector<int>& ridx0, vector<int>& ridx1) const;
+  const Tensor prepareDetail(const corpushl<T, U>& other, const vector<U>& workwords, const int& eidx, const vector<int>& ridx0, const vector<int>& ridx1, const vector<int>& ridx2);
+  
+  vector<U>    words;
+  Tensor       corpust;
 };
 
 template <typename T, typename U> corpushl<T,U>::corpushl() {
@@ -440,20 +441,34 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
   result.words   = gatherWords(words, other.words, ridx0, ridx1);
   result.corpust = Tensor();
   cerr << "+" << flush;
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-  for(int i = 0; i < result.words.size(); i ++)
-    for(int j = 0; j < result.words.size(); j ++) {
-      if(0 <= ridx0[i] && 0 <= ridx0[j])
-        for(int k = 0; k < result.words.size(); k ++)
-          if(0 <= ridx0[k])
-            result.corpust[i][j][k] += corpust[ridx0[i]][ridx0[j]][ridx0[k]];
-      if(0 <= ridx1[i] && 0 <= ridx1[j])
-        for(int k = 0; k < result.words.size(); k ++)
-          if(0 <= ridx1[k])
-            result.corpust[i][j][k] += other.corpust[ridx1[i]][ridx1[j]][ridx1[k]];
+  auto& ci0(corpust.iter());
+  for(int i = 0; i < ci0.size(); i ++) {
+    const int ii(reverseLookup(ridx0, ci0[i].first));
+    auto& ci1(ci0[i].second.iter());
+    for(int j = 0; j < ci1.size(); j ++) {
+      const int jj(reverseLookup(ridx0, ci1[j].first));
+      auto& ci2(ci1[j].second.iter());
+      for(int k = 0; k < ci2.size(); k ++) {
+        const int kk(reverseLookup(ridx0, ci2[k].first));
+        if(0 <= ii && 0 <= jj && 0 <= kk)
+          result.corpust[ii][jj][kk] += ci2[k].second;
+      }
     }
+  }
+  auto& oi0(other.corpust.iter());
+  for(int i = 0; i < oi0.size(); i ++) {
+    const int ii(reverseLookup(ridx1, oi0[i].first));
+    auto& oi1(oi0[i].second.iter());
+    for(int j = 0; j < oi1.size(); j ++) {
+      const int jj(reverseLookup(ridx1, oi1[j].first));
+      auto& oi2(oi1[j].second.iter());
+      for(int k = 0; k < oi2.size(); k ++) {
+        const int kk(reverseLookup(ridx1, oi2[k].first));
+        if(0 <= ii && 0 <= jj && 0 <= kk)
+          result.corpust[ii][jj][kk] += oi2[k].second;
+      }
+    }
+  }
   return result;
 }
 
@@ -504,14 +519,19 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
       result.words.push_back(words[ridx0[i]]);
     else if(ridx1[i] >= 0 && ridx2[i] >= 0)
       result.words.push_back(other.words[ridx1[i]]);
-#if defined(_OPENMP)
-#pragma omp paralell for schedule(static, 1)
-#endif
-  for(int i = 0; i < workwords.size(); i ++) if(0 <= ridx2[i])
-    for(int j = 0; j < workwords.size(); j ++) if(0 <= ridx2[j])
-      for(int k = 0; k < workwords.size(); k ++) if(0 <= ridx2[k])
-        if(ridx0[i] >= 0 && ridx0[j] >= 0 && ridx0[k] >= 0)
-          result.corpust[ridx2[i]][ridx2[j]][ridx2[k]] = corpust[ridx0[i]][ridx0[j]][ridx0[k]];
+  auto& ci0(corpust.iter());
+  for(int i = 0; i < ci0.size(); i ++) {
+    const int ii(reverseLookup(ridx0, ci0[i].first));
+    auto& ci1(ci0[i].second.iter());
+    for(int j = 0; j < ci1.size(); j ++) {
+      const int jj(reverseLookup(ridx0, ci1[i].first));
+      auto& ci2(ci1[j].second.iter());
+      for(int k = 0; k < ci2.size(); k ++) {
+        const int kk(reverseLookup(ridx0, ci2[i].first));
+        result.corpust[ii][jj][kk] = ci2[k].second;
+      }
+    }
+  }
   result.corpust += prepareDetail(other, workwords, eidx, ridx0, ridx1, ridx2);
   return result;
 }
@@ -532,15 +552,20 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2rel
         mul[ridx0[j]][ridx0[k]][ridx0[i]] = 1.;
         mul[ridx0[k]][ridx0[i]][ridx0[j]] = 1.;
       }
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-  for(int i = 0; i < words.size(); i ++) if(0 <= ridx0[i])
-    for(int j = 0; j < words.size(); j ++) if(0 <= ridx0[j])
-      for(int k = 0; k < words.size(); k ++) if(0 <= ridx0[k] &&
-          result.corpust[ridx0[i]][ridx0[j]][ridx0[k]] != T(0))
-        result.corpust[ridx0[i]][ridx0[j]][ridx0[k]] *=
-          mul[ridx0[i]][ridx0[j]][ridx0[k]];
+  auto& ci0(result.corpust.iter());
+  for(int i = 0; i < ci0.size(); i ++) {
+    const int ii(ci0[i].first);
+    auto& ci1(ci0[i].second.iter());
+    for(int j = 0; j < ci1.size(); j ++) {
+      const int jj(ci1[j].first);
+      auto& ci2(ci1[j].second.iter());
+      for(int k = 0; k < ci2.size(); k ++) {
+        const int kk(ci2[k].first);
+        if(0 <= ridx0[ii] && 0 <= ridx0[jj] && 0 <= ridx0[kk])
+          ci2[k].second *= mul[ridx0[ii]][ridx0[jj]][ridx0[kk]];
+      }
+    }
+  }
   return result;
 }
 
@@ -778,24 +803,29 @@ template <typename T, typename U> const pair<T, T> corpushl<T, U>::compareStruct
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::reDig(const T& ratio) {
-#if defined(_OPENMP)
-#pragma omp paralell for schedule(static, 1)
-#endif
-  for(int i = 0; i < words.size(); i ++)
-    for(int j = 0; j < words.size(); j ++)
-      for(int k = 0; k < words.size(); k ++)
-        if(corpust[i][j][k] != T(0))
-          corpust[i][j][k] = (corpust[i][j][k] < T(0) ? - T(1) : T(1)) * exp(log(abs(corpust[i][j][k])) * ratio);
+  auto& ci0(corpust.iter());
+  for(int i = 0; i < ci0.size(); i ++) {
+    auto& ci1(ci0[i].second.iter());
+    for(int j = 0; j < ci1.size(); j ++) {
+      auto& ci2(ci1[j].second.iter());
+      for(int k = 0; k < ci2.size(); k ++)
+        ci2[k].second = (ci2[k].second < T(0) ? - T(1) : T(1)) * exp(log(abs(ci2[k].second)) * ratio);
+    }
+  }
   return *this;
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThresh(const T& ratio) const {
   T absmax(0);
-  for(int i = 0; i < words.size(); i ++)
-    for(int j = 0; j < words.size(); j ++)
-      for(int k = 0; k < words.size(); k ++)
-        if(absmax < abs(corpust[i][j][k]))
-          absmax = abs(corpust[i][j][k]);
+  auto& ci0(corpust.iter());
+  for(int i = 0; i < ci0.size(); i ++) {
+    auto& ci1(ci0[i].second.iter());
+    for(int j = 0; j < ci1.size(); j ++) {
+      auto& ci2(ci1[j].second.iter());
+      for(int k = 0; k < ci2.size(); k ++)
+        absmax = max(abs(ci2[k].second), absmax);
+    }
+  }
   Tensor work;
   vector<int> okidx;
   for(int i = 0; i < words.size(); i ++) {
@@ -828,6 +858,20 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThr
           result.corpust[i][j][k] = corpust[okidx[i]][okidx[j]][okidx[k]];
   }
   return result;
+}
+
+template <typename T, typename U> const int corpushl<T, U>::reverseLookup(const vector<int>& src, const int& idx) const {
+  assert(0 <= idx && idx < src.size());
+  int sidx(- 1);
+  for(int i = 0; i < src.size(); i ++)
+    if(idx == src[i]) {
+      sidx = i;
+      break;
+    }
+  if(sidx < 0)
+    return - 1;
+  assert(0 <= sidx && sidx < src.size());
+  return sidx;
 }
 
 template <typename T, typename U> vector<U> corpushl<T, U>::gatherWords(const vector<U>& in0, const vector<U>& in1, vector<int>& ridx0, vector<int>& ridx1) const {
@@ -865,7 +909,7 @@ template <typename T, typename U> vector<U> corpushl<T, U>::gatherWords(const ve
   for( ; i < sin0.size(); i ++) {
     for(; i < sin0.size() && j < sin1.size(); j ++) {
       if(sin0[i] == sin1[j]) {
-        result.push_back(U(sin0[i]));
+        result.push_back(sin0[i]);
         const int d0(distance(in0.begin(), equal_range(in0.begin(), in0.end(), sin0[i]).first));
         const int d1(distance(in1.begin(), equal_range(in1.begin(), in1.end(), sin1[j]).first));
         if(0 <= d0 && d0 < in0.size())
@@ -896,43 +940,37 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
   cerr << "p" << flush;
   // initialize result tensor with 0.
   Tensor res;
-  // Sum-up detailed word into result pool without definition row, col.
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-  for(int i = 0; i < workwords.size(); i ++) if(ridx0[i] >= 0 && ridx2[i] >= 0)
-    for(int j = 0; j < workwords.size(); j ++) if(ridx0[j] >= 0 && ridx2[j] >= 0)
-      for(int k = 0; k < workwords.size(); k ++) if(ridx0[k] >= 0) {
-        const T ratio(corpust[ridx0[i]][ridx0[j]][ridx0[k]]);
-        if(ratio == T(0))
-          continue;
-        if(ridx2[k] >= 0 && ridx1[k] >= 0 && ridx1[i] >= 0 && ridx1[j] >= 0 &&
-           other.corpust[ridx1[i]][ridx1[j]][ridx1[k]] != T(0))
-          res[ridx2[i]][ridx2[j]][ridx2[k]] +=
-            ratio * other.corpust[ridx1[i]][ridx1[j]][ridx1[k]];
-      }
-
-  // Sum-up words defined in definition row, col without crossing point.
-  {
-    const int i(eidx);
-    for(int j = 0; j < workwords.size(); j ++) if(ridx2[j] >= 0) {
-      for(int k = 0; k < workwords.size(); k ++) if(ridx2[k] >= 0) {
-        // if all side exists on both corpust, weight and add.
-        if(ridx0[i] >= 0 && ridx0[j] >= 0 && ridx0[k] >= 0 &&
-           ridx1[j] >= 0 && ridx1[k] >= 0) {
-          const T r0(corpust[ridx0[i]][ridx0[j]][ridx0[k]]);
-          const T r1(corpust[ridx0[j]][ridx0[i]][ridx0[k]]);
-          for(int kk = 0; kk < workwords.size(); kk ++)
-            if(ridx1[kk] >= 0 && ridx2[kk] >= 0) {
-              res[ridx2[kk]][ridx2[j] ][ridx2[k]] +=
-                r0 * other.corpust[ridx1[kk]][ridx1[j] ][ridx1[k]];
-              res[ridx2[j] ][ridx2[kk]][ridx2[k]] +=
-                r1 * other.corpust[ridx1[j] ][ridx1[kk]][ridx1[k]];
-            }
-        // if only other have words defined, just add.
-        } else if(ridx1[j] >= 0 && ridx1[k] >= 0 && ridx2[i] >= 0) {
-          res[ridx2[i]][ridx2[j]][ridx2[k]] += other.corpust[ridx1[i]][ridx1[j]][ridx1[k]];
-          res[ridx2[j]][ridx2[i]][ridx2[k]] += other.corpust[ridx1[j]][ridx1[i]][ridx1[k]];
+  const auto& ci0(other.corpust.iter());
+  for(int i = 0; i < ci0.size(); i ++) {
+    const int ii(reverseLookup(ridx1, ci0[i].first));
+    const auto& ci1(ci0[i].second.iter());
+    for(int j = 0; j < ci1.size(); j ++) {
+      const int jj(reverseLookup(ridx1, ci1[j].first));
+      const auto& ci2(ci1[j].second.iter());
+      for(int k = 0; k < ci2.size(); k ++) {
+        // Sum-up detailed word into result pool without definition row, col.
+        const int kk(reverseLookup(ridx1, ci2[k].first));
+        if(0 <= ridx0[ii] && 0 <= ridx0[jj] && 0 <= ridx0[kk]) {
+          res[ridx2[ii]][ridx2[jj]][ridx2[kk]] += corpust[ridx0[ii]][ridx0[jj]][ridx0[kk]] * ci2[k].second;
+          
+          // add crossing points
+          const T r0(corpust[ridx0[ii]][ridx0[jj]][ridx0[kk]]);
+          const T r1(corpust[ridx0[jj]][ridx0[ii]][ridx0[kk]]);
+          auto& oci0(other.corpust.iter());
+          auto& oci1(other.corpust[ridx1[jj]].iter());
+          for(int k1 = 0; k1 < oci0.size(); k1 ++) {
+            const int kk1(reverseLookup(ridx1, oci0[k1].first));
+            res[ridx2[kk1]][ridx2[jj]][ridx2[kk]] +=
+              r0 * oci0[k1].second[ridx1[jj]][ridx1[kk]];
+          }
+          for(int k1 = 0; k1 < oci1.size(); k1 ++) {
+            const int kk1(reverseLookup(ridx1, oci1[k1].first));
+            res[ridx2[jj]][ridx2[kk1]][ridx2[kk]] +=
+              r1 * oci1[k1].second[ridx1[kk]];
+          }
+        } else {
+          res[ridx2[ii]][ridx2[jj]][ridx2[kk]] += ci2[k].second;
+          res[ridx2[jj]][ridx2[ii]][ridx2[kk]] += ci2[k].second;
         }
       }
     }

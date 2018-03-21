@@ -56,8 +56,10 @@ public:
         T  dot         (const SimpleSparseVector<T>& other) const;
         T& operator [] (const int& idx);
   const T  operator [] (const int& idx) const;
+        vector<pair<int, T> >& iter();
+  const vector<pair<int, T> >& iter() const;
 private:
-  vector<pair<int, T> > entity;
+  vector<pair<int, T> >  entity;
 };
 
 template <typename T> SimpleSparseVector<T>::SimpleSparseVector() {
@@ -196,6 +198,14 @@ template <typename T> const T SimpleSparseVector<T>::operator [] (const int& idx
   if(0 <= i && i < entity.size() && entity[i].first == idx)
     return entity[i].second;
   return T(0);
+}
+
+template <typename T> vector<pair<int, T> >& SimpleSparseVector<T>::iter() {
+  return entity;
+}
+
+template <typename T> const vector<pair<int, T> >& SimpleSparseVector<T>::iter() const {
+  return entity;
 }
 
 template <typename T> using SimpleSparseMatrix = SimpleSparseVector<SimpleSparseVector<T> >;
