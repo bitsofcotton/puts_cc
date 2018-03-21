@@ -14,6 +14,6 @@ all:	tools test
 clean:
 	@rm -rf ${CLEANFILES}
 
-tools.o:        tools.cc corpus.hh file2eigen.hh lword.hh
-test.o:		test.cc corpus.hh file2eigen.hh lword.hh
+tools.o:        tools.cc sparse.hh corpus.hh file2eigen.hh lword.hh
+test.o:		test.cc  sparse.hh corpus.hh file2eigen.hh lword.hh
 

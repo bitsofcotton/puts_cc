@@ -12,13 +12,14 @@
  */
 #if !defined(_CORPUS_)
 
-#include <Eigen/Core>
-#include <Eigen/SVD>
 #include <cstdio>
 #include <cstring>
 #include <vector>
 #include <iterator>
 #include <iostream>
+#include <Eigen/Core>
+#include <Eigen/SVD>
+#include "sparse.hh"
 
 using std::cerr;
 using std::endl;
@@ -59,9 +60,9 @@ template <typename T> bool lessNotEqualStrClip(const T& a, const T& b) {
 
 template <typename T, typename U> class corpus {
 public:
-  typedef Eigen::Matrix<T,   Eigen::Dynamic, Eigen::Dynamic> Mat;
-  typedef Eigen::Matrix<T,   Eigen::Dynamic, 1>              Vec;
-  typedef Eigen::Matrix<Vec, Eigen::Dynamic, Eigen::Dynamic> Tensor;
+  typedef SimpleSparseVector<T> Vec;
+  typedef SimpleSparseMatrix<T> Mat;
+  typedef SimpleSparseTensor<T> Tensor;
   
   corpus();
   ~corpus();
@@ -175,7 +176,7 @@ template <typename T, typename U> const vector<U>& corpus<T,U>::getWords() const
   return words;
 }
 
-template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dynamic, 1>, Eigen::Dynamic, Eigen::Dynamic>& corpus<T,U>::getCorpus() const {
+template <typename T, typename U> const SimpleSparseTensor<T>& corpus<T,U>::getCorpus() const {
   return corpust;
 }
 
@@ -263,7 +264,7 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
 }
 
 template <typename T, typename U> void corpus<T,U>::corpusEach() {
-  corpust = Tensor(words.size(), words.size());
+  corpust = Tensor();
 #if defined(_OPENMP)
 #pragma omp parallel for
 #endif
@@ -271,9 +272,6 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
     cerr << "." << flush;
     for(int j = 0; j < words.size(); j ++) {
       int kk(0);
-      corpust(i, j) = Vec(words.size());
-      for(int k = 0; k < corpust(i, j).size(); k ++)
-        corpust(i, j)[k] = 0;
       if(!ptrs[i].size() || !ptrs[j].size())
         continue;
       for(int k = 0; k < words.size(); k ++) {
@@ -307,7 +305,7 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
           // const T buf1(abs(*itr + .5 - ptrs[j][ctrv]));
           const T work(T(1) / (buf0 * buf0 + buf1 * buf1));
           if(isfinite(work))
-            corpust(i, j)[k] += sqrt(work) / Midx;
+            corpust[i][j][k] += sqrt(work) / Midx;
         }
       }
     }
@@ -318,9 +316,9 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
 
 template <typename T, typename U> class corpushl {
 public:
-  typedef Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>   Mat;
-  typedef Eigen::Matrix<T, Eigen::Dynamic, 1>                Vec;
-  typedef Eigen::Matrix<Vec, Eigen::Dynamic, Eigen::Dynamic> Tensor;
+  typedef SimpleSparseVector<T> Vec;
+  typedef SimpleSparseMatrix<T> Mat;
+  typedef SimpleSparseTensor<T> Tensor;
   
   corpushl();
   corpushl(const corpus<T, U>&   obj);
@@ -400,22 +398,13 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::cast(cons
       result.words.push_back(*p);
     }
   }
-  result.corpust = Tensor(idxs.size(), idxs.size());
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-  for(int i = 0; i < idxs.size(); i ++)
-    for(int j = 0; j < idxs.size(); j ++) {
-      result.corpust(i, j) = Vec(idxs.size());
-      for(int k = 0; k < idxs.size(); k ++)
-        result.corpust(i, j)[k] = corpust(idxs[i], idxs[j])[idxs[k]];
-    }
+  result.corpust = corpust;
   return result;
 }
 
 template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator = (const corpushl<T, U>& other) {
   words   = vector<U>(other.words);
-  corpust = Tensor(other.corpust);
+  corpust = other.corpust;
   return *this;
 }
 
@@ -437,41 +426,33 @@ template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator
 
 template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator *= (const T& t) {
   cerr << "*=" << flush;
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-  for(int i = 0; i < corpust.rows(); i ++)
-    for(int j = 0; j < corpust.cols(); j ++)
-      corpust(i, j) *= t;
+  corpust *= t;
   return *this;
 }
 
 template <typename T, typename U> const bool corpushl<T, U>::operator < (const corpushl<T, U>& other) const {
-  return corpust.rows() < other.corpust.rows();
+  return words.size() < other.words.size();
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator + (const corpushl<T, U>& other) const {
   corpushl<T, U> result;
   vector<int>    ridx0, ridx1;
   result.words   = gatherWords(words, other.words, ridx0, ridx1);
-  result.corpust = Tensor(result.words.size(), result.words.size());
+  result.corpust = Tensor();
   cerr << "+" << flush;
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int i = 0; i < result.corpust.rows(); i ++)
-    for(int j = 0; j < result.corpust.cols(); j ++) {
-      result.corpust(i, j) = Vec(result.words.size());
-      for(int k = 0; k < result.corpust(i, j).size(); k ++)
-        result.corpust(i, j)[k] = T(0);
+  for(int i = 0; i < result.words.size(); i ++)
+    for(int j = 0; j < result.words.size(); j ++) {
       if(0 <= ridx0[i] && 0 <= ridx0[j])
-        for(int k = 0; k < result.corpust(i, j).size(); k ++)
+        for(int k = 0; k < result.words.size(); k ++)
           if(0 <= ridx0[k])
-            result.corpust(i, j)[k] += corpust(ridx0[i], ridx0[j])[ridx0[k]];
+            result.corpust[i][j][k] += corpust[ridx0[i]][ridx0[j]][ridx0[k]];
       if(0 <= ridx1[i] && 0 <= ridx1[j])
-        for(int k = 0; k < result.corpust(i, j).size(); k ++)
+        for(int k = 0; k < result.words.size(); k ++)
           if(0 <= ridx1[k])
-            result.corpust(i, j)[k] += other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
+            result.corpust[i][j][k] += other.corpust[ridx1[i]][ridx1[j]][ridx1[k]];
     }
   return result;
 }
@@ -517,29 +498,20 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
   }
   if(!flag1 || eidx < 0 || ridx0[eidx] < 0)
     return result;
-  result.corpust = Tensor(workwords.size() - 1, workwords.size() - 1);
+  result.corpust = Tensor();
   for(int i = 0; i < workwords.size(); i ++)
     if(ridx0[i] >= 0 && ridx2[i] >= 0)
       result.words.push_back(words[ridx0[i]]);
     else if(ridx1[i] >= 0 && ridx2[i] >= 0)
       result.words.push_back(other.words[ridx1[i]]);
 #if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-  for(int i = 0; i < result.corpust.rows(); i ++)
-    for(int j = 0; j < result.corpust.cols(); j ++) {
-      result.corpust(i, j) = Vec(workwords.size() - 1);
-      for(int k = 0; k < result.corpust(i, j).size(); k ++)
-        result.corpust(i, j)[k] = T(0);
-    }
-#if defined(_OPENMP)
 #pragma omp paralell for schedule(static, 1)
 #endif
   for(int i = 0; i < workwords.size(); i ++) if(0 <= ridx2[i])
     for(int j = 0; j < workwords.size(); j ++) if(0 <= ridx2[j])
-      for(int k = 0; k < result.corpust(ridx2[i], ridx2[j]).size(); k ++) if(ridx2[k] >= 0)
+      for(int k = 0; k < workwords.size(); k ++) if(0 <= ridx2[k])
         if(ridx0[i] >= 0 && ridx0[j] >= 0 && ridx0[k] >= 0)
-          result.corpust(ridx2[i], ridx2[j])[ridx2[k]] = corpust(ridx0[i], ridx0[j])[ridx0[k]];
+          result.corpust[ridx2[i]][ridx2[j]][ridx2[k]] = corpust[ridx0[i]][ridx0[j]][ridx0[k]];
   result.corpust += prepareDetail(other, workwords, eidx, ridx0, ridx1, ridx2);
   return result;
 }
@@ -549,36 +521,26 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2rel
   corpushl<T, U> result(*this);
   vector<int>    ridx0, ridx1;
   vector<U>      words(gatherWords(result.words, other.words, ridx0, ridx1));
-  Tensor mul(result.corpust);
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-  for(int i = 0; i < mul.rows(); i ++)
-    for(int j = 0; j < mul.cols(); j ++)
-      for(int k = 0; k < mul(i, j).size(); k ++)
-        mul(i, j)[k] = T(0);
+  Tensor mul;
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < words.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0)
     for(int j = 0; j < words.size(); j ++) if(ridx0[j] >= 0 && ridx1[j] >= 0)
       for(int k = 0; k < words.size(); k ++) if(ridx0[k] >= 0) {
-        if(ridx0[k] < mul(ridx0[i], ridx0[j]).size())
-          mul(ridx0[i], ridx0[j])[ridx0[k]] = 1.;
-        if(ridx0[i] < mul(ridx0[j], ridx0[k]).size())
-          mul(ridx0[j], ridx0[k])[ridx0[i]] = 1.;
-        if(ridx0[j] < mul(ridx0[k], ridx0[i]).size())
-          mul(ridx0[k], ridx0[i])[ridx0[j]] = 1.;
+        mul[ridx0[i]][ridx0[j]][ridx0[k]] = 1.;
+        mul[ridx0[j]][ridx0[k]][ridx0[i]] = 1.;
+        mul[ridx0[k]][ridx0[i]][ridx0[j]] = 1.;
       }
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int i = 0; i < result.corpust.rows(); i ++) if(0 <= ridx0[i])
-    for(int j = 0; j < result.corpust.cols(); j ++) if(0 <= ridx0[j])
-      for(int k = 0; k < result.corpust(i, j).size(); k ++) if(0 <= ridx0[k] &&
-          ridx0[k] < result.corpust(ridx0[i], ridx0[j]).size())
-        result.corpust(ridx0[i], ridx0[j])[ridx0[k]] *=
-          mul(ridx0[i], ridx0[j])[ridx0[k]];
+  for(int i = 0; i < words.size(); i ++) if(0 <= ridx0[i])
+    for(int j = 0; j < words.size(); j ++) if(0 <= ridx0[j])
+      for(int k = 0; k < words.size(); k ++) if(0 <= ridx0[k] &&
+          result.corpust[ridx0[i]][ridx0[j]][ridx0[k]] != T(0))
+        result.corpust[ridx0[i]][ridx0[j]][ridx0[k]] *=
+          mul[ridx0[i]][ridx0[j]][ridx0[k]];
   return result;
 }
 
@@ -588,10 +550,10 @@ template <typename T, typename U> const T corpushl<T, U>::cdot(const corpushl<T,
   vector<U>   drop(gatherWords(words, other.words, ridx0, ridx1));
   for(int i = 0; i < drop.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0)
     for(int j = 0; j < drop.size(); j ++) if(ridx0[j] >= 0 && ridx1[j] >= 0)
-      for(int k = 0; k < drop.size(); k ++) if(ridx0[k] >= 0 && ridx1[k] >= 0 &&
-          ridx0[k] < corpust(ridx0[i], ridx0[j]).size() &&
-          ridx1[k] < other.corpust(ridx1[i], ridx1[j]).size())
-        res += corpust(ridx0[i], ridx0[j])[ridx0[k]] * other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
+      for(int k = 0; k < drop.size(); k ++) if(ridx0[k] >= 0 && ridx1[k] >= 0) {
+        const T lscore(corpust[ridx0[i]][ridx0[j]][ridx0[k]] * other.corpust[ridx1[i]][ridx1[j]][ridx1[k]]);
+        res += lscore;
+      }
   return res;
 }
 
@@ -669,19 +631,19 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::conflictP
 
 template <typename T, typename U> const U corpushl<T, U>::serialize() const {
   cerr << " serialize" << flush;
-  if(corpust.rows() < 1 || corpust.cols() < 1)
+  if(words.size())
     return U("*NULL*");
   auto plus(*this), minus(*this);
-  for(int i = 0; i < plus.corpust.rows(); i ++)
-    for(int j = 0; j < plus.corpust.cols(); j ++)
-      for(int k = 0; k < plus.corpust(i, j).size(); k ++)
-        if(plus.corpust(i, j)[k] < T(0)) {
-          plus.corpust(i, j)[k]  = T(0);
-          minus.corpust(i, j)[k] = - minus.corpust(i, j)[k];
-        } else
-          minus.corpust(i, j)[k] = T(0);
+  for(int i = 0; i < plus.words.size(); i ++)
+    for(int j = 0; j < plus.words.size(); j ++)
+      for(int k = 0; k < plus.words.size(); k ++)
+        if(plus.corpust[i][j][k] < T(0)) {
+          plus.corpust[i][j][k]  = T(0);
+          minus.corpust[i][j][k] = - minus.corpust[i][j][k];
+        } else if(plus.corpust[i][j][k] != T(0))
+          minus.corpust[i][j][k] = T(0);
   vector<int> entire;
-  for(int i = 0; i < corpust.rows(); i ++)
+  for(int i = 0; i < words.size(); i ++)
     entire.push_back(i);
   return plus.serializeSub(entire)  + U(".<br/>\n-") +
          minus.serializeSub(entire) + U(".");
@@ -699,12 +661,12 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
   for(int i = 0; i < idxs.size(); i ++) {
     int lscore(0);
     for(int j = 0; j < idxs.size(); j ++)
-      if(0 <= idxs[j] && idxs[j] < corpust.rows()) {
+      if(0 <= idxs[j] && idxs[j] < words.size()) {
         for(int k = 0; k < idxs.size(); k ++)
           if(j != k &&
-             0 <= idxs[k] && idxs[k] < corpust.cols() &&
-             0 <= idxs[i] && idxs[i] < corpust(idxs[j], idxs[k]).size() &&
-             corpust(idxs[j], idxs[k])[idxs[i]] != T(0))
+             0 <= idxs[k] && idxs[k] < words.size() &&
+             0 <= idxs[i] && idxs[i] < words.size() &&
+             corpust[idxs[j]][idxs[k]][idxs[i]] != T(0))
             lscore --;
       }
     cscore.push_back(make_pair(lscore, idxs[i]));
@@ -722,13 +684,13 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
     }
     vector<pair<int, int> > score;
     for(int i = 0; i < idxs.size(); i ++)
-      if(idxs[i] != middle[0] && 0 <= idxs[i] && idxs[i] < corpust.rows()) {
+      if(idxs[i] != middle[0] && 0 <= idxs[i] && idxs[i] < words.size()) {
         int lscore(0);
         for(int j = 0; j < idxs.size(); j ++)
-          if(idxs[j] != middle[0] && 0 <= idxs[j] && idxs[j] < corpust.cols()) {
-            if(corpust(idxs[i], idxs[j])[middle[0]] != T(0))
+          if(idxs[j] != middle[0] && 0 <= idxs[j] && idxs[j] < words.size()) {
+            if(corpust[idxs[i]][idxs[j]][middle[0]] != T(0))
               lscore --;
-            if(corpust(idxs[j], idxs[i])[middle[0]] != T(0))
+            if(corpust[idxs[j]][idxs[i]][middle[0]] != T(0))
               lscore ++;
           }
         score.push_back(make_pair(lscore, idxs[i]));
@@ -821,38 +783,38 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::reDig(con
 #if defined(_OPENMP)
 #pragma omp paralell for schedule(static, 1)
 #endif
-  for(int i = 0; i < corpust.rows(); i ++)
-    for(int j = 0; j < corpust.cols(); j ++)
-      for(int k = 0; k < corpust(i, j).size(); k ++)
-        if(corpust(i, j)[k] != T(0))
-          corpust(i, j)[k] = (corpust(i, j)[k] < T(0) ? - T(1) : T(1)) * exp(log(abs(corpust(i, j)[k])) * ratio);
+  for(int i = 0; i < words.size(); i ++)
+    for(int j = 0; j < words.size(); j ++)
+      for(int k = 0; k < words.size(); k ++)
+        if(corpust[i][j][k] != T(0))
+          corpust[i][j][k] = (corpust[i][j][k] < T(0) ? - T(1) : T(1)) * exp(log(abs(corpust[i][j][k])) * ratio);
   return *this;
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThresh(const T& ratio) const {
   T absmax(0);
-  for(int i = 0; i < corpust.rows(); i ++)
-    for(int j = 0; j < corpust.cols(); j ++)
-      for(int k = 0; k < corpust(i, j).size(); k ++)
-        if(absmax < abs(corpust(i, j)[k]))
-          absmax = abs(corpust(i, j)[k]);
+  for(int i = 0; i < words.size(); i ++)
+    for(int j = 0; j < words.size(); j ++)
+      for(int k = 0; k < words.size(); k ++)
+        if(absmax < abs(corpust[i][j][k]))
+          absmax = abs(corpust[i][j][k]);
   Tensor work(corpust);
-  for(int i = 0; i < corpust.rows(); i ++)
-    for(int j = 0; j < corpust.cols(); j ++)
-      for(int k = 0; k < corpust(i, j).size(); k ++)
-        if(abs(corpust(i, j)[k]) < absmax * ratio)
-          work(i, j)[k] = T(0);
+  for(int i = 0; i < words.size(); i ++)
+    for(int j = 0; j < words.size(); j ++)
+      for(int k = 0; k < words.size(); k ++)
+        if(abs(corpust[i][j][k]) < absmax * ratio)
+          work[i][j][k] = T(0);
   vector<int> okidx;
-  for(int i = 0; i < corpust.rows(); i ++) {
+  for(int i = 0; i < words.size(); i ++) {
     bool flag(true);
-    for(int j = 0; j < corpust.rows(); j ++) {
-      if(work(i, j).dot(work(i, j)) != T(0) ||
-         work(j, i).dot(work(j, i)) != T(0)) {
+    for(int j = 0; j < words.size(); j ++) {
+      if(work[i][j].dot(work[i][j]) != T(0) ||
+         work[j][i].dot(work[j][i]) != T(0)) {
         flag = false;
         break;
       }
-      for(int k = 0; k < corpust.cols(); k ++)
-        if(i < work(j, k).size() && work(j, k)[i] != T(0)) {
+      for(int k = 0; k < words.size(); k ++)
+        if(i < words.size() && work[j][k][i] != T(0)) {
           flag = false;
           break;
         }
@@ -864,14 +826,13 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThr
   }
   corpushl<T, U> result;
   result.words   = vector<U>();
-  result.corpust = Tensor(okidx.size(), okidx.size());
+  result.corpust = Tensor();
   for(int i = 0; i < okidx.size(); i ++) {
     result.words.push_back(words[okidx[i]]);
-    for(int j = 0; j < okidx.size(); j ++) {
-      result.corpust(i, j) = Vec(okidx.size());
+    for(int j = 0; j < okidx.size(); j ++)
       for(int k = 0; k < okidx.size(); k ++)
-        result.corpust(i, j)[k] = corpust(okidx[i], okidx[j])[okidx[k]];
-    }
+        if(corpust[okidx[i]][okidx[j]][okidx[k]] != T(0))
+          result.corpust[i][j][k] = corpust[okidx[i]][okidx[j]][okidx[k]];
   }
   return result;
 }
@@ -938,19 +899,10 @@ template <typename T, typename U> vector<U> corpushl<T, U>::gatherWords(const ve
   return result;
 }
 
-template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dynamic, 1>, Eigen::Dynamic, Eigen::Dynamic> corpushl<T, U>::prepareDetail(const corpushl<T, U>& other, const vector<U>& workwords, const int& eidx, const vector<int>& ridx0, const vector<int>& ridx1, const vector<int>& ridx2) {
+template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::prepareDetail(const corpushl<T, U>& other, const vector<U>& workwords, const int& eidx, const vector<int>& ridx0, const vector<int>& ridx1, const vector<int>& ridx2) {
   cerr << "p" << flush;
   // initialize result tensor with 0.
-  Tensor res(workwords.size() - 1, workwords.size() - 1);
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-  for(int i = 0; i < workwords.size(); i ++) if(ridx2[i] >= 0)
-    for(int j = 0; j < workwords.size(); j ++) if(ridx2[j] >= 0) {
-      res(ridx2[i], ridx2[j]) = Vec(workwords.size() - 1);
-      for(int k = 0; k < res(ridx2[i], ridx2[j]).size(); k ++) if(ridx2[k] >= 0)
-        res(ridx2[i], ridx2[j])[ridx2[k]] = T(0);
-    }
+  Tensor res;
   // Sum-up detailed word into result pool without definition row, col.
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
@@ -958,10 +910,13 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
   for(int i = 0; i < workwords.size(); i ++) if(ridx0[i] >= 0 && ridx2[i] >= 0)
     for(int j = 0; j < workwords.size(); j ++) if(ridx0[j] >= 0 && ridx2[j] >= 0)
       for(int k = 0; k < workwords.size(); k ++) if(ridx0[k] >= 0) {
-        const T ratio(corpust(ridx0[i], ridx0[j])[ridx0[k]]);
-        if(ridx2[k] >= 0 && ridx1[k] >= 0 && ridx1[i] >= 0 && ridx1[j] >= 0)
-          res(ridx2[i], ridx2[j])[ridx2[k]] +=
-            ratio * other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
+        const T ratio(corpust[ridx0[i]][ridx0[j]][ridx0[k]]);
+        if(ratio == T(0))
+          continue;
+        if(ridx2[k] >= 0 && ridx1[k] >= 0 && ridx1[i] >= 0 && ridx1[j] >= 0 &&
+           other.corpust[ridx1[i]][ridx1[j]][ridx1[k]] != T(0))
+          res[ridx2[i]][ridx2[j]][ridx2[k]] +=
+            ratio * other.corpust[ridx1[i]][ridx1[j]][ridx1[k]];
       }
 
   // Sum-up words defined in definition row, col without crossing point.
@@ -972,19 +927,19 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
         // if all side exists on both corpust, weight and add.
         if(ridx0[i] >= 0 && ridx0[j] >= 0 && ridx0[k] >= 0 &&
            ridx1[j] >= 0 && ridx1[k] >= 0) {
-          const T& r0(corpust(ridx0[i], ridx0[j])[ridx0[k]]);
-          const T& r1(corpust(ridx0[j], ridx0[i])[ridx0[k]]);
+          const T& r0(corpust[ridx0[i]][ridx0[j]][ridx0[k]]);
+          const T& r1(corpust[ridx0[j]][ridx0[i]][ridx0[k]]);
           for(int kk = 0; kk < workwords.size(); kk ++)
             if(ridx1[kk] >= 0 && ridx2[kk] >= 0) {
-              res(ridx2[kk], ridx2[j])[ridx2[k]] +=
-                r0 * other.corpust(ridx1[kk], ridx1[j])[ ridx1[k]];
-              res(ridx2[j], ridx2[kk])[ridx2[k]] +=
-                r1 * other.corpust(ridx1[j], ridx1[kk])[ ridx1[k]];
+              res[ridx2[kk]][ridx2[j] ][ridx2[k]] +=
+                r0 * other.corpust[ridx1[kk]][ridx1[j] ][ridx1[k]];
+              res[ridx2[j] ][ridx2[kk]][ridx2[k]] +=
+                r1 * other.corpust[ridx1[j] ][ridx1[kk]][ridx1[k]];
             }
         // if only other have words defined, just add.
         } else if(ridx1[j] >= 0 && ridx1[k] >= 0 && ridx2[i] >= 0) {
-          res(ridx2[i], ridx2[j])[ridx2[k]] += other.corpust(ridx1[i], ridx1[j])[ridx1[k]];
-          res(ridx2[j], ridx2[i])[ridx2[k]] += other.corpust(ridx1[j], ridx1[i])[ridx1[k]];
+          res[ridx2[i]][ridx2[j]][ridx2[k]] += other.corpust[ridx1[i]][ridx1[j]][ridx1[k]];
+          res[ridx2[j]][ridx2[i]][ridx2[k]] += other.corpust[ridx1[j]][ridx1[i]][ridx1[k]];
         }
       }
     }
@@ -992,33 +947,38 @@ template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dy
   return res;
 }
 
-template <typename T, typename U> const Eigen::Matrix<T, Eigen::Dynamic, 1> corpushl<T, U>::singularValues() const {
-  Mat planes(corpust.rows(), corpust.cols());
-  for(int i = 0; i < corpust.rows(); i ++) {
-    Mat buf(corpust.rows(), corpust.cols());
-    for(int j = 0; j < corpust.cols(); j ++) {
-      for(int k = 0; k < corpust(i, j).size(); k ++)
-        if(isfinite(corpust(i, j)[k]))
-          buf(k, j) = corpust(i, j)[k];
+template <typename T, typename U> const SimpleSparseVector<T> corpushl<T, U>::singularValues() const {
+  Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> planes(words.size(), words.size());
+  for(int i = 0; i < words.size(); i ++) {
+    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> buf(words.size(), words.size());
+    for(int j = 0; j < words.size(); j ++) {
+      for(int k = 0; k < words.size(); k ++)
+        if(isfinite(corpust[i][j][k]))
+          buf(k, j) = corpust[i][j][k];
         else {
           cerr << "nan" << flush;
           buf(k, j) = T(0);
         }
-      for(int k = corpust(i, j).size(); k < buf.rows(); k ++)
+      for(int k = words.size(); k < buf.rows(); k ++)
         buf(k, j) = T(0);
     }
-    Eigen::JacobiSVD<Mat> svd(buf, 0);
+    Eigen::JacobiSVD<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> > svd(buf, 0);
     planes.col(i) = svd.singularValues();
   }
-  Eigen::JacobiSVD<Mat> svd(planes, 0);
-  return svd.singularValues();
+  Eigen::JacobiSVD<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> > svd(planes, 0);
+  auto sv(svd.singularValues());
+  SimpleSparseVector<T> result;
+  for(int i = 0; i < sv.size(); i ++)
+    if(sv[i] != T(0))
+      result[i] = sv[i];
+  return result;
 }
 
 template <typename T, typename U> const vector<U>& corpushl<T, U>::getWords() const {
   return words;
 }
 
-template <typename T, typename U> const Eigen::Matrix<Eigen::Matrix<T, Eigen::Dynamic, 1>, Eigen::Dynamic, Eigen::Dynamic>& corpushl<T, U>::getCorpus() const {
+template <typename T, typename U> const SimpleSparseTensor<T>& corpushl<T, U>::getCorpus() const {
   return corpust;
 }
 
