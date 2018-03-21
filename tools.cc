@@ -131,8 +131,8 @@ int main(int argc, const char* argv[]) {
               std::cout << itr->count << std::endl;
             }
         }
-      break;
     }
+    break;
   case 8:
     // lbalance.
     {
@@ -159,7 +159,7 @@ int main(int argc, const char* argv[]) {
         stat.compute(input.substr(i * szwindow, szwindow), delimiter);
         const auto& corpus(stat.getCorpus());
         std::cout << words  << std::endl;
-        std::cout << corpus << std::endl;
+        // std::cout << corpus << std::endl;
       }
     }
     break;
