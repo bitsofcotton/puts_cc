@@ -550,10 +550,8 @@ template <typename T, typename U> const T corpushl<T, U>::cdot(const corpushl<T,
   vector<U>   drop(gatherWords(words, other.words, ridx0, ridx1));
   for(int i = 0; i < drop.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0)
     for(int j = 0; j < drop.size(); j ++) if(ridx0[j] >= 0 && ridx1[j] >= 0)
-      for(int k = 0; k < drop.size(); k ++) if(ridx0[k] >= 0 && ridx1[k] >= 0) {
-        const T lscore(corpust[ridx0[i]][ridx0[j]][ridx0[k]] * other.corpust[ridx1[i]][ridx1[j]][ridx1[k]]);
-        res += lscore;
-      }
+      for(int k = 0; k < drop.size(); k ++) if(ridx0[k] >= 0 && ridx1[k] >= 0)
+        res += corpust[ridx0[i]][ridx0[j]][ridx0[k]] * other.corpust[ridx1[i]][ridx1[j]][ridx1[k]];
   return res;
 }
 
@@ -657,7 +655,7 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
     return U();
   }
   vector<pair<int, int> > cscore;
-  // N.B. i0 - i1 - i2 is stored in corpust(i0, i2)[i1].
+  // N.B. i0 - i1 - i2 is stored in corpust[i0][i2][i1].
   for(int i = 0; i < idxs.size(); i ++) {
     int lscore(0);
     for(int j = 0; j < idxs.size(); j ++)
@@ -738,12 +736,12 @@ template <typename T, typename U> const U corpushl<T, U>::reverseLink(const corp
 
 template <typename T, typename U> const pair<T, T> corpushl<T, U>::compareStructure(const corpushl<T, U>& src, const T& thresh, const T& thresh2) const {
   // get H-SVD singular values for each of them and sort:
-  const Vec s0(singularValues()), s1(src.singularValues());
+  const Eigen::Matrix<T, Eigen::Dynamic, 1> s0(singularValues()), s1(src.singularValues());
   
   // get compared.
   pair<T, T> result;
   result.first = result.second = T(0);
-  Mat S0(s0.size(), s0.size()), S1(s1.size(), s1.size());
+  Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> S0(s0.size(), s0.size()), S1(s1.size(), s1.size());
   for(int i = 0; i < S0.rows(); i ++)
     for(int j = 0; j < S0.cols(); j ++) {
       S0(i, j) = s0[i] / s0[j];
@@ -756,10 +754,10 @@ template <typename T, typename U> const pair<T, T> corpushl<T, U>::compareStruct
       if(!isfinite(S1(i, j)) || T(1) / thresh < abs(S1(i, j)))
         S1(i, j) = T(0);
     }
-  Eigen::JacobiSVD<Mat> svd0(S0, 0);
-  Eigen::JacobiSVD<Mat> svd1(S1, 0);
-  const Vec ss0(svd0.singularValues());
-  const Vec ss1(svd1.singularValues());
+  Eigen::JacobiSVD<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> > svd0(S0, 0);
+  Eigen::JacobiSVD<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> > svd1(S1, 0);
+  const auto ss0(svd0.singularValues());
+  const auto ss1(svd1.singularValues());
   int i(0), j(0);
   for( ; i < ss0.size() && j < ss1.size(); )
     if(abs(ss0[i] - ss1[j]) / max(abs(ss0[i]), abs(ss1[i])) < thresh2) {
@@ -798,12 +796,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThr
       for(int k = 0; k < words.size(); k ++)
         if(absmax < abs(corpust[i][j][k]))
           absmax = abs(corpust[i][j][k]);
-  Tensor work(corpust);
-  for(int i = 0; i < words.size(); i ++)
-    for(int j = 0; j < words.size(); j ++)
-      for(int k = 0; k < words.size(); k ++)
-        if(abs(corpust[i][j][k]) < absmax * ratio)
-          work[i][j][k] = T(0);
+  Tensor work;
   vector<int> okidx;
   for(int i = 0; i < words.size(); i ++) {
     bool flag(true);
@@ -927,8 +920,8 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
         // if all side exists on both corpust, weight and add.
         if(ridx0[i] >= 0 && ridx0[j] >= 0 && ridx0[k] >= 0 &&
            ridx1[j] >= 0 && ridx1[k] >= 0) {
-          const T& r0(corpust[ridx0[i]][ridx0[j]][ridx0[k]]);
-          const T& r1(corpust[ridx0[j]][ridx0[i]][ridx0[k]]);
+          const T r0(corpust[ridx0[i]][ridx0[j]][ridx0[k]]);
+          const T r1(corpust[ridx0[j]][ridx0[i]][ridx0[k]]);
           for(int kk = 0; kk < workwords.size(); kk ++)
             if(ridx1[kk] >= 0 && ridx2[kk] >= 0) {
               res[ridx2[kk]][ridx2[j] ][ridx2[k]] +=
