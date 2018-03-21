@@ -738,12 +738,12 @@ template <typename T, typename U> const U corpushl<T, U>::reverseLink(const corp
 
 template <typename T, typename U> const pair<T, T> corpushl<T, U>::compareStructure(const corpushl<T, U>& src, const T& thresh, const T& thresh2) const {
   // get H-SVD singular values for each of them and sort:
-  const Vec s0(singularValues()), s1(src.singularValues());
+  const Eigen::Matrix<T, Eigen::Dynamic, 1> s0(singularValues()), s1(src.singularValues());
   
   // get compared.
   pair<T, T> result;
   result.first = result.second = T(0);
-  Mat S0(s0.size(), s0.size()), S1(s1.size(), s1.size());
+  Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> S0(s0.size(), s0.size()), S1(s1.size(), s1.size());
   for(int i = 0; i < S0.rows(); i ++)
     for(int j = 0; j < S0.cols(); j ++) {
       S0(i, j) = s0[i] / s0[j];
@@ -756,10 +756,10 @@ template <typename T, typename U> const pair<T, T> corpushl<T, U>::compareStruct
       if(!isfinite(S1(i, j)) || T(1) / thresh < abs(S1(i, j)))
         S1(i, j) = T(0);
     }
-  Eigen::JacobiSVD<Mat> svd0(S0, 0);
-  Eigen::JacobiSVD<Mat> svd1(S1, 0);
-  const Vec ss0(svd0.singularValues());
-  const Vec ss1(svd1.singularValues());
+  Eigen::JacobiSVD<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> > svd0(S0, 0);
+  Eigen::JacobiSVD<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> > svd1(S1, 0);
+  const auto ss0(svd0.singularValues());
+  const auto ss1(svd1.singularValues());
   int i(0), j(0);
   for( ; i < ss0.size() && j < ss1.size(); )
     if(abs(ss0[i] - ss1[j]) / max(abs(ss0[i]), abs(ss1[i])) < thresh2) {
