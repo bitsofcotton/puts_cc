@@ -726,13 +726,13 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
     }
     vector<pair<int, int> > score;
     for(int i = 0; i < idxs.size(); i ++)
-      if(idxs[i] != middle[si]) {
+      if(idxs[i] != middle[0]) {
         int lscore(0);
         for(int j = 0; j < idxs.size(); j ++)
-          if(idxs[j] != middle[si]) {
-            if(corpust[idxs[i]][idxs[j]][middle[si]] != T(0))
+          if(idxs[j] != middle[0]) {
+            if(corpust[idxs[i]][idxs[j]][middle[0]] != T(0))
               lscore --;
-            if(corpust[idxs[j]][idxs[i]][middle[si]] != T(0))
+            if(corpust[idxs[j]][idxs[i]][middle[0]] != T(0))
               lscore ++;
           }
         score.push_back(make_pair(lscore, idxs[i]));
