@@ -707,10 +707,14 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
   // N.B. i0 - i1 - i2 is stored in corpust[i0][i2][i1].
   for(int i = 0; i < idxs.size(); i ++) {
     int lscore(0);
-    for(int j = 0; j < idxs.size(); j ++)
-      for(int k = 0; k < idxs.size(); k ++)
-        if(j != k && corpust[idxs[j]][idxs[k]][idxs[i]] != T(0))
+    const auto& ci1(corpust.iter());
+    for(int j = 0; j < ci1.size(); j ++) {
+      const auto& ci2(ci1[j].second.iter());
+      for(int k = 0; k < ci2.size(); k ++)
+        if(ci1[j].first != ci2[k].first &&
+           ci2[k].second[idxs[i]] != T(0))
           lscore --;
+    }
     cscore.push_back(make_pair(lscore, idxs[i]));
   }
   sort(cscore.begin(), cscore.end());
