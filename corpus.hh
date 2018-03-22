@@ -84,7 +84,7 @@ private:
   int                  nthresh;
   int                  Nthresh;
   int                  Mwords;
-  T                    Midx;
+  int                  Midx;
    
   void getWordPtrs(const U& input, const vector<U>& delimiter);
   void corpusEach();
@@ -445,12 +445,14 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
   for(int i = 0; i < ci0.size(); i ++) {
     const int ii(reverseLookup(ridx0, ci0[i].first));
     auto& ci1(ci0[i].second.iter());
+    if(ii < 0) continue;
     for(int j = 0; j < ci1.size(); j ++) {
       const int jj(reverseLookup(ridx0, ci1[j].first));
       auto& ci2(ci1[j].second.iter());
+      if(jj < 0) continue;
       for(int k = 0; k < ci2.size(); k ++) {
         const int kk(reverseLookup(ridx0, ci2[k].first));
-        if(0 <= ii && 0 <= jj && 0 <= kk)
+        if(0 <= kk)
           result.corpust[ii][jj][kk] += ci2[k].second;
       }
     }
@@ -459,12 +461,14 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
   for(int i = 0; i < oi0.size(); i ++) {
     const int ii(reverseLookup(ridx1, oi0[i].first));
     auto& oi1(oi0[i].second.iter());
+    if(ii < 0) continue;
     for(int j = 0; j < oi1.size(); j ++) {
       const int jj(reverseLookup(ridx1, oi1[j].first));
       auto& oi2(oi1[j].second.iter());
+      if(jj < 0) continue;
       for(int k = 0; k < oi2.size(); k ++) {
         const int kk(reverseLookup(ridx1, oi2[k].first));
-        if(0 <= ii && 0 <= jj && 0 <= kk)
+        if(0 <= kk)
           result.corpust[ii][jj][kk] += oi2[k].second;
       }
     }
@@ -554,15 +558,17 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2rel
       }
   auto& ci0(result.corpust.iter());
   for(int i = 0; i < ci0.size(); i ++) {
-    const int ii(ci0[i].first);
+    const int ii(reverseLookup(ridx0, ci0[i].first));
     auto& ci1(ci0[i].second.iter());
+    if(ii < 0) continue;
     for(int j = 0; j < ci1.size(); j ++) {
-      const int jj(ci1[j].first);
+      const int jj(reverseLookup(ridx0, ci1[j].first));
       auto& ci2(ci1[j].second.iter());
+      if(jj < 0) continue;
       for(int k = 0; k < ci2.size(); k ++) {
-        const int kk(ci2[k].first);
-        if(0 <= ridx0[ii] && 0 <= ridx0[jj] && 0 <= ridx0[kk])
-          ci2[k].second *= mul[ridx0[ii]][ridx0[jj]][ridx0[kk]];
+        const int kk(reverseLookup(ridx0, ci2[k].first));
+        if(0 <= kk)
+          ci2[k].second *= mul[ii][jj][kk];
       }
     }
   }
@@ -573,10 +579,28 @@ template <typename T, typename U> const T corpushl<T, U>::cdot(const corpushl<T,
   T res(0);
   vector<int> ridx0, ridx1;
   vector<U>   drop(gatherWords(words, other.words, ridx0, ridx1));
-  for(int i = 0; i < drop.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0)
-    for(int j = 0; j < drop.size(); j ++) if(ridx0[j] >= 0 && ridx1[j] >= 0)
-      for(int k = 0; k < drop.size(); k ++) if(ridx0[k] >= 0 && ridx1[k] >= 0)
-        res += corpust[ridx0[i]][ridx0[j]][ridx0[k]] * other.corpust[ridx1[i]][ridx1[j]][ridx1[k]];
+  const auto& oi0(other.corpust.iter());
+  for(int i = 0; i < oi0.size(); i ++) {
+    const int   i0(reverseLookup(ridx1, oi0[i].first));
+    if(i0 < 0) continue;
+    const int   ii(ridx0[i0]);
+    const auto& oi1(oi0[i].second.iter());
+    if(ii < 0) continue;
+    for(int j = 0; j < oi1.size(); j ++) {
+      const int   j0(reverseLookup(ridx1, oi1[j].first));
+      if(j0 < 0) continue;
+      const int   jj(ridx0[j0]);
+      const auto& oi2(oi1[j].second.iter());
+      if(jj < 0) continue;
+      for(int k = 0; k < oi2.size(); k ++) {
+        const int k0(reverseLookup(ridx1, oi2[k].first));
+        if(k0 < 0) continue;
+        const int kk(ridx0[k0]);
+        if(0 <= kk)
+          res += corpust[ii][jj][kk] * oi2[k].second;
+      }
+    }
+  }
   return res;
 }
 
@@ -654,7 +678,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::conflictP
 
 template <typename T, typename U> const U corpushl<T, U>::serialize() const {
   cerr << " serialize" << flush;
-  if(words.size())
+  if(words.size() <= 0)
     return U("*NULL*");
   auto plus(*this), minus(*this);
   for(int i = 0; i < plus.words.size(); i ++)
@@ -684,14 +708,9 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
   for(int i = 0; i < idxs.size(); i ++) {
     int lscore(0);
     for(int j = 0; j < idxs.size(); j ++)
-      if(0 <= idxs[j] && idxs[j] < words.size()) {
-        for(int k = 0; k < idxs.size(); k ++)
-          if(j != k &&
-             0 <= idxs[k] && idxs[k] < words.size() &&
-             0 <= idxs[i] && idxs[i] < words.size() &&
-             corpust[idxs[j]][idxs[k]][idxs[i]] != T(0))
-            lscore --;
-      }
+      for(int k = 0; k < idxs.size(); k ++)
+        if(j != k && corpust[idxs[j]][idxs[k]][idxs[i]] != T(0))
+          lscore --;
     cscore.push_back(make_pair(lscore, idxs[i]));
   }
   sort(cscore.begin(), cscore.end());
@@ -707,13 +726,13 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
     }
     vector<pair<int, int> > score;
     for(int i = 0; i < idxs.size(); i ++)
-      if(idxs[i] != middle[0] && 0 <= idxs[i] && idxs[i] < words.size()) {
+      if(idxs[i] != middle[si]) {
         int lscore(0);
         for(int j = 0; j < idxs.size(); j ++)
-          if(idxs[j] != middle[0] && 0 <= idxs[j] && idxs[j] < words.size()) {
-            if(corpust[idxs[i]][idxs[j]][middle[0]] != T(0))
+          if(idxs[j] != middle[si]) {
+            if(corpust[idxs[i]][idxs[j]][middle[si]] != T(0))
               lscore --;
-            if(corpust[idxs[j]][idxs[i]][middle[0]] != T(0))
+            if(corpust[idxs[j]][idxs[i]][middle[si]] != T(0))
               lscore ++;
           }
         score.push_back(make_pair(lscore, idxs[i]));
@@ -828,16 +847,14 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThr
   }
   Tensor work;
   vector<int> okidx;
+  // XXX fixme: this should depend on absmax * ratio.
   for(int i = 0; i < words.size(); i ++) {
     bool flag(true);
     for(int j = 0; j < words.size(); j ++) {
-      if(work[i][j].dot(work[i][j]) != T(0) ||
-         work[j][i].dot(work[j][i]) != T(0)) {
-        flag = false;
-        break;
-      }
       for(int k = 0; k < words.size(); k ++)
-        if(i < words.size() && work[j][k][i] != T(0)) {
+        if(ratio * absmax <= abs(work[i][j][k]) ||
+           ratio * absmax <= abs(work[j][k][i]) ||
+           ratio * absmax <= abs(work[j][i][k])) {
           flag = false;
           break;
         }
@@ -854,7 +871,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThr
     result.words.push_back(words[okidx[i]]);
     for(int j = 0; j < okidx.size(); j ++)
       for(int k = 0; k < okidx.size(); k ++)
-        if(corpust[okidx[i]][okidx[j]][okidx[k]] != T(0))
+        if(ratio * absmax <= abs(corpust[okidx[i]][okidx[j]][okidx[k]]))
           result.corpust[i][j][k] = corpust[okidx[i]][okidx[j]][okidx[k]];
   }
   return result;
@@ -862,16 +879,10 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThr
 
 template <typename T, typename U> const int corpushl<T, U>::reverseLookup(const vector<int>& src, const int& idx) const {
   assert(0 <= idx && idx < src.size());
-  int sidx(- 1);
   for(int i = 0; i < src.size(); i ++)
-    if(idx == src[i]) {
-      sidx = i;
-      break;
-    }
-  if(sidx < 0)
-    return - 1;
-  assert(0 <= sidx && sidx < src.size());
-  return sidx;
+    if(idx == src[i])
+      return i;
+  return - 1;
 }
 
 template <typename T, typename U> vector<U> corpushl<T, U>::gatherWords(const vector<U>& in0, const vector<U>& in1, vector<int>& ridx0, vector<int>& ridx1) const {
@@ -1175,12 +1186,13 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
   vector<pair<T, int> > work;
   vector<vector<int> >  idxs;
   vector<pair<T, int> > residue;
-  auto                  cstatsw(cstats);
+  Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> cstatsw(cstats);
   for(int i = 0; i < cstat.size(); i ++)
     idxs.push_back(vector<int>());
   for(int ii = 0; phrases.size() <= cstatsw.rows(); ii ++) {
     vector<vector<pair<T, int> > > scores0;
     vector<pair<T, int> > cidxs;
+    auto                  phrase0(phrases);
     for(int i = 0; i < cstatsw.rows(); i ++)
       if(!binary_search(phrases.begin(), phrases.end(), i)) {
         vector<pair<T, int> > lscores;
@@ -1197,10 +1209,9 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
       } else
         scores0.push_back(vector<pair<T, int> >());
     sort(cidxs.begin(), cidxs.end());
-    if(!cidxs.size()) break;
-    if(cidxs[0].first == T(0)) {
-      for(int j = 0; j < phrases.size(); j ++)
-        if(!binary_search(phrases.begin(), phrases.end(), j)) {
+    if(!cidxs.size() || cidxs[0].first == T(0)) {
+      for(int j = 0; j < cstats.rows(); j ++)
+        if(!binary_search(phrase0.begin(), phrase0.end(), j)) {
           T mm(0);
           for(int k = 0; k < cstatsw.rows(); k ++)
             mm = min(mm, cstatsw(j, k));
