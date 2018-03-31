@@ -22,16 +22,7 @@ using std::cout;
 using std::cerr;
 using std::endl;
 using std::flush;
-using std::vector;
-using std::sort;
-using std::pair;
-using std::make_pair;
-using std::distance;
-using std::upper_bound;
-
-template <typename T> bool orderPairVec(const T& a, const T& b) {
-  return a.first < b.first;
-}
+using std::map;
 
 template <typename T> class SimpleSparseVector {
 public:
@@ -56,25 +47,25 @@ public:
         T  dot         (const SimpleSparseVector<T>& other) const;
         T& operator [] (const int& idx);
   const T  operator [] (const int& idx) const;
-        vector<pair<int, T> >& iter();
-  const vector<pair<int, T> >& iter() const;
+        map<int, T>& iter();
+  const map<int, T>& iter() const;
 private:
-  vector<pair<int, T> >  entity;
+  map<int, T>  entity;
 };
 
 template <typename T> SimpleSparseVector<T>::SimpleSparseVector() {
-  entity = vector<pair<int, T> >();
+  entity = map<int, T>();
   return;
 }
 
 template <typename T> SimpleSparseVector<T>::SimpleSparseVector(const int& sute) {
   assert(sute == 0);
-  entity = vector<pair<int, T> >();
+  entity = map<int, T>();
   return;
 }
 
 template <typename T> SimpleSparseVector<T>::SimpleSparseVector(const SimpleSparseVector<T>& other) {
-  entity = vector<pair<int, T> >(other.entity);
+  entity = map<int, T>(other.entity);
   return;
 }
 
@@ -89,11 +80,8 @@ template <typename T> SimpleSparseVector<T>::~SimpleSparseVector() {
 
 template <typename T> SimpleSparseVector<T> SimpleSparseVector<T>::operator - () const {
   SimpleSparseVector<T> res(*this);
-#if defined(_OPENMP)
-#pragma omp simd
-#endif
-  for(int i = 0; i < res.entity.size(); i ++)
-    res.entity[i].second = - res.entity[i].second;
+  for(auto itr(res.entity.begin()); itr != res.entity.end(); itr ++)
+    itr->second = - itr->second;
   return res;
 }
 
@@ -103,12 +91,12 @@ template <typename T> SimpleSparseVector<T> SimpleSparseVector<T>::operator + (c
 }
 
 template <typename T> const SimpleSparseVector<T>& SimpleSparseVector<T>::operator += (const SimpleSparseVector<T>& other) {
-  for(int i = 0; i < other.entity.size(); i ++) {
-    const int j(distance(entity.begin(), upper_bound(entity.begin(), entity.end(), other.entity[i], orderPairVec<pair<int, T> >)) - 1);
-    if(0 <= j && j < entity.size() && entity[j].first == other.entity[i].first)
-      entity[j].second += other.entity[i].second;
-    else if(other.entity[i].second != T(0))
-      (*this)[other.entity[i].first] = other.entity[i].second;
+  for(auto itr(other.entity.begin()); itr != other.entity.end(); itr ++) {
+    auto search(entity.find(itr->first));
+    if(search == entity.end())
+      (*this)[itr->first] = itr->second;
+    else
+      search->second += itr->second;
   }
   return *this;
 }
@@ -128,11 +116,8 @@ template <typename T> template <typename U> SimpleSparseVector<T> SimpleSparseVe
 }
 
 template <typename T> template <typename U> const SimpleSparseVector<T>& SimpleSparseVector<T>::operator *= (const U& other) {
-#if defined(_OPENMP)
-#pragma omp simd
-#endif
-  for(int i = 0; i < entity.size(); i ++)
-    entity[i].second *= other;
+  for(auto itr(entity.begin()); itr != entity.end(); itr ++)
+    itr->second *= other;
   return *this;
 }
 
@@ -156,55 +141,45 @@ template <typename T> bool SimpleSparseVector<T>::operator == (const SimpleSpars
 }
 
 template <typename T> template <typename U> const SimpleSparseVector<T>& SimpleSparseVector<T>::operator /= (const U& other) {
-#if defined(_OPENMP)
-#pragma omp simd
-#endif
-  for(int i = 0; i < entity.size(); i ++)
-    entity[i].second /= other;
+  for(auto itr(entity.begin()); itr < entity.end(); itr ++)
+    itr->second /= other;
   return *this;
 }
 
 template <typename T> T SimpleSparseVector<T>::dot(const SimpleSparseVector<T>& other) const {
   T res(0);
-  SimpleSparseVector<T> work;
-  for(int i = 0; i < other.entity.size(); i ++) {
-    const int j(distance(entity.begin(), upper_bound(entity.begin(), entity.end(), other.entity[i], orderPairVec<pair<int, T> >)) - 1);
-    if(0 <= j && j < entity.size() && entity[j].first == other.entity[i].first)
-      work[entity[j].first] = entity[j].second * other.entity[i].second;
+  for(auto itr(other.entity.begin()); itr < other.entity.end(); itr ++) {
+    auto search(entity.find(itr->first));
+    if(search != entity.end())
+      res += search->second * itr->second;
   }
-  for(int i = 0; i < work.entity.size(); i ++)
-    res += work.entity[i].second;
   return res;
 }
 
 template <typename T> T& SimpleSparseVector<T>::operator [] (const int& idx) {
   assert(0 <= idx);
-  const auto lidx(make_pair(int(idx), T(0)));
-  const int  ii(distance(entity.begin(), upper_bound(entity.begin(), entity.end(), lidx, orderPairVec<pair<int, T> >)) - 1);
-  if(0 <= ii && ii < entity.size() && entity[ii].first == idx)
-    return entity[ii].second;
-  else {
-    entity.push_back(make_pair(int(idx), T(0)));
-    sort(entity.begin(), entity.end(), orderPairVec<pair<int, T> >);
-  }
-  const int  i(distance(entity.begin(), upper_bound(entity.begin(), entity.end(), lidx, orderPairVec<pair<int, T> >)) - 1);
-  return entity[i].second;
+  const auto search(entity.find(idx));
+  if(search != entity.end())
+    return search->second;
+  else
+    entity[idx] = T(0);
+  const auto search2(entity.find(idx));
+  return search2->second;
 }
 
 template <typename T> const T SimpleSparseVector<T>::operator [] (const int& idx) const {
   assert(0 <= idx);
-  const auto lidx(make_pair(int(idx), T(0)));
-  const int  i(distance(entity.begin(), upper_bound(entity.begin(), entity.end(), lidx, orderPairVec<pair<int, T> >)) - 1);
-  if(0 <= i && i < entity.size() && entity[i].first == idx)
-    return entity[i].second;
+  const auto search(entity.find(idx));
+  if(search != entity.end())
+    return search->second;
   return T(0);
 }
 
-template <typename T> vector<pair<int, T> >& SimpleSparseVector<T>::iter() {
+template <typename T> map<int, T>& SimpleSparseVector<T>::iter() {
   return entity;
 }
 
-template <typename T> const vector<pair<int, T> >& SimpleSparseVector<T>::iter() const {
+template <typename T> const map<int, T>& SimpleSparseVector<T>::iter() const {
   return entity;
 }
 
