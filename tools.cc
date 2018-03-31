@@ -12,8 +12,8 @@ void usage() {
   std::cout << "tools (lword|lbalance|corpus|toc|redig|stat|reconstruct|diff|getdict)" << std::endl;
 }
 
-const int szwindow(600);
-const int szblock(600 * 200);
+const int szwindow(200);
+const int szblock(20000);
 const int Mbalance(40);
 std::vector<std::string> delimiter;
 std::vector<std::string> csvelim;
