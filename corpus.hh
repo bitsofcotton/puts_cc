@@ -209,8 +209,8 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
         if(workd[ii] == delimiter[j] && pdelim[pdelim.size() - 1] < i)
           pdelim.push_back(i);
     }
-    auto lo(words0.begin() + distance(words0.begin(), upper_bound(words0.begin(), words0.end(), work, lessEqualStrClip<U>)));
-    auto up(words0.begin() + distance(words0.begin(), upper_bound(words0.begin(), words0.end(), work, lessNotEqualStrClip<U>)));
+    auto lo(upper_bound(words0.begin(), words0.end(), work, lessEqualStrClip<U>));
+    auto up(upper_bound(words0.begin(), words0.end(), work, lessNotEqualStrClip<U>));
     bool match(false);
     for(auto itr(lo); itr < up; ++ itr)
       if(equalStrClip<U>(work, *itr)) {
@@ -220,7 +220,7 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
         } else if(work.size() < itr->size())
           match = true;
       }
-    if(match && input[i + 1])
+    if(match && i < input.size() - 1)
       continue;
     if(matchwidx.size() > 0) {
       int j = matchwidx.size() - 1;
@@ -229,18 +229,11 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
       matchwidx = vector<int>();
       matchidxs = vector<int>();
     }
+    if(i == input.size() - 1)
+      break;
     i     -= work.size() - 1;
     i0     = i;
     work   = U();
-  }
-  {
-    if(matchwidx.size() > 0) {
-      int j = matchwidx.size() - 1;
-      ptrs0[matchwidx[j]].push_back(matchidxs[j]);
-      Midx = matchidxs[j];
-      matchwidx = vector<int>();
-      matchidxs = vector<int>();
-    }
   }
   words = vector<U>();
   ptrs  = vector<vector<int> >();
@@ -358,7 +351,7 @@ public:
 
 private:
   const U      serializeSub(const vector<int>& idxs) const;
-  const Vec    singularValues() const;
+  Eigen::Matrix<T, Eigen::Dynamic, 1> singularValues() const;
   const int    reverseLookup(const vector<int>& src, const int& idx) const;
   vector<U>    gatherWords(const vector<U>& in0, const vector<U>& in1, vector<int>& ridx0, vector<int>& ridx1) const;
   const Tensor prepareDetail(const corpushl<T, U>& other, const vector<U>& workwords, const int& eidx, const vector<int>& ridx0, const vector<int>& ridx1, const vector<int>& ridx2);
@@ -526,13 +519,16 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
   auto& ci0(corpust.iter());
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); itr0 ++) {
     const int ii(reverseLookup(ridx0, itr0->first));
+    if(ii < 0) continue;
     auto& ci1(itr0->second.iter());
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); itr1 ++) {
       const int jj(reverseLookup(ridx0, itr1->first));
+      if(jj < 0) continue;
       auto& ci2(itr1->second.iter());
       for(auto itr2(ci2.begin()); itr2 != ci2.end(); itr2 ++) {
         const int kk(reverseLookup(ridx0, itr2->first));
-        result.corpust[ii][jj][kk] = itr2->second;
+        if(0 <= kk)
+          result.corpust[ii][jj][kk] = itr2->second;
       }
     }
   }
@@ -721,13 +717,8 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
   for(int si = 0; si < cscore.size(); si ++) {
     vector<int> middle, left, right;
     middle.push_back(cscore[si].second);
-    if(!cscore[si].first) {
-      string result;
-      for(int i = 0; i < cscore.size(); i ++)
-        if(cscore[i].first != T(0))
-          result += words[cscore[i].second];
-      return result;
-    }
+    if(!cscore[si].first)
+      goto symmetric;
     vector<pair<int, int> > score;
     for(int i = 0; i < idxs.size(); i ++)
       if(idxs[i] != middle[0]) {
@@ -752,7 +743,12 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
     if(left.size() || right.size())
       return serializeSub(left) + serializeSub(middle) + serializeSub(right);
   }
-  return U("SYMMETRIC");
+ symmetric:
+  string result;
+  for(int i = 0; i < cscore.size(); i ++)
+    if(cscore[i].first != T(0))
+      result += words[cscore[i].second];
+  return result;
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(const U& word, const corpushl<T, U>& mean) {
@@ -784,7 +780,7 @@ template <typename T, typename U> const U corpushl<T, U>::reverseLink(const corp
 
 template <typename T, typename U> const pair<T, T> corpushl<T, U>::compareStructure(const corpushl<T, U>& src, const T& thresh, const T& thresh2) const {
   // get H-SVD singular values for each of them and sort:
-  const Eigen::Matrix<T, Eigen::Dynamic, 1> s0(singularValues()), s1(src.singularValues());
+  const auto s0(singularValues()), s1(src.singularValues());
   
   // get compared.
   pair<T, T> result;
@@ -851,7 +847,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThr
   }
   Tensor work;
   vector<int> okidx;
-  // XXX fixme: this should depend on absmax * ratio.
+  // XXX: can be rewrited as speed up.
   for(int i = 0; i < words.size(); i ++) {
     bool flag(true);
     for(int j = 0; j < words.size(); j ++) {
@@ -958,13 +954,16 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
   const auto& ci0(other.corpust.iter());
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); itr0 ++) {
     const int ii(reverseLookup(ridx1, itr0->first));
+    if(ii < 0) continue;
     const auto& ci1(itr0->second.iter());
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); itr1 ++) {
       const int jj(reverseLookup(ridx1, itr1->first));
+      if(jj < 0) continue;
       const auto& ci2(itr1->second.iter());
       for(auto itr2(ci2.begin()); itr2 != ci2.end(); itr2 ++) {
         // Sum-up detailed word into result pool without definition row, col.
         const int kk(reverseLookup(ridx1, itr2->first));
+        if(kk < 0) continue;
         if(0 <= ridx0[ii] && 0 <= ridx0[jj] && 0 <= ridx0[kk]) {
           res[ridx2[ii]][ridx2[jj]][ridx2[kk]] += corpust[ridx0[ii]][ridx0[jj]][ridx0[kk]] * itr2->second;
           
@@ -993,7 +992,7 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
   return res;
 }
 
-template <typename T, typename U> const SimpleSparseVector<T> corpushl<T, U>::singularValues() const {
+template <typename T, typename U> Eigen::Matrix<T, Eigen::Dynamic, 1> corpushl<T, U>::singularValues() const {
   Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> planes(words.size(), words.size());
   for(int i = 0; i < words.size(); i ++) {
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> buf(words.size(), words.size());
@@ -1012,12 +1011,7 @@ template <typename T, typename U> const SimpleSparseVector<T> corpushl<T, U>::si
     planes.col(i) = svd.singularValues();
   }
   Eigen::JacobiSVD<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> > svd(planes, 0);
-  auto sv(svd.singularValues());
-  SimpleSparseVector<T> result;
-  for(int i = 0; i < sv.size(); i ++)
-    if(sv[i] != T(0))
-      result[i] = sv[i];
-  return result;
+  return Vec(svd.singularValues());
 }
 
 template <typename T, typename U> const vector<U>& corpushl<T, U>::getWords() const {
@@ -1196,7 +1190,6 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
   for(int ii = 0; phrases.size() <= cstatsw.rows(); ii ++) {
     vector<vector<pair<T, int> > > scores0;
     vector<pair<T, int> > cidxs;
-    auto                  phrase0(phrases);
     for(int i = 0; i < cstatsw.rows(); i ++)
       if(!binary_search(phrases.begin(), phrases.end(), i)) {
         vector<pair<T, int> > lscores;
@@ -1215,7 +1208,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     sort(cidxs.begin(), cidxs.end());
     if(!cidxs.size() || cidxs[0].first == T(0)) {
       for(int j = 0; j < cstats.rows(); j ++)
-        if(!binary_search(phrase0.begin(), phrase0.end(), j)) {
+        if(!binary_search(phrases.begin(), phrases.end(), j)) {
           T mm(0);
           for(int k = 0; k < cstatsw.rows(); k ++)
             mm = min(mm, cstatsw(j, k));
