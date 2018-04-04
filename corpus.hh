@@ -42,6 +42,7 @@ using std::max;
 using std::abs;
 using std::exp;
 using std::log;
+using std::move;
 
 template <typename T> bool equalStrClip(const T& a, const T& b) {
   int cmp(0), jidx(0);
@@ -325,6 +326,7 @@ public:
   const corpushl<T, U>  operator -  (const corpushl<T, U>& other) const;
   const corpushl<T, U>  operator *  (const T& t)                  const;
   const corpushl<T, U>& operator =  (const corpushl<T, U>& other);
+        corpushl<T, U>& operator =  (corpushl<T,U>&& other);
   const bool            operator == (const corpushl<T, U>& other) const;
   const bool            operator != (const corpushl<T, U>& other) const;
   const corpushl<T, U>  withDetail(const U& word, const corpushl<T, U>& other);
@@ -396,6 +398,12 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::cast(cons
 template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator = (const corpushl<T, U>& other) {
   words   = vector<U>(other.words);
   corpust = other.corpust;
+  return *this;
+}
+
+template <typename T, typename U>       corpushl<T, U>& corpushl<T, U>::operator = (corpushl<T, U>&& other) {
+  words   = move(other.words);
+  corpust = move(other.corpust);
   return *this;
 }
 

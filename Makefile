@@ -5,7 +5,7 @@ CXXFLAGS+=	-I/usr/local/include/eigen3
 CXXFLAGS+=	-Ofast -g0
 #CXXFLAGS+=	-O2 -g2
 CXXFLAGS+=	-std=c++11
-LDFLAGS+=	-lstdc++
+LDFLAGS+=	-lc++
 
 CLEANFILES= *.o tools test
 
