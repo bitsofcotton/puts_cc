@@ -28,7 +28,6 @@ using std::string;
 using std::vector;
 using std::sort;
 using std::distance;
-using std::equal_range;
 using std::upper_bound;
 using std::unique;
 using std::find;
@@ -107,8 +106,7 @@ template <typename T, typename U> void corpus<T,U>::init(const vector<U>& words0
   this->words0.erase(unique(this->words0.begin(), this->words0.end()), this->words0.end());
   this->words   = vector<U>();
   this->ptrs0   = vector<vector<int> >();
-  for(int i = 0; i < words0.size(); i ++)
-    ptrs0.push_back(vector<int>());
+  this->ptrs0.resize(words0.size(), vector<int>());
   this->ptrs    = vector<vector<int> >();
   this->pdelim  = vector<int>();
   this->corpust = Tensor();
@@ -314,6 +312,7 @@ public:
   corpushl();
   corpushl(const corpus<T, U>&   obj);
   corpushl(const corpushl<T, U>& obj);
+  corpushl(corpushl<T, U>&& obj);
   ~corpushl();
   
   const corpushl<T, U>  cast(const vector<U>& words) const;
@@ -351,7 +350,7 @@ public:
 private:
   const U      serializeSub(const vector<int>& idxs) const;
   Eigen::Matrix<T, Eigen::Dynamic, 1> singularValues() const;
-  const int    reverseLookup(const vector<int>& src, const int& idx) const;
+  const vector<int> reverseLookup(const vector<int>& src) const;
   vector<U>    gatherWords(const vector<U>& in0, const vector<U>& in1, vector<int>& ridx0, vector<int>& ridx1) const;
   const Tensor prepareDetail(const corpushl<T, U>& other, const vector<U>& workwords, const int& eidx, const vector<int>& ridx0, const vector<int>& ridx1, const vector<int>& ridx2);
   
@@ -378,6 +377,10 @@ template <typename T, typename U> corpushl<T,U>::corpushl(const corpushl<T, U>& 
   *this = obj;
 }
 
+template <typename T, typename U> corpushl<T,U>::corpushl(corpushl<T, U>&& obj) {
+  *this = obj;
+}
+
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::cast(const vector<U>& words) const {
   cerr << "cast" << endl;
   corpushl<T, U> result;
@@ -391,6 +394,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::cast(cons
       result.words.push_back(*p);
     }
   }
+  // XXX fixme:
   result.corpust = corpust;
   return result;
 }
@@ -438,34 +442,35 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
   vector<int>    ridx0, ridx1;
   result.words   = gatherWords(words, other.words, ridx0, ridx1);
   result.corpust = Tensor();
-  cerr << "+" << flush;
   auto& ci0(corpust.iter());
+  const auto rridx0(reverseLookup(ridx0));
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); itr0 ++) {
-    const int ii(reverseLookup(ridx0, itr0->first));
+    const int ii(rridx0[itr0->first]);
     auto& ci1(itr0->second.iter());
     if(ii < 0) continue;
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); itr1 ++) {
-      const int jj(reverseLookup(ridx0, itr1->first));
+      const int jj(rridx0[itr1->first]);
       auto& ci2(itr1->second.iter());
       if(jj < 0) continue;
       for(auto itr2(ci2.begin()); itr2 != ci2.end(); itr2 ++) {
-        const int kk(reverseLookup(ridx0, itr2->first));
+        const int kk(rridx0[itr2->first]);
         if(0 <= kk)
           result.corpust[ii][jj][kk] += itr2->second;
       }
     }
   }
   auto& oi0(other.corpust.iter());
+  const auto rridx1(reverseLookup(ridx1));
   for(auto itr0(oi0.begin()); itr0 != oi0.end(); itr0 ++) {
-    const int ii(reverseLookup(ridx1, itr0->first));
+    const int ii(rridx1[itr0->first]);
     auto& oi1(itr0->second.iter());
     if(ii < 0) continue;
     for(auto itr1(oi1.begin()); itr1 != oi1.end(); itr1 ++) {
-      const int jj(reverseLookup(ridx1, itr1->first));
+      const int jj(rridx1[itr1->first]);
       auto& oi2(itr1->second.iter());
       if(jj < 0) continue;
       for(auto itr2(oi2.begin()); itr2 != oi2.end(); itr2 ++) {
-        const int kk(reverseLookup(ridx1, itr2->first));
+        const int kk(rridx1[itr2->first]);
         if(0 <= kk)
           result.corpust[ii][jj][kk] += itr2->second;
       }
@@ -475,7 +480,6 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator - () const {
-  cerr << "-" << flush;
   corpushl<T, U> result(*this);
   result.corpust = - result.corpust;
   return result;
@@ -498,7 +502,6 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
   if(!(0 <= fidx && fidx < words.size() && *itr == word))
     return *this;
   cerr << "withDetail : " << *itr << ", " << word << ": " << itr->size() << " / " << word.size() << endl;
-  corpushl<T, U> result;
   vector<int> ridx0, ridx1, ridx2;
   vector<U>   workwords(gatherWords(words, other.words, ridx0, ridx1));
   int  eidx(- 1);
@@ -514,7 +517,8 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
     ridx2.push_back(ii ++);
   }
   if(!flag1 || eidx < 0 || ridx0[eidx] < 0)
-    return result;
+    return *this;
+  corpushl<T, U> result;
   result.corpust = Tensor();
   for(int i = 0; i < workwords.size(); i ++)
     if(ridx0[i] >= 0 && ridx2[i] >= 0)
@@ -522,16 +526,17 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
     else if(ridx1[i] >= 0 && ridx2[i] >= 0)
       result.words.push_back(other.words[ridx1[i]]);
   auto& ci0(corpust.iter());
+  const auto rridx0(reverseLookup(ridx0));
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); itr0 ++) {
-    const int ii(reverseLookup(ridx0, itr0->first));
+    const int ii(rridx0[itr0->first]);
     if(ii < 0) continue;
     auto& ci1(itr0->second.iter());
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); itr1 ++) {
-      const int jj(reverseLookup(ridx0, itr1->first));
+      const int jj(rridx0[itr1->first]);
       if(jj < 0) continue;
       auto& ci2(itr1->second.iter());
       for(auto itr2(ci2.begin()); itr2 != ci2.end(); itr2 ++) {
-        const int kk(reverseLookup(ridx0, itr2->first));
+        const int kk(rridx0[itr2->first]);
         if(0 <= kk)
           result.corpust[ii][jj][kk] = itr2->second;
       }
@@ -542,7 +547,6 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2relPseudo(const corpushl<T, U>& other) const {
-  cerr << "m2r" << flush;
   corpushl<T, U> result(*this);
   vector<int>    ridx0, ridx1;
   vector<U>      words(gatherWords(result.words, other.words, ridx0, ridx1));
@@ -555,16 +559,17 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2rel
         mul[ridx0[k]][ridx0[i]][ridx0[j]] = 1.;
       }
   auto& ci0(result.corpust.iter());
+  const auto rridx0(reverseLookup(ridx0));
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); itr0 ++) {
-    const int ii(reverseLookup(ridx0, itr0->first));
+    const int ii(rridx0[itr0->first]);
     auto& ci1(itr0->second.iter());
     if(ii < 0) continue;
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); itr1 ++) {
-      const int jj(reverseLookup(ridx0, itr1->first));
+      const int jj(rridx0[itr1->first]);
       auto& ci2(itr1->second.iter());
       if(jj < 0) continue;
       for(auto itr2(ci2.begin()); itr2 != ci2.end(); itr2 ++) {
-        const int kk(reverseLookup(ridx0, itr2->first));
+        const int kk(rridx0[itr2->first]);
         if(0 <= kk)
           itr2->second *= mul[ii][jj][kk];
       }
@@ -578,20 +583,21 @@ template <typename T, typename U> const T corpushl<T, U>::cdot(const corpushl<T,
   vector<int> ridx0, ridx1;
   vector<U>   drop(gatherWords(words, other.words, ridx0, ridx1));
   const auto& oi0(other.corpust.iter());
+  const auto  rridx1(reverseLookup(ridx1));
   for(auto itr0(oi0.begin()); itr0 != oi0.end(); itr0 ++) {
-    const int   i0(reverseLookup(ridx1, itr0->first));
+    const int   i0(rridx1[itr0->first]);
     if(i0 < 0) continue;
-    const int   ii(ridx0[i0]);
+    const int   ii(itr0->first);
     const auto& oi1(itr0->second.iter());
     if(ii < 0) continue;
     for(auto itr1(oi1.begin()); itr1 != oi1.end(); itr1 ++) {
-      const int   j0(reverseLookup(ridx1, itr1->first));
+      const int   j0(rridx1[itr1->first]);
       if(j0 < 0) continue;
       const int   jj(ridx0[j0]);
       const auto& oi2(itr1->second.iter());
       if(jj < 0) continue;
       for(auto itr2(oi2.begin()); itr2 != oi2.end(); itr2 ++) {
-        const int k0(reverseLookup(ridx1, itr2->first));
+        const int k0(rridx1[itr2->first]);
         if(k0 < 0) continue;
         const int kk(ridx0[k0]);
         if(0 <= kk)
@@ -688,6 +694,7 @@ template <typename T, typename U> const U corpushl<T, U>::serialize() const {
         } else if(plus.corpust[i][j][k] != T(0))
           minus.corpust[i][j][k] = T(0);
   vector<int> entire;
+  entire.reserve(words.size());
   for(int i = 0; i < words.size(); i ++)
     entire.push_back(i);
   return plus.serializeSub(entire)  + U(".<br/>\n-") +
@@ -745,11 +752,11 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
       middle.push_back(score[i].second);
     for( ; i < score.size(); i ++)
       right.push_back(score[i].second);
-    if(left.size() || right.size())
+    if((middle.size() && (left.size() || right.size())) || (left.size() && right.size()))
       return serializeSub(left) + serializeSub(middle) + serializeSub(right);
   }
  symmetric:
-  string result;
+  U result;
   for(int i = 0; i < cscore.size(); i ++)
     if(cscore[i].first != T(0))
       result += words[cscore[i].second];
@@ -757,7 +764,6 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(const U& word, const corpushl<T, U>& mean) {
-  cerr << "a" << flush;
   corpushl<T, U> work(match2relPseudo(mean));
   // XXX fixme: need to add abbreved word for work.
   const T tn(cdot(work)), td(work.cdot(work));
@@ -882,12 +888,19 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThr
   return result;
 }
 
-template <typename T, typename U> const int corpushl<T, U>::reverseLookup(const vector<int>& src, const int& idx) const {
-  assert(0 <= idx && idx < src.size());
-  for(int i = 0; i < src.size(); i ++)
-    if(idx == src[i])
-      return i;
-  return - 1;
+template <typename T, typename U> const vector<int> corpushl<T, U>::reverseLookup(const vector<int>& src) const {
+  vector<int> result;
+  for(int j = 0; j < src.size(); j ++) {
+    int i(0);
+    for( ; i < src.size(); i ++)
+      if(j == src[i]) {
+        result.push_back(i);
+        break;
+      }
+    if(src.size() <= i)
+      result.push_back(- 1);
+  }
+  return result;
 }
 
 template <typename T, typename U> vector<U> corpushl<T, U>::gatherWords(const vector<U>& in0, const vector<U>& in1, vector<int>& ridx0, vector<int>& ridx1) const {
@@ -926,8 +939,8 @@ template <typename T, typename U> vector<U> corpushl<T, U>::gatherWords(const ve
     for(; i < sin0.size() && j < sin1.size(); j ++) {
       if(sin0[i] == sin1[j]) {
         result.push_back(sin0[i]);
-        const int d0(distance(in0.begin(), equal_range(in0.begin(), in0.end(), sin0[i]).first));
-        const int d1(distance(in1.begin(), equal_range(in1.begin(), in1.end(), sin1[j]).first));
+        const int d0(distance(in0.begin(), find(in0.begin(), in0.end(), sin0[i])));
+        const int d1(distance(in1.begin(), find(in1.begin(), in1.end(), sin1[j])));
         if(0 <= d0 && d0 < in0.size())
           ridx0[result.size() - 1] = d0;
         if(0 <= d1 && d1 < in1.size())
@@ -936,7 +949,7 @@ template <typename T, typename U> vector<U> corpushl<T, U>::gatherWords(const ve
         continue;
       } else if(sin0[i] > sin1[j]) {
         result.push_back(sin1[j]);
-        const int d1(distance(in1.begin(), equal_range(in1.begin(), in1.end(), sin1[j]).first));
+        const int d1(distance(in1.begin(), find(in1.begin(), in1.end(), sin1[j])));
         if(0 <= d1 && d1 < in1.size())
           ridx1[result.size() - 1] = d1;
         continue;
@@ -945,29 +958,29 @@ template <typename T, typename U> vector<U> corpushl<T, U>::gatherWords(const ve
     }
     if(sin0.size() <= i) break;
     result.push_back(sin0[i]);
-    const int d0(distance(in0.begin(), equal_range(in0.begin(), in0.end(), sin0[i]).first));
+    const int d0(distance(in0.begin(), find(in0.begin(), in0.end(), sin0[i])));
     if(0 <= d0 && d0 < in0.size())
-      ridx0[result.size() - 1] = distance(in0.begin(), equal_range(in0.begin(), in0.end(), sin0[i]).first);
+      ridx0[result.size() - 1] = d0;
   }
   return result;
 }
 
 template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::prepareDetail(const corpushl<T, U>& other, const vector<U>& workwords, const int& eidx, const vector<int>& ridx0, const vector<int>& ridx1, const vector<int>& ridx2) {
-  cerr << "p" << flush;
   // initialize result tensor with 0.
   Tensor res;
   const auto& ci0(other.corpust.iter());
+  const auto  rridx1(reverseLookup(ridx1));
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); itr0 ++) {
-    const int ii(reverseLookup(ridx1, itr0->first));
+    const int ii(rridx1[itr0->first]);
     if(ii < 0) continue;
     const auto& ci1(itr0->second.iter());
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); itr1 ++) {
-      const int jj(reverseLookup(ridx1, itr1->first));
+      const int jj(rridx1[itr1->first]);
       if(jj < 0) continue;
       const auto& ci2(itr1->second.iter());
       for(auto itr2(ci2.begin()); itr2 != ci2.end(); itr2 ++) {
         // Sum-up detailed word into result pool without definition row, col.
-        const int kk(reverseLookup(ridx1, itr2->first));
+        const int kk(rridx1[itr2->first]);
         if(kk < 0) continue;
         if(0 <= ridx0[ii] && 0 <= ridx0[jj] && 0 <= ridx0[kk]) {
           res[ridx2[ii]][ridx2[jj]][ridx2[kk]] += corpust[ridx0[ii]][ridx0[jj]][ridx0[kk]] * itr2->second;
@@ -978,12 +991,12 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
           auto& oci0(other.corpust.iter());
           auto& oci1(other.corpust[ridx1[jj]].iter());
           for(auto oiter0(oci0.begin()); oiter0 != oci0.end(); oiter0 ++) {
-            const int kk1(reverseLookup(ridx1, oiter0->first));
+            const int kk1(rridx1[oiter0->first]);
             res[ridx2[kk1]][ridx2[jj]][ridx2[kk]] +=
               r0 * oiter0->second[ridx1[jj]][ridx1[kk]];
           }
           for(auto oiter1(oci1.begin()); oiter1 != oci1.end(); oiter1 ++) {
-            const int kk1(reverseLookup(ridx1, oiter1->first));
+            const int kk1(rridx1[oiter1->first]);
             res[ridx2[jj]][ridx2[kk1]][ridx2[kk]] +=
               r1 * oiter1->second[ridx1[kk]];
           }
