@@ -258,9 +258,6 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
 
 template <typename T, typename U> void corpus<T,U>::corpusEach() {
   corpust = Tensor();
-#if defined(_OPENMP)
-#pragma omp parallel for
-#endif
   for(int i = 0; i < words.size(); i ++) {
     cerr << "." << flush;
     for(int j = 0; j < words.size(); j ++) {
