@@ -941,38 +941,42 @@ template <typename T, typename U> vector<U> corpushl<T, U>::gatherWords(const ve
   vector<U> sin0(in0), sin1(in1);
   sort(sin0.begin(), sin0.end());
   sort(sin1.begin(), sin1.end());
-  int rbufsize(in0.size() + in1.size() + 1);
-  for(int i = 0; i < rbufsize; i ++) {
-    ridx0.push_back(- 1);
-    ridx1.push_back(- 1);
-  }
+  const int rbufsize(in0.size() + in1.size() + 1);
+  ridx0.resize(rbufsize, - 1);
+  ridx1.resize(rbufsize, - 1);
   int i(0), j(0);
   for( ; i < sin0.size(); i ++) {
     for(; i < sin0.size() && j < sin1.size(); j ++) {
       if(sin0[i] == sin1[j]) {
-        result.push_back(sin0[i]);
         const int d0(distance(in0.begin(), find(in0.begin(), in0.end(), sin0[i])));
         const int d1(distance(in1.begin(), find(in1.begin(), in1.end(), sin1[j])));
-        if(0 <= d0 && d0 < in0.size())
-          ridx0[result.size() - 1] = d0;
-        if(0 <= d1 && d1 < in1.size())
-          ridx1[result.size() - 1] = d1;
+        assert(0 <= d0 && d0 < in0.size());
+        assert(0 <= d1 && d1 < in1.size());
+        ridx0[result.size()] = d0;
+        ridx1[result.size()] = d1;
+        result.push_back(sin0[i]);
         i ++;
         continue;
       } else if(sin0[i] > sin1[j]) {
-        result.push_back(sin1[j]);
         const int d1(distance(in1.begin(), find(in1.begin(), in1.end(), sin1[j])));
-        if(0 <= d1 && d1 < in1.size())
-          ridx1[result.size() - 1] = d1;
+        assert(0 <= d1 && d1 < in1.size());
+        ridx1[result.size()] = d1;
+        result.push_back(sin1[j]);
         continue;
       }
       break;
     }
     if(sin0.size() <= i) break;
-    result.push_back(sin0[i]);
     const int d0(distance(in0.begin(), find(in0.begin(), in0.end(), sin0[i])));
-    if(0 <= d0 && d0 < in0.size())
-      ridx0[result.size() - 1] = d0;
+    assert(0 <= d0 && d0 < in0.size());
+    ridx0[result.size()] = d0;
+    result.push_back(sin0[i]);
+  }
+  for( ; j < sin1.size(); j ++) {
+    const int d1(distance(in1.begin(), find(in1.begin(), in1.end(), sin1[j])));
+    assert(0 <= d1 && d1 < in1.size());
+    ridx1[result.size()] = d1;
+    result.push_back(sin1[j]);
   }
   return result;
 }
