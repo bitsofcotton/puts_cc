@@ -46,9 +46,10 @@ public:
         SimpleSparseVector<T>& operator =  (SimpleSparseVector<T>&& other);
         bool                   operator != (const SimpleSparseVector<T>& other) const;
         bool                   operator == (const SimpleSparseVector<T>& other) const;
-        T    dot         (const SimpleSparseVector<T>& other) const;
-        T&   operator [] (const int& idx);
-  const T&   operator [] (const int& idx) const;
+        T  dot         (const SimpleSparseVector<T>& other) const;
+        T& operator [] (const int& idx);
+  const T& operator [] (const int& idx) const;
+  void     clear();
         map<int, T>& iter();
   const map<int, T>& iter() const;
 private:
@@ -179,6 +180,11 @@ template <typename T> const T& SimpleSparseVector<T>::operator [] (const int& id
     return search->second;
   const static T zero(0);
   return zero;
+}
+
+template <typename T> void SimpleSparseVector<T>::clear() {
+  entity = map<int, T>();
+  return;
 }
 
 template <typename T> map<int, T>& SimpleSparseVector<T>::iter() {

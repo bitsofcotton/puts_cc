@@ -563,11 +563,17 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2rel
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     const int ii(rridx0[itr0->first]);
     auto& ci1(itr0->second.iter());
-    if(ii < 0) continue;
+    if(ii < 0) {
+      itr0->second.clear();
+      continue;
+    }
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
       const int jj(rridx0[itr1->first]);
       auto& ci2(itr1->second.iter());
-      if(jj < 0) continue;
+      if(jj < 0) {
+        itr1->second.clear();
+        continue;
+      }
       for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
         const int kk(rridx0[itr2->first]);
         if(0 <= kk)
@@ -588,13 +594,13 @@ template <typename T, typename U> const T corpushl<T, U>::cdot(const corpushl<T,
     const int   i0(rridx1[itr0->first]);
     if(i0 < 0) continue;
     const int   ii(ridx0[i0]);
-    if(ii < 0) continue;
+    if(ii < 0 || !corpust[ii].iter().size()) continue;
     const auto& oi1(itr0->second.iter());
     for(auto itr1(oi1.begin()); itr1 != oi1.end(); ++ itr1) {
       const int   j0(rridx1[itr1->first]);
       if(j0 < 0) continue;
       const int   jj(ridx0[j0]);
-      if(jj < 0) continue;
+      if(jj < 0 || !corpust[ii][jj].iter().size()) continue;
       const auto& oi2(itr1->second.iter());
       for(auto itr2(oi2.begin()); itr2 != oi2.end(); ++ itr2) {
         const int k0(rridx1[itr2->first]);
