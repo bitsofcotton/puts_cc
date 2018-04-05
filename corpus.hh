@@ -353,6 +353,7 @@ private:
   const vector<int> reverseLookup(const vector<int>& src) const;
   vector<U>    gatherWords(const vector<U>& in0, const vector<U>& in1, vector<int>& ridx0, vector<int>& ridx1) const;
   const Tensor prepareDetail(const corpushl<T, U>& other, const vector<U>& workwords, const int& eidx, const vector<int>& ridx0, const vector<int>& ridx1, const vector<int>& ridx2);
+  void merge5(Tensor& d, const int& i, const int& ki, const int& kk, const int& kj, const int& j, const T& intensity) const;
   
   vector<U>    words;
   Tensor       corpust;
@@ -501,21 +502,20 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
   int  fidx(distance(words.begin(), itr));
   if(!(0 <= fidx && fidx < words.size() && *itr == word))
     return *this;
-  cerr << "withDetail : " << *itr << ", " << word << ": " << itr->size() << " / " << word.size() << endl;
+  cerr << "withDetail : " << word << ": " << endl;
   vector<int> ridx0, ridx1, ridx2;
   vector<U>   workwords(gatherWords(words, other.words, ridx0, ridx1));
   int  eidx(- 1);
   bool flag1(false);
-  for(int i = 0, ii = 0; i < workwords.size(); i ++) {
+  for(int i = 0, ii = 0; i < workwords.size(); i ++)
     if(workwords[i] == word) {
       ridx2.push_back(- 1);
       eidx = i;
-      continue;
+    } else {
+      if(ridx1[i] >= 0)
+        flag1 = true;
+      ridx2.push_back(ii ++);
     }
-    if(ridx1[i] >= 0)
-      flag1 = true;
-    ridx2.push_back(ii ++);
-  }
   if(!flag1 || eidx < 0 || ridx0[eidx] < 0)
     return *this;
   corpushl<T, U> result;
@@ -531,14 +531,17 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
     const int ii(rridx0[itr0->first]);
     auto& ci1(itr0->second.iter());
     assert(0 <= ii);
+    if(ridx2[ii] < 0) continue;
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
       const int jj(rridx0[itr1->first]);
       auto& ci2(itr1->second.iter());
       assert(0 <= jj);
+      if(ridx2[jj] < 0) continue;
       for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
         const int kk(rridx0[itr2->first]);
         assert(0 <= kk);
-        result.corpust[ii][jj][kk] = itr2->second;
+        if(0 <= ridx2[kk] && itr2->second != T(0))
+          result.corpust[ridx2[ii]][ridx2[jj]][ridx2[kk]] = itr2->second;
       }
     }
   }
@@ -991,6 +994,8 @@ template <typename T, typename U> vector<U> corpushl<T, U>::gatherWords(const ve
     ridx1[result.size()] = d1;
     result.push_back(sin1[j]);
   }
+  ridx0.resize(result.size());
+  ridx1.resize(result.size());
   return result;
 }
 
@@ -998,45 +1003,83 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
   // initialize result tensor with 0.
   Tensor res;
   const auto& ci0(other.corpust.iter());
+  const auto  rridx0(reverseLookup(ridx0));
   const auto  rridx1(reverseLookup(ridx1));
+  assert(0 <= ridx0[eidx]);
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
-    const int ii(rridx1[itr0->first]);
-    if(ii < 0) continue;
+    const int   ii(rridx1[itr0->first]);
     const auto& ci1(itr0->second.iter());
+    assert(0 <= ii);
+    if(ridx2[ii] < 0) continue;
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
-      const int jj(rridx1[itr1->first]);
-      if(jj < 0) continue;
+      const int   jj(rridx1[itr1->first]);
       const auto& ci2(itr1->second.iter());
+      assert(0 <= jj);
+      if(ridx2[jj] < 0) continue;
       for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
         // Sum-up detailed word into result pool without definition row, col.
         const int kk(rridx1[itr2->first]);
-        if(kk < 0) continue;
-        if(0 <= ridx0[ii] && 0 <= ridx0[jj] && 0 <= ridx0[kk]) {
-          res[ridx2[ii]][ridx2[jj]][ridx2[kk]] += corpust[ridx0[ii]][ridx0[jj]][ridx0[kk]] * itr2->second;
-          
-          // add crossing points
-          const T r0(corpust[ridx0[ii]][ridx0[jj]][ridx0[kk]]);
-          const T r1(corpust[ridx0[jj]][ridx0[ii]][ridx0[kk]]);
-          auto& oci0(other.corpust.iter());
-          auto& oci1(other.corpust[ridx1[jj]].iter());
-          for(auto oiter0(oci0.begin()); oiter0 != oci0.end(); oiter0 ++) {
-            const int kk1(rridx1[oiter0->first]);
-            res[ridx2[kk1]][ridx2[jj]][ridx2[kk]] +=
-              r0 * oiter0->second[ridx1[jj]][ridx1[kk]];
+        assert(0 <= kk);
+        if(itr2->second == T(0)) continue;
+        // add crossing points
+        const T x0(corpust[eidx][eidx][eidx] != T(0) ? corpust[eidx][eidx][eidx] : T(1));
+        auto& ti0(corpust.iter());
+        for(auto titr0(ti0.begin()); titr0 != ti0.end(); ++ titr0) {
+          auto& ti1(titr0->second.iter());
+          const int tii(rridx0[titr0->first]);
+          assert(0 <= tii);
+          if(ridx2[tii] < 0) continue;
+          // add line points.
+          for(auto titr1(ti1.begin()); titr1 != ti1.end(); ++ titr1) {
+            const int tjj(rridx0[titr1->first]);
+            if(0 <= ridx2[tjj])
+              merge5(res, ridx2[tii], ridx2[ii], ridx2[kk], ridx2[jj], ridx2[tjj], titr1->second[ridx0[eidx]] * itr2->second * x0);
           }
-          for(auto oiter1(oci1.begin()); oiter1 != oci1.end(); oiter1 ++) {
-            const int kk1(rridx1[oiter1->first]);
-            res[ridx2[jj]][ridx2[kk1]][ridx2[kk]] +=
-              r1 * oiter1->second[ridx1[kk]];
+        }
+        for(auto titr0(ti0.begin()); titr0 != ti0.end(); ++ titr0) {
+          auto& ti2(titr0->second[eidx].iter());
+          const int tii(rridx0[titr0->first]);
+          assert(0 <= tii);
+          if(ridx2[tii] < 0) continue;
+          for(auto titr2(ti2.begin()); titr2 != ti2.end(); ++ titr2) {
+            const int tkk(rridx0[titr2->first]);
+            assert(0 <= tkk);
+            if(0 <= ridx2[tkk])
+              merge5(res, ridx2[tii], ridx2[tkk], ridx2[ii], ridx2[kk], ridx2[jj], titr2->second * itr2->second * x0);
           }
-        } else {
-          res[ridx2[ii]][ridx2[jj]][ridx2[kk]] += itr2->second;
-          res[ridx2[jj]][ridx2[ii]][ridx2[kk]] += itr2->second;
+        }
+        auto& ti1(corpust[eidx].iter());
+        for(auto titr1(ti1.begin()); titr1 != ti1.end(); ++ titr1) {
+          auto& ti2(titr1->second.iter());
+          const int tjj(rridx0[titr1->first]);
+          assert(0 <= tjj);
+          if(ridx2[tjj] < 0) continue;
+          for(auto titr2(ti2.begin()); titr2 != ti2.end(); ++ titr2) {
+            const int tkk(rridx0[titr2->first]);
+            assert(0 <= tkk);
+            if(0 <= ridx2[tkk])
+              merge5(res, ridx2[ii], ridx2[kk], ridx2[jj], ridx2[tjj], ridx2[tkk], titr2->second * itr2->second * x0);
+          }
         }
       }
     }
   }
   return res;
+}
+
+template <typename T, typename U> void corpushl<T,U>::merge5(Tensor& d, const int& i, const int& ki, const int& kk, const int& kj, const int& j, const T& intensity) const {
+  if(intensity == T(0)) return;
+  d[ i][kk][ki] += intensity;
+  d[ i][kj][ki] += intensity;
+  d[ i][ j][ki] += intensity;
+  d[ i][kj][kk] += intensity;
+  d[ i][ j][kk] += intensity;
+  d[ i][ j][kj] += intensity;
+  d[ki][kj][kk] += intensity;
+  d[ki][ j][kk] += intensity;
+  d[ki][ j][kj] += intensity;
+  d[kk][ j][kj] += intensity;
+  return;
 }
 
 template <typename T, typename U> Eigen::Matrix<T, Eigen::Dynamic, 1> corpushl<T, U>::singularValues() const {
@@ -1341,16 +1384,15 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
     dstat[i].reDig(redig);
     auto diff(cstat[i] - dstat[i]);
     diff.reDig(redig);
-    diffs.push_back(diff);
+    diffs.emplace_back(diff);
   }
-  getAbbreved(diffs, words, detailtitle0, detail0, delimiter, szwindow);
+  // getAbbreved(diffs, words, detailtitle0, detail0, delimiter, szwindow);
   
   cerr << " making outputs." << flush;
   U result;
   for(int i = 0; i < cstat.size(); i ++)
     if(diffs[i].cdot(diffs[i]) != T(0)) {
       auto& diff(diffs[i]);
-      diff    = diff.simpleThresh(thresh);
       result += diff.serialize() + U("<br/>\n");
       result += cstat[i].reverseLink(cstat0[i]) + U("<br/>\n");
       result += diff.reverseLink(cstat0[i]) + U("<br/>\n");
