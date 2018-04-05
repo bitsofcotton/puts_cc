@@ -23,6 +23,7 @@ using std::cerr;
 using std::endl;
 using std::flush;
 using std::map;
+using std::move;
 
 template <typename T> class SimpleSparseVector {
 public:
@@ -42,6 +43,7 @@ public:
   template <typename U>       SimpleSparseVector<T>  operator /  (const U& other) const;
   template <typename U> const SimpleSparseVector<T>& operator /= (const U& other);
         SimpleSparseVector<T>& operator =  (const SimpleSparseVector<T>& other);
+        SimpleSparseVector<T>& operator =  (SimpleSparseVector<T>&& other);
         bool                   operator != (const SimpleSparseVector<T>& other) const;
         bool                   operator == (const SimpleSparseVector<T>& other) const;
         T  dot         (const SimpleSparseVector<T>& other) const;
@@ -65,13 +67,11 @@ template <typename T> SimpleSparseVector<T>::SimpleSparseVector(const int& sute)
 }
 
 template <typename T> SimpleSparseVector<T>::SimpleSparseVector(const SimpleSparseVector<T>& other) {
-  entity = map<int, T>(other.entity);
-  return;
+  *this = other;
 }
 
 template <typename T> SimpleSparseVector<T>::SimpleSparseVector(SimpleSparseVector<T>&& other) {
-  entity = other.entity;
-  return;
+  *this = other;
 }
 
 template <typename T> SimpleSparseVector<T>::~SimpleSparseVector() {
@@ -131,6 +131,11 @@ template <typename T> SimpleSparseVector<T>& SimpleSparseVector<T>::operator = (
   return *this;
 }
 
+template <typename T> SimpleSparseVector<T>& SimpleSparseVector<T>::operator = (SimpleSparseVector<T>&& other) {
+  entity = move(other.entity);
+  return *this;
+}
+
 template <typename T> bool SimpleSparseVector<T>::operator != (const SimpleSparseVector<T>& other) const {
   // XXX : this is imcomplete.
   return entity != other.entity;
@@ -172,7 +177,8 @@ template <typename T> const T SimpleSparseVector<T>::operator [] (const int& idx
   const auto search(entity.find(idx));
   if(search != entity.end())
     return search->second;
-  return T(0);
+  const static T zero(0);
+  return zero;
 }
 
 template <typename T> map<int, T>& SimpleSparseVector<T>::iter() {
