@@ -444,15 +444,15 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
   result.corpust = Tensor();
   auto& ci0(corpust.iter());
   const auto rridx0(reverseLookup(ridx0));
-  for(auto itr0(ci0.begin()); itr0 != ci0.end(); itr0 ++) {
+  for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     const int ii(rridx0[itr0->first]);
     auto& ci1(itr0->second.iter());
     if(ii < 0) continue;
-    for(auto itr1(ci1.begin()); itr1 != ci1.end(); itr1 ++) {
+    for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
       const int jj(rridx0[itr1->first]);
       auto& ci2(itr1->second.iter());
       if(jj < 0) continue;
-      for(auto itr2(ci2.begin()); itr2 != ci2.end(); itr2 ++) {
+      for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
         const int kk(rridx0[itr2->first]);
         if(0 <= kk)
           result.corpust[ii][jj][kk] += itr2->second;
@@ -461,15 +461,15 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
   }
   auto& oi0(other.corpust.iter());
   const auto rridx1(reverseLookup(ridx1));
-  for(auto itr0(oi0.begin()); itr0 != oi0.end(); itr0 ++) {
+  for(auto itr0(oi0.begin()); itr0 != oi0.end(); ++ itr0) {
     const int ii(rridx1[itr0->first]);
     auto& oi1(itr0->second.iter());
     if(ii < 0) continue;
-    for(auto itr1(oi1.begin()); itr1 != oi1.end(); itr1 ++) {
+    for(auto itr1(oi1.begin()); itr1 != oi1.end(); ++ itr1) {
       const int jj(rridx1[itr1->first]);
       auto& oi2(itr1->second.iter());
       if(jj < 0) continue;
-      for(auto itr2(oi2.begin()); itr2 != oi2.end(); itr2 ++) {
+      for(auto itr2(oi2.begin()); itr2 != oi2.end(); ++ itr2) {
         const int kk(rridx1[itr2->first]);
         if(0 <= kk)
           result.corpust[ii][jj][kk] += itr2->second;
@@ -527,15 +527,15 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
       result.words.push_back(other.words[ridx1[i]]);
   auto& ci0(corpust.iter());
   const auto rridx0(reverseLookup(ridx0));
-  for(auto itr0(ci0.begin()); itr0 != ci0.end(); itr0 ++) {
+  for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     const int ii(rridx0[itr0->first]);
     if(ii < 0) continue;
     auto& ci1(itr0->second.iter());
-    for(auto itr1(ci1.begin()); itr1 != ci1.end(); itr1 ++) {
+    for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
       const int jj(rridx0[itr1->first]);
       if(jj < 0) continue;
       auto& ci2(itr1->second.iter());
-      for(auto itr2(ci2.begin()); itr2 != ci2.end(); itr2 ++) {
+      for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
         const int kk(rridx0[itr2->first]);
         if(0 <= kk)
           result.corpust[ii][jj][kk] = itr2->second;
@@ -560,15 +560,15 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2rel
       }
   auto& ci0(result.corpust.iter());
   const auto rridx0(reverseLookup(ridx0));
-  for(auto itr0(ci0.begin()); itr0 != ci0.end(); itr0 ++) {
+  for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     const int ii(rridx0[itr0->first]);
     auto& ci1(itr0->second.iter());
     if(ii < 0) continue;
-    for(auto itr1(ci1.begin()); itr1 != ci1.end(); itr1 ++) {
+    for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
       const int jj(rridx0[itr1->first]);
       auto& ci2(itr1->second.iter());
       if(jj < 0) continue;
-      for(auto itr2(ci2.begin()); itr2 != ci2.end(); itr2 ++) {
+      for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
         const int kk(rridx0[itr2->first]);
         if(0 <= kk)
           itr2->second *= mul[ii][jj][kk];
@@ -584,19 +584,19 @@ template <typename T, typename U> const T corpushl<T, U>::cdot(const corpushl<T,
   vector<U>   drop(gatherWords(words, other.words, ridx0, ridx1));
   const auto& oi0(other.corpust.iter());
   const auto  rridx1(reverseLookup(ridx1));
-  for(auto itr0(oi0.begin()); itr0 != oi0.end(); itr0 ++) {
+  for(auto itr0(oi0.begin()); itr0 != oi0.end(); ++ itr0) {
     const int   i0(rridx1[itr0->first]);
     if(i0 < 0) continue;
     const int   ii(ridx0[i0]);
     if(ii < 0) continue;
     const auto& oi1(itr0->second.iter());
-    for(auto itr1(oi1.begin()); itr1 != oi1.end(); itr1 ++) {
+    for(auto itr1(oi1.begin()); itr1 != oi1.end(); ++ itr1) {
       const int   j0(rridx1[itr1->first]);
       if(j0 < 0) continue;
       const int   jj(ridx0[j0]);
       if(jj < 0) continue;
       const auto& oi2(itr1->second.iter());
-      for(auto itr2(oi2.begin()); itr2 != oi2.end(); itr2 ++) {
+      for(auto itr2(oi2.begin()); itr2 != oi2.end(); ++ itr2) {
         const int k0(rridx1[itr2->first]);
         if(k0 < 0) continue;
         const int kk(ridx0[k0]);
@@ -691,7 +691,7 @@ template <typename T, typename U> const U corpushl<T, U>::serialize() const {
         if(plus.corpust[i][j][k] < T(0)) {
           plus.corpust[i][j][k]  = T(0);
           minus.corpust[i][j][k] = - minus.corpust[i][j][k];
-        } else if(plus.corpust[i][j][k] != T(0))
+        } else if(minus.corpust[i][j][k] != T(0))
           minus.corpust[i][j][k] = T(0);
   vector<int> entire;
   entire.reserve(words.size());
@@ -713,11 +713,11 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
   for(int i = 0; i < idxs.size(); i ++) {
     int lscore(0);
     const auto& ci1(corpust.iter());
-    for(auto itr1(ci1.begin()); itr1 != ci1.end(); itr1 ++) {
+    for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
       if(!binary_search(idxs.begin(), idxs.end(), itr1->first))
         continue;
       const auto& ci2(itr1->second.iter());
-      for(auto itr2(ci2.begin()); itr2 != ci2.end(); itr2 ++)
+      for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2)
         if(binary_search(idxs.begin(), idxs.end(), itr2->first) &&
            itr1->first != itr2->first &&
            itr2->second[idxs[i]] != T(0))
@@ -834,11 +834,11 @@ template <typename T, typename U> const pair<T, T> corpushl<T, U>::compareStruct
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::reDig(const T& ratio) {
   auto& ci0(corpust.iter());
-  for(auto itr0(ci0.begin()); itr0 != ci0.end(); itr0 ++) {
+  for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     auto& ci1(itr0->second.iter());
-    for(auto itr1(ci1.begin()); itr1 != ci1.end(); itr1 ++) {
+    for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
       auto& ci2(itr1->second.iter());
-      for(auto itr2(ci2.begin()); itr2 != ci2.end(); itr2 ++)
+      for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2)
         itr2->second = (itr2->second < T(0) ? - T(1) : T(1)) * exp(log(abs(itr2->second)) * ratio);
     }
   }
@@ -848,11 +848,11 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::reDig(con
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThresh(const T& ratio) const {
   T absmax(0);
   auto& ci0(corpust.iter());
-  for(auto itr0(ci0.begin()); itr0 != ci0.end(); itr0 ++) {
+  for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     auto& ci1(itr0->second.iter());
-    for(auto itr1(ci1.begin()); itr1 != ci1.end(); itr1 ++) {
+    for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
       auto& ci2(itr1->second.iter());
-      for(auto itr2(ci2.begin()); itr2 != ci2.end(); itr2 ++)
+      for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2)
         absmax = max(abs(itr2->second), absmax);
     }
   }
@@ -970,15 +970,15 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
   Tensor res;
   const auto& ci0(other.corpust.iter());
   const auto  rridx1(reverseLookup(ridx1));
-  for(auto itr0(ci0.begin()); itr0 != ci0.end(); itr0 ++) {
+  for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     const int ii(rridx1[itr0->first]);
     if(ii < 0) continue;
     const auto& ci1(itr0->second.iter());
-    for(auto itr1(ci1.begin()); itr1 != ci1.end(); itr1 ++) {
+    for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
       const int jj(rridx1[itr1->first]);
       if(jj < 0) continue;
       const auto& ci2(itr1->second.iter());
-      for(auto itr2(ci2.begin()); itr2 != ci2.end(); itr2 ++) {
+      for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
         // Sum-up detailed word into result pool without definition row, col.
         const int kk(rridx1[itr2->first]);
         if(kk < 0) continue;
