@@ -93,6 +93,7 @@ template <typename T> SimpleSparseVector<T> SimpleSparseVector<T>::operator + (c
 
 template <typename T> const SimpleSparseVector<T>& SimpleSparseVector<T>::operator += (const SimpleSparseVector<T>& other) {
   for(auto itr(other.entity.begin()); itr != other.entity.end(); ++ itr) {
+    if(itr->second == T(0)) continue;
     auto search(entity.find(itr->first));
     if(search == entity.end())
       (*this)[itr->first] = itr->second;
