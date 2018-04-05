@@ -46,9 +46,9 @@ public:
         SimpleSparseVector<T>& operator =  (SimpleSparseVector<T>&& other);
         bool                   operator != (const SimpleSparseVector<T>& other) const;
         bool                   operator == (const SimpleSparseVector<T>& other) const;
-        T  dot         (const SimpleSparseVector<T>& other) const;
-        T& operator [] (const int& idx);
-  const T  operator [] (const int& idx) const;
+        T    dot         (const SimpleSparseVector<T>& other) const;
+        T&   operator [] (const int& idx);
+  const T&   operator [] (const int& idx) const;
         map<int, T>& iter();
   const map<int, T>& iter() const;
 private:
@@ -80,7 +80,7 @@ template <typename T> SimpleSparseVector<T>::~SimpleSparseVector() {
 
 template <typename T> SimpleSparseVector<T> SimpleSparseVector<T>::operator - () const {
   SimpleSparseVector<T> res(*this);
-  for(auto itr(res.entity.begin()); itr != res.entity.end(); itr ++)
+  for(auto itr(res.entity.begin()); itr != res.entity.end(); ++ itr)
     itr->second = - itr->second;
   return res;
 }
@@ -91,7 +91,7 @@ template <typename T> SimpleSparseVector<T> SimpleSparseVector<T>::operator + (c
 }
 
 template <typename T> const SimpleSparseVector<T>& SimpleSparseVector<T>::operator += (const SimpleSparseVector<T>& other) {
-  for(auto itr(other.entity.begin()); itr != other.entity.end(); itr ++) {
+  for(auto itr(other.entity.begin()); itr != other.entity.end(); ++ itr) {
     auto search(entity.find(itr->first));
     if(search == entity.end())
       (*this)[itr->first] = itr->second;
@@ -116,7 +116,7 @@ template <typename T> template <typename U> SimpleSparseVector<T> SimpleSparseVe
 }
 
 template <typename T> template <typename U> const SimpleSparseVector<T>& SimpleSparseVector<T>::operator *= (const U& other) {
-  for(auto itr(entity.begin()); itr != entity.end(); itr ++)
+  for(auto itr(entity.begin()); itr != entity.end(); ++ itr)
     itr->second *= other;
   return *this;
 }
@@ -146,14 +146,14 @@ template <typename T> bool SimpleSparseVector<T>::operator == (const SimpleSpars
 }
 
 template <typename T> template <typename U> const SimpleSparseVector<T>& SimpleSparseVector<T>::operator /= (const U& other) {
-  for(auto itr(entity.begin()); itr < entity.end(); itr ++)
+  for(auto itr(entity.begin()); itr < entity.end(); ++ itr)
     itr->second /= other;
   return *this;
 }
 
 template <typename T> T SimpleSparseVector<T>::dot(const SimpleSparseVector<T>& other) const {
   T res(0);
-  for(auto itr(other.entity.begin()); itr < other.entity.end(); itr ++) {
+  for(auto itr(other.entity.begin()); itr < other.entity.end(); ++ itr) {
     auto search(entity.find(itr->first));
     if(search != entity.end())
       res += search->second * itr->second;
@@ -172,7 +172,7 @@ template <typename T> T& SimpleSparseVector<T>::operator [] (const int& idx) {
   return search2->second;
 }
 
-template <typename T> const T SimpleSparseVector<T>::operator [] (const int& idx) const {
+template <typename T> const T& SimpleSparseVector<T>::operator [] (const int& idx) const {
   assert(0 <= idx);
   const auto search(entity.find(idx));
   if(search != entity.end())
