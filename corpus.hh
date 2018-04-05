@@ -447,15 +447,15 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     const int ii(rridx0[itr0->first]);
     auto& ci1(itr0->second.iter());
-    if(ii < 0) continue;
+    assert(0 <= ii);
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
       const int jj(rridx0[itr1->first]);
       auto& ci2(itr1->second.iter());
-      if(jj < 0) continue;
+      assert(0 <= jj);
       for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
         const int kk(rridx0[itr2->first]);
-        if(0 <= kk)
-          result.corpust[ii][jj][kk] += itr2->second;
+        assert(0 <= kk);
+        result.corpust[ii][jj][kk] += itr2->second;
       }
     }
   }
@@ -464,15 +464,15 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
   for(auto itr0(oi0.begin()); itr0 != oi0.end(); ++ itr0) {
     const int ii(rridx1[itr0->first]);
     auto& oi1(itr0->second.iter());
-    if(ii < 0) continue;
+    assert(0 <= ii);
     for(auto itr1(oi1.begin()); itr1 != oi1.end(); ++ itr1) {
       const int jj(rridx1[itr1->first]);
       auto& oi2(itr1->second.iter());
-      if(jj < 0) continue;
+      assert(0 <= jj);
       for(auto itr2(oi2.begin()); itr2 != oi2.end(); ++ itr2) {
         const int kk(rridx1[itr2->first]);
-        if(0 <= kk)
-          result.corpust[ii][jj][kk] += itr2->second;
+        assert(0 <= kk);
+        result.corpust[ii][jj][kk] += itr2->second;
       }
     }
   }
@@ -529,16 +529,16 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
   const auto rridx0(reverseLookup(ridx0));
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     const int ii(rridx0[itr0->first]);
-    if(ii < 0) continue;
     auto& ci1(itr0->second.iter());
+    assert(0 <= ii);
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
       const int jj(rridx0[itr1->first]);
-      if(jj < 0) continue;
       auto& ci2(itr1->second.iter());
+      assert(0 <= jj);
       for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
         const int kk(rridx0[itr2->first]);
-        if(0 <= kk)
-          result.corpust[ii][jj][kk] = itr2->second;
+        assert(0 <= kk);
+        result.corpust[ii][jj][kk] = itr2->second;
       }
     }
   }
@@ -547,6 +547,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2relPseudo(const corpushl<T, U>& other) const {
+  cerr << "XXX : confirm me corpushl::match2relPseudo" << endl;
   corpushl<T, U> result(*this);
   vector<int>    ridx0, ridx1;
   vector<U>      words(gatherWords(result.words, other.words, ridx0, ridx1));
@@ -555,40 +556,34 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2rel
   const auto rridx0(reverseLookup(ridx0));
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     const int i0(rridx0[itr0->first]);
-    if(i0 < 0) continue;
+    const auto& ci1(itr0->second.iter());
+    assert(0 <= i0);
     const int ii(ridx1[i0]);
     if(ii < 0) continue;
-    const auto& ci1(itr0->second.iter());
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
       const int j0(rridx0[itr1->first]);
-      if(j0 < 0) continue;
+      assert(0 <= j0);
       const int jj(ridx1[j0]);
       if(jj < 0) continue;
-      for(int k = 0; k < words.size(); k ++) if(ridx0[k] >= 0) {
-        mul[itr0->first][itr1->first][ridx0[k]] = 1.;
-        mul[itr1->first][ridx0[k]][itr0->first] = 1.;
-        mul[ridx0[k]][itr0->first][itr1->first] = 1.;
+      for(int k = 0; k < words.size(); k ++) {
+        mul[ii][jj][k ] = 1.;
+        mul[jj][k ][ii] = 1.;
+        mul[k ][jj][ii] = 1.;
       }
     }
   }
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     const int ii(rridx0[itr0->first]);
     auto& ci1(itr0->second.iter());
-    if(ii < 0) {
-      itr0->second.clear();
-      continue;
-    }
+    assert(0 <= ii);
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
       const int jj(rridx0[itr1->first]);
       auto& ci2(itr1->second.iter());
-      if(jj < 0) {
-        itr1->second.clear();
-        continue;
-      }
+      assert(0 <= jj);
       for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
         const int kk(rridx0[itr2->first]);
-        if(0 <= kk)
-          itr2->second *= mul[ii][jj][kk];
+        assert(0 <= kk);
+        itr2->second *= mul[ii][jj][kk];
       }
     }
   }
@@ -603,19 +598,19 @@ template <typename T, typename U> const T corpushl<T, U>::cdot(const corpushl<T,
   const auto  rridx1(reverseLookup(ridx1));
   for(auto itr0(oi0.begin()); itr0 != oi0.end(); ++ itr0) {
     const int   i0(rridx1[itr0->first]);
-    if(i0 < 0) continue;
+    assert(0 <= i0);
     const int   ii(ridx0[i0]);
     if(ii < 0 || !corpust[ii].iter().size()) continue;
     const auto& oi1(itr0->second.iter());
     for(auto itr1(oi1.begin()); itr1 != oi1.end(); ++ itr1) {
       const int   j0(rridx1[itr1->first]);
-      if(j0 < 0) continue;
+      assert(0 <= j0);
       const int   jj(ridx0[j0]);
       if(jj < 0 || !corpust[ii][jj].iter().size()) continue;
       const auto& oi2(itr1->second.iter());
       for(auto itr2(oi2.begin()); itr2 != oi2.end(); ++ itr2) {
         const int k0(rridx1[itr2->first]);
-        if(k0 < 0) continue;
+        assert(0 <= k0);
         const int kk(ridx0[k0]);
         if(0 <= kk)
           res += itr2->second * corpust[ii][jj][kk];
