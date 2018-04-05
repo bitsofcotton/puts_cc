@@ -555,16 +555,28 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::match2relPseudo
   auto& ci0(result.corpust.iter());
   const auto rridx0(reverseLookup(ridx0));
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
-    const int i0(rridx0[itr0->first]);
+    const int ii(rridx0[itr0->first]);
     const auto& ci1(itr0->second.iter());
-    assert(0 <= i0);
-    const int ii(ridx1[i0]);
-    if(ii < 0) continue;
+    assert(0 <= ii);
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
-      const int j0(rridx0[itr1->first]);
-      assert(0 <= j0);
-      const int jj(ridx1[j0]);
-      if(jj < 0) continue;
+      const int jj(rridx0[itr1->first]);
+      assert(0 <= jj);
+      for(int k = 0; k < words.size(); k ++) {
+        mul[ii][jj][k ] = 1.;
+        mul[jj][k ][ii] = 1.;
+        mul[k ][jj][ii] = 1.;
+      }
+    }
+  }
+  auto& di0(other.corpust.iter());
+  const auto rridx1(reverseLookup(ridx1));
+  for(auto itr0(di0.begin()); itr0 != di0.end(); ++ itr0) {
+    const int ii(rridx1[itr0->first]);
+    const auto& di1(itr0->second.iter());
+    assert(0 <= ii);
+    for(auto itr1(di1.begin()); itr1 != di1.end(); ++ itr1) {
+      const int jj(rridx1[itr1->first]);
+      assert(0 <= jj);
       for(int k = 0; k < words.size(); k ++) {
         mul[ii][jj][k ] = 1.;
         mul[jj][k ][ii] = 1.;
