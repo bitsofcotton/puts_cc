@@ -551,15 +551,26 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2rel
   vector<int>    ridx0, ridx1;
   vector<U>      words(gatherWords(result.words, other.words, ridx0, ridx1));
   Tensor mul;
-  for(int i = 0; i < words.size(); i ++) if(ridx0[i] >= 0 && ridx1[i] >= 0)
-    for(int j = 0; j < words.size(); j ++) if(ridx0[j] >= 0 && ridx1[j] >= 0)
-      for(int k = 0; k < words.size(); k ++) if(ridx0[k] >= 0) {
-        mul[ridx0[i]][ridx0[j]][ridx0[k]] = 1.;
-        mul[ridx0[j]][ridx0[k]][ridx0[i]] = 1.;
-        mul[ridx0[k]][ridx0[i]][ridx0[j]] = 1.;
-      }
   auto& ci0(result.corpust.iter());
   const auto rridx0(reverseLookup(ridx0));
+  for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
+    const int i0(rridx0[itr0->first]);
+    if(i0 < 0) continue;
+    const int ii(ridx1[i0]);
+    if(ii < 0) continue;
+    const auto& ci1(itr0->second.iter());
+    for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
+      const int j0(rridx0[itr1->first]);
+      if(j0 < 0) continue;
+      const int jj(ridx1[j0]);
+      if(jj < 0) continue;
+      for(int k = 0; k < words.size(); k ++) if(ridx0[k] >= 0) {
+        mul[itr0->first][itr1->first][ridx0[k]] = 1.;
+        mul[itr1->first][ridx0[k]][itr0->first] = 1.;
+        mul[ridx0[k]][itr0->first][itr1->first] = 1.;
+      }
+    }
+  }
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     const int ii(rridx0[itr0->first]);
     auto& ci1(itr0->second.iter());
