@@ -315,37 +315,37 @@ public:
   corpushl(corpushl<T, U>&& obj);
   ~corpushl();
   
-  const corpushl<T, U>  cast(const vector<U>& words) const;
-  const corpushl<T, U>& operator += (const corpushl<T, U>& other);
-  const corpushl<T, U>& operator -= (const corpushl<T, U>& other);
-  const corpushl<T, U>& operator *= (const T& t);
-  const bool            operator <  (const corpushl<T, U>& other) const;
-  const corpushl<T, U>  operator +  (const corpushl<T, U>& other) const;
-  const corpushl<T, U>  operator -  () const;
-  const corpushl<T, U>  operator -  (const corpushl<T, U>& other) const;
-  const corpushl<T, U>  operator *  (const T& t)                  const;
-  const corpushl<T, U>& operator =  (const corpushl<T, U>& other);
+        corpushl<T, U>  cast(const vector<U>& words) const;
+        corpushl<T, U>& operator += (const corpushl<T, U>& other);
+        corpushl<T, U>& operator -= (const corpushl<T, U>& other);
+        corpushl<T, U>& operator *= (const T& t);
+        bool            operator <  (const corpushl<T, U>& other) const;
+        corpushl<T, U>  operator +  (const corpushl<T, U>& other) const;
+        corpushl<T, U>  operator -  () const;
+        corpushl<T, U>  operator -  (const corpushl<T, U>& other) const;
+        corpushl<T, U>  operator *  (const T& t)                  const;
+        corpushl<T, U>& operator =  (const corpushl<T, U>& other);
         corpushl<T, U>& operator =  (corpushl<T,U>&& other);
-  const bool            operator == (const corpushl<T, U>& other) const;
-  const bool            operator != (const corpushl<T, U>& other) const;
-  const corpushl<T, U>  withDetail(const U& word, const corpushl<T, U>& other);
-  const T               cdot(const corpushl<T, U>& other) const;
-  const corpushl<T, U>  match2relPseudo(const corpushl<T, U>& other) const;
+        bool            operator == (const corpushl<T, U>& other) const;
+        bool            operator != (const corpushl<T, U>& other) const;
+        corpushl<T, U>  withDetail(const U& word, const corpushl<T, U>& other);
+        T               cdot(const corpushl<T, U>& other) const;
+        corpushl<T, U>  match2relPseudo(const corpushl<T, U>& other) const;
   const T               prej(const corpushl<T, U>& prejs) const;
   const T               prej2(const vector<corpushl<T, U> >& prej0, const vector<corpushl<T, U> >& prej1, const T& thresh) const;
   const corpushl<T, U>  lackOfInsist() const;
   const corpushl<T, U>  invertInsist() const;
   const T               culturalConflicts(const corpushl<T, U>& base) const;
-  const corpushl<T, U>  conflictPart();
+  const corpushl<T, U>  conflictPart() const;
   const vector<U>&      getWords() const;
   const Tensor&         getCorpus() const;
   const U               serialize() const;
-  const corpushl<T, U>  abbrev(const U& word, const corpushl<T, U>& mean);
+        corpushl<T, U>  abbrev(const U& word, const corpushl<T, U>& mean) const;
   const vector<U>       reverseLink(const corpushl<T, U>& orig) const;
   const U               reverseLink(const corpus<T, U>& orig) const;
   const pair<T, T>      compareStructure(const corpushl<T, U>& src, const T& thresh = T(1e-4), const T& thresh2 = T(.125)) const;
-  const corpushl<T, U>  reDig(const T& ratio);
-  const corpushl<T, U>  simpleThresh(const T& ratio) const;
+        corpushl<T, U>  reDig(const T& ratio);
+        corpushl<T, U>  simpleThresh(const T& ratio) const;
 
 private:
   const U      serializeSub(const vector<int>& idxs) const;
@@ -381,7 +381,7 @@ template <typename T, typename U> corpushl<T,U>::corpushl(corpushl<T, U>&& obj) 
   *this = obj;
 }
 
-template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::cast(const vector<U>& words) const {
+template <typename T, typename U> corpushl<T, U> corpushl<T, U>::cast(const vector<U>& words) const {
   cerr << "cast" << endl;
   corpushl<T, U> result;
   vector<U>      sword(words);
@@ -399,45 +399,45 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::cast(cons
   return result;
 }
 
-template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator = (const corpushl<T, U>& other) {
+template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator = (const corpushl<T, U>& other) {
   words   = vector<U>(other.words);
   corpust = other.corpust;
   return *this;
 }
 
-template <typename T, typename U>       corpushl<T, U>& corpushl<T, U>::operator = (corpushl<T, U>&& other) {
+template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator = (corpushl<T, U>&& other) {
   words   = move(other.words);
   corpust = move(other.corpust);
   return *this;
 }
 
-template <typename T, typename U> const bool corpushl<T, U>::operator == (const corpushl<T, U>& other) const {
+template <typename T, typename U> bool corpushl<T, U>::operator == (const corpushl<T, U>& other) const {
   return ! (*this != other);
 }
 
-template <typename T, typename U> const bool corpushl<T, U>::operator != (const corpushl<T, U>& other) const {
+template <typename T, typename U> bool corpushl<T, U>::operator != (const corpushl<T, U>& other) const {
   return words != other.words || corpust != other.corpust;
 }
 
-template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator += (const corpushl<T, U>& other) {
+template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator += (const corpushl<T, U>& other) {
   return *this = *this + other;
 }
 
-template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator -= (const corpushl<T, U>& other) {
+template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator -= (const corpushl<T, U>& other) {
   return *this = *this - other;
 }
 
-template <typename T, typename U> const corpushl<T, U>& corpushl<T, U>::operator *= (const T& t) {
+template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator *= (const T& t) {
   cerr << "*=" << flush;
   corpust *= t;
   return *this;
 }
 
-template <typename T, typename U> const bool corpushl<T, U>::operator < (const corpushl<T, U>& other) const {
+template <typename T, typename U> bool corpushl<T, U>::operator < (const corpushl<T, U>& other) const {
   return words.size() < other.words.size();
 }
 
-template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator + (const corpushl<T, U>& other) const {
+template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator + (const corpushl<T, U>& other) const {
   corpushl<T, U> result;
   vector<int>    ridx0, ridx1;
   result.words   = gatherWords(words, other.words, ridx0, ridx1);
@@ -479,22 +479,22 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator 
   return result;
 }
 
-template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator - () const {
+template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator - () const {
   corpushl<T, U> result(*this);
   result.corpust = - result.corpust;
   return result;
 }
 
-template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator - (const corpushl<T, U>& other) const {
+template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator - (const corpushl<T, U>& other) const {
   return (*this) + (- other);
 }
 
-template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::operator * (const T& t) const {
+template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator * (const T& t) const {
   corpushl<T, U> work(*this);
   return work *= t;
 }
 
-template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetail(const U& word, const corpushl<T, U>& other) {
+template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(const U& word, const corpushl<T, U>& other) {
   if(words.size() <= 0 || other.words.size() <= 0)
     return *this;
   auto itr(find(words.begin(), words.end(), word));
@@ -546,7 +546,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::withDetai
   return result;
 }
 
-template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2relPseudo(const corpushl<T, U>& other) const {
+template <typename T, typename U> corpushl<T, U> corpushl<T, U>::match2relPseudo(const corpushl<T, U>& other) const {
   cerr << "XXX : confirm me corpushl::match2relPseudo" << endl;
   corpushl<T, U> result(*this);
   vector<int>    ridx0, ridx1;
@@ -587,10 +587,10 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::match2rel
       }
     }
   }
-  return result;
+  return result.simpleThresh(T(0));
 }
 
-template <typename T, typename U> const T corpushl<T, U>::cdot(const corpushl<T, U>& other) const {
+template <typename T, typename U> T corpushl<T, U>::cdot(const corpushl<T, U>& other) const {
   T res(0);
   vector<int> ridx0, ridx1;
   vector<U>   drop(gatherWords(words, other.words, ridx0, ridx1));
@@ -683,7 +683,7 @@ template <typename T, typename U> const T corpushl<T, U>::culturalConflicts(cons
   return T(0);
 }
 
-template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::conflictPart() {
+template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::conflictPart() const {
   cerr << "XXX confirm me: corpushl::conflictPart" << endl;
   assert(0);
   // search conflict parts.
@@ -775,8 +775,8 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
   return result;
 }
 
-template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::abbrev(const U& word, const corpushl<T, U>& mean) {
-  corpushl<T, U> work(match2relPseudo(mean));
+template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U& word, const corpushl<T, U>& mean) const {
+  const corpushl<T, U> work(match2relPseudo(mean));
   // XXX fixme: need to add abbreved word for work.
   const T tn(cdot(work)), td(work.cdot(work));
   if(isfinite(tn / td))
@@ -844,7 +844,7 @@ template <typename T, typename U> const pair<T, T> corpushl<T, U>::compareStruct
   return result;
 }
 
-template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::reDig(const T& ratio) {
+template <typename T, typename U> corpushl<T, U> corpushl<T, U>::reDig(const T& ratio) {
   auto& ci0(corpust.iter());
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     auto& ci1(itr0->second.iter());
@@ -857,7 +857,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::reDig(con
   return *this;
 }
 
-template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThresh(const T& ratio) const {
+template <typename T, typename U> corpushl<T, U> corpushl<T, U>::simpleThresh(const T& ratio) const {
   T absmax(0);
   auto& ci0(corpust.iter());
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
@@ -870,20 +870,21 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThr
   }
   Tensor work;
   vector<int> okidx;
-  // XXX: can be rewrited as speed up.
   for(int i = 0; i < words.size(); i ++) {
     bool flag(true);
-    for(int j = 0; j < words.size(); j ++) {
-      for(int k = 0; k < words.size(); k ++)
-        if(ratio * absmax <= abs(work[i][j][k]) ||
-           ratio * absmax <= abs(work[j][k][i]) ||
-           ratio * absmax <= abs(work[j][i][k])) {
-          flag = false;
+    if(work[i].iter().size())
+      for(int j = 0; j < words.size(); j ++) {
+        if(!work[i][j].iter().size()) continue;
+        for(int k = 0; k < words.size(); k ++)
+          if(ratio * absmax < abs(work[i][j][k]) ||
+             ratio * absmax < abs(work[j][k][i]) ||
+             ratio * absmax < abs(work[j][i][k])) {
+            flag = false;
+            break;
+          }
+        if(!flag)
           break;
-        }
-      if(!flag)
-        break;
-    }
+      }
     if(!flag)
       okidx.push_back(i);
   }
@@ -892,9 +893,9 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::simpleThr
   result.corpust = Tensor();
   for(int i = 0; i < okidx.size(); i ++) {
     result.words.push_back(words[okidx[i]]);
-    for(int j = 0; j < okidx.size(); j ++)
+    for(int j = 0; j < okidx.size(); j ++) if(corpust[i][j].iter().size())
       for(int k = 0; k < okidx.size(); k ++)
-        if(ratio * absmax <= abs(corpust[okidx[i]][okidx[j]][okidx[k]]))
+        if(ratio * absmax < abs(corpust[okidx[i]][okidx[j]][okidx[k]]))
           result.corpust[i][j][k] = corpust[okidx[i]][okidx[j]][okidx[k]];
   }
   return result;
@@ -1069,7 +1070,7 @@ template <typename T, typename U> void getAbbreved(vector<corpushl<T, U> >& csta
       corpus<T, U> lstat;
       lstat.init(words, 0, 120);
       lstat.compute(detail[i].substr(j * szwindow / 2, szwindow).c_str(), delimiter);
-      details[details.size() - 1].push_back(corpushl<T, U>(lstat));
+      details[details.size() - 1].emplace_back(corpushl<T, U>(lstat));
     }
   }
   
@@ -1095,7 +1096,7 @@ template <typename T, typename U> vector<U> getDetailed(const U& name, vector<co
       corpus<T, U> lstat;
       lstat.init(words, 0, 120);
       lstat.compute(detail[i].substr(j * szwindow / 2, szwindow).c_str(), delimiter);
-      details[details.size() - 1].push_back(corpushl<T, U>(lstat));
+      details[details.size() - 1].emplace_back(corpushl<T, U>(lstat));
     }
   }
   cstat0 = vector<corpus<T, U> >();
