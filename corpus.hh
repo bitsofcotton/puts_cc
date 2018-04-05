@@ -1387,7 +1387,7 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
     diff.reDig(redig);
     diffs.emplace_back(diff);
   }
-  // getAbbreved(diffs, words, detailtitle0, detail0, delimiter, szwindow);
+  getAbbreved(diffs, words, detailtitle0, detail0, delimiter, szwindow);
   
   cerr << " making outputs." << flush;
   U result;
