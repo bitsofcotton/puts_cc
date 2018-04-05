@@ -1027,12 +1027,12 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
         for(auto titr0(ti0.begin()); titr0 != ti0.end(); ++ titr0) {
           auto& ti1(titr0->second.iter());
           const int tii(rridx0[titr0->first]);
-          assert(titr0->first != eidx && 0 <= tii);
+          assert(titr0->first == eidx || 0 <= tii);
           if(titr0->first == eidx || ridx2[tii] < 0) continue;
           // add line points.
           for(auto titr1(ti1.begin()); titr1 != ti1.end(); ++ titr1) {
             const int tjj(rridx0[titr1->first]);
-            assert(titr1->first != eidx && 0 <= tjj);
+            assert(titr1->first == eidx || 0 <= tjj);
             if(titr1->first != eidx && 0 <= ridx2[tjj])
               merge5(res, ridx2[tii], ridx2[ii], ridx2[kk], ridx2[jj], ridx2[tjj], titr1->second[ridx0[eidx]] * itr2->second * x0);
           }
@@ -1040,11 +1040,11 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
         for(auto titr0(ti0.begin()); titr0 != ti0.end(); ++ titr0) {
           auto& ti2(titr0->second[eidx].iter());
           const int tii(rridx0[titr0->first]);
-          assert(titr0->first != eidx && 0 <= tii);
+          assert(titr0->first == eidx || 0 <= tii);
           if(titr0->first == eidx || ridx2[tii] < 0) continue;
           for(auto titr2(ti2.begin()); titr2 != ti2.end(); ++ titr2) {
             const int tkk(rridx0[titr2->first]);
-            assert(titr2->first != eidx && 0 <= tkk);
+            assert(titr2->first == eidx || 0 <= tkk);
             if(titr2->first != eidx && 0 <= ridx2[tkk])
               merge5(res, ridx2[tii], ridx2[tkk], ridx2[ii], ridx2[kk], ridx2[jj], titr2->second * itr2->second * x0);
           }
@@ -1053,11 +1053,11 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
         for(auto titr1(ti1.begin()); titr1 != ti1.end(); ++ titr1) {
           auto& ti2(titr1->second.iter());
           const int tjj(rridx0[titr1->first]);
-          assert(titr1->first != eidx && 0 <= tjj);
+          assert(titr1->first == eidx || 0 <= tjj);
           if(titr1->first == eidx || ridx2[tjj] < 0) continue;
           for(auto titr2(ti2.begin()); titr2 != ti2.end(); ++ titr2) {
             const int tkk(rridx0[titr2->first]);
-            assert(titr2->first != eidx && 0 <= tkk);
+            assert(titr2->first == eidx || 0 <= tkk);
             if(titr2->first != eidx && 0 <= ridx2[tkk])
               merge5(res, ridx2[ii], ridx2[kk], ridx2[jj], ridx2[tjj], ridx2[tkk], titr2->second * itr2->second * x0);
           }
