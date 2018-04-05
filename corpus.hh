@@ -587,21 +587,21 @@ template <typename T, typename U> const T corpushl<T, U>::cdot(const corpushl<T,
   for(auto itr0(oi0.begin()); itr0 != oi0.end(); itr0 ++) {
     const int   i0(rridx1[itr0->first]);
     if(i0 < 0) continue;
-    const int   ii(itr0->first);
-    const auto& oi1(itr0->second.iter());
+    const int   ii(ridx0[i0]);
     if(ii < 0) continue;
+    const auto& oi1(itr0->second.iter());
     for(auto itr1(oi1.begin()); itr1 != oi1.end(); itr1 ++) {
       const int   j0(rridx1[itr1->first]);
       if(j0 < 0) continue;
       const int   jj(ridx0[j0]);
-      const auto& oi2(itr1->second.iter());
       if(jj < 0) continue;
+      const auto& oi2(itr1->second.iter());
       for(auto itr2(oi2.begin()); itr2 != oi2.end(); itr2 ++) {
         const int k0(rridx1[itr2->first]);
         if(k0 < 0) continue;
         const int kk(ridx0[k0]);
         if(0 <= kk)
-          res += corpust[ii][jj][kk] * itr2->second;
+          res += itr2->second * corpust[ii][jj][kk];
       }
     }
   }
