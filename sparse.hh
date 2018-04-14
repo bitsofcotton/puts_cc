@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <vector>
 #include <utility>
+#include <map>
 
 using std::cout;
 using std::cerr;
@@ -33,15 +34,15 @@ public:
   SimpleSparseVector(SimpleSparseVector<T>&& other);
   ~SimpleSparseVector();
   
-        SimpleSparseVector<T>  operator -  () const;
-        SimpleSparseVector<T>  operator +  (const SimpleSparseVector<T>& other) const;
-  const SimpleSparseVector<T>& operator += (const SimpleSparseVector<T>& other);
-        SimpleSparseVector<T>  operator -  (const SimpleSparseVector<T>& other) const;
-  const SimpleSparseVector<T>& operator -= (const SimpleSparseVector<T>& other);
-  template <typename U>       SimpleSparseVector<T>  operator *  (const U& other) const;
-  template <typename U> const SimpleSparseVector<T>& operator *= (const U& other);
-  template <typename U>       SimpleSparseVector<T>  operator /  (const U& other) const;
-  template <typename U> const SimpleSparseVector<T>& operator /= (const U& other);
+  SimpleSparseVector<T>  operator -  () const;
+  SimpleSparseVector<T>  operator +  (const SimpleSparseVector<T>& other) const;
+  SimpleSparseVector<T>& operator += (const SimpleSparseVector<T>& other);
+  SimpleSparseVector<T>  operator -  (const SimpleSparseVector<T>& other) const;
+  SimpleSparseVector<T>& operator -= (const SimpleSparseVector<T>& other);
+  template <typename U> SimpleSparseVector<T>  operator *  (const U& other) const;
+  template <typename U> SimpleSparseVector<T>& operator *= (const U& other);
+  template <typename U> SimpleSparseVector<T>  operator /  (const U& other) const;
+  template <typename U> SimpleSparseVector<T>& operator /= (const U& other);
         SimpleSparseVector<T>& operator =  (const SimpleSparseVector<T>& other);
         SimpleSparseVector<T>& operator =  (SimpleSparseVector<T>&& other);
         bool                   operator != (const SimpleSparseVector<T>& other) const;
@@ -91,7 +92,7 @@ template <typename T> SimpleSparseVector<T> SimpleSparseVector<T>::operator + (c
   return res += other;
 }
 
-template <typename T> const SimpleSparseVector<T>& SimpleSparseVector<T>::operator += (const SimpleSparseVector<T>& other) {
+template <typename T> SimpleSparseVector<T>& SimpleSparseVector<T>::operator += (const SimpleSparseVector<T>& other) {
   for(auto itr(other.entity.begin()); itr != other.entity.end(); ++ itr) {
     if(itr->second == T(0)) continue;
     auto search(entity.find(itr->first));
@@ -108,7 +109,7 @@ template <typename T> SimpleSparseVector<T> SimpleSparseVector<T>::operator - (c
   return res -= other;
 }
 
-template <typename T> const SimpleSparseVector<T>& SimpleSparseVector<T>::operator -= (const SimpleSparseVector<T>& other) {
+template <typename T> SimpleSparseVector<T>& SimpleSparseVector<T>::operator -= (const SimpleSparseVector<T>& other) {
   return *this += - other;
 }
 
@@ -117,7 +118,7 @@ template <typename T> template <typename U> SimpleSparseVector<T> SimpleSparseVe
   return res *= other;
 }
 
-template <typename T> template <typename U> const SimpleSparseVector<T>& SimpleSparseVector<T>::operator *= (const U& other) {
+template <typename T> template <typename U> SimpleSparseVector<T>& SimpleSparseVector<T>::operator *= (const U& other) {
   for(auto itr(entity.begin()); itr != entity.end(); ++ itr)
     itr->second *= other;
   return *this;
@@ -147,8 +148,8 @@ template <typename T> bool SimpleSparseVector<T>::operator == (const SimpleSpars
   return ! (*this != other);
 }
 
-template <typename T> template <typename U> const SimpleSparseVector<T>& SimpleSparseVector<T>::operator /= (const U& other) {
-  for(auto itr(entity.begin()); itr < entity.end(); ++ itr)
+template <typename T> template <typename U> SimpleSparseVector<T>& SimpleSparseVector<T>::operator /= (const U& other) {
+  for(auto itr(entity.begin()); itr != entity.end(); ++ itr)
     itr->second /= other;
   return *this;
 }
