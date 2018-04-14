@@ -13,10 +13,10 @@ function doexecp($so, $se, $cmd, $text, $cwd, $env) {
   return;
 }
 
-function analyse($cwd, $pathb2, $fileb2, $do_stat) {
+function analyse($cwd, $pathb2, $do_stat) {
   echo $pathb2;
   $text = "";
-  $file = fopen($fileb2, "r");
+  $file = fopen($pathb2, "r");
   while(($buf = fgets($file)) !== false)
     $text .= $buf;
   fclose($file);

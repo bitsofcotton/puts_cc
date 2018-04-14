@@ -75,6 +75,7 @@ case "da":
   exec("rm -fr " . $pathb . "/output && mkdir -p " . $pathb . "/output");
   break;
 case "ta":
+  exec("cd " . $pathb . " && rm -f *.core");
   exec("cd " . $pathb . " && rm -f archive.tar.gz && tar cfz archive.tar.gz .");
   break;
 default:

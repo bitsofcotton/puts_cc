@@ -311,6 +311,7 @@ public:
   
   corpushl();
   corpushl(const corpus<T, U>&   obj);
+  corpushl(corpus<T, U>&&   obj);
   corpushl(const corpushl<T, U>& obj);
   corpushl(corpushl<T, U>&& obj);
   ~corpushl();
@@ -319,11 +320,14 @@ public:
         corpushl<T, U>& operator += (const corpushl<T, U>& other);
         corpushl<T, U>& operator -= (const corpushl<T, U>& other);
         corpushl<T, U>& operator *= (const T& t);
+        corpushl<T, U>& operator /= (const T& t);
         bool            operator <  (const corpushl<T, U>& other) const;
         corpushl<T, U>  operator +  (const corpushl<T, U>& other) const;
         corpushl<T, U>  operator -  () const;
+        corpushl<T, U>& operator -  ();
         corpushl<T, U>  operator -  (const corpushl<T, U>& other) const;
         corpushl<T, U>  operator *  (const T& t)                  const;
+        corpushl<T, U>  operator /  (const T& t)                  const;
         corpushl<T, U>& operator =  (const corpushl<T, U>& other);
         corpushl<T, U>& operator =  (corpushl<T,U>&& other);
         bool            operator == (const corpushl<T, U>& other) const;
@@ -372,6 +376,11 @@ template <typename T, typename U> corpushl<T,U>::~corpushl() {
 template <typename T, typename U> corpushl<T,U>::corpushl(const corpus<T, U>& obj) {
   words   = vector<U>(obj.getWords());
   corpust = Tensor(obj.getCorpus());
+}
+
+template <typename T, typename U> corpushl<T,U>::corpushl(corpus<T, U>&& obj) {
+  words   = move(obj.getWords());
+  corpust = move(obj.getCorpus());
 }
 
 template <typename T, typename U> corpushl<T,U>::corpushl(const corpushl<T, U>& obj) {
@@ -434,6 +443,12 @@ template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator *= (c
   return *this;
 }
 
+template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator /= (const T& t) {
+  cerr << "/=" << flush;
+  corpust /= t;
+  return *this;
+}
+
 template <typename T, typename U> bool corpushl<T, U>::operator < (const corpushl<T, U>& other) const {
   return words.size() < other.words.size();
 }
@@ -486,6 +501,11 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator - () c
   return result;
 }
 
+template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator - () {
+  corpust = - corpust;
+  return *this;
+}
+
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator - (const corpushl<T, U>& other) const {
   return (*this) + (- other);
 }
@@ -493,6 +513,11 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator - (con
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator * (const T& t) const {
   corpushl<T, U> work(*this);
   return work *= t;
+}
+
+template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator / (const T& t) const {
+  corpushl<T, U> work(*this);
+  return work /= t;
 }
 
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(const U& word, const corpushl<T, U>& other) {
@@ -554,21 +579,18 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::match2relPseudo
   corpushl<T, U> result(*this);
   vector<int>    ridx0, ridx1;
   vector<U>      words(gatherWords(result.words, other.words, ridx0, ridx1));
-  Tensor mul;
+  vector<int>    idxs;
   auto& ci0(result.corpust.iter());
   const auto rridx0(reverseLookup(ridx0));
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     const int ii(rridx0[itr0->first]);
     const auto& ci1(itr0->second.iter());
     assert(0 <= ii);
+    idxs.push_back(ii);
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
       const int jj(rridx0[itr1->first]);
       assert(0 <= jj);
-      for(int k = 0; k < words.size(); k ++) {
-        mul[ii][jj][k ] = 1.;
-        mul[jj][k ][ii] = 1.;
-        mul[k ][jj][ii] = 1.;
-      }
+      idxs.push_back(jj);
     }
   }
   auto& di0(other.corpust.iter());
@@ -577,28 +599,31 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::match2relPseudo
     const int ii(rridx1[itr0->first]);
     const auto& di1(itr0->second.iter());
     assert(0 <= ii);
+    idxs.push_back(ii);
     for(auto itr1(di1.begin()); itr1 != di1.end(); ++ itr1) {
       const int jj(rridx1[itr1->first]);
       assert(0 <= jj);
-      for(int k = 0; k < words.size(); k ++) {
-        mul[ii][jj][k ] = 1.;
-        mul[jj][k ][ii] = 1.;
-        mul[k ][jj][ii] = 1.;
-      }
+      idxs.push_back(jj);
     }
   }
+  sort(idxs.begin(), idxs.end());
+  idxs.erase(unique(idxs.begin(), idxs.end()), idxs.end());
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     const int ii(rridx0[itr0->first]);
     auto& ci1(itr0->second.iter());
     assert(0 <= ii);
+    const auto bii(binary_search(idxs.begin(), idxs.end(), ii));
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
       const int jj(rridx0[itr1->first]);
       auto& ci2(itr1->second.iter());
       assert(0 <= jj);
+      const auto bjj(binary_search(idxs.begin(), idxs.end(), jj));
       for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
         const int kk(rridx0[itr2->first]);
         assert(0 <= kk);
-        itr2->second *= mul[ii][jj][kk];
+        const auto bkk(binary_search(idxs.begin(), idxs.end(), kk));
+        if(!((bii && bjj) || (bjj && bkk) || (bkk && bii)))
+          itr2->second = T(0);
       }
     }
   }
@@ -794,12 +819,11 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
   const corpushl<T, U> work(match2relPseudo(mean));
   // XXX fixme: need to add abbreved word for work.
   const T tn(cdot(work)), td(work.cdot(work));
-  if(isfinite(tn / td))
-    return *this - (work * (tn / td));
-  // can't abbrev.
-  cerr << "XXX: can't abbrev : " << td << endl;
-  // assert(td == T(0));
-  return *this;
+  if(td <= T(0)) {
+    cerr << "XXX: can't abbrev : " << tn << ", " << td << endl;
+    return *this;
+  }
+  return (*this * td - work * tn) / td;
 }
 
 template <typename T, typename U> const vector<U> corpushl<T, U>::reverseLink(const corpushl<T, U>& orig) const {
