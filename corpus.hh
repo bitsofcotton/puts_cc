@@ -438,13 +438,11 @@ template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator -= (c
 }
 
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator *= (const T& t) {
-  cerr << "*=" << flush;
   corpust *= t;
   return *this;
 }
 
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator /= (const T& t) {
-  cerr << "/=" << flush;
   corpust /= t;
   return *this;
 }
@@ -827,7 +825,6 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
 
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U& word, const corpushl<T, U>& mean) const {
   const auto work(match2relPseudo(mean));
-  cerr << mean.words.size() << ", " << work.words.size() << endl;
   const T    tn(cdot(work));
   const T    td(work.cdot(work));
   cerr << "XXX: abbrev eliminates abbreved word now..." << endl;
@@ -960,7 +957,6 @@ template <typename T, typename U> const vector<int> corpushl<T, U>::reverseLooku
 }
 
 template <typename T, typename U> vector<U> corpushl<T, U>::gatherWords(const vector<U>& in0, const vector<U>& in1, vector<int>& ridx0, vector<int>& ridx1) const {
-  cerr << "g" << flush;
   vector<U> result;
   ridx0 = vector<int>();
   ridx1 = vector<int>();
