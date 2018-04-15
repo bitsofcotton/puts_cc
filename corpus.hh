@@ -1288,6 +1288,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
   for(int i = 0; i < cstat.size(); i ++)
     idxs.push_back(vector<int>());
   for(int ii = 0; phrases.size() <= cstatsw.rows(); ii ++) {
+    cerr << "." << flush;
     vector<vector<pair<T, int> > > scores0;
     vector<pair<T, int> > cidxs;
     for(int i = 0; i < cstatsw.rows(); i ++)
@@ -1390,7 +1391,7 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
   cerr << " making diffs" << endl;
   U result;
   getAbbreved(cstat, words, detailtitle0, detail0, delimiter, szwindow);
-  getAbbreved(dstat, words, detailtitle0, detail0, delimiter, szwindow);
+  getAbbreved(dstat, words, detailtitle1, detail1, delimiter, szwindow);
   for(int i = 0; i < cstat.size(); i ++) {
     cstat[i].reDig(redig);
     dstat[i].reDig(redig);
