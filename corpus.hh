@@ -392,7 +392,7 @@ template <typename T, typename U> corpushl<T,U>::corpushl(corpushl<T, U>&& obj) 
 }
 
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::cast(const vector<U>& words) const {
-  cerr << "cast" << endl;
+  cerr << "cast (XXX fixme.)" << endl;
   corpushl<T, U> result;
   vector<U>      sword(words);
   vector<int>    idxs;
@@ -404,14 +404,14 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::cast(const vect
       result.words.push_back(*p);
     }
   }
-  // XXX fixme:
+  // fixme:
   result.corpust = corpust;
   return result;
 }
 
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator = (const corpushl<T, U>& other) {
   words   = vector<U>(other.words);
-  corpust = other.corpust;
+  corpust = Tensor(other.corpust);
   return *this;
 }
 
@@ -575,7 +575,6 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
 }
 
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::match2relPseudo(const corpushl<T, U>& other) const {
-  cerr << "XXX : confirm me corpushl::match2relPseudo" << endl;
   corpushl<T, U> result(*this);
   vector<int>    ridx0, ridx1;
   vector<U>      words(gatherWords(result.words, other.words, ridx0, ridx1));
@@ -589,8 +588,14 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::match2relPseudo
     idxs.push_back(ii);
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
       const int jj(rridx0[itr1->first]);
+      const auto& ci2(itr1->second.iter());
       assert(0 <= jj);
       idxs.push_back(jj);
+      for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
+        const int kk(rridx0[itr2->first]);
+        assert(0 <= kk);
+        idxs.push_back(kk);
+      }
     }
   }
   auto& di0(other.corpust.iter());
@@ -602,8 +607,14 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::match2relPseudo
     idxs.push_back(ii);
     for(auto itr1(di1.begin()); itr1 != di1.end(); ++ itr1) {
       const int jj(rridx1[itr1->first]);
+      const auto& di2(itr1->second.iter());
       assert(0 <= jj);
       idxs.push_back(jj);
+      for(auto itr2(di2.begin()); itr2 != di2.end(); ++ itr2) {
+        const int kk(rridx1[itr2->first]);
+        assert(0 <= kk);
+        idxs.push_back(kk);
+      }
     }
   }
   sort(idxs.begin(), idxs.end());
@@ -661,7 +672,6 @@ template <typename T, typename U> T corpushl<T, U>::cdot(const corpushl<T, U>& o
 }
 
 template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T, U>& prejs) const {
-  // XXX this is broken method. DO NOT USE THIS ONLY.: fixme...
   cerr << "XXX : confirm me corpushl::prej function." << endl;
   // XXX confirm me: need some other counting methods?
   // XXX fixme: amount of the word that is not said in the context is
@@ -816,27 +826,28 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
 }
 
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U& word, const corpushl<T, U>& mean) const {
-  const corpushl<T, U> work(match2relPseudo(mean));
-  // XXX fixme: need to add abbreved word for work.
-  const T tn(cdot(work)), td(work.cdot(work));
+  const auto work(match2relPseudo(mean));
+  cerr << mean.words.size() << ", " << work.words.size() << endl;
+  const T    tn(cdot(work));
+  const T    td(work.cdot(work));
+  cerr << "XXX: abbrev eliminates abbreved word now..." << endl;
   if(td <= T(0)) {
-    cerr << "XXX: can't abbrev : " << tn << ", " << td << endl;
+    cerr << "XXX: can't abbrev : " << cdot(*this) << endl;
     return *this;
   }
   return (*this * td - work * tn) / td;
 }
 
 template <typename T, typename U> const vector<U> corpushl<T, U>::reverseLink(const corpushl<T, U>& orig) const {
-  vector<U>      res;
-  vector<int>    ridx0, ridx1;
-  corpushl<T, U> work(match2relPseudo(corpushl<T, U>(orig)));
-  vector<U>      rwords(gatherWords(words, work.words, ridx0, ridx1));
-  return rwords;
+  vector<U>   res;
+  vector<int> ridx0, ridx1;
+  auto        work(match2relPseudo(corpushl<T, U>(orig)));
+  return gatherWords(words, work.words, ridx0, ridx1);
 }
 
 template <typename T, typename U> const U corpushl<T, U>::reverseLink(const corpus<T, U>& orig) const {
-  vector<int>    ridx0, ridx1;
-  corpushl<T, U> work(match2relPseudo(orig));
+  vector<int> ridx0, ridx1;
+  auto        work(match2relPseudo(orig));
   return orig.getAttributed(gatherWords(words, work.words, ridx0, ridx1));
 }
 
@@ -907,25 +918,18 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::simpleThresh(co
         absmax = max(abs(itr2->second), absmax);
     }
   }
-  Tensor work;
   vector<int> okidx;
   for(int i = 0; i < words.size(); i ++) {
-    bool flag(true);
-    if(work[i].iter().size())
-      for(int j = 0; j < words.size(); j ++) {
-        if(!work[i][j].iter().size()) continue;
-        for(int k = 0; k < words.size(); k ++)
-          if(ratio * absmax < abs(work[i][j][k]) ||
-             ratio * absmax < abs(work[j][k][i]) ||
-             ratio * absmax < abs(work[j][i][k])) {
-            flag = false;
-            break;
-          }
-        if(!flag)
-          break;
-      }
-    if(!flag)
-      okidx.push_back(i);
+    for(int j = 0; j < words.size(); j ++)
+      for(int k = 0; k < words.size(); k ++)
+        if(ratio * absmax < abs(corpust[i][j][k]) ||
+           ratio * absmax < abs(corpust[j][i][k]) ||
+           ratio * absmax < abs(corpust[j][k][i])) {
+          okidx.push_back(i);
+          goto next;
+        }
+   next:
+    ;
   }
   corpushl<T, U> result;
   result.words   = vector<U>();
@@ -1024,7 +1028,6 @@ template <typename T, typename U> vector<U> corpushl<T, U>::gatherWords(const ve
 }
 
 template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::prepareDetail(const corpushl<T, U>& other, const vector<U>& workwords, const int& eidx, const vector<int>& ridx0, const vector<int>& ridx1, const vector<int>& ridx2) {
-  // initialize result tensor with 0.
   Tensor res;
   const auto& ci0(other.corpust.iter());
   const auto  rridx0(reverseLookup(ridx0));
@@ -1141,25 +1144,17 @@ template <typename T, typename U> const SimpleSparseTensor<T>& corpushl<T, U>::g
 
 template <typename T, typename U> void getAbbreved(vector<corpushl<T, U> >& cstat, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow) {
   assert(detailtitle.size() == detail.size());
-  cerr << "getAbbreved : preparing datas";
-  vector<vector<corpushl<T, U> > > details;
+  cerr << " getAbbreved";
   for(int i = 0; i < detail.size(); i ++) {
     cerr << "." << flush;
-    details.push_back(vector<corpushl<T, U> >());
     for(int j = 0; j < detail[i].size() / szwindow * 2 + 1; j ++) {
       corpus<T, U> lstat;
       lstat.init(words, 0, 120);
       lstat.compute(detail[i].substr(j * szwindow / 2, szwindow).c_str(), delimiter);
-      details[details.size() - 1].emplace_back(corpushl<T, U>(lstat));
+      corpushl<T, U> work(lstat);
+      for(int k = 0; k < cstat.size(); k ++)
+        cstat[k] = cstat[k].abbrev(detailtitle[i], work);
     }
-  }
-  
-  cerr << " getting abbrevs";
-  for(int i = 0; i < details.size(); i ++) {
-    cerr << "." << flush;
-    for(int j = 0; j < cstat.size(); j ++)
-      for(int k = 0; k < details[i].size(); k ++)
-        cstat[j] = cstat[j].abbrev(detailtitle[i], details[i][k]);
   }
   cerr << endl;
   return;
@@ -1167,18 +1162,7 @@ template <typename T, typename U> void getAbbreved(vector<corpushl<T, U> >& csta
 
 template <typename T, typename U> vector<U> getDetailed(const U& name, vector<corpus<T, U> >& cstat0, vector<corpushl<T, U> >& cstat, const U& input, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow) {
   assert(detailtitle.size() == detail.size());
-  cerr << "getDetailed : preparing datas";
-  vector<vector<corpushl<T, U> > > details;
-  for(int i = 0; i < detail.size(); i ++) {
-    cerr << "." << flush;
-    details.push_back(vector<corpushl<T, U> >());
-    for(int j = 0; j < detail[i].size() / szwindow * 2 + 1; j ++) {
-      corpus<T, U> lstat;
-      lstat.init(words, 0, 120);
-      lstat.compute(detail[i].substr(j * szwindow / 2, szwindow).c_str(), delimiter);
-      details[details.size() - 1].emplace_back(corpushl<T, U>(lstat));
-    }
-  }
+  cerr << " getDetailed";
   cstat0 = vector<corpus<T, U> >();
   cstat  = vector<corpushl<T, U> >();
   vector<U> result;
@@ -1193,13 +1177,16 @@ template <typename T, typename U> vector<U> getDetailed(const U& name, vector<co
     tagged += U("</span><br/>");
     result.push_back(tagged);
   }
-
-  cerr << " getting details";
-  for(int i = 0; i < details.size(); i ++) {
+  for(int i = 0; i < detail.size(); i ++) {
     cerr << "." << flush;
-    for(int j = 0; j < cstat0.size(); j ++)
-      for(int k = 0; k < details[i].size(); k ++)
-        cstat[j] = cstat[j].withDetail(detailtitle[i], details[i][k]);
+    for(int j = 0; j < detail[i].size() / szwindow * 2 + 1; j ++) {
+      corpus<T, U> lstat;
+      lstat.init(words, 0, 120);
+      lstat.compute(detail[i].substr(j * szwindow / 2, szwindow).c_str(), delimiter);
+      corpushl<T, U> work(lstat);
+      for(int k = 0; k < cstat0.size(); k ++)
+        cstat[k] = cstat[k].withDetail(detailtitle[i], work);
+    }
   }
   cerr << endl;
   return result;
@@ -1220,40 +1207,40 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
   vector<int> matched;
   U result;
   for(int i = 0; i < topics.size(); i ++) {
-     cerr << "." << flush;
-     vector<corpus<T, U> >   tstat0;
-     vector<corpushl<T, U> > tstat;
-     getDetailed<T, U>(name, tstat0, tstat, topics[i], words, detailtitle, detail, delimiter, szwindow);
-     vector<pair<T, pair<int, int> > > scores;
-     for(int j = 0; j < tstat.size(); j ++)
-       for(int k = 0; k < cstat.size(); k ++)
-         if(! (cstat[k].cdot(cstat[k]) <= T(0))) {
-           const T lscore(cstat[k].prej(tstat[j]));
-           if(lscore <= - T(1) + thresh || thresh <= lscore)
-             scores.push_back(make_pair(- lscore, make_pair(j, k)));
-         }
-     sort(scores.begin(), scores.end());
-     T   sum(0);
-     int cnt(0);
-     for(int j = 0; j < scores.size(); j ++) {
-       sum += scores[j].first;
-       cnt ++;
-     }
-     if(!cnt) continue;
-     result += topictitle[i] + U(" : (") + to_string(scores[0].first);
-     result += U(", ") + to_string(sum / cnt);
-     result += U(", ") + to_string(scores[scores.size() - 1].first);
-     result += U(")<br/><span class=\"small\">\n");;
-     for(int j = 0; j < scores.size(); j ++) {
-       matched.push_back(scores[j].second.second);
-       const auto& work(cstat[scores[j].second.second] + tstat[scores[j].second.first]);
-       result += to_string(scores[j].first) + U(" : ");
-       result += U("<a href=\"#") + name + to_string(scores[j].second.second) + U("\">");
-       result += work.serialize() + U("</a><br/>\n");
-       result += work.reverseLink(cstat0[scores[j].second.second]) + U("<br/>\n");
-       result += work.reverseLink(tstat0[scores[j].second.first])  + U("<br/><br/>\n");
-     }
-     result += U("</span><br/>\n");
+    cerr << "." << flush;
+    vector<corpus<T, U> >   tstat0;
+    vector<corpushl<T, U> > tstat;
+    getDetailed<T, U>(name, tstat0, tstat, topics[i], words, detailtitle, detail, delimiter, szwindow);
+    vector<pair<T, pair<int, int> > > scores;
+    for(int j = 0; j < tstat.size(); j ++)
+      for(int k = 0; k < cstat.size(); k ++)
+        if(! (cstat[k].cdot(cstat[k]) <= T(0))) {
+          const T lscore(cstat[k].prej(tstat[j]));
+          if(lscore <= - T(1) + thresh || thresh <= lscore)
+            scores.push_back(make_pair(- lscore, make_pair(j, k)));
+        }
+    sort(scores.begin(), scores.end());
+    T   sum(0);
+    int cnt(0);
+    for(int j = 0; j < scores.size(); j ++) {
+      sum += scores[j].first;
+      cnt ++;
+    }
+    if(!cnt) continue;
+    result += topictitle[i] + U(" : (") + to_string(scores[0].first);
+    result += U(", ") + to_string(sum / cnt);
+    result += U(", ") + to_string(scores[scores.size() - 1].first);
+    result += U(")<br/><span class=\"small\">\n");;
+    for(int j = 0; j < scores.size(); j ++) {
+      matched.push_back(scores[j].second.second);
+      const auto& work(cstat[scores[j].second.second] + tstat[scores[j].second.first]);
+      result += to_string(scores[j].first) + U(" : ");
+      result += U("<a href=\"#") + name + to_string(scores[j].second.second) + U("\">");
+      result += work.serialize() + U("</a><br/>\n");
+      result += work.reverseLink(cstat0[scores[j].second.second]) + U("<br/>\n");
+      result += work.reverseLink(tstat0[scores[j].second.first])  + U("<br/><br/>\n");
+    }
+    result += U("</span><br/>\n");
   }
   sort(matched.begin(), matched.end());
   matched.erase(unique(matched.begin(), matched.end()), matched.end());
@@ -1292,6 +1279,8 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     for(int j = i + 1; j < cstat.size(); j ++)
       if(! (cstat[j].cdot(cstat[j]) <= T(0)))
         cstats(i, j) = - cstat[i].prej(cstat[j]);
+      else
+        cstats(i, j) = T(8);
   }
   
   cerr << "OK, sorting phrases." << flush;
@@ -1403,26 +1392,21 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
   getDetailed<T, U>(name, dstat0, dstat, input, words, detailtitle1, detail1, delimiter, szwindow);
   
   cerr << " making diffs" << endl;
-  vector<corpushl<T, U> > diffs;
+  U result;
+  getAbbreved(cstat, words, detailtitle0, detail0, delimiter, szwindow);
+  getAbbreved(dstat, words, detailtitle0, detail0, delimiter, szwindow);
   for(int i = 0; i < cstat.size(); i ++) {
     cstat[i].reDig(redig);
     dstat[i].reDig(redig);
     auto diff(cstat[i] - dstat[i]);
     diff.reDig(redig);
-    diffs.emplace_back(diff);
-  }
-  getAbbreved(diffs, words, detailtitle0, detail0, delimiter, szwindow);
-  
-  cerr << " making outputs." << flush;
-  U result;
-  for(int i = 0; i < cstat.size(); i ++)
-    if(diffs[i].cdot(diffs[i]) != T(0)) {
-      auto& diff(diffs[i]);
+    if(diff.cdot(diff) != T(0)) {
       result += diff.serialize() + U("<br/>\n");
       result += cstat[i].reverseLink(cstat0[i]) + U("<br/>\n");
       result += diff.reverseLink(cstat0[i]) + U("<br/>\n");
       result += diff.reverseLink(dstat0[i]) + U("<br/><br/><br/>\n");
     }
+  }
   return result;
 }
 
