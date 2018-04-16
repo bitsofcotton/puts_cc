@@ -60,16 +60,16 @@ function analyse($cwd, $pathb2, $do_stat) {
     return;
   }
   foreach($match[0] as $df) {
-    $pathc = $cwd . "../" . $df . "/";
-    if(file_exists($pathc . "dicts")) {
-      $buf = " -dict ";
+    $pathc = "../" . $df . "/";
+    if(file_exists($cwd . '/' . $pathc . "dicts")) {
+      $buf  = " -dict ";
       foreach (new DirectoryIterator($cwd . '/dicts') as $fileInfo) {
         if($fileInfo->isDot()) continue;
         $name = $fileInfo->getFilename();
         $buf .= "\"dicts/" . $name . "\" ";
       }
       $buf .= " -dict2 ";
-      foreach (new DirectoryIterator($pathc . '/dicts') as $fileInfo) {
+      foreach (new DirectoryIterator($cwd . '/' . $pathc . '/dicts') as $fileInfo) {
         if($fileInfo->isDot()) continue;
         $name = $fileInfo->getFilename();
         $buf .= "\"" . $pathc . "/dicts/" . $name . "\" ";
