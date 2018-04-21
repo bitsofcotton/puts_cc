@@ -5,7 +5,7 @@ And this program is implemented with a deterministic way.
 This IS NOT the program that judges it is true or false, this IS ONLY the program that seines
 the score that seems to be true or that seems to be false FROM INPUT (with no deductions for logics).
 
-This program uses large amount of region on the memory. And, very slow because of scans sometimes on large regions.
+This program uses large amount of region on the memory. And, very slow because of the scans on large regions.
 
 # Usage
     make tools
@@ -88,5 +88,4 @@ However, the data we get with this method is only a technique collection, not th
 # Another downloads
 * https://ja.osdn.net/projects/puts-cc/
 * https://www.sourceforge.net/projects/puts-cc/
-* https://konbu.sakura.ne.jp/files/
 * https://files.limpid-intensity.info/
