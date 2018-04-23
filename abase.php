@@ -35,6 +35,8 @@ function analyse($cwd, $pathb2, $do_stat) {
   }
   doexecp($pathb2 . "-detail.html", $pathb2 . "-detail-error.txt",
           "../../puts toc words.txt " . $buf, $text, $cwd, $env);
+  doexecp($pathb2 . "-lack.html", $pathb2 . "-lack-error.txt",
+          "../../puts lack words.txt " . $buf, $text, $cwd, $env);
   
   if($do_stat) {
     $buf = "";
@@ -45,6 +47,8 @@ function analyse($cwd, $pathb2, $do_stat) {
     }
     doexecp($pathb2 . "-stat.html", $pathb2 . "-stat-error.txt",
             "../../puts stat words.txt " . $buf, $text, $cwd, $env);
+    doexecp($pathb2 . "-root.html", $pathb2 . "-root-error.txt",
+            "../../puts findroot words.txt " . $buf, $text, $cwd, $env);
   }
   doexecp($pathb2 . "-lbalance.txt", $pathb2 . "-lbalance-error.txt",
           "../../puts lbalance words.txt", $text, $cwd, $env);

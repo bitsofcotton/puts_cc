@@ -1201,7 +1201,7 @@ template <typename T, typename U> vector<U> getDetailed(const U& name, vector<co
   return result;
 }
 
-template <typename T, typename U> U preparedTOC(const U& input, const U& name, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& topictitle, const vector<U>& topics, const vector<U>& delimiter, const int& szwindow, const T& thresh, const T& redig = T(1)) {
+template <typename T, typename U> U preparedTOC(const U& input, const U& name, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& topictitle, const vector<U>& topics, const vector<U>& delimiter, const int& szwindow, const T& thresh, const T& redig = T(1), const bool& reverse = false) {
   cerr << "preparedToc: parsing input" << endl;
   assert(detailtitle.size() == detail.size());
   assert(topictitle.size()  == topics.size());
@@ -1224,8 +1224,8 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
     for(int j = 0; j < tstat.size(); j ++)
       for(int k = 0; k < cstat.size(); k ++)
         if(! (cstat[k].cdot(cstat[k]) <= T(0))) {
-          const T lscore(cstat[k].prej(tstat[j]));
-          if(lscore <= - T(1) + thresh || thresh <= lscore)
+          const T lscore(T(reverse ? - 1 : 1) * cstat[k].prej(tstat[j]));
+          if(thresh <= lscore)
             scores.push_back(make_pair(- lscore, make_pair(j, k)));
         }
     sort(scores.begin(), scores.end());
@@ -1262,7 +1262,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
   return result;
 }
 
-template <typename T, typename U> U optimizeTOC(const U& input, const U& name, const vector<U>& words, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const int& szwindow, const int& depth, const T& redig = T(1)) {
+template <typename T, typename U> U optimizeTOC(const U& input, const U& name, const vector<U>& words, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const int& szwindow, const int& depth, const T& redig = T(1), const bool& countnum = false) {
   cerr << "optimizeToc: parsing input" << endl;
   vector<corpus<T, U> >   cstat0;
   vector<corpushl<T, U> > cstat;
@@ -1312,8 +1312,12 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
               lscores.push_back(make_pair(cstatsw(j, i), j));
         sort(lscores.begin(), lscores.end());
         T lscore(0);
-        for(int j = 0; j < min(depth, int(lscores.size())); j ++)
-          lscore += lscores[j].first;
+        if(countnum)
+          lscore = - lscores.size();
+        else {
+          for(int j = 0; j < min(depth, int(lscores.size())); j ++)
+            lscore -= lscores[j].first;
+        }
         cidxs.push_back(make_pair(lscore, i));
         scores0.push_back(lscores);
       } else
