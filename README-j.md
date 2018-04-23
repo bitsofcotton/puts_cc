@@ -24,7 +24,7 @@
 また、テンソルによるテキストの表現については、先行がありましたが、これとは若干コンセプトが異なりました。(R.B. ieee 2004)
 
 # 状態
-辞書の抽出を記述中です。また、実装のチェックとテストをしています。また、衝突検出を準備しています。メモリ操作の省略による高速化と軽量化を準備しています。
+実装のチェックとテストをしています。また、辞書の抽出を記述中です。また、衝突検出を準備しています。
 
 # デモ
 https://services.limpid-intensity.info/puts.php にサンプルがあります。
@@ -87,5 +87,4 @@ lword コマンドで知らない単語を抽出、人(あるいは機械学習)
 # その他のダウンロードサイト
 * https://ja.osdn.net/projects/puts-cc/
 * https://www.sourceforge.net/projects/puts-cc/
-* https://konbu.sakura.ne.jp/files/
 * https://files.limpid-intensity.info/

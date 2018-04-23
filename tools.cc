@@ -95,6 +95,8 @@ int main(int argc, const char* argv[]) {
     mode = 13;
   else if(std::strcmp(argv[1], "logiccheck") == 0 && argc > 2)
     mode = 14;
+  else if(std::strcmp(argv[1], "findroot") == 0 && argc > 2)
+    mode = 15;
   else {
     usage();
     return - 2;
@@ -278,39 +280,94 @@ int main(int argc, const char* argv[]) {
     // get dict.
     // get dicts from input.
     {
+      std::cerr << "absent function : get dict : refer optTOC." << std::endl;
+      assert(0);
     }
     break;
   case 9:
     // opt dict.
     // group dicts.
     {
+      std::cerr << "not implemented around NOT word tables." << std::endl;
+      assert(0);
     }
     break;
   case 10:
     // conflict.
     // sign and abs amount check.
     {
+      std::cerr << "not implemented around NOT word tables." << std::endl;
+      assert(0);
     }
     break;
   case 11:
     // negate elementary sets of dictionaries is needed.
     {
+      std::cerr << "not implemented around NOT word tables." << std::endl;
+      assert(0);
     }
     break;
   case 12:
-    // lack large amounts of dictionaries is needed.
+    // lack large amounts of dictionaries is needed. reverse order of TOC.
     {
+      const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
+      std::vector<std::string> details;
+      std::vector<std::string> tocs;
+      std::vector<std::string> detailwords;
+      std::vector<std::string> tocwords;
+      bool toc(false);
+      for(int iidx = 3; iidx < argc; iidx ++) {
+        if(std::string(argv[iidx]) == std::string("-toc")) {
+          toc = true;
+          continue;
+        }
+        const auto work(loadbuf(argv[iidx]));
+        if(toc) {
+          tocs.push_back(work.second);
+          tocwords.push_back(work.first);
+        } else {
+          details.push_back(work.second);
+          detailwords.push_back(work.first);
+        }
+      }
+      std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
+      std::cout << std::string("<body>");
+      for(int i = 0; i <= input.size() / szblock; i ++)
+        std::cout << preparedTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.5), .125, true) << std::string("<hr/>") << std::endl;
+      std::cout << std::string("</body></html>");
     }
     break;
   case 13:
     // consistancy elementary sets of dictionaries and logical check is needed.
     // some another implementation is needed.
     {
+      std::cerr << "Logics so far..." << std::endl;
+      assert(0);
     }
     break;
   case 14:
     // logic check another implementation is needed.
     {
+      std::cerr << "Logics so far..." << std::endl;
+      assert(0);
+    }
+    break;
+  case 15:
+    // findroot : find parts of root of the insists. another count of optTOC.
+    {
+      const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));;
+      std::vector<std::string> rdetails;
+      std::vector<std::string> rdetailwords;
+      for(int iidx = 3; iidx < argc; iidx ++) {
+        const auto work(loadbuf(argv[iidx]));
+        rdetails.push_back(work.second);
+        rdetailwords.push_back(work.first);
+      }
+      std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
+      std::cout << std::string("<body>");
+      for(int i = 0; i <= input.size() / szblock; i ++)
+        std::cout << optimizeTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, rdetails, rdetailwords, delimiter, szwindow, 8, 1., true) << std::string("<hr/>") << std::endl;
+      std::cout << std::string("</body></html>");
     }
     break;
   }
