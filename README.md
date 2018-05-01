@@ -24,9 +24,8 @@ Inspired from morphological analysis softwares and parameter auto configuring al
 There's preceders Tensor representation of the text set (with a way different to this) R.B. ieee 2004.
 
 # Status
-Writing getting dictionary from a text, checking and testing implementation.
-And preparing for collision detecting (searching 'NOT' definition and small sized dictionaries.). 
-And preparing for shrinking speed and region.
+Checking and testing implementation.  
+And preparing for collision detecting (searching 'NOT' definition and small sized dictionaries.).
 
 # Demos
 https://services.limpid-intensity.info/puts.php have a working sample.
