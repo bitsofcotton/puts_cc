@@ -263,6 +263,8 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
 
 template <typename T, typename U> void corpus<T,U>::corpusEach() {
   corpust = Tensor();
+  if(words.size() <= 2)
+    return;
   for(int i = 0; i < words.size(); i ++) {
     cerr << "." << flush;
     for(int j = 0; j < words.size(); j ++) {
@@ -1228,16 +1230,13 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
           if(thresh <= lscore)
             scores.push_back(make_pair(- lscore, make_pair(j, k)));
         }
+    if(!scores.size()) continue;
     sort(scores.begin(), scores.end());
-    T   sum(0);
-    int cnt(0);
-    for(int j = 0; j < scores.size(); j ++) {
+    T sum(0);
+    for(int j = 0; j < scores.size(); j ++)
       sum += scores[j].first;
-      cnt ++;
-    }
-    if(!cnt) continue;
     result += topictitle[i] + U(" : (") + to_string(scores[0].first);
-    result += U(", ") + to_string(sum / cnt);
+    result += U(", ") + to_string(sum / scores.size());
     result += U(", ") + to_string(scores[scores.size() - 1].first);
     result += U(")<br/><span class=\"small\">\n");;
     for(int j = 0; j < scores.size(); j ++) {
