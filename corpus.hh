@@ -1225,7 +1225,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
     vector<pair<T, pair<int, int> > > scores;
     for(int j = 0; j < tstat.size(); j ++)
       for(int k = 0; k < cstat.size(); k ++)
-        if(! (cstat[k].cdot(cstat[k]) <= T(0))) {
+        if(cstat[k].absmax() != T(0)) {
           const T lscore(T(reverse ? - 1 : 1) * cstat[k].prej(tstat[j]));
           if(thresh <= lscore)
             scores.push_back(make_pair(- lscore, make_pair(j, k)));
@@ -1315,7 +1315,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
           lscore = - lscores.size();
         else {
           for(int j = 0; j < min(depth, int(lscores.size())); j ++)
-            lscore -= lscores[j].first;
+            lscore += lscores[j].first;
         }
         cidxs.push_back(make_pair(lscore, i));
         scores0.push_back(lscores);
