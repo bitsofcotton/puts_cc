@@ -58,13 +58,15 @@ private:
 };
 
 template <typename T> SimpleSparseVector<T>::SimpleSparseVector() {
-  entity = map<int, T>();
+  // already initialized by compiler, initializer don't needs this.
+//  entity = map<int, T>();
   return;
 }
 
 template <typename T> SimpleSparseVector<T>::SimpleSparseVector(const int& sute) {
   assert(sute == 0);
-  entity = map<int, T>();
+  // already initialized by compiler, initializer don't needs this.
+//  entity = map<int, T>();
   return;
 }
 

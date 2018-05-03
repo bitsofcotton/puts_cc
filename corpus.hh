@@ -100,16 +100,16 @@ template <typename T, typename U> corpus<T,U>::~corpus() {
 }
 
 template <typename T, typename U> void corpus<T,U>::init(const vector<U>& words0, const int& nthresh, const int& Nthresh, const int& Mwords) {
-  this->orig    = U();
+  // this->orig    = U();
   this->words0  = words0;
   sort(this->words0.begin(), this->words0.end());
   this->words0.erase(unique(this->words0.begin(), this->words0.end()), this->words0.end());
-  this->words   = vector<U>();
-  this->ptrs0   = vector<vector<int> >();
+  // this->words   = vector<U>();
+  // this->ptrs0   = vector<vector<int> >();
   this->ptrs0.resize(words0.size(), vector<int>());
-  this->ptrs    = vector<vector<int> >();
-  this->pdelim  = vector<int>();
-  this->corpust = Tensor();
+  // this->ptrs    = vector<vector<int> >();
+  // this->pdelim  = vector<int>();
+  // this->corpust = Tensor();
   this->nthresh = nthresh;
   this->Nthresh = Nthresh;
   this->Midx    = 1;
@@ -373,8 +373,12 @@ private:
 };
 
 template <typename T, typename U> corpushl<T,U>::corpushl() {
+  // already initialized by compiler, do not need to initialize same.
+/*
   words   = vector<U>();
   corpust = Tensor();
+*/
+  ;
 }
 
 template <typename T, typename U> corpushl<T,U>::~corpushl() {
