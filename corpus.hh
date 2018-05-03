@@ -1327,7 +1327,8 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
         if(!binary_search(phrases.begin(), phrases.end(), j)) {
           T mm(0);
           for(int k = 0; k < cstatsw.rows(); k ++)
-            mm = min(mm, cstatsw(j, k));
+            if(j != k)
+              mm = min(mm, cstatsw(j, k));
           residue.push_back(make_pair(mm, j));
         }
       break;
@@ -1385,7 +1386,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     result += U("no match : <a href=\"#") + name + to_string(j) + U("\">");
     result += to_string(j) + U("</a> - ");
     result += cs.reverseLink(cstat0[j]);
-    result += U("<br/>");
+    result += U("</span></div><br/>");
   }
   result += U("<br/><br/>Original:<br/>");
   for(int i = 0; i < tagged.size(); i ++)
