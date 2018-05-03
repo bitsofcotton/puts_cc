@@ -117,11 +117,12 @@ template <typename T, typename U> lword<T, U>::~lword() {
 template <typename T, typename U> void lword<T, U>::init(const int& loop, const int& mthresh, const int& Mthresh) {
   this->mthresh = mthresh;
   this->Mthresh = Mthresh;
+/*
   this->dict0   = vector<T>();
   this->dicts   = vector<vector<gram_t<U> > >();
-  for(int i = 0; i < loop; i ++)
-    this->dicts.push_back(vector<gram_t<U> >());
-  this->words   = vector<word_t<U> >();
+*/
+  this->dicts.resize(loop, vector<gram_t<U> >());
+//  this->words   = vector<word_t<U> >();
   return;
 }
 
