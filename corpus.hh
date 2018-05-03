@@ -1227,7 +1227,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
       for(int k = 0; k < cstat.size(); k ++)
         if(cstat[k].absmax() != T(0)) {
           const T lscore(T(reverse ? - 1 : 1) * cstat[k].prej(tstat[j]));
-          if(thresh <= lscore)
+          if(isfinite(lscore) && thresh <= lscore)
             scores.push_back(make_pair(- lscore, make_pair(j, k)));
         }
     if(!scores.size()) continue;
@@ -1283,11 +1283,14 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     for(int j = 0; j < i; j ++)
       cstats(i, j) = cstats(j, i);
     cstats(i, i) = T(0);
-    for(int j = i + 1; j < cstat.size(); j ++)
+    for(int j = i + 1; j < cstat.size(); j ++) {
       if(cstat[j].absmax() <= T(0))
         cstats(i, j) = T(8);
       else
         cstats(i, j) = - cstat[i].prej(cstat[j]);
+      if(!isfinite(cstats(i, j)))
+        cstats(i, j) = T(8);
+    }
   }
   
   cerr << "OK, sorting phrases." << flush;
@@ -1307,8 +1310,8 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
         vector<pair<T, int> > lscores;
         for(int j = 0; j < cstatsw.rows(); j ++)
           if(i != j && !binary_search(phrases.begin(), phrases.end(), j))
-            if(cstatsw(j, i) <= T(0))
-              lscores.push_back(make_pair(cstatsw(j, i), j));
+            if(cstatsw(i, j) <= T(0))
+              lscores.push_back(make_pair(cstatsw(i, j), j));
         sort(lscores.begin(), lscores.end());
         T lscore(0);
         if(countnum)
