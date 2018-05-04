@@ -1144,7 +1144,7 @@ template <typename T, typename U> Eigen::Matrix<T, Eigen::Dynamic, 1> corpushl<T
     planes.col(i) = svd.singularValues();
   }
   Eigen::JacobiSVD<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> > svd(planes, 0);
-  return Vec(svd.singularValues());
+  return svd.singularValues();
 }
 
 template <typename T, typename U> const vector<U>& corpushl<T, U>::getWords() const {
@@ -1413,7 +1413,7 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
   
   cerr << " making diffs" << endl;
   U result;
-  // XXX: checkme cross dictionary difference.
+  // N.B. cross dictionary difference.
   getAbbreved(cstat, words, detailtitle1, detail1, delimiter, szwindow);
   getAbbreved(dstat, words, detailtitle0, detail0, delimiter, szwindow);
   for(int i = 0; i < cstat.size(); i ++) {
@@ -1422,9 +1422,7 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
     auto diff(cstat[i] - dstat[i]);
     diff.reDig(redig);
     diff = diff.simpleThresh(thresh);
-    if(thresh < diff.absmax()) {
-      // XXX checkme:
-      // && cstat[i].serialize() != dstat[i].serialize()) {
+    if(thresh < diff.absmax() && cstat[i].serialize() != dstat[i].serialize()) {
       result += diff.serialize() + U("<br/>\n");
       result += cstat[i].reverseLink(cstat0[i]) + U("<br/>\n");
       result += dstat[i].reverseLink(dstat0[i]) + U("<br/>\n");
