@@ -127,10 +127,7 @@ template <typename T, typename U> void lword<T, U>::init(const int& loop, const 
 }
 
 template <typename T, typename U> bool lword<T, U>::isin(const U& key) {
-  if(dicts.size() < key.size()) {
-    cerr << "dictionary small" << endl;
-    return false;
-  }
+  assert(key.size() < dicts.size());
   const vector<gram_t<U> >& dict(dicts[key.size()]);
   gram_t<U> key0;
   key0.str = key;
@@ -140,10 +137,7 @@ template <typename T, typename U> bool lword<T, U>::isin(const U& key) {
 
 template <typename T, typename U> gram_t<U>& lword<T, U>::find(const U& key) {
   static gram_t<U> dummy;
-  if(dicts.size() < key.size()) {
-    cerr << "XXX: find slips." << endl;
-    return dummy;
-  }
+  assert(key.size() < dicts.size());
   vector<gram_t<U> >& dict(dicts[key.size()]);
   gram_t<U> key0;
   key0.str = key;
@@ -156,10 +150,7 @@ template <typename T, typename U> gram_t<U>& lword<T, U>::find(const U& key) {
 }
 
 template <typename T, typename U> void lword<T, U>::assign(const gram_t<U>& val) {
-  if(dicts.size() < val.str.size()) {
-    cerr << "assign : dictionary small." << endl;
-    return;
-  }
+  assert(val.str.size() < dicts.size());
   vector<gram_t<U> >& dict(dicts[val.str.size()]);
   auto p(lower_bound(dict.begin(), dict.end(), val));
   if(val.ptr0.size()) {
@@ -193,13 +184,8 @@ template <typename T, typename U> void lword<T, U>::assign(const gram_t<U>& val)
 }
 
 template <typename T, typename U> const vector<word_t<U> >& lword<T, U>::compute(const U& input) {
-  cerr << " bi-gram" << flush;
   makeBigram(input);
-  
-  cerr << " longest words" << endl;
   constructNwords();
-  
-  cerr << "making word tables." << endl;
   for(auto itr = dicts.begin(); itr != dicts.end(); ++ itr)
     for(auto itr2 = itr->begin(); itr2 != itr->end(); ++ itr2) {
       word_t<U> work;
@@ -207,7 +193,6 @@ template <typename T, typename U> const vector<word_t<U> >& lword<T, U>::compute
       if(!work.count)
         continue;
       work.str   = itr2->str;
-      // XXX fixme not here.
       bool flag(false);
       for(int i = 0; i < words.size(); i ++)
         if(work.str == words[i].str) {
@@ -248,7 +233,7 @@ template <typename T, typename U> void lword<T, U>::makeBigram(const U& input) {
 template <typename T, typename U> void lword<T, U>::constructNwords() {
   int i;
   for(i = 2; i < dicts.size(); i ++) {
-    cerr << i << " " << flush;
+    cerr << i << flush;
     map<U, vector<int> > map0;
     map<U, vector<int> > map1;
     map<U, vector<int> > dmap;
@@ -373,9 +358,8 @@ template <typename T, typename U> Eigen::Matrix<T, Eigen::Dynamic, 1> countWords
   return result;
 }
 
-// XXX very pseudo, this cannot be applied with simple DP.
 template <typename T, typename U> vector<int> pseudoWordsBalance(const vector<U>& orig, const vector<U>& words0, int nloop = - 1) {
-  cerr << "pseudoWordsBalance initializing matrix with initial words " << orig.size() << ", " << words0.size() << flush;
+  cerr << "pseudoWordsBalance : " << orig.size() << ", " << words0.size() << flush;
   vector<U> words(words0);
   sort(words.begin(), words.end());
   words.erase(unique(words.begin(), words.end()), words.end());
@@ -388,7 +372,6 @@ template <typename T, typename U> vector<int> pseudoWordsBalance(const vector<U>
   if(nloop <= 0)
     nloop = result.cols();
   
-  cerr << "pseudo-balancing..." << flush;
   for(int i = 0; i < min(int(result.cols()), nloop); i ++) {
     vector<pair<T, int> > scores;
     for(int j = 0; j < result.cols(); j ++)
@@ -404,8 +387,9 @@ template <typename T, typename U> vector<int> pseudoWordsBalance(const vector<U>
     T sum(0);
     for(int j = 0; j < result.rows(); j ++)
       sum += result.row(j).dot(result.row(j));
-    cerr << sum << ":" << flush;
+    cerr << ":" << sum << flush;
   }
+  cerr << endl;
   return vres;
 }
 

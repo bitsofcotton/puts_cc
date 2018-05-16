@@ -277,12 +277,8 @@ int main(int argc, const char* argv[]) {
     }
     break;
   case 7:
-    // get dict.
-    // get dicts from input.
-    {
-      std::cerr << "absent function : get dict : refer optTOC." << std::endl;
-      assert(0);
-    }
+    // get dict. get dicts from input.
+    assert(0 && "absent function : get dict : refer optTOC.");
     break;
   case 9:
     // opt dict.

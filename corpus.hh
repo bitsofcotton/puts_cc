@@ -712,7 +712,6 @@ template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T,
   const auto n2e1(ex1.cdot(ex1));
   if(n2e1 == T(0))
     return T(4);
-  // XXX is sign correct?
   return cdot(prejs) / sqrt(n2this * n2p) - ex0.cdot(ex1) / sqrt(n2e0 * n2e1) - T(1);
 }
 
@@ -731,8 +730,7 @@ template <typename T, typename U> const T corpushl<T, U>::prej2(const vector<cor
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::lackOfInsist() const {
-  cerr << "XXX confirm me: corpushl::lackOfInsist" << endl;
-  assert(0);
+  assert(0 && "confirm me: corpushl::lackOfInsist");
   // XXX confirm me: this method can only count what's on the table.
   //                 so the things that isn't on the table will not be counted.
   corpushl<T, U> result;
@@ -740,8 +738,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::lackOfIns
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::invertInsist() const {
-  cerr << "XXX confirm me: corpushl::invertInsist" << endl;
-  assert(0);
+  assert(0 && "confirm me: corpushl::invertInsist");
   // XXX confirm me: this method cannot calculate in logically correct
   //                 because of it's method.
   cerr << "STUB INVERT INSIST." << endl;
@@ -750,14 +747,12 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::invertIns
 }
 
 template <typename T, typename U> const T corpushl<T, U>::culturalConflicts(const corpushl<T, U>& base) const {
-  cerr << "XXX confirm me: corpushl::culturalConflicts" << endl;
-  assert(0);
+  assert(0 && "confirm me: corpushl::culturalConflicts");
   return T(0);
 }
 
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::conflictPart() const {
-  cerr << "XXX confirm me: corpushl::conflictPart" << endl;
-  assert(0);
+  assert(0 && "confirm me: corpushl::conflictPart");
   // search conflict parts.
   // dictionary base of the word 'NOT' is needed.
   corpushl<T, U> result;
@@ -845,9 +840,9 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
     return *this;
   const T tn(     cdot(work));
   const T td(work.cdot(work));
-  cerr << "XXX: abbrev eliminates abbreved word now..." << endl;
   if(td <= T(0))
     return *this;
+  cerr << "XXX: abbrev eliminates abbreved word now..." << endl;
   return (*this * td - work * tn) / td;
 }
 
@@ -1061,7 +1056,7 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
         assert(0 <= kk);
         if(itr2->second == T(0)) continue;
         // add crossing points
-        const T x0(corpust[eidx][eidx][eidx] != T(0) ? corpust[eidx][eidx][eidx] : T(1));
+        const T x0(corpust[eidx][eidx][eidx] != T(0) ? T(1) + corpust[eidx][eidx][eidx] : T(1));
         auto& ti0(corpust.iter());
         for(auto titr0(ti0.begin()); titr0 != ti0.end(); ++ titr0) {
           auto& ti1(titr0->second.iter());
