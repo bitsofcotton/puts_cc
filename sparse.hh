@@ -142,8 +142,10 @@ template <typename T> SimpleSparseVector<T>& SimpleSparseVector<T>::operator = (
 }
 
 template <typename T> bool SimpleSparseVector<T>::operator != (const SimpleSparseVector<T>& other) const {
-  // XXX : this is imcomplete.
-  return entity != other.entity;
+  for(auto itr(entity.begin()); itr != entity.end(); ++ itr)
+    if(itr->second != other[itr->first])
+      return true;
+  return false;
 }
 
 template <typename T> bool SimpleSparseVector<T>::operator == (const SimpleSparseVector<T>& other) const {
