@@ -58,6 +58,10 @@ template <typename T> bool lessNotEqualStrClip(const T& a, const T& b) {
   return a < b && !equalStrClip<T>(a, b);
 }
 
+template <typename T> bool lessFirst(const T& a, const T& b) {
+  return a.first < b.first;
+}
+
 template <typename T, typename U> class corpus {
 public:
   typedef SimpleSparseVector<T> Vec;
@@ -321,7 +325,7 @@ public:
   corpushl(corpushl<T, U>&& obj);
   ~corpushl();
   
-        corpushl<T, U>  cast(const vector<U>& words) const;
+        corpushl<T, U>  cutCast(const vector<U>& words) const;
         corpushl<T, U>& operator += (const corpushl<T, U>& other);
         corpushl<T, U>& operator -= (const corpushl<T, U>& other);
         corpushl<T, U>& operator *= (const T& t);
@@ -401,21 +405,41 @@ template <typename T, typename U> corpushl<T,U>::corpushl(corpushl<T, U>&& obj) 
   *this = obj;
 }
 
-template <typename T, typename U> corpushl<T, U> corpushl<T, U>::cast(const vector<U>& words) const {
-  cerr << "cast (XXX fixme.)" << endl;
+template <typename T, typename U> corpushl<T, U> corpushl<T, U>::cutCast(const vector<U>& words) const {
   corpushl<T, U> result;
   vector<U>      sword(words);
-  vector<int>    idxs;
+  vector<pair<int, int> > idxs;
   sort(sword.begin(), sword.end());
-  for(int i = 0; i < sword.size(); i ++) {
+  for(int i = 0, ii = 0; i < sword.size(); i ++) {
     auto p(find(words.begin(), words.end(), sword[i]));
     if(*p == sword[i]) {
-      idxs.push_back(distance(words.begin(), p));
+      idxs.push_back(make_pair(distance(words.begin(), p), ii ++));
       result.words.push_back(*p);
     }
   }
-  // fixme:
-  result.corpust = corpust;
+  sort(idxs.begin(), idxs.end());
+  const auto ci0(corpust.iter());
+  for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
+    const auto ii0(upper_bound(idxs.begin(), idxs.end(), make_pair(itr0->first, 0), lessFirst<vector<int, int> >));
+    if(!(idxs.begin() <= ii0 && ii0 < idxs.end() && ii0->first == itr0->first))
+      continue;
+    const int i0(ii0->second);
+    const auto ci1(itr0->second.iter());
+    for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
+      const auto ii1(upper_bound(idxs.begin(), idxs.end(), make_pair(itr1->first, 0), lessFirst<vector<int, int> >));
+      if(!(idxs.begin() <= ii1 && ii1 < idxs.end() && ii1->first == itr1->first))
+        continue;
+      const int i1(ii1->second);
+      const auto ci2(itr1->second.iter());
+      for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
+        const auto ii2(upper_bound(idxs.begin(), idxs.end(), make_pair(itr2->first, 0), lessFirst<vector<int, int> >));
+        if(!(idxs.begin() <= ii2 && ii2 < idxs.end() && ii2->first == itr2->first))
+          continue;
+        const int i2(ii2->second);
+        result[i0][i1][i2] += itr2->second;
+      }
+    }
+  }
   return result;
 }
 
@@ -694,10 +718,12 @@ template <typename T, typename U> T corpushl<T, U>::absmax() const {
 }
 
 template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T, U>& prejs) const {
-  cerr << "XXX : confirm me corpushl::prej function." << endl;
+  static bool shown(false);
+  if(!shown) {
+    cerr << "XXX : confirm me corpushl::prej function." << endl;
+    shown = true;
+  }
   // XXX confirm me: need some other counting methods?
-  // XXX fixme: amount of the word that is not said in the context is
-  //            also important.
   const auto n2this(cdot(*this));
   if(n2this == T(0))
     return T(0);
@@ -716,9 +742,12 @@ template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T,
 }
 
 template <typename T, typename U> const T corpushl<T, U>::prej2(const vector<corpushl<T, U> >& prej0, const vector<corpushl<T, U> >& prej1, const T& thresh) const {
-  cerr << "XXX confirm me: corpushl::prej2" << endl;
+  static bool shown(false);
+  if(!shown) {
+    cerr << "XXX confirm me: corpushl::prej2" << endl;
+    shown = true;
+  }
   // XXX confirm me: is this correct counting method?
-  // XXX fixme: also with prej func.
   corpushl<T, U> p0(*this), p1(*this);
   for(int i = 0; i < prej0.size(); i ++)
     p0 = p0.abbrev(string("P") + to_string(i), prej0[i]);
@@ -741,7 +770,6 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::invertIns
   assert(0 && "confirm me: corpushl::invertInsist");
   // XXX confirm me: this method cannot calculate in logically correct
   //                 because of it's method.
-  cerr << "STUB INVERT INSIST." << endl;
   corpushl<T, U> result;
   return result;
 }
@@ -842,8 +870,62 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
   const T td(work.cdot(work));
   if(td <= T(0))
     return *this;
-  cerr << "XXX: abbrev eliminates abbreved word now..." << endl;
-  return (*this * td - work * tn) / td;
+  static bool shown(false);
+  if(!shown) {
+    cerr << "XXX: abbrev function is now beta." << endl;
+    shown = true;
+  }
+  const auto p(find(words.begin(), words.end(), word));
+        auto result((*this * td - work * tn) / td);
+  int widx(- 1);
+  if(words.begin() <= p && p < words.end() && *p == word)
+    widx = distance(words.begin(), p);
+  else {
+    result.words.push_back(word);
+    widx = result.words.size() - 1;
+  }
+  assert(0 <= widx && result.words[widx] == word);
+  result.corpust[widx][widx][widx] += sqrt(td);
+  vector<int> ridx0, ridx1, ridx2;
+  vector<U>   drop0(gatherWords(result.words, words, ridx0, ridx1));
+  vector<U>   drop1(gatherWords(result.words, work.words, ridx0, ridx2));
+  const auto  rridx1(reverseLookup(ridx1));
+  const auto  rridx2(reverseLookup(ridx2));
+  const auto ci0(result.corpust.iter());
+  Mat c_ij, c_jk, c_ik;
+  for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
+    if(rridx2[itr0->first] < 0) continue;
+    const auto ci1(itr0->second.iter());
+    for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
+      if(rridx2[itr1->first] < 0) continue;
+      const auto ci2(itr1->second.iter());
+      for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
+        if(rridx2[itr2->first] < 0) continue;
+        const int i1(itr0->first);
+        const int j1(itr2->first);
+        const int k1(itr1->first);
+        if(0 <= i1 && 0 <= j1)
+          c_ij[i1][j1] += itr2->second;
+        if(0 <= j1 && 0 <= k1)
+          c_jk[j1][k1] += itr2->second;
+        if(0 <= k1 && 0 <= i1)
+          c_ik[i1][k1] += itr2->second;
+      }
+    }
+  }
+  for(int i = 0; i < result.words.size(); i ++) {
+    if(i == widx) continue;
+    for(int j = 0; j < result.words.size(); j ++) {
+      if(j == widx) continue;
+      for(int k = 0; k < result.words.size(); k ++) {
+        if(k == widx) continue;
+        const T score(corpust[i][j][k] * (c_ij[i][j] + c_jk[j][k] + c_ik[i][k]));
+        result.corpust[i][j][widx] += score;
+        result.corpust[i][j][k]    -= score;
+      }
+    }
+  }
+  return result;
 }
 
 template <typename T, typename U> const vector<U> corpushl<T, U>::reverseLink(const corpushl<T, U>& orig) const {
