@@ -1,5 +1,3 @@
 word 'NOT' implementation and link to another logics library.
 Stabilize and debug functions through test.cc implementation.
-delete XXX-implementations.
-implement a little accurate abbrev function.
 

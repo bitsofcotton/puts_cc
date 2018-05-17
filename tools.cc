@@ -9,7 +9,7 @@
 #include "file2eigen.hh"
 
 void usage() {
-  std::cout << "tools (lword|lbalance|corpus|toc|redig|stat|reconstruct|diff|getdict)" << std::endl;
+  std::cout << "tools (lword|lbalance|corpus|toc|redig|stat|reconstruct|diff)" << std::endl;
 }
 
 const int szwindow(200);
@@ -81,8 +81,6 @@ int main(int argc, const char* argv[]) {
     mode = 3;
   else if(std::strcmp(argv[1], "diff") == 0 && argc > 2)
     mode = 5;
-  else if(std::strcmp(argv[1], "getdict") == 0 && argc > 2)
-    mode = 7;
   else if(std::strcmp(argv[1], "optdict") == 0 && argc > 2)
     mode = 9;
   else if(std::strcmp(argv[1], "conflict") == 0 && argc > 2)
@@ -166,7 +164,9 @@ int main(int argc, const char* argv[]) {
     }
     break;
   case 2:
-    // toc
+  case 12:
+    //  2: toc
+    // 12: lack large amounts of dictionaries is needed. reverse order of TOC.
     {
       const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
       std::vector<std::string> details;
@@ -191,7 +191,7 @@ int main(int argc, const char* argv[]) {
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
       for(int i = 0; i <= input.size() / szblock; i ++)
-        std::cout << preparedTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.5), .125) << std::string("<hr/>") << std::endl;
+        std::cout << preparedTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.25), .125, mode == 12) << std::string("<hr/>") << std::endl;
       std::cout << std::string("</body></html>");
     }
     break;
@@ -259,7 +259,9 @@ int main(int argc, const char* argv[]) {
     }
     break;
   case 6:
-    // stat : statistics with optimized TOC with link to original articles.
+  case 15:
+    //  6: stat, statistics with optimized TOC with link to original articles.
+    // 15: findroot, find parts of root of the insists. another count of optTOC.
     {
       const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));;
       std::vector<std::string> rdetails;
@@ -272,100 +274,46 @@ int main(int argc, const char* argv[]) {
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
       for(int i = 0; i <= input.size() / szblock; i ++)
-        std::cout << optimizeTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, rdetails, rdetailwords, delimiter, szwindow, 8, 1.) << std::string("<hr/>") << std::endl;
+        std::cout << optimizeTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, rdetails, rdetailwords, delimiter, szwindow, 8, 1., mode == 15) << std::string("<hr/>") << std::endl;
       std::cout << std::string("</body></html>");
     }
-    break;
-  case 7:
-    // get dict. get dicts from input.
-    assert(0 && "absent function : get dict : refer optTOC.");
     break;
   case 9:
     // opt dict.
     // group dicts.
     {
-      std::cerr << "not implemented around NOT word tables." << std::endl;
-      assert(0);
+      assert(0 && "group dicts: not implemented around NOT word tables.");
     }
     break;
   case 10:
     // conflict.
     // sign and abs amount check.
     {
-      std::cerr << "not implemented around NOT word tables." << std::endl;
-      assert(0);
+      assert(0 && "conflict : not implemented around NOT word tables.");
     }
     break;
   case 11:
     // negate elementary sets of dictionaries is needed.
     {
-      std::cerr << "not implemented around NOT word tables." << std::endl;
-      assert(0);
-    }
-    break;
-  case 12:
-    // lack large amounts of dictionaries is needed. reverse order of TOC.
-    {
-      const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
-      std::vector<std::string> details;
-      std::vector<std::string> tocs;
-      std::vector<std::string> detailwords;
-      std::vector<std::string> tocwords;
-      bool toc(false);
-      for(int iidx = 3; iidx < argc; iidx ++) {
-        if(std::string(argv[iidx]) == std::string("-toc")) {
-          toc = true;
-          continue;
-        }
-        const auto work(loadbuf(argv[iidx]));
-        if(toc) {
-          tocs.push_back(work.second);
-          tocwords.push_back(work.first);
-        } else {
-          details.push_back(work.second);
-          detailwords.push_back(work.first);
-        }
-      }
-      std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
-      std::cout << std::string("<body>");
-      for(int i = 0; i <= input.size() / szblock; i ++)
-        std::cout << preparedTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.5), .125, true) << std::string("<hr/>") << std::endl;
-      std::cout << std::string("</body></html>");
+      assert(0 && "negate: not implemented around NOT word tables.");
     }
     break;
   case 13:
     // consistancy elementary sets of dictionaries and logical check is needed.
     // some another implementation is needed.
     {
-      std::cerr << "Logics so far..." << std::endl;
-      assert(0);
+      assert(0 && "consistancy : Logics check so far...");
     }
     break;
   case 14:
     // logic check another implementation is needed.
     {
-      std::cerr << "Logics so far..." << std::endl;
-      assert(0);
+      assert(0 && "logic check : Logics check so far...");
     }
     break;
-  case 15:
-    // findroot : find parts of root of the insists. another count of optTOC.
-    {
-      const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));;
-      std::vector<std::string> rdetails;
-      std::vector<std::string> rdetailwords;
-      for(int iidx = 3; iidx < argc; iidx ++) {
-        const auto work(loadbuf(argv[iidx]));
-        rdetails.push_back(work.second);
-        rdetailwords.push_back(work.first);
-      }
-      std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
-      std::cout << std::string("<body>");
-      for(int i = 0; i <= input.size() / szblock; i ++)
-        std::cout << optimizeTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, rdetails, rdetailwords, delimiter, szwindow, 8, 1., true) << std::string("<hr/>") << std::endl;
-      std::cout << std::string("</body></html>");
-    }
-    break;
+  default:
+    usage();
+    return - 2;
   }
   return 0;
 }

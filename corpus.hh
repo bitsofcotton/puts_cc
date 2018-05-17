@@ -347,9 +347,7 @@ public:
         corpushl<T, U>  match2relPseudo(const corpushl<T, U>& other) const;
   const T               prej(const corpushl<T, U>& prejs) const;
   const T               prej2(const vector<corpushl<T, U> >& prej0, const vector<corpushl<T, U> >& prej1, const T& thresh) const;
-  const corpushl<T, U>  lackOfInsist() const;
   const corpushl<T, U>  invertInsist() const;
-  const T               culturalConflicts(const corpushl<T, U>& base) const;
   const corpushl<T, U>  conflictPart() const;
   const vector<U>&      getWords() const;
   const Tensor&         getCorpus() const;
@@ -758,29 +756,16 @@ template <typename T, typename U> const T corpushl<T, U>::prej2(const vector<cor
   return T(p0.words.size() - prej0.size()) / T(p1.words.size() - prej1.size());
 }
 
-template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::lackOfInsist() const {
-  assert(0 && "confirm me: corpushl::lackOfInsist");
-  // XXX confirm me: this method can only count what's on the table.
-  //                 so the things that isn't on the table will not be counted.
-  corpushl<T, U> result;
-  return result;
-}
-
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::invertInsist() const {
-  assert(0 && "confirm me: corpushl::invertInsist");
+  assert(0 && "confirm me: corpushl::invertInsist do not implemented NOT word table.");
   // XXX confirm me: this method cannot calculate in logically correct
   //                 because of it's method.
   corpushl<T, U> result;
   return result;
 }
 
-template <typename T, typename U> const T corpushl<T, U>::culturalConflicts(const corpushl<T, U>& base) const {
-  assert(0 && "confirm me: corpushl::culturalConflicts");
-  return T(0);
-}
-
 template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::conflictPart() const {
-  assert(0 && "confirm me: corpushl::conflictPart");
+  assert(0 && "confirm me: corpushl::conflictPart do not implemented NOT word table.");
   // search conflict parts.
   // dictionary base of the word 'NOT' is needed.
   corpushl<T, U> result;
