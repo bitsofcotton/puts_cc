@@ -13,7 +13,7 @@ void usage() {
 }
 
 const int szwindow(200);
-const int szblock(20000);
+const int szblock(8000);
 const int Mbalance(40);
 std::vector<std::string> delimiter;
 std::vector<std::string> csvelim;
@@ -191,7 +191,7 @@ int main(int argc, const char* argv[]) {
       std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
       for(int i = 0; i <= input.size() / szblock; i ++)
-        std::cout << preparedTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.25), .125, mode == 12) << std::string("<hr/>") << std::endl;
+        std::cout << preparedTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.125), .125, mode == 12) << std::string("<hr/>") << std::endl;
       std::cout << std::string("</body></html>");
     }
     break;
