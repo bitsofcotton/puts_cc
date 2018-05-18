@@ -855,20 +855,14 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
   const T td(work.cdot(work));
   if(td <= T(0))
     return *this;
-  static bool shown(false);
-  if(!shown) {
-    cerr << "XXX: abbrev function is now beta." << endl;
-    shown = true;
-  }
-  const auto p(find(words.begin(), words.end(), word));
-        auto result((*this * td - work * tn) / td);
-  int widx(- 1);
-  if(words.begin() <= p && p < words.end() && *p == word)
-    widx = distance(words.begin(), p);
-  else {
+  cerr << "abbrev: " << word << " : beta." << endl;
+  auto result((*this * td - work * tn) / td);
+  auto p(find(result.words.begin(), result.words.end(), word));
+  if(! (result.words.begin() <= p && p < result.words.end() && *p == word)) {
     result.words.push_back(word);
-    widx = result.words.size() - 1;
+    p = find(result.words.begin(), result.words.end(), word);
   }
+  const int widx(distance(result.words.begin(), p));
   assert(0 <= widx && result.words[widx] == word);
   result.corpust[widx][widx][widx] += sqrt(td);
   vector<int> ridx0, ridx1, ridx2;
@@ -1378,7 +1372,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
         sort(lscores.begin(), lscores.end());
         T lscore(0);
         if(countnum)
-          lscore = - lscores.size();
+          lscore = - T(lscores.size());
         else {
           for(int j = 0; j < min(depth, int(lscores.size())); j ++)
             lscore += lscores[j].first;
@@ -1461,7 +1455,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
   return result;
 }
 
-template <typename T, typename U> U diff(const U& input, const U& name, const vector<U>& words, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const T& thresh = T(1e-6), const T& redig = T(1)) {
+template <typename T, typename U> U diff(const U& input, const U& name, const vector<U>& words, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const T& thresh = T(.05), const T& redig = T(1)) {
   cerr << "Diff: preparing inputs..." << endl;
   vector<corpus<T, U> >   cstat0;
   vector<corpus<T, U> >   dstat0;
@@ -1480,8 +1474,9 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
     dstat[i].reDig(redig);
     auto diff(cstat[i] - dstat[i]);
     diff.reDig(redig);
-    diff = diff.simpleThresh(thresh);
-    if(thresh < diff.absmax() && cstat[i].serialize() != dstat[i].serialize()) {
+    const T score(diff.cdot(diff) / sqrt(cstat[i].cdot(cstat[i]) * dstat[i].cdot(dstat[i])));
+    if(thresh < score) {
+      result += U("(") + to_string(score) + U(") : ");
       result += diff.serialize() + U("<br/>\n");
       result += cstat[i].reverseLink(cstat0[i]) + U("<br/>\n");
       result += dstat[i].reverseLink(dstat0[i]) + U("<br/>\n");
