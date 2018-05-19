@@ -527,8 +527,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator + (con
 
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator - () const {
   corpushl<T, U> result(*this);
-  result.corpust = - result.corpust;
-  return result;
+  return - result;
 }
 
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator - () {

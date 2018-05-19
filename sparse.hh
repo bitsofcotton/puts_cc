@@ -35,6 +35,7 @@ public:
   ~SimpleSparseVector();
   
   SimpleSparseVector<T>  operator -  () const;
+  SimpleSparseVector<T>& operator -  ();
   SimpleSparseVector<T>  operator +  (const SimpleSparseVector<T>& other) const;
   SimpleSparseVector<T>& operator += (const SimpleSparseVector<T>& other);
   SimpleSparseVector<T>  operator -  (const SimpleSparseVector<T>& other) const;
@@ -84,9 +85,13 @@ template <typename T> SimpleSparseVector<T>::~SimpleSparseVector() {
 
 template <typename T> SimpleSparseVector<T> SimpleSparseVector<T>::operator - () const {
   SimpleSparseVector<T> res(*this);
-  for(auto itr(res.entity.begin()); itr != res.entity.end(); ++ itr)
+  return - res;
+}
+
+template <typename T> SimpleSparseVector<T>& SimpleSparseVector<T>::operator - () {
+  for(auto itr(entity.begin()); itr != entity.end(); ++ itr)
     itr->second = - itr->second;
-  return res;
+  return *this;
 }
 
 template <typename T> SimpleSparseVector<T> SimpleSparseVector<T>::operator + (const SimpleSparseVector<T>& other) const {
