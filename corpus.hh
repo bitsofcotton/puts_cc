@@ -29,6 +29,7 @@ using std::vector;
 using std::sort;
 using std::distance;
 using std::upper_bound;
+using std::binary_search;
 using std::unique;
 using std::find;
 using std::pair;
@@ -727,15 +728,12 @@ template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T,
   const auto n2p(prejs.cdot(prejs));
   if(n2p == T(0))
     return T(0);
-  const auto ex0(*this - match2relPseudo(prejs) + *this - prejs);
-  const auto n2e0(ex0.cdot(ex0));
-  if(n2e0 == T(0))
-    return T(4);
-  const auto ex1(prejs - prejs.match2relPseudo(*this) + prejs - *this);
-  const auto n2e1(ex1.cdot(ex1));
-  if(n2e1 == T(0))
-    return T(4);
-  return cdot(prejs) / sqrt(n2this * n2p) - ex0.cdot(ex1) / sqrt(n2e0 * n2e1) - T(1);
+  return cdot(prejs) / sqrt(n2this * n2p);
+/*j
+  const auto elimthis(match2relPseudo(prejs));
+  const auto elimp(prejs.match2relPseudo(*this));
+  return cdot(prejs) / sqrt(n2this * n2p) - elimthis.cdot(elimthis) * elimp.dot(elimp) / (n2this * n2p);
+*/
 }
 
 template <typename T, typename U> const T corpushl<T, U>::prej2(const vector<corpushl<T, U> >& prej0, const vector<corpushl<T, U> >& prej1, const T& thresh) const {
@@ -803,9 +801,9 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
   // N.B. i0 - i1 - i2 is stored in corpust[i0][i2][i1].
   for(int i = 0; i < idxs.size(); i ++) {
     int lscore(0);
-    for(int j = 0; j < words.size(); j ++)
-      for(int k = 0; k < words.size(); k ++)
-        if(corpust[j][k][idxs[i]] != T(0))
+    for(int j = 0; j < idxs.size(); j ++)
+      for(int k = 0; k < idxs.size(); k ++)
+        if(corpust[idxs[j]][idxs[k]][idxs[i]] != T(0))
           lscore --;
     cscore.push_back(make_pair(lscore, idxs[i]));
   }
@@ -816,18 +814,18 @@ template <typename T, typename U> const U corpushl<T, U>::serializeSub(const vec
     if(!cscore[si].first)
       goto symmetric;
     vector<pair<int, int> > score;
-    for(int i = 0; i < idxs.size(); i ++)
-      if(idxs[i] != middle[0]) {
-        int lscore(0);
-        for(int j = 0; j < idxs.size(); j ++)
-          if(idxs[j] != middle[0]) {
-            if(corpust[idxs[i]][idxs[j]][middle[0]] != T(0))
-              lscore --;
-            if(corpust[idxs[j]][idxs[i]][middle[0]] != T(0))
-              lscore ++;
-          }
-        score.push_back(make_pair(lscore, idxs[i]));
-      }
+    for(int i = 0; i < idxs.size(); i ++) {
+      if(idxs[i] == middle[0]) continue;
+      int lscore(0);
+      for(int j = 0; j < idxs.size(); j ++)
+        if(idxs[j] != middle[0]) {
+          if(corpust[idxs[i]][idxs[j]][middle[0]] != T(0))
+            lscore --;
+          if(corpust[idxs[j]][idxs[i]][middle[0]] != T(0))
+            lscore ++;
+        }
+      score.push_back(make_pair(lscore, idxs[i]));
+    }
     sort(score.begin(), score.end());
     int i(0);
     for( ; i < score.size() && score[i].first < 0; i ++)
@@ -909,13 +907,13 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
 template <typename T, typename U> const vector<U> corpushl<T, U>::reverseLink(const corpushl<T, U>& orig) const {
   vector<U>   res;
   vector<int> ridx0, ridx1;
-  auto        work(match2relPseudo(corpushl<T, U>(orig)));
+  auto        work(match2relPseudo(orig));
   return gatherWords(words, work.words, ridx0, ridx1);
 }
 
 template <typename T, typename U> const U corpushl<T, U>::reverseLink(const corpus<T, U>& orig) const {
   vector<int> ridx0, ridx1;
-  auto        work(match2relPseudo(orig));
+  auto        work(match2relPseudo(corpushl<T, U>(orig)));
   return orig.getAttributed(gatherWords(words, work.words, ridx0, ridx1));
 }
 
