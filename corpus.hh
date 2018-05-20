@@ -1295,7 +1295,9 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
     result += U(", ") + to_string(sum / scores.size());
     result += U(", ") + to_string(scores[scores.size() - 1].first);
     result += U(")<br/><span class=\"small\">\n");;
-    for(int j = 0; j < scores.size(); j ++) {
+    for(int j = 0; j < 1; j ++) {
+//  XXX select me:
+//  for(int j = 0; j < scores.size(); j ++) {
       matched.push_back(scores[j].second.second);
       const auto& work(cstat[scores[j].second.second] + tstat[scores[j].second.first]);
       result += U("<a href=\"#") + name + to_string(scores[j].second.second) + U("\">");
