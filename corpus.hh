@@ -1282,7 +1282,8 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
         if(cstat[k].absmax() != T(0)) {
           const T lscore(reverse ? T(1) / abs(cstat[k].prej(tstat[j]))
                                  : cstat[k].prej(tstat[j]));
-          if(isfinite(lscore) && thresh <= lscore)
+          if(isfinite(lscore) && (reverse ? T(1) / thresh <= lscore :
+                                            thresh <= lscore))
             scores.push_back(make_pair(- lscore, make_pair(j, k)));
         }
     if(!scores.size()) continue;
@@ -1297,8 +1298,8 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
     for(int j = 0; j < scores.size(); j ++) {
       matched.push_back(scores[j].second.second);
       const auto& work(cstat[scores[j].second.second] + tstat[scores[j].second.first]);
-      result += to_string(scores[j].first) + U(" : ");
       result += U("<a href=\"#") + name + to_string(scores[j].second.second) + U("\">");
+      result += to_string(scores[j].first) + U(" : ");
       result += /*work.serialize() + */ U("</a><br/>\n");
       result += work.reverseLink(cstat0[scores[j].second.second]) + U("<br/>\n");
       result += work.reverseLink(tstat0[scores[j].second.first])  + U("<br/><br/>\n");
