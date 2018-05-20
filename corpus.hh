@@ -1280,7 +1280,8 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
     for(int j = 0; j < tstat.size(); j ++)
       for(int k = 0; k < cstat.size(); k ++)
         if(cstat[k].absmax() != T(0)) {
-          const T lscore(T(reverse ? - 1 : 1) * cstat[k].prej(tstat[j]));
+          const T lscore(reverse ? - T(1) / abs(cstat[k].prej(tstat[j]))
+                                 : cstat[k].prej(tstat[j]));
           if(isfinite(lscore) && thresh <= lscore)
             scores.push_back(make_pair(- lscore, make_pair(j, k)));
         }
@@ -1298,7 +1299,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
       const auto& work(cstat[scores[j].second.second] + tstat[scores[j].second.first]);
       result += to_string(scores[j].first) + U(" : ");
       result += U("<a href=\"#") + name + to_string(scores[j].second.second) + U("\">");
-      result += work.serialize() + U("</a><br/>\n");
+      result += /*work.serialize() + */ U("</a><br/>\n");
       result += work.reverseLink(cstat0[scores[j].second.second]) + U("<br/>\n");
       result += work.reverseLink(tstat0[scores[j].second.first])  + U("<br/><br/>\n");
     }
@@ -1438,7 +1439,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     corpushl<T, U> cs(cstat[j]);
     result += U("<div><span class=\"small\">");
     result += to_string(residue[i].first) + U(" : ");
-    result += cs.serialize();
+    // result += cs.serialize();
     result += U("</span><br/><span class=\"small\">");
     result += U("no match : <a href=\"#") + name + to_string(j) + U("\">");
     result += to_string(j) + U("</a> - ");
