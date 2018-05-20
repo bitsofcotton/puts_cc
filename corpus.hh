@@ -1280,7 +1280,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
     for(int j = 0; j < tstat.size(); j ++)
       for(int k = 0; k < cstat.size(); k ++)
         if(cstat[k].absmax() != T(0)) {
-          const T lscore(reverse ? - T(1) / abs(cstat[k].prej(tstat[j]))
+          const T lscore(reverse ? T(1) / abs(cstat[k].prej(tstat[j]))
                                  : cstat[k].prej(tstat[j]));
           if(isfinite(lscore) && thresh <= lscore)
             scores.push_back(make_pair(- lscore, make_pair(j, k)));
