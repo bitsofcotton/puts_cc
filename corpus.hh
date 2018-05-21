@@ -682,7 +682,7 @@ template <typename T, typename U> T corpushl<T, U>::cdot(const corpushl<T, U>& o
       const auto& oi2(itr1->second.iter());
       for(auto itr2(oi2.begin()); itr2 != oi2.end(); ++ itr2) {
         const int& k0(ridx1[itr2->first]);
-        assert(0 <= k0);
+        assert(0 <= k0 || itr2->second == T(0));
         const int& kk(rridx0[k0]);
         if(0 <= kk)
           res += itr2->second * corpust[ii][jj][kk];
@@ -1079,6 +1079,8 @@ template <typename T, typename U> vector<U> corpushl<T, U>::gatherWords(const ve
   }
   ridx0.resize(result.size());
   ridx1.resize(result.size());
+  ridx0 = reverseLookup(ridx0);
+  ridx1 = reverseLookup(ridx1);
   return result;
 }
 
