@@ -277,7 +277,10 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
       if(!ptrs[i].size() || !ptrs[j].size())
         continue;
       for(int k = 0; k < words.size(); k ++) {
-        if(!ptrs[k].size())
+        const int end0(words.size() - 1);
+        if(((i == 0 || i == end0) && (j == 0 || j == end0) &&
+            (k == 0 || k == end0)) ||
+           !ptrs[k].size())
           continue;
         int ctru = 0;
         int ctrv = 0;
@@ -720,7 +723,7 @@ template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T,
   if(n2p == T(0))
     return T(0);
   return cdot(prejs) / sqrt(n2this * n2p);
-/*j
+/*
   const auto elimthis(match2relPseudo(prejs));
   const auto elimp(prejs.match2relPseudo(*this));
   return cdot(prejs) / sqrt(n2this * n2p) - elimthis.cdot(elimthis) * elimp.dot(elimp) / (n2this * n2p);
