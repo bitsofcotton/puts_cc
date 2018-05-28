@@ -150,6 +150,9 @@ template <typename T> bool SimpleSparseVector<T>::operator != (const SimpleSpars
   for(auto itr(entity.begin()); itr != entity.end(); ++ itr)
     if(itr->second != other[itr->first])
       return true;
+  for(auto itr(other.entity.begin()); itr != other.entity.end(); ++ itr)
+    if(itr->second != (*this)[itr->first])
+      return true;
   return false;
 }
 
