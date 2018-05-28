@@ -32,43 +32,8 @@ https://services.limpid-intensity.info/puts.php have a working sample.
 Please pseudo-login with e-mail address - salt pair.
 
 # Example of using as a library
-    #include "lword.hh"
-    #include "corpus.hh"
-    #include <string>
-    #include <iostream>
-    #include <fstream>
-    
-    std::string input;
-    // ... initialize input.
-    lword<char, std::string> stat;
-    stat.init(60, 2, 2, 4);
-    std::vector<word_t<std::string> > words(stat.compute(input.c_str()));
-    for(auto itr = words.begin(); itr != words.end(); ++ itr) {
-      std::cout << itr->str << ", ";
-      std::cout << itr->count << std::endl;
-    }
-    
-    std::string wordlist;
-    std::vector<std::string> csvelim, csvdelim;
-    // ... initialize wordlist and csvelim and csvdelim.
-    corpus<double, char> cstat;
-    cstat.init(cutText(wordlist, csvelim, csvdelim), 0, 120);
-    cstat.compute(input.c_str());
-    
-    corpushl<double, char> cstats;
-    cstats = corpushl<double, char>(cstat);
-    
-    std::vector<corpushl<double, char> > details, tocs;
-    std::vector<std::string> detailwords, tocwords;
-    // ... initialize details and tocs.
-    
-    for(int i = 0; i < details.size(); i ++)
-      cstat0 = cstat0.withDetail(detailwords[i], details[i]);
-    // cstat0 is detailed corpus.
-    
-    // sample output for toc.
-    std::cout << cstat0.toc(tocwords, tocs);
-    
+Please refer tools.cc, and please include with namespace block but include guard should harms.
+
 # Tips
 These programs may have a algorithm that is *not carefully confirmed*.  
 Statistics definition needs to be not dense. If it's dense, the context we get from statistics may say nothing. So with layered dictionaries, we can calculate a little accuratery.  
