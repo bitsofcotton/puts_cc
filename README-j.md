@@ -31,43 +31,8 @@ https://services.limpid-intensity.info/puts.php にサンプルがあります�
 擬似的なログインですので、登録は必要ありません。
 
 # ライブラリとしての使い方
-    #include "lword.hh"
-    #include "corpus.hh"
-    #include <string>
-    #include <iostream>
-    #include <fstream>
-    
-    std::string input;
-    // ... initialize input.
-    lword<char, std::string> stat;
-    stat.init(60, 2, 2, 4);
-    std::vector<word_t<std::string> > words(stat.compute(input.c_str()));
-    for(auto itr = words.begin(); itr != words.end(); ++ itr) {
-      std::cout << itr->str << ", ";
-      std::cout << itr->count << std::endl;
-    }
-    
-    std::string wordlist;
-    std::vector<std::string> csvelim, csvdelim;
-    // ... initialize wordlist and csvelim and csvdelim.
-    corpus<double, char> cstat;
-    cstat.init(cutText(wordlist, csvelim, csvdelim), 0, 120);
-    cstat.compute(input.c_str());
-    
-    corpushl<double, char> cstats;
-    cstats = corpushl<double, char>(cstat);
-    
-    std::vector<corpushl<double, char> > details, tocs;
-    std::vector<std::string> detailwords, tocwords;
-    // ... initialize details and tocs.
-    
-    for(int i = 0; i < details.size(); i ++)
-      cstat0 = cstat0.withDetail(detailwords[i], details[i]);
-    // cstat0 is detailed corpus.
-    
-    // sample output for toc.
-    std::cout << cstat0.toc(tocwords, tocs);
-    
+tools.cc を参照してください。また、namespace ブロックで括ってください。ただし、インクルードガードの定義が高確率で有害です。
+
 # Tips
 これらのプログラムはまだよく検証されたアルゴリズムを使用して*いない可能性があります*。  
 内部処理で使用されるテンソルが Dense な場合、示される情報は意味を失っています。複数レイヤに別れた辞書をうまく使うと、このような状態を避けることができます。  
