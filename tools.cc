@@ -13,7 +13,7 @@ void usage() {
 }
 
 const int szwindow(200);
-const int szblock(8000);
+const int szblock(16000);
 const int Mbalance(40);
 std::vector<std::string> delimiter;
 std::vector<std::string> csvelim;
