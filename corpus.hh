@@ -863,13 +863,16 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
   const auto ci0(result.corpust.iter());
   Mat c_ij, c_jk, c_ik;
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
-    if(rridx2[itr0->first] < 0) continue;
+    assert(0 <= ridx0[itr0->first]);
+    if(rridx2[ridx0[itr0->first]] < 0) continue;
     const auto ci1(itr0->second.iter());
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
-      if(rridx2[itr1->first] < 0) continue;
+      assert(0 <= ridx0[itr1->first]);
+      if(rridx2[ridx0[itr1->first]] < 0) continue;
       const auto ci2(itr1->second.iter());
       for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
-        if(rridx2[itr2->first] < 0) continue;
+        assert(0 <= ridx0[itr2->first]);
+        if(rridx2[ridx0[itr2->first]] < 0) continue;
         const int i1(itr0->first);
         const int j1(itr2->first);
         const int k1(itr1->first);
@@ -889,7 +892,9 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
       for(int k = 0; k < result.words.size(); k ++) {
         if(k == widx) continue;
         const T score(corpust[i][j][k] * (c_ij[i][j] + c_jk[j][k] + c_ik[i][k]));
-        result.corpust[i][j][widx] += score;
+        result.corpust[widx][j][k] += score / T(3);
+        result.corpust[i][widx][k] += score / T(3);
+        result.corpust[i][j][widx] += score / T(3);
         result.corpust[i][j][k]    -= score;
       }
     }
