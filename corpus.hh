@@ -1269,6 +1269,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
   cerr << "preparedToc: analysing input text" << flush;
   vector<int> matched;
   U result;
+  result += U("Show/Hide : <input class=\"gather\" type=\"checkbox\"><div class=\"gather\">");
   for(int i = 0; i < topics.size(); i ++) {
     cerr << "." << flush;
     vector<corpus<T, U> >   tstat0;
@@ -1292,7 +1293,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
     result += topictitle[i] + U(" : (") + to_string(scores[0].first);
     result += U(", ") + to_string(sum / scores.size());
     result += U(", ") + to_string(scores[scores.size() - 1].first);
-    result += U(")<br/><span class=\"small\">\n");;
+    result += U(")<br/>\n");
     for(int j = 0; j < 1; j ++) {
 //  XXX select me:
 //  for(int j = 0; j < scores.size(); j ++) {
@@ -1304,8 +1305,9 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
       result += work.reverseLink(cstat0[scores[j].second.second]) + U("<br/>\n");
       result += work.reverseLink(tstat0[scores[j].second.first])  + U("<br/><br/>\n");
     }
-    result += U("</span><br/>\n");
+    result += U("<br/>\n");
   }
+  result += U("</div>");
   sort(matched.begin(), matched.end());
   matched.erase(unique(matched.begin(), matched.end()), matched.end());
   if(matched.size()) {
@@ -1418,14 +1420,14 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     corpushl<T, U> cs(cstat[j]);
     for(int l = 0; l < idt.size(); l ++)
       cs += cstat[idt[l]];
-    result += U("<div><span class=\"small\">");
+    result += U("<div>");
     result += to_string(work[jj].first) + U(" : ");
-    result += cs.serialize();
-    result += U("</span><br/><span class=\"small\">");
+    result += U("<br/>");
     result += U("base : <a href=\"#") + name + to_string(j) + U("\">");
     result += to_string(j) + U("</a> - ");
     result += cs.reverseLink(cstat0[j]);
-    result += U("<br/>");
+    result += cs.serialize();
+    result += U("<br/>Show/Hide : <input class=\"gather\" type=\"checkbox\"><div class=\"gather\">");
     for(int l = 0; l < idt.size(); l ++) {
       result += U("<a href=\"#") + name + to_string(idt[l]) + U("\">");
       result += to_string(idt[l]) + U("</a> : ");
@@ -1433,28 +1435,28 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
       result += cs.reverseLink(cstat0[idt[l]]);
       result += U("<br/>");
     }
-    result += U("</span></div><br/>");
+    result += U("</div></div><br/>");
   }
   for(int i = 0; i < residue.size(); i ++) {
     const int& j(residue[i].second);
     corpushl<T, U> cs(cstat[j]);
-    result += U("<div><span class=\"small\">");
+    result += U("<div>");
     result += to_string(residue[i].first) + U(" : ");
     // result += cs.serialize();
-    result += U("</span><br/><span class=\"small\">");
+    result += U("<br/>");
     result += U("no match : <a href=\"#") + name + to_string(j) + U("\">");
     result += to_string(j) + U("</a> - ");
     result += cs.reverseLink(cstat0[j]);
-    result += U("</span></div><br/>");
+    result += U("</div><br/>");
   }
-  result += U("<br/><br/>Original:<br/>");
+  result += U("<br/><br/>Original:<br/>Show/Hide : <input class=\"gather\" type=\"checkbox\"><div class=\"gather\">");
   for(int i = 0; i < tagged.size(); i ++)
     result += tagged[i];
-  result += U("<br/>");
+  result += U("</div><br/>");
   return result;
 }
 
-template <typename T, typename U> U diff(const U& input, const U& name, const vector<U>& words, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const T& thresh = T(.05), const T& redig = T(1)) {
+template <typename T, typename U> U diff(const U& input, const U& name, const vector<U>& words, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const T& thresh = T(.2), const T& redig = T(1)) {
   cerr << "Diff: preparing inputs..." << endl;
   vector<corpus<T, U> >   cstat0;
   vector<corpus<T, U> >   dstat0;
@@ -1472,8 +1474,8 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
     cstat[i].reDig(redig);
     dstat[i].reDig(redig);
     auto diff(cstat[i] - dstat[i]);
-    diff.reDig(redig);
     const T score(diff.cdot(diff) / sqrt(cstat[i].cdot(cstat[i]) * dstat[i].cdot(dstat[i])));
+    diff.reDig(redig);
     if(thresh < score) {
       result += U("(") + to_string(score) + U(") : ");
       result += diff.serialize() + U("<br/>\n");

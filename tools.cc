@@ -188,7 +188,7 @@ int main(int argc, const char* argv[]) {
           detailwords.push_back(work.first);
         }
       }
-      std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
+      std::cout << std::string("<html><head><meta charset=\"UTF-8\"><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
       for(int i = 0; i <= input.size() / szblock; i ++)
         std::cout << preparedTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.5), .125, mode == 12) << std::string("<hr/>") << std::endl;
@@ -251,7 +251,7 @@ int main(int argc, const char* argv[]) {
           detailwords.push_back(work.first);
         }
       }
-      std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
+      std::cout << std::string("<html><head><meta charset=\"UTF-8\"><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
       for(int i = 0; i <= input.size() / szblock; i ++)
         std::cout << diff<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, details, detailwords, details2, detailwords2, delimiter, szwindow) << std::string("<hr/>") << std::endl;
@@ -271,7 +271,7 @@ int main(int argc, const char* argv[]) {
         rdetails.push_back(work.second);
         rdetailwords.push_back(work.first);
       }
-      std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
+      std::cout << std::string("<html><head><meta charset=\"UTF-8\"><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
       std::cout << std::string("<body>");
       for(int i = 0; i <= input.size() / szblock; i ++)
         std::cout << optimizeTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, rdetails, rdetailwords, delimiter, szwindow, 8, 1., mode == 15) << std::string("<hr/>") << std::endl;

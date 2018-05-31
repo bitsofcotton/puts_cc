@@ -1,10 +1,12 @@
-span.small {
-    font-size: small;
-    padding: 5px;
-    margin: 5px;
-}
-
 font.match {
     color: red;
+}
+
+div.gather {
+    display: none;
+}
+
+input[type=checkbox].gather:checked ~ div.gather {
+    display: inline-block;
 }
 
