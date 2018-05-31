@@ -20,8 +20,7 @@
     exec("rm -f " . $pathb . "puts.core");
     if(!file_exists($pathb . "words.txt"))
       exec("cp ./words.txt " . $pathb);
-    if(!file_exists($pathb . "style.css"))
-      exec("cp ./style.css " . $pathb);
+    exec("cp ./style.css " . $pathb);
     if(!file_exists($pathb . "sentry.txt"))
       exec("touch " . $pathb . "sentry.txt");
     exec("touch " . $pathb . "urls.txt");
