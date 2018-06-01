@@ -605,36 +605,18 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::match2relPseudo
   vector<int>    ridx0, ridx1;
   vector<U>      words(gatherWords(result.words, other.words, ridx0, ridx1));
   vector<int>    idxs;
-  auto& ci0(result.corpust.iter());
+  const auto& ci0(other.corpust.iter());
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
-    const int&  ii(ridx0[itr0->first]);
+    const int&  ii(ridx1[itr0->first]);
     const auto& ci1(itr0->second.iter());
     assert(0 <= ii);
     idxs.push_back(ii);
     for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
-      const int&  jj(ridx0[itr1->first]);
+      const int&  jj(ridx1[itr1->first]);
       const auto& ci2(itr1->second.iter());
       assert(0 <= jj);
       idxs.push_back(jj);
       for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
-        const int& kk(ridx0[itr2->first]);
-        assert(0 <= kk);
-        idxs.push_back(kk);
-      }
-    }
-  }
-  const auto& di0(other.corpust.iter());
-  for(auto itr0(di0.begin()); itr0 != di0.end(); ++ itr0) {
-    const int&  ii(ridx1[itr0->first]);
-    const auto& di1(itr0->second.iter());
-    assert(0 <= ii);
-    idxs.push_back(ii);
-    for(auto itr1(di1.begin()); itr1 != di1.end(); ++ itr1) {
-      const int&  jj(ridx1[itr1->first]);
-      const auto& di2(itr1->second.iter());
-      assert(0 <= jj);
-      idxs.push_back(jj);
-      for(auto itr2(di2.begin()); itr2 != di2.end(); ++ itr2) {
         const int& kk(ridx1[itr2->first]);
         assert(0 <= kk);
         idxs.push_back(kk);
@@ -643,17 +625,18 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::match2relPseudo
   }
   sort(idxs.begin(), idxs.end());
   idxs.erase(unique(idxs.begin(), idxs.end()), idxs.end());
-  for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
+  auto& oi0(result.corpust.iter());
+  for(auto itr0(oi0.begin()); itr0 != oi0.end(); ++ itr0) {
     const int& ii(ridx0[itr0->first]);
-    auto& ci1(itr0->second.iter());
     assert(0 <= ii);
     const auto bii(binary_search(idxs.begin(), idxs.end(), ii));
-    for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
+    auto& oi1(itr0->second.iter());
+    for(auto itr1(oi1.begin()); itr1 != oi1.end(); ++ itr1) {
       const int& jj(ridx0[itr1->first]);
-      auto& ci2(itr1->second.iter());
       assert(0 <= jj);
       const auto bjj(binary_search(idxs.begin(), idxs.end(), jj));
-      for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
+      auto& oi2(itr1->second.iter());
+      for(auto itr2(oi2.begin()); itr2 != oi2.end(); ++ itr2) {
         const int& kk(ridx0[itr2->first]);
         assert(0 <= kk);
         const auto bkk(binary_search(idxs.begin(), idxs.end(), kk));
