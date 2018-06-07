@@ -573,9 +573,9 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
   corpushl<T, U> result;
   result.corpust = Tensor();
   for(int i = 0; i < workwords.size(); i ++)
-    if(ridx0[i] >= 0 && i != eidx)
+    if(ridx0[i] >= 0)
       result.words.push_back(words[ridx0[i]]);
-    else if(ridx1[i] >= 0 && i != eidx)
+    else if(ridx1[i] >= 0)
       result.words.push_back(other.words[ridx1[i]]);
   auto& ci0(corpust.iter());
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
