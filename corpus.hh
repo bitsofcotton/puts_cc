@@ -652,10 +652,10 @@ template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T,
     shown = true;
   }
   // XXX confirm me: need some other counting methods?
-  const auto n2this(cdot(*this));
+  const auto n2this(sqrt(cdot(*this)));
   if(n2this == T(0))
     return T(0);
-  const auto n2p(prejs.cdot(prejs));
+  const auto n2p(sqrt(prejs.cdot(prejs)));
   if(n2p == T(0))
     return T(0);
   return cdot(prejs) / sqrt(n2this * n2p);
