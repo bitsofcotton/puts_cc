@@ -49,12 +49,6 @@ int main(int argc, const char* argv[]) {
   delimiter.push_back(string(","));
   delimiter.push_back(string("\'"));
   delimiter.push_back(string("\""));
-  delimiter.push_back(string("。"));
-  delimiter.push_back(string("、"));
-  delimiter.push_back(string("「"));
-  delimiter.push_back(string("」"));
-  delimiter.push_back(string("("));
-  delimiter.push_back(string(")"));
   csvelim.push_back(string(" "));
   csvelim.push_back(string("\t"));
   csvdelim.push_back(string(","));
