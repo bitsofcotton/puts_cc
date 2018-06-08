@@ -568,9 +568,9 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
   const auto rridx0(reverseLookup(ridx0));
   const auto rridx1(reverseLookup(ridx1));
   for(int i = 0; i < workwords.size(); i ++)
-    if(0 <= ridx0[i])
+    if(0 <= rridx0[i])
       result.words.push_back(words[rridx0[i]]);
-    else if(0 <= ridx1[i])
+    else if(0 <= rridx1[i])
       result.words.push_back(other.words[rridx1[i]]);
     else
       assert(0 && "withDetail error reconstructing from gatherwords");
@@ -1011,7 +1011,8 @@ template <typename T, typename U> vector<U> corpushl<T, U>::gatherWords(const ve
 template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::prepareDetail(const corpushl<T, U>& other, const vector<U>& workwords, const int& eidx, const vector<int>& ridx0, const vector<int>& ridx1) {
   Tensor res;
   const auto& ci0(other.corpust.iter());
-  assert(0 <= ridx0[eidx]);
+  const auto  rridx0(reverseLookup(ridx0));
+  assert(0 <= rridx0[eidx]);
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     const int&  ii(ridx1[itr0->first]);
     const auto& ci1(itr0->second.iter());
@@ -1032,24 +1033,24 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
         const auto& ti0(corpust.iter());
         for(auto titr0(ti0.begin()); titr0 != ti0.end(); ++ titr0) {
           const auto& ti1(titr0->second.iter());
-          const int& tii(ridx0[titr0->first]);
+          const int& tii(rridx0[titr0->first]);
           assert(0 <= tii);
           if(tii == eidx) continue;
           // add line points.
           for(auto titr1(ti1.begin()); titr1 != ti1.end(); ++ titr1) {
-            const int& tjj(ridx0[titr1->first]);
+            const int& tjj(rridx0[titr1->first]);
             assert(0 <= tjj);
             if(tjj == eidx) continue;
-            merge5(res, tii, ii, kk, jj, tjj, titr1->second[ridx0[eidx]] * itr2->second * x0);
+            merge5(res, tii, ii, kk, jj, tjj, titr1->second[rridx0[eidx]] * itr2->second * x0);
           }
         }
         for(auto titr0(ti0.begin()); titr0 != ti0.end(); ++ titr0) {
           const auto& ti2(titr0->second[eidx].iter());
-          const int& tii(ridx0[titr0->first]);
+          const int& tii(rridx0[titr0->first]);
           assert(0 <= tii);
           if(tii == eidx) continue;
           for(auto titr2(ti2.begin()); titr2 != ti2.end(); ++ titr2) {
-            const int& tkk(ridx0[titr2->first]);
+            const int& tkk(rridx0[titr2->first]);
             assert(0 <= tkk);
             if(tkk == eidx) continue;
             merge5(res, tii, tkk, ii, kk, jj, titr2->second * itr2->second * x0);
@@ -1058,11 +1059,11 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
         const auto& ti1(corpust[eidx].iter());
         for(auto titr1(ti1.begin()); titr1 != ti1.end(); ++ titr1) {
           const auto& ti2(titr1->second.iter());
-          const int& tjj(ridx0[titr1->first]);
+          const int& tjj(rridx0[titr1->first]);
           assert(0 <= tjj);
           if(tjj == eidx) continue;
           for(auto titr2(ti2.begin()); titr2 != ti2.end(); ++ titr2) {
-            const int& tkk(ridx0[titr2->first]);
+            const int& tkk(rridx0[titr2->first]);
             assert(0 <= tkk);
             if(tkk == eidx) continue;
             merge5(res, ii, kk, jj, tjj, tkk, titr2->second * itr2->second * x0);
