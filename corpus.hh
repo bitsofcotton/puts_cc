@@ -1029,7 +1029,7 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
         assert(0 <= kk);
         if(itr2->second == T(0) || kk == eidx) continue;
         // add crossing points
-        const T x0(T(1) + corpust[eidx][eidx][eidx]);
+        const T x0(T(1) + corpust[eeidx][eeidx][eeidx]);
         const auto& ti0(corpust.iter());
         for(auto titr0(ti0.begin()); titr0 != ti0.end(); ++ titr0) {
           const auto& ti1(titr0->second.iter());
