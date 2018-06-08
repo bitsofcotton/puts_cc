@@ -1034,7 +1034,7 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
         for(auto titr0(ti0.begin()); titr0 != ti0.end(); ++ titr0) {
           const auto& ti1(titr0->second.iter());
           const int& tii(ridx0[titr0->first]);
-          cerr << titr0->first << ", " << eidx << endl;
+          cerr << titr0->first << ", " << eidx << ", " << eeidx << endl;
           assert(0 <= tii);
           if(tii == eidx) continue;
           // add line points.
@@ -1057,7 +1057,7 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
             merge5(res, tii, tkk, ii, kk, jj, titr2->second * itr2->second * x0);
           }
         }
-        const auto& ti1(corpust[eidx].iter());
+        const auto& ti1(corpust[eeidx].iter());
         for(auto titr1(ti1.begin()); titr1 != ti1.end(); ++ titr1) {
           const auto& ti2(titr1->second.iter());
           const int& tjj(ridx0[titr1->first]);
