@@ -565,11 +565,13 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
   assert(0 <= eidx && eidx < workwords.size() && *itr2 == word);
   corpushl<T, U> result;
   result.corpust = Tensor();
+  const auto rridx0(reverseLookup(ridx0));
+  const auto rridx1(reverseLookup(ridx1));
   for(int i = 0; i < workwords.size(); i ++)
     if(0 <= ridx0[i])
-      result.words.push_back(words[ridx0[i]]);
+      result.words.push_back(words[rridx0[i]]);
     else if(0 <= ridx1[i])
-      result.words.push_back(other.words[ridx1[i]]);
+      result.words.push_back(other.words[rridx1[i]]);
     else
       assert(0 && "withDetail error reconstructing from gatherwords");
   const auto& ci0(corpust.iter());
