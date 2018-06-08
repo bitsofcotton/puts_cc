@@ -282,6 +282,10 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
             (k == 0 || k == end0)) ||
            !ptrs[k].size())
           continue;
+        // XXX checkme:
+        if(words[i] == U("$") || words[j] == U("$") || words[k] == U("$") ||
+           words[i] == U("^") || words[j] == U("^") || words[k] == U("^"))
+          continue;
         int ctru = 0;
         int ctrv = 0;
         for(auto itr = ptrs[k].begin(); itr != ptrs[k].end(); ++ itr) {
@@ -648,10 +652,10 @@ template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T,
     shown = true;
   }
   // XXX confirm me: need some other counting methods?
-  const auto n2this(absmax());
+  const auto n2this(cdot(*this));
   if(n2this == T(0))
     return T(0);
-  const auto n2p(prejs.absmax());
+  const auto n2p(prejs.cdot(prejs));
   if(n2p == T(0))
     return T(0);
   return cdot(prejs) / sqrt(n2this * n2p);
@@ -773,7 +777,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
   const T td(work.cdot(work));
   if(td <= T(0))
     return *this;
-  cerr << "abbrev: " << word << " : beta." << endl;
+  cerr << "abbrev: " << word << " : fixme ratio." << endl;
   auto result((*this * td - work * tn) / td);
   auto p(find(result.words.begin(), result.words.end(), word));
   if(! (result.words.begin() <= p && p < result.words.end() && *p == word)) {
@@ -817,7 +821,8 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
       if(j == widx) continue;
       for(int k = 0; k < result.words.size(); k ++) {
         if(k == widx) continue;
-        const T score(corpust[i][j][k] * (c_ij[i][j] + c_jk[j][k] + c_ik[i][k]));
+        // XXX fixme ratio.
+        const T score(corpust[i][j][k] * (c_ij[i][j] + c_jk[j][k] + c_ik[i][k]) / result.words.size());
         result.corpust[widx][j][k] += score / T(3);
         result.corpust[i][widx][k] += score / T(3);
         result.corpust[i][j][widx] += score / T(3);
@@ -1013,6 +1018,7 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
   const auto& ci0(other.corpust.iter());
   const int   eeidx(reverseLookup(ridx0)[eidx]);
   assert(0 <= eidx && 0 <= eeidx);
+  const T x0(corpust[eeidx][eeidx][eeidx]);
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     const int&  ii(ridx1[itr0->first]);
     const auto& ci1(itr0->second.iter());
@@ -1029,12 +1035,10 @@ template <typename T, typename U> const SimpleSparseTensor<T> corpushl<T, U>::pr
         assert(0 <= kk);
         if(itr2->second == T(0) || kk == eidx) continue;
         // add crossing points
-        const T x0(T(1) + corpust[eeidx][eeidx][eeidx]);
         const auto& ti0(corpust.iter());
         for(auto titr0(ti0.begin()); titr0 != ti0.end(); ++ titr0) {
           const auto& ti1(titr0->second.iter());
           const int& tii(ridx0[titr0->first]);
-          cerr << titr0->first << ", " << eidx << ", " << eeidx << endl;
           assert(0 <= tii);
           if(tii == eidx) continue;
           // add line points.
@@ -1200,14 +1204,17 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
       for(int k = 0; k < cstat.size(); k ++)
         if(cstat[k].absmax() != T(0)) {
           const T lscore(reverse ? T(1) / abs(cstat[k].prej(tstat[j]))
-                                 : cstat[k].prej(tstat[j]));
-          cerr << lscore << endl;
-          if(isfinite(lscore) && (reverse ? T(1) / thresh <= lscore :
-                                            thresh <= lscore))
+                                 :            cstat[k].prej(tstat[j]) );
+          if(isfinite(lscore))
             scores.push_back(make_pair(- lscore, make_pair(j, k)));
         }
     if(!scores.size()) continue;
     sort(scores.begin(), scores.end());
+    if(! (reverse ? T(1) / thresh <= - scores[0].first :
+                           thresh <= - scores[0].first ) ) {
+      result += to_string(scores[0].first) + U("<br/>\n");
+      continue;
+    }
     T sum(0);
     for(int j = 0; j < scores.size(); j ++)
       sum += scores[j].first;
