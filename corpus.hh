@@ -658,7 +658,7 @@ template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T,
   const auto n2p(sqrt(prejs.cdot(prejs)));
   if(n2p == T(0))
     return T(0);
-  return cdot(prejs) / sqrt(n2this * n2p);
+  return cdot(prejs) / (n2this * n2p);
 }
 
 template <typename T, typename U> const T corpushl<T, U>::prej2(const vector<corpushl<T, U> >& prej0, const vector<corpushl<T, U> >& prej1, const T& thresh) const {
