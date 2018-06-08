@@ -322,23 +322,22 @@ template <typename T> vector<T> cutText(const T& input, const vector<T>& elimina
   T         workbuf;
   for(int i = 0; i < input.size(); i ++) {
     workbuf += input[i];
-    bool flag(false);
     for(int j = 0; j < delimiter.size(); j ++)
       if(workbuf.size() >= delimiter[j].size() &&
          workbuf.substr(workbuf.size() - delimiter[j].size(), delimiter[j].size()) == delimiter[j]) {
         if(workbuf.size() - delimiter[j].size())
           result.push_back(workbuf.substr(0, workbuf.size() - delimiter[j].size()));
         workbuf = T();
-        flag = true;
-        break;
+        goto next;
       }
-    if(flag) continue;
     for(int j = 0; j < eliminate.size(); j ++)
       if(workbuf.size() >= eliminate[j].size() &&
         workbuf.substr(workbuf.size() - eliminate[j].size(), eliminate[j].size()) == eliminate[j]) {
         workbuf = workbuf.substr(0, workbuf.size() - eliminate[j].size());
         break;
       }
+   next:
+    ;
   }
   if(workbuf.size())
     result.push_back(workbuf);
