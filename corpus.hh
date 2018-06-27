@@ -552,13 +552,12 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
     return *this;
   cerr << "withDetail : " << word << ": " << endl;
   vector<int> ridx0, ridx1;
-  vector<U>   workwords(gatherWords(words, other.words, ridx0, ridx1));
-  const auto itr2(find(workwords.begin(), workwords.end(), word));
-  const int  eidx(distance(workwords.begin(), itr2));
-  assert(0 <= eidx && eidx < workwords.size() && *itr2 == word);
   corpushl<T, U> result;
-  result.words   = workwords;
+  result.words = gatherWords(words, other.words, ridx0, ridx1);
   result.corpust = Tensor();
+  const auto itr2(find(result.words.begin(), result.words.end(), word));
+  const int  eidx(distance(result.words.begin(), itr2));
+  assert(0 <= eidx && eidx < result.words.size() && *itr2 == word);
   const auto rridx0(reverseLookup(ridx0));
   const auto rridx1(reverseLookup(ridx1));
   const int  eeidx(rridx0[eidx]);
@@ -1229,8 +1228,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
     if(!scores.size())
       continue;
     sort(scores.begin(), scores.end());
-    if(! (reverse ? T(1) / thresh <= - scores[0].first :
-                           thresh <= - scores[0].first ) ) {
+    if(! (thresh <= - scores[0].first)) {
       result += to_string(scores[0].first) + U("<br/>\n");
       continue;
     }
@@ -1245,7 +1243,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
 //  XXX select me:
 //  for(int j = 0; j < scores.size(); j ++) {
       matched.push_back(scores[j].second.second);
-      const auto& work(cstat[scores[j].second.second] + tstat[scores[j].second.first]);
+      const auto work(cstat[scores[j].second.second] + tstat[scores[j].second.first]);
       result += U("<a href=\"#") + name + to_string(scores[j].second.second) + U("\">");
       result += to_string(scores[j].first) + U(" : ");
       result += /*work.serialize() + */ U("</a><br/>\n");
@@ -1421,7 +1419,7 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
     cstat[i].reDig(redig);
     dstat[i].reDig(redig);
     auto diff(cstat[i] - dstat[i]);
-    const T score(sqrt(diff.cdot(diff)) / sqrt(cstat[i].absmax() * dstat[i].absmax()));
+    const T score(sqrt(diff.cdot(diff) / sqrt(cstat[i].cdot(cstat[i]) * dstat[i].cdot(dstat[i]))));
     diff.reDig(redig);
     if(thresh < score) {
       result += U("(") + to_string(score) + U(") : ");
