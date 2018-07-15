@@ -454,6 +454,7 @@ template <typename T, typename U> bool corpushl<T, U>::operator == (const corpus
 }
 
 template <typename T, typename U> bool corpushl<T, U>::operator != (const corpushl<T, U>& other) const {
+  // XXX: imcomplete.
   return words != other.words || corpust != other.corpust;
 }
 
@@ -1401,7 +1402,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
   return result;
 }
 
-template <typename T, typename U> U diff(const U& input, const U& name, const vector<U>& words, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const T& thresh = T(.125), const T& redig = T(1)) {
+template <typename T, typename U> U diff(const U& input, const U& name, const vector<U>& words, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const int& depth = T(20), const T& redig = T(1)) {
   cerr << "Diff: preparing inputs..." << endl;
   vector<corpus<T, U> >   cstat0;
   vector<corpus<T, U> >   dstat0;
@@ -1415,20 +1416,25 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
   // N.B. cross dictionary difference.
   getAbbreved<T, U>(cstat, words, detailtitle1, detail1, delimiter, szwindow);
   getAbbreved<T, U>(dstat, words, detailtitle0, detail0, delimiter, szwindow);
+  vector<pair<T, int> > scores;
   for(int i = 0; i < cstat.size(); i ++) {
     cstat[i].reDig(redig);
     dstat[i].reDig(redig);
     auto diff(cstat[i] - dstat[i]);
-    const T score(sqrt(diff.cdot(diff) / sqrt(cstat[i].cdot(cstat[i]) * dstat[i].cdot(dstat[i]))));
+    scores.push_back(make_pair(- sqrt(diff.cdot(diff) / sqrt(cstat[i].cdot(cstat[i]) * dstat[i].cdot(dstat[i]))), i));
+  }
+  sort(scores.begin(), scores.end());
+  for(int ii = 0; ii < min(depth, int(scores.size())); ii ++) {
+    const T&   score(scores[ii].first);
+    const int& i(scores[ii].second);
+    auto diff(cstat[i] - dstat[i]);
     diff.reDig(redig);
-    if(thresh < score) {
-      result += U("(") + to_string(score) + U(") : ");
-      result += diff.serialize() + U("<br/>\n");
-      result += cstat[i].reverseLink(cstat0[i]) + U("<br/>\n");
-      result += dstat[i].reverseLink(dstat0[i]) + U("<br/>\n");
-      result += diff.reverseLink(cstat0[i]) + U("<br/>\n");
-      result += diff.reverseLink(dstat0[i]) + U("<br/><br/><br/>\n");
-    }
+    result += U("(") + to_string(score) + U(") : ");
+    result += diff.serialize() + U("<br/>\n");
+    result += cstat[i].reverseLink(cstat0[i]) + U("<br/>\n");
+    result += dstat[i].reverseLink(dstat0[i]) + U("<br/>\n");
+    result += diff.reverseLink(cstat0[i]) + U("<br/>\n");
+    result += diff.reverseLink(dstat0[i]) + U("<br/><br/><br/>\n");
   }
   return result;
 }
