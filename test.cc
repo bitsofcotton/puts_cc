@@ -60,6 +60,7 @@ int main(int argc, const char* argv[]) {
   csvdelim.push_back(string(","));
   csvdelim.push_back(string("\r"));
   csvdelim.push_back(string("\n"));
+/*
   const auto words0(cutText(loadbuf(argv[1]).second, csvelim, csvdelim));
   std::string p0("�イトニュース 25,27d24 < @charset\"UTF-8\";#imp_Ad:after,.clearfix:after{content:\"\";visibility:hidden;clear:both}#backnumber.active,#exFooter.jumpLink02a,#exFooterContents,#exGlovalLink,#exGlova");
   std::string p1(" れ、待ちに待った新モデルには違いないのだから。 ");
@@ -71,6 +72,7 @@ int main(int argc, const char* argv[]) {
   corpushl<double, std::string> ppp0(pp0), ppp1(pp1);
   std::cerr << abs(ppp0.prej(ppp1)) << ppp0.reverseLink(pp0) << std::endl;
   return 0;
+*/
   int mode = - 1;
   if(argc < 2) {
     usage();

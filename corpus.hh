@@ -613,20 +613,20 @@ template <typename T, typename U> T corpushl<T, U>::cdot(const corpushl<T, U>& o
     const int& i0(ridx1[itr0->first]);
     assert(0 <= i0);
     const int& ii(rridx0[i0]);
-    if(ii < 0 || !corpust[ii].iter().size()) continue;
+    if(ii < 0 || !const_cast<const Tensor&>(corpust)[ii].iter().size()) continue;
     const auto& oi1(itr0->second.iter());
     for(auto itr1(oi1.begin()); itr1 != oi1.end(); ++ itr1) {
       const int& j0(ridx1[itr1->first]);
       assert(0 <= j0);
       const int& jj(rridx0[j0]);
-      if(jj < 0 || !corpust[ii][jj].iter().size()) continue;
+      if(jj < 0 || !const_cast<const Tensor&>(corpust)[ii][jj].iter().size()) continue;
       const auto& oi2(itr1->second.iter());
       for(auto itr2(oi2.begin()); itr2 != oi2.end(); ++ itr2) {
         const int& k0(ridx1[itr2->first]);
         assert(0 <= k0 || itr2->second == T(0));
         const int& kk(rridx0[k0]);
         if(kk < 0) continue;
-        res += itr2->second * corpust[ii][jj][kk];
+        res += itr2->second * const_cast<const Tensor&>(corpust)[ii][jj][kk];
       }
     }
   }
@@ -716,10 +716,10 @@ template <typename T, typename U> U corpushl<T, U>::serialize() const {
   for(int i = 0; i < plus.words.size(); i ++)
     for(int j = 0; j < plus.words.size(); j ++)
       for(int k = 0; k < plus.words.size(); k ++)
-        if(plus.corpust[i][j][k] < T(0)) {
+        if(const_cast<const Tensor&>(plus.corpust)[i][j][k] < T(0)) {
           plus.corpust[i][j][k]  = T(0);
-          minus.corpust[i][j][k] = - minus.corpust[i][j][k];
-        } else if(minus.corpust[i][j][k] != T(0))
+          minus.corpust[i][j][k] = - const_cast<const Tensor&>(minus.corpust)[i][j][k];
+        } else if(const_cast<const Tensor&>(minus.corpust)[i][j][k] != T(0))
           minus.corpust[i][j][k] = T(0);
   vector<int> entire;
   entire.reserve(words.size());
@@ -740,9 +740,9 @@ template <typename T, typename U> U corpushl<T, U>::serializeSub(const vector<in
   // N.B. i0 - i1 - i2 is stored in corpust[i0][i2][i1].
   for(int i = 0; i < idxs.size(); i ++) {
     int lscore(0);
-    for(int j = 0; j < idxs.size(); j ++)
+    for(int j = 0; j < idxs.size(); j ++) if(const_cast<const Tensor&>(corpust)[idxs[j]].iter().size())
       for(int k = 0; k < idxs.size(); k ++)
-        if(corpust[idxs[j]][idxs[k]][idxs[i]] != T(0))
+        if(const_cast<const Tensor&>(corpust)[idxs[j]][idxs[k]][idxs[i]] != T(0))
           lscore --;
     cscore.push_back(make_pair(lscore, idxs[i]));
   }
@@ -758,9 +758,9 @@ template <typename T, typename U> U corpushl<T, U>::serializeSub(const vector<in
       int lscore(0);
       for(int j = 0; j < idxs.size(); j ++)
         if(idxs[j] != middle[0]) {
-          if(corpust[idxs[i]][idxs[j]][middle[0]] != T(0))
+          if(const_cast<const Tensor&>(corpust)[idxs[i]][idxs[j]][middle[0]] != T(0))
             lscore --;
-          if(corpust[idxs[j]][idxs[i]][middle[0]] != T(0))
+          if(const_cast<const Tensor&>(corpust)[idxs[j]][idxs[i]][middle[0]] != T(0))
             lscore ++;
         }
       score.push_back(make_pair(lscore, idxs[i]));
@@ -836,7 +836,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
       for(int k = 0; k < result.words.size(); k ++) {
         if(k == widx) continue;
         // XXX fixme ratio.
-        const T score(corpust[i][j][k] * (c_ij[i][j] + c_jk[j][k] + c_ik[i][k]) / result.words.size());
+        const T score(const_cast<const Tensor&>(corpust)[i][j][k] * (c_ij[i][j] + c_jk[j][k] + c_ik[i][k]) / result.words.size());
         result.corpust[widx][j][k] += score / T(3);
         result.corpust[i][widx][k] += score / T(3);
         result.corpust[i][j][widx] += score / T(3);
@@ -920,9 +920,9 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::simpleThresh(co
   for(int i = 0; i < words.size(); i ++) {
     for(int j = 0; j < words.size(); j ++)
       for(int k = 0; k < words.size(); k ++)
-        if(ratio * thisabsmax < abs(corpust[i][j][k]) ||
-           ratio * thisabsmax < abs(corpust[j][i][k]) ||
-           ratio * thisabsmax < abs(corpust[j][k][i])) {
+        if(ratio * thisabsmax < abs(const_cast<const Tensor&>(corpust)[i][j][k]) ||
+           ratio * thisabsmax < abs(const_cast<const Tensor&>(corpust)[j][i][k]) ||
+           ratio * thisabsmax < abs(const_cast<const Tensor&>(corpust)[j][k][i])) {
           okidx.push_back(i);
           goto next;
         }
@@ -937,7 +937,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::simpleThresh(co
     for(int j = 0; j < okidx.size(); j ++)
       if(corpust[okidx[i]][okidx[j]].iter().size())
         for(int k = 0; k < okidx.size(); k ++)
-          if(ratio * thisabsmax < abs(corpust[okidx[i]][okidx[j]][okidx[k]]))
+          if(ratio * thisabsmax < abs(const_cast<const Tensor&>(corpust)[okidx[i]][okidx[j]][okidx[k]]))
             result.corpust[i][j][k] = corpust[okidx[i]][okidx[j]][okidx[k]];
   }
   return result;
@@ -1117,8 +1117,8 @@ template <typename T, typename U> Eigen::Matrix<T, Eigen::Dynamic, 1> corpushl<T
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> buf(words.size(), words.size());
     for(int j = 0; j < words.size(); j ++) {
       for(int k = 0; k < words.size(); k ++)
-        if(isfinite(corpust[i][j][k]))
-          buf(k, j) = corpust[i][j][k];
+        if(isfinite(const_cast<const Tensor&>(corpust)[i][j][k]))
+          buf(k, j) = const_cast<const Tensor&>(corpust)[i][j][k];
         else {
           cerr << "nan" << flush;
           buf(k, j) = T(0);

@@ -189,9 +189,11 @@ template <typename T> T& SimpleSparseVector<T>::operator [] (const int& idx) {
 
 template <typename T> const T& SimpleSparseVector<T>::operator [] (const int& idx) const {
   assert(0 <= idx);
-  const auto search(entity.find(idx));
-  if(search != entity.end())
-    return search->second;
+  if(entity.size()) {
+    const auto search(entity.find(idx));
+    if(search != entity.end())
+      return search->second;
+  }
   const static T zero(0);
   return zero;
 }
