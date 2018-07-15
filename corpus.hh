@@ -338,7 +338,6 @@ public:
         bool            operator <  (const corpushl<T, U>& other) const;
         corpushl<T, U>  operator +  (const corpushl<T, U>& other) const;
         corpushl<T, U>  operator -  () const;
-        corpushl<T, U>& operator -  ();
         corpushl<T, U>  operator -  (const corpushl<T, U>& other) const;
         corpushl<T, U>  operator *  (const T& t)                  const;
         corpushl<T, U>  operator /  (const T& t)                  const;
@@ -522,12 +521,8 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator + (con
 
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator - () const {
   corpushl<T, U> result(*this);
-  return - result;
-}
-
-template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator - () {
-  corpust = - corpust;
-  return *this;
+  result.corpust = - result.corpust;
+  return result;
 }
 
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator - (const corpushl<T, U>& other) const {
