@@ -708,14 +708,28 @@ template <typename T, typename U> U corpushl<T, U>::serialize() const {
   if(words.size() <= 0)
     return U("*NULL*");
   auto plus(*this), minus(*this);
-  for(int i = 0; i < plus.words.size(); i ++)
-    for(int j = 0; j < plus.words.size(); j ++)
-      for(int k = 0; k < plus.words.size(); k ++)
-        if(const_cast<const Tensor&>(plus.corpust)[i][j][k] < T(0)) {
-          plus.corpust[i][j][k]  = T(0);
-          minus.corpust[i][j][k] = - const_cast<const Tensor&>(minus.corpust)[i][j][k];
-        } else if(const_cast<const Tensor&>(minus.corpust)[i][j][k] != T(0))
-          minus.corpust[i][j][k] = T(0);
+  const auto& pi0(plus.corpust.iter());
+  for(auto itr0(pi0.begin()); itr0 != pi0.end(); ++ itr0) {
+    const auto& pi1(itr0->second.iter());
+    for(auto itr1(pi1.begin()); itr1 != pi1.end(); ++ itr1) {
+      const auto& pi2(itr1->second.iter());
+      for(auto itr2(pi2.begin()); itr2 != pi2.end(); ++ itr2)
+        if(itr2->second < T(0))
+          plus.corpust[itr0->first][itr1->first][itr2->first] = T(0);
+    }
+  }
+  const auto& mi0(minus.corpust.iter());
+  for(auto itr0(mi0.begin()); itr0 != mi0.end(); ++ itr0) {
+    const auto& mi1(itr0->second.iter());
+    for(auto itr1(mi1.begin()); itr1 != mi1.end(); ++ itr1) {
+      const auto& mi2(itr1->second.iter());
+      for(auto itr2(mi2.begin()); itr2 != mi2.end(); ++ itr2)
+        if(itr2->second > T(0))
+          minus.corpust[itr0->first][itr1->first][itr2->first] = T(0);
+        else
+          minus.corpust[itr0->first][itr1->first][itr2->first] = - itr2->second;
+    }
+  }
   vector<int> entire;
   entire.reserve(words.size());
   for(int i = 0; i < words.size(); i ++)
@@ -732,6 +746,7 @@ template <typename T, typename U> U corpushl<T, U>::serializeSub(const vector<in
     return U();
   }
   vector<pair<int, int> > cscore;
+  cscore.reserve(idxs.size());
   // N.B. i0 - i1 - i2 is stored in corpust[i0][i2][i1].
   for(int i = 0; i < idxs.size(); i ++) {
     int lscore(0);
@@ -744,6 +759,9 @@ template <typename T, typename U> U corpushl<T, U>::serializeSub(const vector<in
   sort(cscore.begin(), cscore.end());
   for(int si = 0; si < cscore.size(); si ++) {
     vector<int> middle, left, right;
+    left.reserve(idxs.size());
+    middle.reserve(idxs.size());
+    right.reserve(idxs.size());
     middle.push_back(cscore[si].second);
     if(!cscore[si].first)
       goto symmetric;
@@ -770,6 +788,8 @@ template <typename T, typename U> U corpushl<T, U>::serializeSub(const vector<in
       right.push_back(score[i].second);
     if((middle.size() && (left.size() || right.size())) || (left.size() && right.size()))
       return serializeSub(left) + serializeSub(middle) + serializeSub(right);
+    // XXX checkme with some speed matter.
+    break;
   }
  symmetric:
   U result;
@@ -930,7 +950,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::simpleThresh(co
   for(int i = 0; i < okidx.size(); i ++) {
     result.words.push_back(words[okidx[i]]);
     for(int j = 0; j < okidx.size(); j ++)
-      if(corpust[okidx[i]][okidx[j]].iter().size())
+      if(const_cast<const Tensor&>(corpust)[okidx[i]][okidx[j]].iter().size())
         for(int k = 0; k < okidx.size(); k ++)
           if(ratio * thisabsmax < abs(const_cast<const Tensor&>(corpust)[okidx[i]][okidx[j]][okidx[k]]))
             result.corpust[i][j][k] = corpust[okidx[i]][okidx[j]][okidx[k]];
@@ -1415,8 +1435,7 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
   for(int i = 0; i < cstat.size(); i ++) {
     cstat[i].reDig(redig);
     dstat[i].reDig(redig);
-    auto diff(cstat[i] - dstat[i]);
-    scores.push_back(make_pair(- sqrt(diff.cdot(diff) / sqrt(cstat[i].cdot(cstat[i]) * dstat[i].cdot(dstat[i]))), i));
+    scores.push_back(make_pair(- (T(1) - abs(cstat[i].cdot(dstat[i])) / sqrt(cstat[i].cdot(cstat[i]) * dstat[i].cdot(dstat[i]))), i));
   }
   sort(scores.begin(), scores.end());
   for(int ii = 0; ii < min(depth, int(scores.size())); ii ++) {
