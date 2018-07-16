@@ -859,7 +859,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
       }
     }
   }
-  return result;
+  return result.simpleThresh(T(0));
 }
 
 template <typename T, typename U> vector<U> corpushl<T, U>::reverseLink(const corpushl<T, U>& orig) const {
@@ -1435,7 +1435,9 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
   for(int i = 0; i < cstat.size(); i ++) {
     cstat[i].reDig(redig);
     dstat[i].reDig(redig);
-    scores.push_back(make_pair(- (T(1) - abs(cstat[i].cdot(dstat[i])) / sqrt(cstat[i].cdot(cstat[i]) * dstat[i].cdot(dstat[i]))), i));
+    const auto score(abs(cstat[i].cdot(dstat[i])) / sqrt(cstat[i].cdot(cstat[i]) * dstat[i].cdot(dstat[i])) - T(1));
+    if(isfinite(score))
+      scores.push_back(make_pair(score, i));
   }
   sort(scores.begin(), scores.end());
   for(int ii = 0; ii < min(depth, int(scores.size())); ii ++) {
