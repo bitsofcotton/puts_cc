@@ -43,6 +43,7 @@ using std::abs;
 using std::exp;
 using std::log;
 using std::move;
+using std::replace;
 
 template <typename T> bool equalStrClip(const T& a, const T& b) {
   int cmp(0), jidx(0);
@@ -76,6 +77,7 @@ public:
   corpus<T, U>&    operator = (const corpus<T, U>& other);
   const void       compute(const U& input, const vector<U>& delimiter = vector<U>());
   const U          getAttributed(const vector<U>& highlight) const;
+  const U&         getOrig() const;
   const vector<U>& getWords() const;
   const Tensor&    getCorpus() const;
 private:
@@ -107,6 +109,7 @@ template <typename T, typename U> corpus<T,U>::~corpus() {
 template <typename T, typename U> void corpus<T,U>::init(const vector<U>& words0, const int& nthresh, const int& Nthresh, const int& Mwords) {
   // this->orig    = U();
   this->words0  = words0;
+  // XXX: exauste of resources:
   sort(this->words0.begin(), this->words0.end());
   this->words0.erase(unique(this->words0.begin(), this->words0.end()), this->words0.end());
   // this->words   = vector<U>();
@@ -174,6 +177,10 @@ template <typename T, typename U> const U corpus<T,U>::getAttributed(const vecto
       result += orig[i ++];
   }
   return result;
+}
+
+template <typename T, typename U> const U& corpus<T,U>::getOrig() const {
+  return orig;
 }
 
 template <typename T, typename U> const vector<U>& corpus<T,U>::getWords() const {
@@ -1381,22 +1388,34 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     corpushl<T, U> cs(cstat[j]);
     for(int l = 0; l < idt.size(); l ++)
       cs += cstat[idt[l]];
-    result += U("<div>");
+    result += U("<form action=\"../../../../../puts.php\"><div>");
     result += to_string(work[jj].first) + U(" : ");
     result += U("<br/>");
     result += U("base : <a href=\"#") + name + to_string(j) + U("\">");
     result += to_string(j) + U("</a> - ");
     result += cs.reverseLink(cstat0[j]);
-    result += cs.serialize();
+    //result += cs.serialize();
+    U entry;
+    entry  += cstat0[j].getOrig();
     result += U("<br/>Show/Hide : <input class=\"gather\" type=\"checkbox\"><div class=\"gather\">");
     for(int l = 0; l < idt.size(); l ++) {
       result += U("<a href=\"#") + name + to_string(idt[l]) + U("\">");
       result += to_string(idt[l]) + U("</a> : ");
       result += to_string(cstats(j, idt[l])) + U(" - ");
       result += cs.reverseLink(cstat0[idt[l]]);
+      entry  += cstat0[idt[l]].getOrig();
       result += U("<br/>");
     }
-    result += U("</div></div><br/>");
+    result += U("</div></div>");
+    for(auto p = entry.find(U("\"")); (p = entry.find(U("\""), p)) && p != string::npos; ) {
+      entry.replace(entry.begin() + p, entry.begin() + p + 1, U("\%2f"));
+      p += U("\%2f").length();
+    }
+    result += U("<input type=\"hidden\" name=\"entry\" value=\"") + entry + U("\" />");
+    result += U("<input type=\"hidden\" name=\"name\" value=\"append\" />");
+    result += U("<input type=\"hidden\" name=\"adddict\" value=\"\" />");
+    result += U("<input type=\"submit\" value=\"Append\" />");
+    result += U("</form><br/>");
   }
   for(int i = 0; i < residue.size(); i ++) {
     const int& j(residue[i].second);
