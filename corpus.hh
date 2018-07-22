@@ -1388,7 +1388,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     corpushl<T, U> cs(cstat[j]);
     for(int l = 0; l < idt.size(); l ++)
       cs += cstat[idt[l]];
-    result += U("<form action=\"../../../../../puts.php\"><div>");
+    result += U("<form action=\"../../../../puts.php\"><div>");
     result += to_string(work[jj].first) + U(" : ");
     result += U("<br/>");
     result += U("base : <a href=\"#") + name + to_string(j) + U("\">");
@@ -1407,11 +1407,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
       result += U("<br/>");
     }
     result += U("</div></div>");
-    for(auto p = entry.find(U("\"")); (p = entry.find(U("\""), p)) && p != string::npos; ) {
-      entry.replace(entry.begin() + p, entry.begin() + p + 1, U("\%2f"));
-      p += U("\%2f").length();
-    }
-    result += U("<input type=\"hidden\" name=\"entry\" value=\"") + entry + U("\" />");
+    result += U("<textarea name=\"entry\">") + entry + U("</textarea>");
     result += U("<input type=\"hidden\" name=\"name\" value=\"append\" />");
     result += U("<input type=\"hidden\" name=\"adddict\" value=\"\" />");
     result += U("<input type=\"submit\" value=\"Append\" />");

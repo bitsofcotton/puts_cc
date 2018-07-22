@@ -16,6 +16,7 @@
     exec("mkdir " . $pathb . "dicts");
     exec("mkdir " . $pathb . "output");
     exec("mkdir " . $pathb . "web");
+    exec("mkdir " . $pathb . "web/sub");
     exec("mkdir " . $pathb . "crawl");
     exec("rm -f " . $pathb . "puts.core");
     if(!file_exists($pathb . "words.txt"))
