@@ -100,7 +100,7 @@ def writeSub(stra, f, flog):
 
 inurls = glob.glob(inbase)
 for addr in inurls:
-  lbase = os.path.dirname(addr) + "/web/" + datetime.datetime.now().strftime("%Y%m%d%H") + ".txt"
+  lbase = os.path.dirname(addr) + "/web/sub/" + datetime.datetime.now().strftime("%Y%m%d%H") + ".txt"
   rbase = os.path.dirname(addr) + "/webhash.txt"
   print lbase
   f     = open(addr, "r")
