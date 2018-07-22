@@ -1388,7 +1388,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     corpushl<T, U> cs(cstat[j]);
     for(int l = 0; l < idt.size(); l ++)
       cs += cstat[idt[l]];
-    result += U("<form action=\"../../../../puts.php\"><div>");
+    result += U("<form action=\"../../../../puts.php\" method=\"POST\"><div>");
     result += to_string(work[jj].first) + U(" : ");
     result += U("<br/>");
     result += U("base : <a href=\"#") + name + to_string(j) + U("\">");
