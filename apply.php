@@ -21,7 +21,7 @@ $cmd = $_REQUEST["cmd"];
 switch($cmd) {
 case "aa":
   if(mb_strlen($containt) < $M_STR) {
-    $pathb2 = '/output/' . hash("sha256", $containt) . "/";
+    $pathb2 = 'output/' . hash("sha256", $containt) . "/";
     exec("mkdir -p " . $pathb . $pathb2);
     file_put_contents($pathb . $pathb2 . "/orig.txt", $containt);
     exec("rm -f " . $pathb . $pathb2 . "/.lock");
