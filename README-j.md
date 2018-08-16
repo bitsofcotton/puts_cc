@@ -40,6 +40,8 @@ php ファイルと prep.py ファイルおよび tools 実行ファイルを(pu
 mysql 互換のデータベース環境および php 実行環境と、python 実行環境が必要です。
 また、諸処のコマンドのパスが設定されている必要があります。
 
+prep.py はとても古い python2.7 および \_mysql ライブラリを必要とします。
+
 # wiktionary のインポート (GFDL)
 mediawiki さんの最新バージョンと xml2sql さんが必要です。
 必要であれば莫大なデータベースである wikipedia さんの wiktionary をインポートしてください。
