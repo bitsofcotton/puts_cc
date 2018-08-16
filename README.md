@@ -18,6 +18,7 @@ This program uses large amount of region on the memory. And, very slow because o
     ./tools stat wordlist.txt dictionaries ... < data.txt
     ./tools reconstruct wordlist.txt < data.txt
     ./tools diff wordlist.txt -dict ... -dict2 ... < data.txt
+    ./tools nwordt wordlist.txt < data.txt
 
 # Contexts
 Inspired from morphological analysis softwares and parameter auto configuring algorithms' structure.   
@@ -33,6 +34,15 @@ Please pseudo-login with e-mail address - salt pair.
 
 # Example of using as a library
 Please refer tools.cc, and please include with namespace block but include guard should harms.
+
+# Example of using as web interface
+Please move to directory that php file and prep.py file and tools executable as puts executable.
+And please mkdir data directory as configured permissions.  
+And for normal use, mysql compatible database and php executable environment and python-mysql environment is needed.
+And, please configure the executable paths.
+
+# Importing wiktionary database (GFDL)
+We needs mediawiki and xml2sql softwares. And if you need, please import wiktionary huge database into your database to run with.
 
 # Tips
 These programs may have a algorithm that is *not carefully confirmed*.  
