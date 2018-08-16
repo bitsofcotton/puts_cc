@@ -18,7 +18,8 @@ function prepdicts($cwd, $txt, $text, $env) {
           "../../puts nwordt words.txt", $text, $cwd, $env);
   $f  = fopen($txt . "-prep.txt", "r");
   while(($buf = fgets($f)) !== false) {
-    doexecp($cwd . "/pdict/" . $buf, "/dev/null", "python ../../prep.py " . $buf,
+    doexecp($cwd . "/pdict/" . rtrim($buf), "/dev/null",
+            "python ../../prep.py " . rtrim($buf),
             "\n", $cwd, $env);
   }
   fclose($f);
