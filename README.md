@@ -41,6 +41,8 @@ And please mkdir data directory as configured permissions.
 And for normal use, mysql compatible database and php executable environment and python-mysql environment is needed.
 And, please configure the executable paths.
 
+prep.py needs legacy \_mysql library with python2.7, this can cause compatible problem, so then, please rewrite prep.py file.
+
 # Importing wiktionary database (GFDL)
 We needs mediawiki and xml2sql softwares. And if you need, please import wiktionary huge database into your database to run with.
 
