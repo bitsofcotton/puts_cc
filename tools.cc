@@ -9,7 +9,7 @@
 #include "file2eigen.hh"
 
 void usage() {
-  std::cout << "tools (lword|lbalance|corpus|toc|redig|stat|reconstruct|diff)" << std::endl;
+  std::cout << "tools (lword|lbalance|corpus|toc|redig|stat|reconstruct|diff|nwordt)" << std::endl;
 }
 
 const int szwindow(200);
@@ -89,6 +89,8 @@ int main(int argc, const char* argv[]) {
     mode = 14;
   else if(std::strcmp(argv[1], "findroot") == 0 && argc > 2)
     mode = 15;
+  else if(std::strcmp(argv[1], "nwordt") == 0 && argc > 2)
+    mode = 7;
   else {
     usage();
     return - 2;
@@ -187,6 +189,23 @@ int main(int argc, const char* argv[]) {
       for(int i = 0; i <= input.size() / szblock; i ++)
         std::cout << preparedTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.5), .125, mode == 12) << std::string("<hr/>") << std::endl;
       std::cout << std::string("</body></html>");
+    }
+    break;
+  case 7:
+    // nwordt
+    {
+      auto words(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
+      std::sort(words.begin(), words.end());
+      int lws(0);
+      for(int i = 0; i <= input.size() * 2 / szblock; i ++) {
+        corpus<double, std::string> lstat;
+        lstat.init(words, 0, 120);
+        lstat.compute(input.substr(i * szblock / 2, szblock), delimiter);
+        corpushl<double, std::string> work(lstat);
+        const auto lwords(work.reverseLink(work));
+        for(int j = 0; j < lwords.size(); j ++)
+          std::cout << lwords[j] << std::endl;
+      }
     }
     break;
   case 3:
