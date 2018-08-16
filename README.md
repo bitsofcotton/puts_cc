@@ -54,11 +54,6 @@ serialize function is needed to be the inverse of corpushl(corpus(...)) but now,
 This is from simply interest, so don't use this for the reason other than standing under the context.  
 If there's large numbers of the sets that correctly defined texts, it may optimizable out to get opposite side's claim, but this is only the what's able to be said, so this isn't what's the matter.  
 
-# Sample working methods
-Detect unknown words with lword command, and add words.txt by human or machine learning. Then, get rough block by stat command, and add to dictionary.
-
-However, the data we get with this method is only a technique collection, not the structure itself.
-
 # Another downloads
 * https://ja.osdn.net/projects/puts-cc/
 * https://www.sourceforge.net/projects/puts-cc/
