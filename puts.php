@@ -14,6 +14,7 @@
     exec("mkdir " . $pathb);
     exec("mkdir " . $pathb . "topics");
     exec("mkdir " . $pathb . "dicts");
+    exec("mkdir " . $pathb . "pdict");
     exec("mkdir " . $pathb . "output");
     exec("mkdir " . $pathb . "web");
     exec("mkdir " . $pathb . "web/sub");

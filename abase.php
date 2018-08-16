@@ -13,6 +13,17 @@ function doexecp($so, $se, $cmd, $text, $cwd, $env) {
   return;
 }
 
+function prepdicts($cwd, $txt, $text, $env) {
+  doexecp($txt . "-prep.txt", $txt . "-prep-err.txt",
+          "../../puts nwordt words.txt", $text, $cwd, $env);
+  $f  = fopen($txt . "-prep.txt", "r");
+  while(($buf = fgets($f)) !== false) {
+    doexecp($cwd . "/pdict/" . $buf, "/dev/null", "python ../../prep.py " . $buf,
+            "\n", $cwd, $env);
+  }
+  fclose($f);
+}
+
 function analyse($cwd, $pathb2, $do_stat) {
   echo $pathb2;
   $text = "";
@@ -38,12 +49,29 @@ function analyse($cwd, $pathb2, $do_stat) {
   doexecp($pathb2 . "-lack.html", $pathb2 . "-lack-error.txt",
           "../../puts lack words.txt " . $buf, $text, $cwd, $env);
   
+  doexecp("/dev/null", "/dev/null", "rm -f " . $cwd . "/pdict/*",
+          "\n", $cwd, $env);
+  prepdicts($cwd, $pathb2, $text, $env);
+  foreach (new DirectoryIterator($cwd . '/topics') as $fileInfo) {
+    if($fileInfo->isDot()) continue;
+    $ltext = "";
+    $lf = fopen($cwd . '/topics/' . $fileInfo->getFilename(), "r");
+    while(($buf = fgets($lf)) !== false)
+      $ltext .= $buf;
+    fclose($lf);
+    prepdicts($cwd, $pathb2, $ltext, $env);
+  }
   if($do_stat) {
     $buf = "";
     foreach (new DirectoryIterator($cwd . '/dicts') as $fileInfo) {
       if($fileInfo->isDot()) continue;
       $name = $fileInfo->getFilename();
       $buf .= "\"dicts/" . $name . "\" ";
+    }
+    foreach (new DirectoryIterator($cwd . '/pdict') as $fileInfo) {
+      if($fileInfo->isDot()) continue;
+      $name = $fileInfo->getFilename();
+      $buf .= "\"pdict/" . $name . "\" ";
     }
     doexecp($pathb2 . "-stat.html", $pathb2 . "-stat-error.txt",
             "../../puts stat words.txt " . $buf, $text, $cwd, $env);
