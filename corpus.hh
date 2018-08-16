@@ -109,7 +109,7 @@ template <typename T, typename U> corpus<T,U>::~corpus() {
 template <typename T, typename U> void corpus<T,U>::init(const vector<U>& words0, const int& nthresh, const int& Nthresh, const int& Mwords) {
   // this->orig    = U();
   this->words0  = words0;
-  // XXX: exauste of resources:
+  // XXX: exhaust of resources:
   sort(this->words0.begin(), this->words0.end());
   this->words0.erase(unique(this->words0.begin(), this->words0.end()), this->words0.end());
   // this->words   = vector<U>();
