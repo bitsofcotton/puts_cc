@@ -33,23 +33,6 @@ function analyse($cwd, $pathb2, $do_stat) {
     $text .= $buf;
   fclose($file);
   
-  $buf = "";
-  foreach (new DirectoryIterator($cwd . '/dicts') as $fileInfo) {
-    if($fileInfo->isDot()) continue;
-    $name = $fileInfo->getFilename();
-    $buf .= "\"dicts/" . $name . "\" ";
-  }
-  $buf .= " -toc ";
-  foreach (new DirectoryIterator($cwd . '/topics') as $fileInfo) {
-    if($fileInfo->isDot()) continue;
-    $name = $fileInfo->getFilename();
-    $buf .= "\"topics/" . $name . "\" ";
-  }
-  doexecp($pathb2 . "-detail.html", $pathb2 . "-detail-error.txt",
-          "../../puts toc words.txt " . $buf, $text, $cwd, $env);
-  doexecp($pathb2 . "-lack.html", $pathb2 . "-lack-error.txt",
-          "../../puts lack words.txt " . $buf, $text, $cwd, $env);
-  
   doexecp("/dev/null", "/dev/null", "rm -f " . $cwd . "/pdict/*",
           "\n", $cwd, $env);
   prepdicts($cwd, $pathb2, $text, $env);
@@ -62,6 +45,29 @@ function analyse($cwd, $pathb2, $do_stat) {
     fclose($lf);
     prepdicts($cwd, $pathb2, $ltext, $env);
   }
+  
+  $buf = "";
+  foreach (new DirectoryIterator($cwd . '/dicts') as $fileInfo) {
+    if($fileInfo->isDot()) continue;
+    $name = $fileInfo->getFilename();
+    $buf .= "\"dicts/" . $name . "\" ";
+  }
+  foreach (new DirectoryIterator($cwd . '/pdict') as $fileInfo) {
+    if($fileInfo->isDot()) continue;
+    $name = $fileInfo->getFilename();
+    $buf .= "\"pdict/" . $name . "\" ";
+  }
+  $buf .= " -toc ";
+  foreach (new DirectoryIterator($cwd . '/topics') as $fileInfo) {
+    if($fileInfo->isDot()) continue;
+    $name = $fileInfo->getFilename();
+    $buf .= "\"topics/" . $name . "\" ";
+  }
+  doexecp($pathb2 . "-detail.html", $pathb2 . "-detail-error.txt",
+          "../../puts toc words.txt " . $buf, $text, $cwd, $env);
+  doexecp($pathb2 . "-lack.html", $pathb2 . "-lack-error.txt",
+          "../../puts lack words.txt " . $buf, $text, $cwd, $env);
+  
   if($do_stat) {
     $buf = "";
     foreach (new DirectoryIterator($cwd . '/dicts') as $fileInfo) {
@@ -101,11 +107,21 @@ function analyse($cwd, $pathb2, $do_stat) {
         $name = $fileInfo->getFilename();
         $buf .= "\"dicts/" . $name . "\" ";
       }
+      foreach (new DirectoryIterator($cwd . '/pdict') as $fileInfo) {
+        if($fileInfo->isDot()) continue;
+        $name = $fileInfo->getFilename();
+        $buf .= "\"pdict/" . $name . "\" ";
+      }
       $buf .= " -dict2 ";
       foreach (new DirectoryIterator($cwd . '/' . $pathc . '/dicts') as $fileInfo) {
         if($fileInfo->isDot()) continue;
         $name = $fileInfo->getFilename();
         $buf .= "\"" . $pathc . "/dicts/" . $name . "\" ";
+      }
+      foreach (new DirectoryIterator($cwd . '/pdict') as $fileInfo) {
+        if($fileInfo->isDot()) continue;
+        $name = $fileInfo->getFilename();
+        $buf .= "\"pdict/" . $name . "\" ";
       }
       doexecp($pathb2 . $df . "diff.html", $pathb2 . $df . "diff-error.txt",
           "../../puts diff words.txt " . $buf, $text, $cwd, $env);
