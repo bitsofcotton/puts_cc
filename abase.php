@@ -17,9 +17,11 @@ function prepdicts($cwd, $txt, $text, $env) {
   doexecp($txt . "-prep.txt", $txt . "-prep-err.txt",
           "../../puts nwordt words.txt", $text, $cwd, $env);
   $f  = fopen($txt . "-prep.txt", "r");
+  $escape = array("\\", "\$", "{", "}", "(", ")", "\'", "\"", "/");
   while(($buf = fgets($f)) !== false) {
-    doexecp($cwd . "/pdict/" . rtrim($buf), "/dev/null",
-            "python ../../prep.py " . rtrim($buf),
+    doexecp($cwd . "/pdict/" . str_replace($escape, "", rtrim($buf)),
+            "/dev/null",
+            "python ../../prep.py " . str_replace($escape, "", rtrim($buf)),
             "\n", $cwd, $env);
   }
   fclose($f);
