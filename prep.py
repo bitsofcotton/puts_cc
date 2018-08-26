@@ -11,11 +11,11 @@ import MySQLdb
 conn = MySQLdb.connect(user='root', passwd='', host='localhost', db='wiktionary', charset='utf8')
 cur  = conn.cursor()
 cur.execute("select page_latest from page where page_title=%s", [sys.argv[1]])
-res   = ""
+res  = ""
 for s in range(0, 20):
   try:
     conn2 = MySQLdb.connect(user='root', passwd='', host='localhost', db='wiktionary', charset='utf8')
-    cur2  = conn2.cursor()
+    cur2 = conn2.cursor()
     work = cur.fetchone()[0]
     cur2.execute("select old_text from text where old_id=%s", [work])
     res += cur2.fetchone()[0]
