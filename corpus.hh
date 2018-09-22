@@ -939,28 +939,36 @@ template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::reDig(const T&
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::simpleThresh(const T& ratio) const {
   const T thisabsmax(absmax());
   vector<int> okidx;
-  for(int i = 0; i < words.size(); i ++) {
-    for(int j = 0; j < words.size(); j ++)
-      for(int k = 0; k < words.size(); k ++)
-        if(ratio * thisabsmax < abs(const_cast<const Tensor&>(corpust)[i][j][k]) ||
-           ratio * thisabsmax < abs(const_cast<const Tensor&>(corpust)[j][i][k]) ||
-           ratio * thisabsmax < abs(const_cast<const Tensor&>(corpust)[j][k][i])) {
-          okidx.push_back(i);
-          goto next;
+  const auto& ci0(corpust.iter());
+  for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
+    const auto& ii(itr0->first);
+    const auto& ci1(itr0->second.iter());
+    for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
+      const auto& jj(itr1->first);
+      const auto& ci2(itr1->second.iter());
+      for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
+        const auto& kk(itr2->first);
+        if(ratio * thisabsmax < abs(itr2->second)) {
+          okidx.push_back(ii);
+          okidx.push_back(jj);
+          okidx.push_back(kk);
         }
-   next:
-    ;
+      }
+    }
   }
+  sort(okidx.begin(), okidx.end());
+  okidx.erase(unique(okidx.begin(), okidx.end()), okidx.end());
   corpushl<T, U> result;
   result.words   = vector<U>();
   result.corpust = Tensor();
   for(int i = 0; i < okidx.size(); i ++) {
     result.words.push_back(words[okidx[i]]);
-    for(int j = 0; j < okidx.size(); j ++)
-      if(const_cast<const Tensor&>(corpust)[okidx[i]][okidx[j]].iter().size())
-        for(int k = 0; k < okidx.size(); k ++)
-          if(ratio * thisabsmax < abs(const_cast<const Tensor&>(corpust)[okidx[i]][okidx[j]][okidx[k]]))
-            result.corpust[i][j][k] = corpust[okidx[i]][okidx[j]][okidx[k]];
+    if(const_cast<const Tensor&>(corpust)[okidx[i]].iter().size())
+      for(int j = 0; j < okidx.size(); j ++)
+        if(const_cast<const Tensor&>(corpust)[okidx[i]][okidx[j]].iter().size())
+          for(int k = 0; k < okidx.size(); k ++)
+            if(ratio * thisabsmax < abs(const_cast<const Tensor&>(corpust)[okidx[i]][okidx[j]][okidx[k]]))
+              result.corpust[i][j][k] = corpust[okidx[i]][okidx[j]][okidx[k]];
   }
   return result;
 }
@@ -1183,7 +1191,7 @@ template <typename T, typename U> void getAbbreved(vector<corpushl<T, U> >& csta
   return;
 }
 
-template <typename T, typename U> vector<U> getDetailed(const U& name, vector<corpus<T, U> >& cstat0, vector<corpushl<T, U> >& cstat, const U& input, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow) {
+template <typename T, typename U> vector<U> getDetailed(const U& name, vector<corpus<T, U> >& cstat0, vector<corpushl<T, U> >& cstat, const U& input, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const T& thresh) {
   assert(detailtitle.size() == detail.size());
   cerr << " getDetailed";
   cstat0 = vector<corpus<T, U> >();
@@ -1194,7 +1202,7 @@ template <typename T, typename U> vector<U> getDetailed(const U& name, vector<co
     lstat.init(words, 0, 120);
     lstat.compute(input.substr(i * szwindow / 2, szwindow), delimiter);
     cstat0.push_back(lstat);
-    cstat.push_back(corpushl<T, U>(lstat));
+    cstat.push_back(corpushl<T, U>(lstat).simpleThresh(thresh));
     U tagged(U("<span id=\"") + name + to_string(i) + U("\">"));
     tagged += cstat[i].reverseLink(cstat0[i]);
     tagged += U("</span><br/>");
@@ -1207,6 +1215,7 @@ template <typename T, typename U> vector<U> getDetailed(const U& name, vector<co
       lstat.init(words, 0, 120);
       lstat.compute(detail[i].substr(j * szwindow / 2, szwindow), delimiter);
       corpushl<T, U> work(lstat);
+      work = work.simpleThresh(thresh);
       for(int k = 0; k < cstat0.size(); k ++)
         cstat[k] = cstat[k].withDetail(detailtitle[i], work);
     }
@@ -1215,14 +1224,14 @@ template <typename T, typename U> vector<U> getDetailed(const U& name, vector<co
   return result;
 }
 
-template <typename T, typename U> U preparedTOC(const U& input, const U& name, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& topictitle, const vector<U>& topics, const vector<U>& delimiter, const int& szwindow, const T& thresh, const T& redig = T(1), const bool& reverse = false) {
+template <typename T, typename U> U preparedTOC(const U& input, const U& name, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& topictitle, const vector<U>& topics, const vector<U>& delimiter, const int& szwindow, const T& thresh, const T& threshin, const T& redig = T(1), const bool& reverse = false) {
   cerr << "preparedToc: parsing input" << endl;
   assert(detailtitle.size() == detail.size());
   assert(topictitle.size()  == topics.size());
   
   vector<corpus<T, U> >   cstat0;
   vector<corpushl<T, U> > cstat;
-  const auto tagged(getDetailed<T, U>(name, cstat0, cstat, input, words, detailtitle, detail, delimiter, szwindow));
+  const auto tagged(getDetailed<T, U>(name, cstat0, cstat, input, words, detailtitle, detail, delimiter, szwindow, threshin));
   for(int i = 0; i < cstat0.size(); i ++)
     cstat[i].reDig(redig);
   
@@ -1236,7 +1245,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
     cerr << "." << flush;
     vector<corpus<T, U> >   tstat0;
     vector<corpushl<T, U> > tstat;
-    getDetailed<T, U>(name, tstat0, tstat, topics[i], words, detailtitle, detail, delimiter, szwindow);
+    getDetailed<T, U>(name, tstat0, tstat, topics[i], words, detailtitle, detail, delimiter, szwindow, threshin);
     vector<pair<T, pair<int, int> > > scores;
     for(int j = 0; j < tstat.size(); j ++)
       for(int k = 0; k < cstat.size(); k ++)
@@ -1287,11 +1296,11 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
   return result;
 }
 
-template <typename T, typename U> U optimizeTOC(const U& input, const U& name, const vector<U>& words, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const int& szwindow, const int& depth, const T& redig = T(1), const bool& countnum = false) {
+template <typename T, typename U> U optimizeTOC(const U& input, const U& name, const vector<U>& words, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const int& szwindow, const int& depth, const T& threshin, const T& redig = T(1), const bool& countnum = false) {
   cerr << "optimizeToc: parsing input" << endl;
   vector<corpus<T, U> >   cstat0;
   vector<corpushl<T, U> > cstat;
-  const auto tagged(getDetailed<T, U>(name, cstat0, cstat, input, words, detailtitle, detail, delimiter, szwindow));
+  const auto tagged(getDetailed<T, U>(name, cstat0, cstat, input, words, detailtitle, detail, delimiter, szwindow, threshin));
   for(int i = 0; i < cstat.size(); i ++)
     cstat[i].reDig(redig);
   
@@ -1432,14 +1441,14 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
   return result;
 }
 
-template <typename T, typename U> U diff(const U& input, const U& name, const vector<U>& words, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const int& depth = T(20), const T& redig = T(1)) {
+template <typename T, typename U> U diff(const U& input, const U& name, const vector<U>& words, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const T& threshin, const int& depth = T(20), const T& redig = T(1)) {
   cerr << "Diff: preparing inputs..." << endl;
   vector<corpus<T, U> >   cstat0;
   vector<corpus<T, U> >   dstat0;
   vector<corpushl<T, U> > cstat;
   vector<corpushl<T, U> > dstat;
-  getDetailed<T, U>(name, cstat0, cstat, input, words, detailtitle0, detail0, delimiter, szwindow);
-  getDetailed<T, U>(name, dstat0, dstat, input, words, detailtitle1, detail1, delimiter, szwindow);
+  getDetailed<T, U>(name, cstat0, cstat, input, words, detailtitle0, detail0, delimiter, szwindow, threshin);
+  getDetailed<T, U>(name, dstat0, dstat, input, words, detailtitle1, detail1, delimiter, szwindow, threshin);
   
   cerr << " making diffs" << endl;
   U result;
