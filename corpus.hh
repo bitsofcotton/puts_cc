@@ -1217,7 +1217,7 @@ template <typename T, typename U> vector<U> getDetailed(const U& name, vector<co
       corpushl<T, U> work(lstat);
       work = work.simpleThresh(thresh);
       for(int k = 0; k < cstat0.size(); k ++)
-        cstat[k] = cstat[k].withDetail(detailtitle[i], work);
+        cstat[k] = cstat[k].withDetail(detailtitle[i], work).simpleThresh(thresh);
     }
   }
   cerr << endl;
