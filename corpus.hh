@@ -279,8 +279,10 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
     return;
   for(int i = 0; i < words.size(); i ++) {
     cerr << "." << flush;
+    if(!ptrs[i].size())
+      continue;
     for(int j = 0; j < words.size(); j ++) {
-      if(!ptrs[i].size() || !ptrs[j].size())
+      if(!ptrs[j].size())
         continue;
       for(int k = 0; k < words.size(); k ++) {
         // XXX checkme:
@@ -297,16 +299,17 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
           ctru --;
           if(ctru < 0) ctru = 0;
           if(ctru <= bctru) break;
+          bctru = ctru;
           while(ctrv < ptrs[j].size() && ptrs[j][ctrv] < *itr) ctrv ++;
           if(ptrs[j].size() <= ctrv || *itr < ptrs[j][ctrv])
             break;
           for( ; kk < pdelim.size() - 1; kk ++)
-            if(pdelim[kk] <= *itr && *itr <= pdelim[kk + 1])
+            if(pdelim[kk] <= *itr && *itr < pdelim[kk + 1])
               break;
-          if(! (pdelim[kk] <= ptrs[i][ctru] &&
-                              ptrs[i][ctru] <= pdelim[kk + 1] &&
+          if(! (pdelim[max(0, kk - 1)] <= ptrs[i][ctru] &&
+                                          ptrs[i][ctru] <= pdelim[kk + 1] &&
                 pdelim[kk] <= ptrs[j][ctrv] &&
-                              ptrs[j][ctrv] <= pdelim[kk + 1]) )
+                              ptrs[j][ctrv] <= pdelim[min(kk + 2, int(pdelim.size() - 1))]) )
             continue;
           // XXX configure me:
           const T buf0(log(T(abs(*itr + .5 - ptrs[i][ctru])) * T(2) * exp(T(1))));
