@@ -22,7 +22,7 @@ function prepdicts($cwd, $txt, $text, $env) {
             "python ../../prep.py " . basename(chop($buf)),
             "\n", $cwd, $env);
   }
-  doexecp("/dev/null", "/dev/null", "find " . $cwd . "/pdict/ -empty | xargs rm", "\n", $cwd, $env);
+  doexecp("/dev/null", "/dev/null", "sh -c \'find pdict/ -empty | xargs rm\'", "\n", $cwd, $env);
   fclose($f);
 }
 
@@ -34,7 +34,7 @@ function analyse($cwd, $pathb2, $do_stat) {
     $text .= $buf;
   fclose($file);
   
-  doexecp("/dev/null", "/dev/null", "rm -f " . $cwd . "/pdict/*",
+  doexecp("/dev/null", "/dev/null", "rm -f pdict/*",
           "\n", $cwd, $env);
   prepdicts($cwd, $pathb2, $text, $env);
   foreach (new DirectoryIterator($cwd . '/topics') as $fileInfo) {
