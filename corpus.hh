@@ -300,16 +300,19 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
           if(ctru < 0) ctru = 0;
           if(ctru <= bctru) break;
           bctru = ctru;
+          assert(0 <= ctru && ctru < ptrs[i].size());
           while(ctrv < ptrs[j].size() && ptrs[j][ctrv] < *itr) ctrv ++;
           if(ptrs[j].size() <= ctrv || *itr < ptrs[j][ctrv])
             break;
+          assert(0 <= ctrv && ctrv < ptrs[j].size());
           for( ; kk < pdelim.size() - 1; kk ++)
             if(pdelim[kk] <= *itr && *itr < pdelim[kk + 1])
               break;
+          assert(0 <= kk && kk < pdelim.size());
           if(ptrs[i][ctru] < pdelim[kk] ||
-             ptrs[j][ctru] < pdelim[kk] ||
-                             pdelim[kk + 1] < ptrs[i][ctru] ||
-                             pdelim[kk + 1] < ptrs[j][ctru])
+             ptrs[j][ctrv] < pdelim[kk] ||
+               pdelim[min(kk + 1, int(pdelim.size() - 1))] <= ptrs[i][ctru] ||
+               pdelim[min(kk + 1, int(pdelim.size() - 1))] <= ptrs[j][ctrv])
             continue;
           // XXX configure me:
           const T buf0(log(T(abs(*itr + .5 - ptrs[i][ctru])) * T(2) * exp(T(1))));
