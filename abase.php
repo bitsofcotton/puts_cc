@@ -22,7 +22,7 @@ function prepdicts($cwd, $txt, $text, $env) {
             "python ../../prep.py " . basename(chop($buf)),
             "\n", $cwd, $env);
   }
-  doexecp("/dev/null", "/dev/null", "sh -c \'find pdict/ -empty | xargs rm\'", "\n", $cwd, $env);
+  doexecp("/dev/null", "/dev/null", "sh -c 'find pdict/ -empty | xargs rm'", "\n", $cwd, $env);
   fclose($f);
 }
 
