@@ -306,10 +306,10 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
           for( ; kk < pdelim.size() - 1; kk ++)
             if(pdelim[kk] <= *itr && *itr < pdelim[kk + 1])
               break;
-          if(! (pdelim[max(0, kk - 1)] <= ptrs[i][ctru] &&
-                                          ptrs[i][ctru] <= pdelim[kk + 1] &&
-                pdelim[kk] <= ptrs[j][ctrv] &&
-                              ptrs[j][ctrv] <= pdelim[min(kk + 2, int(pdelim.size() - 1))]) )
+          if(ptrs[i][ctru] < pdelim[kk] ||
+             ptrs[j][ctru] < pdelim[kk] ||
+                             pdelim[kk + 1] < ptrs[i][ctru] ||
+                             pdelim[kk + 1] < ptrs[j][ctru])
             continue;
           // XXX configure me:
           const T buf0(log(T(abs(*itr + .5 - ptrs[i][ctru])) * T(2) * exp(T(1))));
@@ -1456,8 +1456,10 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
   cerr << " making diffs" << endl;
   U result;
   // N.B. cross dictionary difference.
+/*
   getAbbreved<T, U>(cstat, words, detailtitle1, detail1, delimiter, szwindow);
   getAbbreved<T, U>(dstat, words, detailtitle0, detail0, delimiter, szwindow);
+*/
   vector<pair<T, int> > scores;
   for(int i = 0; i < cstat.size(); i ++) {
     cstat[i].reDig(redig);
