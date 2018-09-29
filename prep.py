@@ -20,6 +20,6 @@ for s in range(0, 20):
     cur2.execute("select old_text from text where old_id=%s", [work])
     res += cur2.fetchone()[0]
   except:
-    break
+    exit(0)
 print res
 
