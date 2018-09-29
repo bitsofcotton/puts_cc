@@ -21,5 +21,5 @@ for s in range(0, 20):
     res += cur2.fetchone()[0]
   except:
     exit(0)
-print res
+print res.strip, 
 
