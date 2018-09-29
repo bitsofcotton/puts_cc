@@ -18,8 +18,8 @@ function prepdicts($cwd, $txt, $text, $env) {
           "../../puts nwordt words.txt", $text, $cwd, $env);
   $f  = fopen($txt . "-prep.txt", "r");
   while(($buf = fgets($f)) !== false) {
-    doexecp($cwd . "/pdict/" . basename($buf), "/dev/null",
-            "python ../../prep.py " . basename($buf),
+    doexecp($cwd . "/pdict/" . basename(chop($buf)), "/dev/null",
+            "python ../../prep.py " . basename(chop($buf)),
             "\n", $cwd, $env);
   }
   doexecp("/dev/null", "/dev/null", "find " . $cwd . "/pdict/ -empty | xargs rm", "\n", $cwd, $env);
