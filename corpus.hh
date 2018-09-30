@@ -420,6 +420,7 @@ template <typename T, typename U> corpushl<T,U>::corpushl(corpushl<T, U>&& obj) 
   *this = obj;
 }
 
+// XXX also cut the meanings.
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::cutCast(const vector<U>& words) const {
   corpushl<T, U> result;
   vector<int>    ridx0;
@@ -466,8 +467,11 @@ template <typename T, typename U> bool corpushl<T, U>::operator == (const corpus
 }
 
 template <typename T, typename U> bool corpushl<T, U>::operator != (const corpushl<T, U>& other) const {
-  // XXX: imcomplete.
-  return words != other.words || corpust != other.corpust;
+  auto wwords(words);
+  auto wowords(other.words);
+  sort(wwords.begin(),  wwords.end());
+  sort(wowords.begin(), wowords.end());
+  return wwords != wowords || corpust != other.corpust;
 }
 
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator += (const corpushl<T, U>& other) {
@@ -553,13 +557,13 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator / (con
 }
 
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(const U& word, const corpushl<T, U>& other, const T& thresh) const {
-  if(words.size() <= 0 || other.words.size() <= 0)
+  if(words.size() <= 2 || other.words.size() <= 2)
     return *this;
   const auto itr(find(words.begin(), words.end(), word));
   const int  fidx(distance(words.begin(), itr));
   if(!(0 <= fidx && fidx < words.size() && *itr == word))
     return *this;
-  cerr << "withDetail : " << word << ": " << endl;
+  cerr << "withDetail : " << word << endl;
   vector<int> ridx0, ridx1;
   corpushl<T, U> result;
   result.words = gatherWords(words, other.words, ridx0, ridx1);
@@ -706,6 +710,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::conflictP
 
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::wordChange(const vector<U>& dst, const vector<U>& src) {
   assert(dst.size() == src.size());
+  cerr << "confirm me: it often destroys or ignores the context itself. Please use carefully. i.e. with prej functions..." << endl;
   for(int i = 0; i < src.size(); i ++) {
     const auto itr(find(words.begin(), words.end(), src[i]));
     if(words.begin() <= itr && itr < words.end() && *itr == src[i]) {
@@ -813,7 +818,7 @@ template <typename T, typename U> U corpushl<T, U>::serializeSub(const vector<in
 }
 
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U& word, const corpushl<T, U>& work, const T& thresh) const {
-  if(words.size() <= 0 || work.words.size() <= 0)
+  if(words.size() <= 2 || work.words.size() <= 2)
     return *this;
   const T tn(     cdot(work));
   const T td(work.cdot(work));
@@ -1459,10 +1464,8 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
   cerr << " making diffs" << endl;
   U result;
   // N.B. cross dictionary difference.
-/*
   getAbbreved<T, U>(cstat, words, detailtitle1, detail1, delimiter, szwindow);
   getAbbreved<T, U>(dstat, words, detailtitle0, detail0, delimiter, szwindow);
-*/
   vector<pair<T, int> > scores;
   for(int i = 0; i < cstat.size(); i ++) {
     cstat[i].reDig(redig);
