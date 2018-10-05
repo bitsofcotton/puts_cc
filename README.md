@@ -3,7 +3,7 @@ Cluster large documents from small elementary document sets and collect a TOC an
 And this program is implemented with a deterministic way.
 
 This IS NOT the program that judges it is true or false, this IS ONLY the program that seines
-the score that seems to be true or that seems to be false FROM INPUT (with no deductions for logics).
+the score that seems to be true or that seems to be false FROM INPUT (with NO deductions for logics).
 
 This program uses large amount of region on the memory. And, very slow because of the scans on large regions.
 
@@ -60,3 +60,6 @@ If there's large numbers of the sets that correctly defined texts, it may optimi
 * https://ja.osdn.net/projects/puts-cc/
 * https://www.sourceforge.net/projects/puts-cc/
 * https://files.limpid-intensity.info/
+
+# The things undone
+If we use similar things with leafs as a measure, middle of the table as a relation, and with morphological analysis, we might get better results and low memory condition, but there's NO implementation here. So that isn't needed by making TOCs.
