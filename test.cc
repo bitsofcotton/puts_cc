@@ -2,11 +2,24 @@
 #include <iterator>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <locale>
 #include <codecvt>
+#include <cstdio>
+#include <cstring>
+#include <algorithm>
+#include <vector>
+#include <map>
+#include <utility>
+#include <Eigen/Core>
+#include <Eigen/SVD>
+
+namespace corpus {
 #include "lword.hh"
 #include "corpus.hh"
 #include "file2eigen.hh"
+};
+using namespace corpus;
 
 void usage() {
   std::cout << "tools (lword|lbalance|corpus|toc|redig|stat|reconstruct|diff)" << std::endl;

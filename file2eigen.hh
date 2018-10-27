@@ -13,11 +13,6 @@
 
 #if !defined(_FILE2EIGEN_)
 
-#include <Eigen/Core>
-#include <iostream>
-#include <fstream>
-#include <sstream>
-
 using std::istream;
 using std::ostream;
 using std::vector;

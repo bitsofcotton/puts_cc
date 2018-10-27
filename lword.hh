@@ -12,13 +12,6 @@
  */
 #if !defined(_LWORD_)
 
-#include <cstdio>
-#include <algorithm>
-#include <vector>
-#include <map>
-#include <iostream>
-#include <cstring>
-
 #include "corpus.hh"
 
 using std::vector;
