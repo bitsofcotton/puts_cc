@@ -14,11 +14,6 @@
 
 #if !defined(_SPARSE_TENSOR_)
 
-#include <cstdio>
-#include <vector>
-#include <utility>
-#include <map>
-
 using std::cout;
 using std::cerr;
 using std::endl;

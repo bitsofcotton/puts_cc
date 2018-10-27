@@ -12,13 +12,6 @@
  */
 #if !defined(_CORPUS_)
 
-#include <cstdio>
-#include <cstring>
-#include <vector>
-#include <iterator>
-#include <iostream>
-#include <Eigen/Core>
-#include <Eigen/SVD>
 #include "sparse.hh"
 
 using std::cerr;
