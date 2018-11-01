@@ -1,3 +1,7 @@
+#include <Eigen/Core>
+#include <Eigen/SVD>
+#include <cstdio>
+#include <cstring>
 #include <string>
 #include <iterator>
 #include <iostream>
@@ -5,14 +9,10 @@
 #include <sstream>
 #include <locale>
 #include <codecvt>
-#include <cstdio>
-#include <cstring>
 #include <algorithm>
 #include <vector>
 #include <map>
 #include <utility>
-#include <Eigen/Core>
-#include <Eigen/SVD>
 
 namespace corpus {
 #include "lword.hh"
@@ -22,11 +22,11 @@ namespace corpus {
 using namespace corpus;
 
 void usage() {
-  std::cout << "tools (lword|lbalance|corpus|toc|redig|stat|reconstruct|diff|nwordt)" << std::endl;
+  std::cout << "tools (lword|lbalance|corpus|toc|redig|stat|reconstruct|diff)" << std::endl;
 }
 
 const int szwindow(200);
-const int szblock(16000);
+const int szblock(8000);
 const int Mbalance(40);
 const double threshin(.01);
 std::vector<std::string> delimiter;
@@ -59,78 +59,37 @@ std::pair<std::string, std::string> loadbuf(const char* filename) {
 }
 
 int main(int argc, const char* argv[]) {
+  if(argc < 3) {
+    usage();
+    return - 2;
+  }
   delimiter.push_back(string("."));
   delimiter.push_back(string(","));
   delimiter.push_back(string("\'"));
   delimiter.push_back(string("\""));
+  delimiter.push_back(string("。"));
+  delimiter.push_back(string("、"));
+  delimiter.push_back(string("「"));
+  delimiter.push_back(string("」"));
+  delimiter.push_back(string("("));
+  delimiter.push_back(string(")"));
   csvelim.push_back(string(" "));
   csvelim.push_back(string("\t"));
   csvdelim.push_back(string(","));
   csvdelim.push_back(string("\r"));
   csvdelim.push_back(string("\n"));
-  int mode = - 1;
-  if(argc < 2) {
-    usage();
-    return - 1;
-  }
-  if(std::strcmp(argv[1], "lword") == 0)
-    mode = 0;
-  else if(std::strcmp(argv[1], "lbalance") == 0 && argc > 2)
-    mode = 8;
-  else if(std::strcmp(argv[1], "corpus") == 0 && argc > 2)
-    mode = 1;
-  else if(std::strcmp(argv[1], "toc") == 0 && argc > 2)
-    mode = 2;
-  else if(std::strcmp(argv[1], "redig") == 0 && argc > 2)
-    mode = 4;
-  else if(std::strcmp(argv[1], "stat") == 0 && argc > 2)
-    mode = 6;
-  else if(std::strcmp(argv[1], "reconstruct") == 0 && argc > 2)
-    mode = 3;
-  else if(std::strcmp(argv[1], "diff") == 0 && argc > 2)
-    mode = 5;
-  else if(std::strcmp(argv[1], "optdict") == 0 && argc > 2)
-    mode = 9;
-  else if(std::strcmp(argv[1], "conflict") == 0 && argc > 2)
-    mode = 10;
-  else if(std::strcmp(argv[1], "negate") == 0 && argc > 2)
-    mode = 11;
-  else if(std::strcmp(argv[1], "lack") == 0 && argc > 2)
-    mode = 12;
-  else if(std::strcmp(argv[1], "consistency") == 0 && argc > 2)
-    mode = 13;
-  else if(std::strcmp(argv[1], "logiccheck") == 0 && argc > 2)
-    mode = 14;
-  else if(std::strcmp(argv[1], "findroot") == 0 && argc > 2)
-    mode = 15;
-  else if(std::strcmp(argv[1], "nwordt") == 0 && argc > 2)
-    mode = 7;
-  else {
-    usage();
-    return - 2;
-  }
-  std::string buf;
-  std::string input;
-  while(getline(std::cin, buf)) {
-    input += buf + std::string("\n");
-    if(std::cin.eof() || std::cin.bad())
-      break;
-  }
-  switch(mode) {
-  case 0:
-    // lword
-    {
-      if(2 <= argc) {
-        auto elimlist(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
-        elimlist.insert(elimlist.end(), csvelim.begin(), csvelim.end());
-        elimlist.push_back(std::string("\r"));
-        elimlist.push_back(std::string("\n"));
-        input = cutText(input, elimlist, vector<std::string>())[0];
-        std::cerr << input << std::endl;
-      }
-      lword<char32_t, std::u32string> stat;
-      std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
-      std::u32string itrans(converter.from_bytes(input));
+        auto csv(cutText(loadbuf(argv[2]).second, csvelim, csvdelim, true));
+  std::string input, line;
+  while(std::getline(std::cin, line))
+    input += line + std::string("\n");
+  if(std::strcmp(argv[1], "lword") == 0) {
+    csv.insert(csv.end(), csvelim.begin(),  csvelim.end());
+    csv.insert(csv.end(), csvdelim.begin(), csvdelim.end());
+    const auto inputs(cutText(input, csv, csv));
+    lword<char32_t, std::u32string> stat;
+    std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
+    for(int j = 0; j < inputs.size(); j ++) {
+      std::u32string itrans(converter.from_bytes(inputs[j]));
       for(int i0 = 0; i0 <= input.size() / szblock; i0 ++)
         for(int i = 2; i < 20; i ++) {
           stat.init(60, i, i);
@@ -142,203 +101,120 @@ int main(int argc, const char* argv[]) {
             }
         }
     }
-    break;
-  case 8:
-    // lbalance.
-    {
-      std::string workbuf;
-      if(2 < argc)
-        workbuf = loadbuf(argv[2]).second;
-      auto elims(csvelim);
-      elims.insert(elims.end(), csvdelim.begin(), csvdelim.end());
-      auto inputs(cutText(input, elims, delimiter));
-      auto idxs(pseudoWordsBalance<double, std::string>(inputs, cutText(workbuf, csvelim, csvdelim), Mbalance));
-      std::cout << idxs.size() << "sets." << std::endl;
-      for(int i = 0; i < idxs.size(); i ++)
-        std::cout << inputs[idxs[i]] << std::endl;
+  } else if(std::strcmp(argv[1], "lbalance") == 0) {
+    const auto idxs(pseudoWordsBalance<double, std::string>(cutText(input, csv, delimiter), delimiter, Mbalance));
+    std::cout << idxs.size() << "sets." << std::endl;
+    for(int i = 0; i < idxs.size(); i ++)
+      std::cout << input[idxs[i]] << std::endl;
+  } else if(std::strcmp(argv[1], "corpus") == 0) {
+    corpus<double, std::string> stat;
+    for(int i = 0; i < input.size() / szwindow + 1; i ++) {
+      stat.init(csv, 0, 120);
+      const auto& words(stat.getWords());
+      stat.compute(input.substr(i * szwindow, szwindow), delimiter);
+      const auto& corpus(stat.getCorpus());
+      std::cout << words  << std::endl;
+      // std::cout << corpus << std::endl;
     }
-    break;
-  case 1:
-    // corpus
-    {
-      corpus<double, std::string> stat;
-      const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
+  } else if(std::strcmp(argv[1], "toc") == 0 ||
+            std::strcmp(argv[1], "lack") == 0) {
+    std::vector<std::string> details;
+    std::vector<std::string> tocs;
+    std::vector<std::string> detailwords;
+    std::vector<std::string> tocwords;
+    bool toc(false);
+    for(int iidx = 3; iidx < argc; iidx ++) {
+      if(std::string(argv[iidx]) == std::string("-toc")) {
+        toc = true;
+        continue;
+      }
+      const auto work(loadbuf(argv[iidx]));
+      if(toc) {
+        tocs.push_back(work.second);
+        tocwords.push_back(work.first);
+      } else {
+        details.push_back(work.second);
+        detailwords.push_back(work.first);
+      }
+    }
+    std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
+    std::cout << std::string("<body>");
+    for(int i = 0; i <= input.size() / szblock; i ++)
+      std::cout << preparedTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), csv, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.125), threshin, .125, std::strcmp(argv[1], "lack") == 0) << std::string("<hr/>") << std::endl;
+    std::cout << std::string("</body></html>");
+  } else if(std::strcmp(argv[1], "reconstruct") == 0) { 
+    corpus<double, std::string> stat;
+    stat.init(csv, 0, 120);
+    stat.compute(input, delimiter);
+    corpushl<double, std::string> recons(stat);
+    std::cout << recons.serialize();
+  } else if(std::strcmp(argv[1], "redig") == 0) {
+    std::vector<double> emph;
+    emph.push_back(4.);
+    emph.push_back(1.);
+    emph.push_back(.25);
+    for(int ei = 0; ei < emph.size(); ei ++) {
       for(int i = 0; i < input.size() / szwindow + 1; i ++) {
-        stat.init(words0, 0, 120);
-        const auto& words(stat.getWords());
+        corpus<double, std::string> stat; 
+        stat.init(csv, 0, 120);
         stat.compute(input.substr(i * szwindow, szwindow), delimiter);
-        const auto& corpus(stat.getCorpus());
-        std::cout << words  << std::endl;
-        // std::cout << corpus << std::endl;
+        corpushl<double, std::string> recons(stat);
+        recons.reDig(emph[ei]);
+        std::cout << recons.serialize() << std::endl;
+      }
+      std::cout << std::endl << std::endl;
+    }
+  } else if(std::strcmp(argv[1], "diff") == 0) {
+    std::vector<std::string> details, details2;
+    std::vector<std::string> detailwords, detailwords2;
+    bool second(false);
+    for(int iidx = 3; iidx < argc; iidx ++) {
+      if(std::string(argv[iidx]) == std::string("-dict")) {
+        second = false;
+        continue;
+      } else if(std::string(argv[iidx]) == std::string("-dict2")) {
+        second = true;
+        continue;
+      }
+      const auto work(loadbuf(argv[iidx]));
+      if(second) {
+        details2.push_back(work.second);
+        detailwords2.push_back(work.first);
+      } else {
+        details.push_back(work.second);
+        detailwords.push_back(work.first);
       }
     }
-    break;
-  case 2:
-  case 12:
-    //  2: toc
-    // 12: lack large amounts of dictionaries is needed. reverse order of TOC.
-    {
-      const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
-      std::vector<std::string> details;
-      std::vector<std::string> tocs;
-      std::vector<std::string> detailwords;
-      std::vector<std::string> tocwords;
-      bool toc(false);
-      for(int iidx = 3; iidx < argc; iidx ++) {
-        if(std::string(argv[iidx]) == std::string("-toc")) {
-          toc = true;
-          continue;
-        }
-        const auto work(loadbuf(argv[iidx]));
-        if(toc) {
-          tocs.push_back(work.second);
-          tocwords.push_back(work.first);
-        } else {
-          details.push_back(work.second);
-          detailwords.push_back(work.first);
-        }
-      }
-      std::cout << std::string("<html><head><meta charset=\"UTF-8\"><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
-      std::cout << std::string("<body>");
-      for(int i = 0; i <= input.size() / szblock; i ++)
-        std::cout << preparedTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.5), threshin, .125, mode == 12) << std::string("<hr/>") << std::endl;
-      std::cout << std::string("</body></html>");
+    std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
+    std::cout << std::string("<body>");
+    for(int i = 0; i <= input.size() / szblock; i ++)
+      std::cout << diff<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), csv, details, detailwords, details2, detailwords2, delimiter, szwindow, threshin) << std::string("<hr/>") << std::endl;
+    std::cout << "</body></html>" << std::endl;
+  } else if(std::strcmp(argv[1], "stat") == 0 ||
+            std::strcmp(argv[1], "findroot") == 0) {
+    std::vector<std::string> rdetails;
+    std::vector<std::string> rdetailwords;
+    for(int iidx = 3; iidx < argc; iidx ++) {
+      const auto work(loadbuf(argv[iidx]));
+      rdetails.push_back(work.second);
+      rdetailwords.push_back(work.first);
     }
-    break;
-  case 7:
-    // nwordt
-    {
-      auto words(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
-      std::sort(words.begin(), words.end());
-      int lws(0);
-      for(int i = 0; i <= input.size() * 2 / szblock; i ++) {
-        corpus<double, std::string> lstat;
-        lstat.init(words, 0, 120);
-        lstat.compute(input.substr(i * szblock / 2, szblock), delimiter);
-        corpushl<double, std::string> work(lstat);
-        const auto lwords(work.reverseLink(work));
-        for(int j = 0; j < lwords.size(); j ++)
-          std::cout << lwords[j] << std::endl;
-      }
-    }
-    break;
-  case 3:
-    // reconstruct
-    {
-      auto wordbuf(loadbuf(argv[2]).second);
-      corpus<double, std::string> stat;
-      stat.init(cutText(wordbuf, csvelim, csvdelim), 0, 120);
-      stat.compute(input, delimiter);
-      corpushl<double, std::string> recons(stat);
-      std::cout << recons.serialize();
-    }
-    break;
-  case 4:
-    // redig
-    {
-      const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));
-      std::vector<double> emph;
-      emph.push_back(4.);
-      emph.push_back(1.);
-      emph.push_back(.25);
-      for(int ei = 0; ei < emph.size(); ei ++) {
-        for(int i = 0; i < input.size() / szwindow + 1; i ++) {
-          corpus<double, std::string> stat; 
-          stat.init(words0, 0, 120);
-          stat.compute(input.substr(i * szwindow, szwindow), delimiter);
-          corpushl<double, std::string> recons(stat);
-          recons.reDig(emph[ei]);
-          std::cout << recons.serialize() << std::endl;
-        }
-        std::cout << std::endl << std::endl;
-      }
-    }
-    break;
-  case 5:
-    // diff : differ.
-    {
-      const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));;
-      std::vector<std::string> details, details2;
-      std::vector<std::string> detailwords, detailwords2;
-      bool second(false);
-      for(int iidx = 3; iidx < argc; iidx ++) {
-        if(std::string(argv[iidx]) == std::string("-dict")) {
-          second = false;
-          continue;
-        } else if(std::string(argv[iidx]) == std::string("-dict2")) {
-          second = true;
-          continue;
-        }
-        const auto work(loadbuf(argv[iidx]));
-        if(second) {
-          details2.push_back(work.second);
-          detailwords2.push_back(work.first);
-        } else {
-          details.push_back(work.second);
-          detailwords.push_back(work.first);
-        }
-      }
-      std::cout << std::string("<html><head><meta charset=\"UTF-8\"><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
-      std::cout << std::string("<body>");
-      for(int i = 0; i <= input.size() / szblock; i ++)
-        std::cout << diff<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, details, detailwords, details2, detailwords2, delimiter, szwindow, threshin) << std::string("<hr/>") << std::endl;
-      std::cout << "</body></html>" << std::endl;
-    }
-    break;
-  case 6:
-  case 15:
-    //  6: stat, statistics with optimized TOC with link to original articles.
-    // 15: findroot, find parts of root of the insists. another count of optTOC.
-    {
-      const auto words0(cutText(loadbuf(argv[2]).second, csvelim, csvdelim));;
-      std::vector<std::string> rdetails;
-      std::vector<std::string> rdetailwords;
-      for(int iidx = 3; iidx < argc; iidx ++) {
-        const auto work(loadbuf(argv[iidx]));
-        rdetails.push_back(work.second);
-        rdetailwords.push_back(work.first);
-      }
-      std::cout << std::string("<html><head><meta charset=\"UTF-8\"><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
-      std::cout << std::string("<body>");
-      for(int i = 0; i <= input.size() / szblock; i ++)
-        std::cout << optimizeTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), words0, rdetails, rdetailwords, delimiter, szwindow, 8, threshin, 1., mode == 15) << std::string("<hr/>") << std::endl;
-      std::cout << std::string("</body></html>");
-    }
-    break;
-  case 9:
-    // opt dict.
-    // group dicts.
-    {
-      assert(0 && "group dicts: not implemented around NOT word tables.");
-    }
-    break;
-  case 10:
-    // conflict.
-    // sign and abs amount check.
-    {
-      assert(0 && "conflict : not implemented around NOT word tables.");
-    }
-    break;
-  case 11:
-    // negate elementary sets of dictionaries is needed.
-    {
-      assert(0 && "negate: not implemented around NOT word tables.");
-    }
-    break;
-  case 13:
-    // consistancy elementary sets of dictionaries and logical check is needed.
-    // some another implementation is needed.
-    {
-      assert(0 && "consistancy : Logics check so far...");
-    }
-    break;
-  case 14:
-    // logic check another implementation is needed.
-    {
-      assert(0 && "logic check : Logics check so far...");
-    }
-    break;
-  default:
+    std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
+    std::cout << std::string("<body>");
+    for(int i = 0; i <= input.size() / szblock; i ++)
+      std::cout << optimizeTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), csv, rdetails, rdetailwords, delimiter, szwindow, 8, threshin, 1., std::strcmp(argv[1], "findroot") == 0) << std::string("<hr/>") << std::endl;
+    std::cout << std::string("</body></html>");
+  } else if(std::strcmp(argv[1], "optdict") == 0)
+    assert(0 && "group dicts: not implemented around NOT word tables.");
+  else if(std::strcmp(argv[1], "conflict") == 0)
+    assert(0 && "conflict : not implemented around NOT word tables.");
+  else if(std::strcmp(argv[1], "negate") == 0)
+    assert(0 && "negate: not implemented around NOT word tables.");
+  else if(std::strcmp(argv[1], "consistency") == 0)
+    assert(0 && "consistancy : Logics check so far...");
+  else if(std::strcmp(argv[1], "logiccheck") == 0)
+    assert(0 && "logic check : Logics check so far...");
+  else {
     usage();
     return - 2;
   }
