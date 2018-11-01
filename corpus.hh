@@ -102,8 +102,8 @@ template <typename T, typename U> corpus<T,U>::~corpus() {
 template <typename T, typename U> void corpus<T,U>::init(const vector<U>& words0, const int& nthresh, const int& Nthresh, const int& Mwords) {
   // this->orig    = U();
   this->words0  = words0;
-  // XXX: exhaust of resources:
-  sort(this->words0.begin(), this->words0.end());
+  // N.B. input MUST be sorted.
+  // sort(this->words0.begin(), this->words0.end());
   this->words0.erase(unique(this->words0.begin(), this->words0.end()), this->words0.end());
   // this->words   = vector<U>();
   // this->ptrs0   = vector<vector<int> >();
@@ -185,7 +185,6 @@ template <typename T, typename U> const SimpleSparseTensor<T>& corpus<T,U>::getC
 }
 
 template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, const vector<U>& delimiter) {
-  sort(words0.begin(), words0.end());
   pdelim = vector<int>();
   pdelim.push_back(0);
   U work;

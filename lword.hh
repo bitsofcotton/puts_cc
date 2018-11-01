@@ -304,7 +304,7 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
 
 
 // some functions.
-template <typename T> vector<T> cutText(const T& input, const vector<T>& eliminate0, const vector<T>& delimiter0) {
+template <typename T> vector<T> cutText(const T& input, const vector<T>& eliminate0, const vector<T>& delimiter0, const bool& f_sort = false) {
   vector<T> delimiter(delimiter0);
   vector<T> eliminate(eliminate0);
   sort(delimiter.begin(), delimiter.end());
@@ -334,6 +334,8 @@ template <typename T> vector<T> cutText(const T& input, const vector<T>& elimina
   }
   if(workbuf.size())
     result.push_back(workbuf);
+  if(f_sort)
+    sort(result.begin(), result.end());
   return result;
 }
 
