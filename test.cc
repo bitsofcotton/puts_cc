@@ -202,6 +202,19 @@ int main(int argc, const char* argv[]) {
     for(int i = 0; i <= input.size() / szblock; i ++)
       std::cout << optimizeTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), csv, rdetails, rdetailwords, delimiter, szwindow, 8, threshin, 1., std::strcmp(argv[1], "findroot") == 0) << std::string("<hr/>") << std::endl;
     std::cout << std::string("</body></html>");
+  } else if(std::strcmp(argv[1], "prep") == 0) {
+    std::vector<std::string> buf;
+    corpus<double, std::string> stat;
+    for(int i = 0; i < input.size() / szwindow + 1; i ++) {
+      stat.init(csv, 0, 120);
+      stat.compute(input.substr(i * szwindow, szwindow), delimiter);
+      const auto& work(stat.getWords());
+      buf.insert(buf.end(), work.begin(), work.end());
+    }
+    std::sort(buf.begin(), buf.end());
+    buf.erase(std::unique(buf.begin(), buf.end()), buf.end());
+    for(int i = 0; i < buf.size(); i ++)
+      std::cout << buf[i] << std::endl;
   } else if(std::strcmp(argv[1], "optdict") == 0)
     assert(0 && "group dicts: not implemented around NOT word tables.");
   else if(std::strcmp(argv[1], "conflict") == 0)
