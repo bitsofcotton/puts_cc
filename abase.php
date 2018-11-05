@@ -15,7 +15,7 @@ function doexecp($so, $se, $cmd, $text, $cwd, $env) {
 
 function prepdicts($cwd, $txt, $text, $env) {
   doexecp($txt . "-prep.txt", $txt . "-prep-err.txt",
-          "../../puts nwordt words.txt", $text, $cwd, $env);
+          "../../puts prep words.txt", $text, $cwd, $env);
   $f  = fopen($txt . "-prep.txt", "r");
   while(($buf = fgets($f)) !== false) {
     doexecp($cwd . "/pdict/" . basename(chop($buf)), "/dev/null",
