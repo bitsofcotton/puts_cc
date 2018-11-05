@@ -207,6 +207,7 @@ int main(int argc, const char* argv[]) {
     corpus<double, std::string> stat;
     for(int i = 0; i < input.size() / szwindow + 1; i ++) {
       stat.init(csv, 0, 120);
+      stat.compute(input.substr(i * szwindow, szwindow), delimiter);
       const auto& work(stat.getWords());
       buf.insert(buf.end(), work.begin(), work.end());
     }
