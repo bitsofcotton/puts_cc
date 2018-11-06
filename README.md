@@ -18,7 +18,7 @@ This program uses large amount of region on the memory. And, very slow because o
     ./tools stat wordlist.txt dictionaries ... < data.txt
     ./tools reconstruct wordlist.txt < data.txt
     ./tools diff wordlist.txt -dict ... -dict2 ... < data.txt
-    ./tools nwordt wordlist.txt < data.txt
+    ./tools prep wordlist.txt < data.txt
 
 # Contexts
 Inspired from morphological analysis softwares and parameter auto configuring algorithms' structure.   
