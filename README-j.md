@@ -18,7 +18,7 @@
     ./tools stat wordlist.txt dictionaries ... < data.txt
     ./tools reconstruct wordlist.txt < data.txt
     ./tools diff wordlist.txt -dict ... -dict2 ... < data.txt
-    ./tools nwordt wordlist.txt < data.txt
+    ./tools prep wordlist.txt < data.txt
 
 # 文脈
 形態要素解析のソフトウェア、及び自動パラメタ調整のソフトウェアに刺激されました。  
