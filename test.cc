@@ -83,7 +83,7 @@ int main(int argc, const char* argv[]) {
   if(std::strcmp(argv[1], "lword") == 0) {
     csv.insert(csv.end(), csvelim.begin(),  csvelim.end());
     csv.insert(csv.end(), csvdelim.begin(), csvdelim.end());
-    const auto inputs(cutText(input, csv, csv));
+    const auto inputs(cutText(input, csv, delimiter));
     lword<char32_t, std::u32string> stat;
     std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
     for(int j = 0; j < inputs.size(); j ++) {
@@ -100,7 +100,7 @@ int main(int argc, const char* argv[]) {
         }
     }
   } else if(std::strcmp(argv[1], "lbalance") == 0) {
-    const auto idxs(pseudoWordsBalance<double, std::string>(cutText(input, csv, delimiter), delimiter, Mbalance));
+    const auto idxs(pseudoWordsBalance<double, std::string>(cutText(input, csvelim, delimiter), csv, Mbalance));
     std::cout << idxs.size() << "sets." << std::endl;
     for(int i = 0; i < idxs.size(); i ++)
       std::cout << input[idxs[i]] << std::endl;
