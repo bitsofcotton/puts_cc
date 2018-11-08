@@ -459,11 +459,8 @@ template <typename T, typename U> bool corpushl<T, U>::operator == (const corpus
 }
 
 template <typename T, typename U> bool corpushl<T, U>::operator != (const corpushl<T, U>& other) const {
-  auto wwords(words);
-  auto wowords(other.words);
-  sort(wwords.begin(),  wwords.end());
-  sort(wowords.begin(), wowords.end());
-  return wwords != wowords || corpust != other.corpust;
+  // N.B. we assume words sorted.
+  return words != other.words || corpust != other.corpust;
 }
 
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator += (const corpushl<T, U>& other) {
@@ -617,20 +614,20 @@ template <typename T, typename U> T corpushl<T, U>::cdot(const corpushl<T, U>& o
     const int& i0(ridx1[itr0->first]);
     assert(0 <= i0);
     const int& ii(rridx0[i0]);
-    if(ii < 0 || !const_cast<const Tensor&>(corpust)[ii].iter().size()) continue;
+    if(ii < 0 || !(const_cast<const Tensor&>(corpust))[ii].iter().size()) continue;
     const auto& oi1(itr0->second.iter());
     for(auto itr1(oi1.begin()); itr1 != oi1.end(); ++ itr1) {
       const int& j0(ridx1[itr1->first]);
       assert(0 <= j0);
       const int& jj(rridx0[j0]);
-      if(jj < 0 || !const_cast<const Tensor&>(corpust)[ii][jj].iter().size()) continue;
+      if(jj < 0 || !(const_cast<const Tensor&>(corpust))[ii][jj].iter().size()) continue;
       const auto& oi2(itr1->second.iter());
       for(auto itr2(oi2.begin()); itr2 != oi2.end(); ++ itr2) {
         const int& k0(ridx1[itr2->first]);
         assert(0 <= k0 || itr2->second == T(0));
         const int& kk(rridx0[k0]);
         if(kk < 0) continue;
-        res += itr2->second * const_cast<const Tensor&>(corpust)[ii][jj][kk];
+        res += itr2->second * (const_cast<const Tensor&>(corpust))[ii][jj][kk];
       }
     }
   }
@@ -760,9 +757,9 @@ template <typename T, typename U> U corpushl<T, U>::serializeSub(const vector<in
   // N.B. i0 - i1 - i2 is stored in corpust[i0][i2][i1].
   for(int i = 0; i < idxs.size(); i ++) {
     int lscore(0);
-    for(int j = 0; j < idxs.size(); j ++) if(const_cast<const Tensor&>(corpust)[idxs[j]].iter().size())
+    for(int j = 0; j < idxs.size(); j ++) if((const_cast<const Tensor&>(corpust))[idxs[j]].iter().size())
       for(int k = 0; k < idxs.size(); k ++)
-        if(const_cast<const Tensor&>(corpust)[idxs[j]][idxs[k]][idxs[i]] != T(0))
+        if((const_cast<const Tensor&>(corpust))[idxs[j]][idxs[k]][idxs[i]] != T(0))
           lscore --;
     cscore.push_back(make_pair(lscore, idxs[i]));
   }
@@ -781,9 +778,9 @@ template <typename T, typename U> U corpushl<T, U>::serializeSub(const vector<in
       int lscore(0);
       for(int j = 0; j < idxs.size(); j ++)
         if(idxs[j] != middle[0]) {
-          if(const_cast<const Tensor&>(corpust)[idxs[i]][idxs[j]][middle[0]] != T(0))
+          if((const_cast<const Tensor&>(corpust))[idxs[i]][idxs[j]][middle[0]] != T(0))
             lscore --;
-          if(const_cast<const Tensor&>(corpust)[idxs[j]][idxs[i]][middle[0]] != T(0))
+          if((const_cast<const Tensor&>(corpust))[idxs[j]][idxs[i]][middle[0]] != T(0))
             lscore ++;
         }
       score.push_back(make_pair(lscore, idxs[i]));
@@ -861,7 +858,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
       for(int k = 0; k < result.words.size(); k ++) {
         if(k == widx) continue;
         // XXX fixme ratio.
-        const T score(const_cast<const Tensor&>(corpust)[i][j][k] * (c_ij[i][j] + c_jk[j][k] + c_ik[i][k]) / result.words.size());
+        const T score((const_cast<const Tensor&>(corpust))[i][j][k] * (c_ij[i][j] + c_jk[j][k] + c_ik[i][k]) / result.words.size());
         result.corpust[widx][j][k] += score / T(3);
         result.corpust[i][widx][k] += score / T(3);
         result.corpust[i][j][widx] += score / T(3);
@@ -966,12 +963,12 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::simpleThresh(co
   result.corpust = Tensor();
   for(int i = 0; i < okidx.size(); i ++) {
     result.words.push_back(words[okidx[i]]);
-    if(const_cast<const Tensor&>(corpust)[okidx[i]].iter().size())
+    if((const_cast<const Tensor&>(corpust))[okidx[i]].iter().size())
       for(int j = 0; j < okidx.size(); j ++)
-        if(const_cast<const Tensor&>(corpust)[okidx[i]][okidx[j]].iter().size())
+        if((const_cast<const Tensor&>(corpust))[okidx[i]][okidx[j]].iter().size())
           for(int k = 0; k < okidx.size(); k ++)
-            if(ratio * thisabsmax < abs(const_cast<const Tensor&>(corpust)[okidx[i]][okidx[j]][okidx[k]]))
-              result.corpust[i][j][k] = corpust[okidx[i]][okidx[j]][okidx[k]];
+            if(ratio * thisabsmax < abs((const_cast<const Tensor&>(corpust))[okidx[i]][okidx[j]][okidx[k]]))
+              result.corpust[i][j][k] = (const_cast<const Tensor&>(corpust))[okidx[i]][okidx[j]][okidx[k]];
   }
   return result;
 }
@@ -1150,8 +1147,8 @@ template <typename T, typename U> Eigen::Matrix<T, Eigen::Dynamic, 1> corpushl<T
     Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> buf(words.size(), words.size());
     for(int j = 0; j < words.size(); j ++) {
       for(int k = 0; k < words.size(); k ++)
-        if(isfinite(const_cast<const Tensor&>(corpust)[i][j][k]))
-          buf(k, j) = const_cast<const Tensor&>(corpust)[i][j][k];
+        if(isfinite((const_cast<const Tensor&>(corpust))[i][j][k]))
+          buf(k, j) = (const_cast<const Tensor&>(corpust))[i][j][k];
         else {
           cerr << "nan" << flush;
           buf(k, j) = T(0);
@@ -1299,7 +1296,8 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
   return result;
 }
 
-template <typename T, typename U> U optimizeTOC(const U& input, const U& name, const vector<U>& words, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const int& szwindow, const int& depth, const T& threshin, const T& redig = T(1), const bool& countnum = false) {
+template <typename T, typename U> U optimizeTOC(const U& input, const U& name, const vector<U>& words, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const int& szwindow, const int& depth, const T& threshin, const T& redig = T(1), const bool& countnum = false, const U& notcheck = U("")) {
+  assert(notcheck == U(""));
   cerr << "optimizeToc: parsing input" << endl;
   vector<corpus<T, U> >   cstat0;
   vector<corpushl<T, U> > cstat;

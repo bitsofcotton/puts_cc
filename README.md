@@ -20,6 +20,10 @@ This program uses large amount of region on the memory. And, very slow because o
     ./tools diff wordlist.txt -dict ... -dict2 ... < data.txt
     ./tools prep wordlist.txt < data.txt
 
+# Memory Fragments
+There exists better efficient memory management programs like jemalloc.
+So with them, this program memory heap usage dramatically increases.
+
 # Contexts
 Inspired from morphological analysis softwares and parameter auto configuring algorithms' structure.   
 There's preceders Tensor representation of the text set (with a way different to this) R.B. ieee 2004.
