@@ -105,9 +105,8 @@ template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator = (const 
 
 template <typename T, typename U> const void corpus<T,U>::compute(const U& input, const vector<U>& delimiter, const vector<U>& words) {
   this->words = words;
-  cerr << "Getting word pointers " << flush;
+  cerr << "c" << flush;
   getWordPtrs(input, delimiter);
-  cerr << "Corpus" << flush;
   corpusEach();
   return;
 }
@@ -116,7 +115,7 @@ template <typename T, typename U> U corpus<T,U>::getAttributed(const vector<U>& 
   U result;
   int    i;
   for(i = 0; i < orig.size(); ) {
-    const auto lb(lower_bound(highlight.begin(), highlight.end(), U(&(orig.c_str()[i])), lessEqualStrClip<U>));
+    const auto lb(upper_bound(highlight.begin(), highlight.end(), U(&(orig.c_str()[i])), lessEqualStrClip<U>));
     if(highlight.begin() <= lb && lb < highlight.end() && equalStrClip<U>(*lb, U(&(orig.c_str()[i])))) {
       result += U("<font class=\"match\">");
       result += *lb;
@@ -576,7 +575,7 @@ template <typename T, typename U> const corpushl<T, U> corpushl<T, U>::conflictP
 }
 
 template <typename T, typename U> U corpushl<T, U>::serialize() const {
-  cerr << " serialize" << flush;
+  cerr << "s" << flush;
   auto plus(*this), minus(*this);
   const auto& pi0(plus.corpust.iter());
   for(auto itr0(pi0.begin()); itr0 != pi0.end(); ++ itr0) {
@@ -874,8 +873,7 @@ template <typename T, typename U> const SimpleSparseTensor<T>& corpushl<T, U>::g
 template <typename T, typename U> void getAbbreved(vector<corpushl<T, U> >& cstat, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow) {
   assert(detailtitle.size() == detail.size());
   cerr << " getAbbreved";
-  for(int i = 0; i < detail.size(); i ++) {
-    cerr << "." << flush;
+  for(int i = 0; i < detail.size(); i ++)
     for(int j = 0; j < detail[i].size() / szwindow * 2 + 1; j ++) {
       corpus<T, U> lstat;
       lstat.compute(detail[i].substr(j * szwindow / 2, szwindow), delimiter, words);
@@ -883,7 +881,6 @@ template <typename T, typename U> void getAbbreved(vector<corpushl<T, U> >& csta
       for(int k = 0; k < cstat.size(); k ++)
         cstat[k] = cstat[k].abbrev(detailtitle[i], work);
     }
-  }
   cerr << endl;
   return;
 }
@@ -904,8 +901,7 @@ template <typename T, typename U> vector<U> getDetailed(const U& name, vector<co
     tagged += U("</span><br/>");
     result.push_back(tagged);
   }
-  for(int i = 0; i < detail.size(); i ++) {
-    cerr << "." << flush;
+  for(int i = 0; i < detail.size(); i ++)
     for(int j = 0; j < detail[i].size() / szwindow * 2 + 1; j ++) {
       corpus<T, U> lstat;
       lstat.compute(detail[i].substr(j * szwindow / 2, szwindow), delimiter, words);
@@ -914,7 +910,6 @@ template <typename T, typename U> vector<U> getDetailed(const U& name, vector<co
       for(int k = 0; k < cstat0.size(); k ++)
         cstat[k] = cstat[k].withDetail(detailtitle[i], work, thresh);
     }
-  }
   cerr << endl;
   return result;
 }
