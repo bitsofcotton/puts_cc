@@ -29,7 +29,7 @@ Inspired from morphological analysis softwares and parameter auto configuring al
 There's preceders Tensor representation of the text set (with a way different to this) R.B. ieee 2004.
 
 # Status
-Checking and testing implementation through test.cc .
+Checking and testing implementation through test.cc . lword.hh is a little stable, corpus and corpushl class is beta, others are being in test.
 
 # Demos
 https://services.limpid-intensity.info/puts.php have a working sample.
