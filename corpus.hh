@@ -214,7 +214,6 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
 template <typename T, typename U> void corpus<T,U>::corpusEach() {
   corpust = Tensor();
   for(int i = 0; i < words.size(); i ++) {
-    cerr << "." << flush;
     if(!ptrs[i].size())
       continue;
     for(int j = 0; j < words.size(); j ++) {
