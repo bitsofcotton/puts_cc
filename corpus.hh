@@ -699,16 +699,19 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
   const auto okidx(countIdx(T(0)));
   for(int i = 0; i < okidx.size(); i ++) {
     if(i == widx) continue;
+    const auto ii(okidx[i]);
     for(int j = 0; j < okidx.size(); j ++) {
       if(j == widx) continue;
+      const auto jj(okidx[j]);
       for(int k = 0; k < okidx.size(); k ++) {
         if(k == widx) continue;
+        const auto kk(okidx[k]);
         // XXX fixme ratio.
-        const T score((const_cast<const Tensor&>(corpust))[i][j][k] * (c_ij[i][j] + c_jk[j][k] + c_ik[i][k]) / result.words.size());
-        result.corpust[widx][j][k] += score / T(3);
-        result.corpust[i][widx][k] += score / T(3);
-        result.corpust[i][j][widx] += score / T(3);
-        result.corpust[i][j][k]    -= score;
+        const T score((const_cast<const Tensor&>(corpust))[ii][jj][kk] * (c_ij[ii][jj] + c_jk[jj][kk] + c_ik[ii][kk]) / result.words.size());
+        result.corpust[widx][jj][kk] += score / T(3);
+        result.corpust[ii][widx][kk] += score / T(3);
+        result.corpust[ii][jj][widx] += score / T(3);
+        result.corpust[ii][jj][kk]   -= score;
       }
     }
   }
@@ -792,12 +795,17 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::simpleThresh(co
   result.words   = words;
   result.corpust = Tensor();
   for(int i = 0; i < okidx.size(); i ++) {
+    const auto ii(okidx[i]);
     if((const_cast<const Tensor&>(corpust))[okidx[i]].iter().size())
-      for(int j = 0; j < okidx.size(); j ++)
+      for(int j = 0; j < okidx.size(); j ++) {
+        const auto jj(okidx[j]);
         if((const_cast<const Tensor&>(corpust))[okidx[i]][okidx[j]].iter().size())
-          for(int k = 0; k < okidx.size(); k ++)
-            if(ratio * thisabsmax < abs((const_cast<const Tensor&>(corpust))[okidx[i]][okidx[j]][okidx[k]]))
-              result.corpust[i][j][k] = (const_cast<const Tensor&>(corpust))[okidx[i]][okidx[j]][okidx[k]];
+          for(int k = 0; k < okidx.size(); k ++) {
+            const auto kk(okidx[k]);
+            if(ratio * thisabsmax < abs((const_cast<const Tensor&>(corpust))[ii][jj][kk]))
+              result.corpust[ii][jj][kk] = (const_cast<const Tensor&>(corpust))[ii][jj][kk];
+          }
+      }
   }
   return result;
 }
