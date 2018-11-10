@@ -926,11 +926,10 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
   assert(topictitle.size()  == topics.size());
   cerr << "preparedTOC..." << flush;
   U result;
-  result += U("Show/Hide : <input class=\"gather\" type=\"checkbox\"><div class=\"gather\">");
   if(!topics.size())
     result += U("zero input.<br/>");
   for(int i = 0; i < topics.size(); i ++) {
-    corpus<T, U>    cstat0, cstat1;
+    corpus<T, U>   cstat0, cstat1;
     corpushl<T, U> stat0,  stat1;
     vector<pair<T, pair<int, int> > > topicidx;
     for(int j = 0; getDetailed<T, U>(name, cstat0, stat0, topics[i], j, words, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
@@ -941,8 +940,10 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
         stat1.reDig(redig);
         const T lscore(reverse ? T(1) / abs(stat0.prej(stat1))
                                :            stat0.prej(stat1) );
-        if(isfinite(lscore) && score <= lscore)
-          idx = k;
+        if(isfinite(lscore) && score <= lscore) {
+          idx   = k;
+          score = lscore;
+        }
       }
       topicidx.push_back(make_pair(- score, make_pair(j, idx)));
     }
@@ -950,9 +951,9 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
     for(int j = 0; j < min(int(topicidx.size()), depth); j ++) {
       getDetailed<T, U>(name, cstat0, stat0, topics[i], topicidx[j].second.first,  words, detailtitle, detail, delimiter, szwindow, threshin);
       getDetailed<T, U>(name, cstat1, stat1, input,     topicidx[j].second.second, words, detailtitle, detail, delimiter, szwindow, threshin);
-      result += U("score: ") + to_string(topicidx[j].first) + U(" : ");
+      result += U("score : ") + to_string(topicidx[j].first) + U(" : ");
       result += getTagged<T,U>(name + to_string(i), cstat0, stat0, topicidx[j].second.first);
-      result += getTagged<T,U>(name + to_string(i), cstat1, stat1, topicidx[j].second.first);
+      result += getTagged<T,U>(name + to_string(i), cstat1, stat1, topicidx[j].second.second);
     }
   }
   return result;
@@ -960,7 +961,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
 
 template <typename T, typename U> U optimizeTOC(const U& input, const U& name, const vector<U>& words, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const int& szwindow, const int& depth, const T& threshin, const T& redig = T(1), const bool& countnum = false, const U& notcheck = U("")) {
   assert(notcheck == U(""));
-  cerr << "optimizeToc..." << endl;
+  cerr << "optimizeTOC..." << endl;
   SimpleSparseMatrix<T> scores;
   corpus<T, U>   cstat0, cstat1;
   corpushl<T, U> stat0,  stat1;
@@ -1019,7 +1020,9 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     result += cs.reverseLink(cstat0) + U("<br/>");
     for(int i = 0; i < min(depth, int(lscore[lidx].size())); i ++) {
       getDetailed<T, U>(name, cstat0, stat0, input, lscore[lidx][i].second.second, words, detailtitle, detail, delimiter, szwindow, threshin);
+      result += to_string(lscore[lidx][i].first) + U(" : ");
       result += getTagged<T,U>(name + to_string(lscore[lidx][i].first), cstat0, stat0, lscore[lidx][i].first);
+      result += getTagged<T,U>(name + to_string(lscore[lidx][i].first), cstat0, cs, lscore[lidx][i].first);
     }
     result += U("</div><textarea name=\"entry\">");
     result += getCut<T,U>(input, lscore[lidx][0].second.first, szwindow);
