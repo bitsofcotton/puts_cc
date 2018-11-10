@@ -906,6 +906,7 @@ template <typename T, typename U> vector<U> getDetailed(const U& name, vector<co
     cstat.push_back(corpushl<T, U>(lstat).simpleThresh(thresh));
     U tagged(U("<span id=\"") + name + to_string(i) + U("\">"));
     tagged += cstat[i].reverseLink(cstat0[i]);
+    tagged += U("<br/> : ") + cstat0[i].getAttributed(cstat0[i].getWords());
     tagged += U("</span><br/>");
     result.push_back(tagged);
   }
@@ -978,7 +979,9 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
       result += to_string(scores[j].first) + U(" : ");
       result += /*work.serialize() + */ U("</a><br/>\n");
       result += work.reverseLink(cstat0[scores[j].second.second]) + U("<br/>\n");
+      result += cstat0[scores[j].second.second].getAttributed(cstat0[scores[j].second.second].getWords()) + U("<br/>\n");
       result += work.reverseLink(tstat0[scores[j].second.first])  + U("<br/><br/>\n");
+      result += tstat0[scores[j].second.first].getAttributed(tstat0[scores[j].second.first].getWords())  + U("<br/><br/>\n");
     }
     result += U("<br/>\n");
   }
@@ -1101,7 +1104,8 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     result += U("<br/>");
     result += U("base : <a href=\"#") + name + to_string(j) + U("\">");
     result += to_string(j) + U("</a> - ");
-    result += cs.reverseLink(cstat0[j]);
+    result += cs.reverseLink(cstat0[j]) + U("<br/>");
+    result += cstat0[j].getAttributed(cstat0[j].getWords()) + U("<br/>");
     //result += cs.serialize();
     U entry;
     entry  += cstat0[j].getOrig();
@@ -1110,7 +1114,8 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
       result += U("<a href=\"#") + name + to_string(idt[l]) + U("\">");
       result += to_string(idt[l]) + U("</a> : ");
       result += to_string(cstats(j, idt[l])) + U(" - ");
-      result += cs.reverseLink(cstat0[idt[l]]);
+      result += cs.reverseLink(cstat0[idt[l]]) + U("<br/>");
+      result += cstat0[idt[l]].getAttributed(cstat0[idt[l]].getWords()) + U("<br/>");
       entry  += cstat0[idt[l]].getOrig();
       result += U("<br/>");
     }
@@ -1130,7 +1135,8 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     result += U("<br/>");
     result += U("no match : <a href=\"#") + name + to_string(j) + U("\">");
     result += to_string(j) + U("</a> - ");
-    result += cs.reverseLink(cstat0[j]);
+    result += cs.reverseLink(cstat0[j]) + U("<br/>");
+    result += cstat0[j].getAttributed(cstat0[j].getWords());
     result += U("</div><br/>");
   }
   result += U("<br/><br/>Original:<br/>Show/Hide : <input class=\"gather\" type=\"checkbox\"><div class=\"gather\">");
@@ -1171,7 +1177,9 @@ template <typename T, typename U> U diff(const U& input, const U& name, const ve
     result += U("(") + to_string(score) + U(") : ");
     result += diff.serialize() + U("<br/>\n");
     result += cstat[i].reverseLink(cstat0[i]) + U("<br/>\n");
+    result += cstat0[i].getAttributed(cstat0[i].getWords()) + U("<br/>\n");
     result += dstat[i].reverseLink(dstat0[i]) + U("<br/>\n");
+    result += dstat0[i].getAttributed(dstat0[i].getWords()) + U("<br/>\n");
     result += diff.reverseLink(cstat0[i]) + U("<br/>\n");
     result += diff.reverseLink(dstat0[i]) + U("<br/><br/><br/>\n");
   }
