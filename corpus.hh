@@ -721,7 +721,7 @@ template <typename T, typename U> vector<U> corpushl<T, U>::reverseLink() const 
   const auto idx(countIdx(T(0)));
   res.reserve(idx.size());
   for(int i = 0; i < idx.size(); i ++)
-    res.emplace_back(words[idx[i]]);
+    res.push_back(words[idx[i]]);
   return res;
 }
 
@@ -790,10 +790,9 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::simpleThresh(co
   const auto thisabsmax(absmax());
   const auto okidx(countIdx(ratio * thisabsmax));
   corpushl<T, U> result;
-  result.words   = vector<U>();
+  result.words   = words;
   result.corpust = Tensor();
   for(int i = 0; i < okidx.size(); i ++) {
-    result.words.push_back(words[okidx[i]]);
     if((const_cast<const Tensor&>(corpust))[okidx[i]].iter().size())
       for(int j = 0; j < okidx.size(); j ++)
         if((const_cast<const Tensor&>(corpust))[okidx[i]][okidx[j]].iter().size())
