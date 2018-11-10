@@ -106,7 +106,7 @@ int main(int argc, const char* argv[]) {
     std::cout << idxs.size() << "sets." << std::endl;
     for(int i = 0; i < idxs.size(); i ++)
       std::cout << input[idxs[i]] << std::endl;
-  } else if(std::strcmp(argv[1], "corpus") == 0) {
+  }/* else if(std::strcmp(argv[1], "corpus") == 0) {
     corpus<double, std::string> stat;
     for(int i = 0; i < input.size() / szwindow + 1; i ++) {
       stat.init(csv, 0, 120);
@@ -116,7 +116,7 @@ int main(int argc, const char* argv[]) {
       std::cout << words  << std::endl;
       // std::cout << corpus << std::endl;
     }
-  } else if(std::strcmp(argv[1], "toc") == 0 ||
+  } */else if(std::strcmp(argv[1], "toc") == 0 ||
             std::strcmp(argv[1], "lack") == 0) {
     std::vector<std::string> details;
     std::vector<std::string> tocs;
@@ -144,8 +144,7 @@ int main(int argc, const char* argv[]) {
     std::cout << std::string("</body></html>");
   } else if(std::strcmp(argv[1], "reconstruct") == 0) { 
     corpus<double, std::string> stat;
-    stat.init(csv, 0, 120);
-    stat.compute(input, delimiter);
+    stat.compute(input, delimiter, csv);
     corpushl<double, std::string> recons(stat);
     std::cout << recons.serialize();
   } else if(std::strcmp(argv[1], "redig") == 0) {
@@ -156,8 +155,7 @@ int main(int argc, const char* argv[]) {
     for(int ei = 0; ei < emph.size(); ei ++) {
       for(int i = 0; i < input.size() / szwindow + 1; i ++) {
         corpus<double, std::string> stat; 
-        stat.init(csv, 0, 120);
-        stat.compute(input.substr(i * szwindow, szwindow), delimiter);
+        stat.compute(input.substr(i * szwindow, szwindow), delimiter, csv);
         corpushl<double, std::string> recons(stat);
         recons.reDig(emph[ei]);
         std::cout << recons.serialize() << std::endl;
@@ -208,8 +206,7 @@ int main(int argc, const char* argv[]) {
     std::vector<std::string> buf;
     corpus<double, std::string> stat;
     for(int i = 0; i < input.size() / szwindow + 1; i ++) {
-      stat.init(csv, 0, 120);
-      stat.compute(input.substr(i * szwindow, szwindow), delimiter);
+      stat.compute(input.substr(i * szwindow, szwindow), delimiter, csv);
       const auto& work(stat.getWords());
       buf.insert(buf.end(), work.begin(), work.end());
     }
