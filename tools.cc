@@ -137,6 +137,10 @@ int main(int argc, const char* argv[]) {
         detailwords.push_back(work.first);
       }
     }
+    csv.insert(csv.end(), tocwords.begin(),    tocwords.end());
+    csv.insert(csv.end(), detailwords.begin(), detailwords.end());
+    std::sort(csv.begin(), csv.end());
+    csv.erase(std::unique(csv.begin(), csv.end()), csv.end());
     std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
     std::cout << std::string("<body>");
     for(int i = 0; i <= input.size() / szblock; i ++)
@@ -183,6 +187,10 @@ int main(int argc, const char* argv[]) {
         detailwords.push_back(work.first);
       }
     }
+    csv.insert(csv.end(), detailwords.begin(),  detailwords.end());
+    csv.insert(csv.end(), detailwords2.begin(), detailwords2.end());
+    std::sort(csv.begin(), csv.end());
+    csv.erase(std::unique(csv.begin(), csv.end()), csv.end());
     std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
     std::cout << std::string("<body>");
     for(int i = 0; i <= input.size() / szblock; i ++)
@@ -197,6 +205,9 @@ int main(int argc, const char* argv[]) {
       rdetails.push_back(work.second);
       rdetailwords.push_back(work.first);
     }
+    csv.insert(csv.end(), rdetailwords.begin(), rdetailwords.end());
+    std::sort(csv.begin(), csv.end());
+    csv.erase(std::unique(csv.begin(), csv.end()), csv.end());
     std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
     std::cout << std::string("<body>");
     for(int i = 0; i <= input.size() / szblock; i ++)

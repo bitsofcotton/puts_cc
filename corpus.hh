@@ -423,8 +423,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
   assert(words == other.words);
   const auto itr(lower_bound(words.begin(), words.end(), word));
   const int  eeidx(distance(words.begin(), itr));
-  if(! (0 <= eeidx && eeidx < words.size() && *itr == word))
-    return *this;
+  assert(0 <= eeidx && eeidx < words.size() && *itr == word);
   cerr << "withDetail : " << word << endl;
   corpushl<T, U> result(*this);
   const auto& oi0(other.corpust.iter());
