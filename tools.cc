@@ -207,7 +207,7 @@ int main(int argc, const char* argv[]) {
     corpus<double, std::string> stat;
     for(int i = 0; i < input.size() / szwindow + 1; i ++) {
       stat.compute(input.substr(i * szwindow, szwindow), delimiter, csv);
-      const auto& work(stat.getWords());
+      const auto work(corpushl<double,std::string>(stat).reverseLink());
       buf.insert(buf.end(), work.begin(), work.end());
     }
     std::sort(buf.begin(), buf.end());
