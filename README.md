@@ -29,7 +29,7 @@ Inspired from morphological analysis softwares and parameter auto configuring al
 There's preceders Tensor representation of the text set (with a way different to this) R.B. ieee 2004.
 
 # Status
-Checking and testing implementation through test.cc .
+Checking and testing implementation through test.cc . lword.hh is a little stable, corpus and corpushl class is beta, others are being in test.
 
 # Demos
 https://services.limpid-intensity.info/puts.php have a working sample.
@@ -65,4 +65,4 @@ If there's large numbers of the sets that correctly defined texts, it may optimi
 * https://files.limpid-intensity.info/
 
 # The things undone
-If we use similar things with leafs as a measure, middle of the table as a relation, and with morphological analysis, we might get better results and low memory condition, but there's NO implementation here. So that isn't needed by making TOCs.
+If we use similar things with category - relation - measure tensor, and with morphological analysis, we might get better results and low memory condition, but there's NO implementation here. So that isn't needed by making TOCs. And if so, if there's two or more phenomenon or people, shrink into one table, it's meaningless.
