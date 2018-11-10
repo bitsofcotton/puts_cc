@@ -26,7 +26,7 @@ void usage() {
 }
 
 const int szwindow(120);
-const int szblock(12000);
+const int szblock(1200);
 const int Mbalance(40);
 const double threshin(.01);
 std::vector<std::string> delimiter;
@@ -144,8 +144,7 @@ int main(int argc, const char* argv[]) {
     csv.erase(std::unique(csv.begin(), csv.end()), csv.end());
     std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
     std::cout << std::string("<body>");
-    for(int i = 0; i <= input.size() / szblock; i ++)
-      std::cout << preparedTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), csv, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.125), threshin, .125, std::strcmp(argv[1], "lack") == 0) << std::string("<hr/>") << std::endl;
+    std::cout << preparedTOC<double, std::string>(input, std::string("ref-"), csv, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.125), threshin, .125, std::strcmp(argv[1], "lack") == 0) << std::string("<hr/>") << std::endl;
     std::cout << std::string("</body></html>");
   } else if(std::strcmp(argv[1], "reconstruct") == 0) { 
     corpus<double, std::string> stat;
@@ -194,8 +193,7 @@ int main(int argc, const char* argv[]) {
     csv.erase(std::unique(csv.begin(), csv.end()), csv.end());
     std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
     std::cout << std::string("<body>");
-    for(int i = 0; i <= input.size() / szblock; i ++)
-      std::cout << diff<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), csv, details, detailwords, details2, detailwords2, delimiter, szwindow, threshin) << std::string("<hr/>") << std::endl;
+    std::cout << diff<double, std::string>(input, std::string("ref-"), csv, details, detailwords, details2, detailwords2, delimiter, szwindow, threshin) << std::string("<hr/>") << std::endl;
     std::cout << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "stat") == 0 ||
             std::strcmp(argv[1], "findroot") == 0) {
@@ -211,8 +209,7 @@ int main(int argc, const char* argv[]) {
     csv.erase(std::unique(csv.begin(), csv.end()), csv.end());
     std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
     std::cout << std::string("<body>");
-    for(int i = 0; i <= input.size() / szblock; i ++)
-      std::cout << optimizeTOC<double, std::string>(input.substr(i * szblock, szblock), std::string("ref") + std::to_string(i) + std::string("-"), csv, rdetails, rdetailwords, delimiter, szwindow, 8, threshin, 1., std::strcmp(argv[1], "findroot") == 0) << std::string("<hr/>") << std::endl;
+    std::cout << optimizeTOC<double, std::string>(input, std::string("ref-"), csv, rdetails, rdetailwords, delimiter, szwindow, 8, threshin, 1., std::strcmp(argv[1], "findroot") == 0) << std::string("<hr/>") << std::endl;
     std::cout << std::string("</body></html>");
   } else if(std::strcmp(argv[1], "prep") == 0) {
     std::vector<std::string> buf;
