@@ -116,7 +116,7 @@ template <typename T, typename U> U corpus<T,U>::getAttributed(const vector<U>& 
   U result;
   int    i;
   for(i = 0; i < orig.size(); ) {
-    const auto lb(lower_bound(highlight.begin(), highlight.end(), U(&(orig.c_str()[i])), equalStrClip<U>));
+    const auto lb(lower_bound(highlight.begin(), highlight.end(), U(&(orig.c_str()[i])), lessEqualStrClip<U>));
     if(highlight.begin() <= lb && lb < highlight.end() && equalStrClip<U>(*lb, U(&(orig.c_str()[i])))) {
       result += U("<font class=\"match\">");
       result += *lb;
