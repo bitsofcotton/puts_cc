@@ -102,10 +102,11 @@ int main(int argc, const char* argv[]) {
         }
     }
   } else if(std::strcmp(argv[1], "lbalance") == 0) {
-    const auto idxs(pseudoWordsBalance<double, std::string>(cutText(input, csvelim, delimiter), csv, Mbalance));
+    const auto cinput(cutText(input, csvelim, delimiter));
+    const auto idxs(pseudoWordsBalance<double, std::string>(cinput, csv, Mbalance));
     std::cout << idxs.size() << "sets." << std::endl;
     for(int i = 0; i < idxs.size(); i ++)
-      std::cout << input[idxs[i]] << std::endl;
+      std::cout << cinput[idxs[i]] << std::endl;
   }/* else if(std::strcmp(argv[1], "corpus") == 0) {
     corpus<double, std::string> stat;
     for(int i = 0; i < input.size() / szwindow + 1; i ++) {
