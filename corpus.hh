@@ -214,7 +214,6 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
 template <typename T, typename U> void corpus<T,U>::corpusEach() {
   corpust = Tensor();
   for(int i = 0; i < words.size(); i ++) {
-    cerr << "." << flush;
     if(!ptrs[i].size())
       continue;
     for(int j = 0; j < words.size(); j ++) {
@@ -424,7 +423,8 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
   assert(words == other.words);
   const auto itr(lower_bound(words.begin(), words.end(), word));
   const int  eeidx(distance(words.begin(), itr));
-  assert(0 <= eeidx && eeidx < words.size() && *itr == word);
+  if(! (0 <= eeidx && eeidx < words.size() && *itr == word))
+    return *this;
   cerr << "withDetail : " << word << endl;
   corpushl<T, U> result(*this);
   const auto& oi0(other.corpust.iter());
