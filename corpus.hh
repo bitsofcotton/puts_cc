@@ -721,7 +721,7 @@ template <typename T, typename U> vector<U> corpushl<T, U>::reverseLink() const 
   const auto idx(countIdx(T(0)));
   res.reserve(idx.size());
   for(int i = 0; i < idx.size(); i ++)
-    res[i] = words[idx[i]];
+    res.emplace_back(words[idx[i]]);
   return res;
 }
 
