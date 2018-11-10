@@ -1018,13 +1018,14 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     result += getTagged<T,U>(name + to_string(lscore[lidx][0].second.first), cstat0, stat0, lscore[lidx][0].second.first);
     result += getTagged<T,U>(name + to_string(lscore[lidx][0].second.first), cstat0, cs, lscore[lidx][0].second.first);
     result += cs.reverseLink(cstat0) + U("<br/>");
+    result += U("<br/>Show/Hide : <input class=\"gather\" type=\"checkbox\"><div class=\"gather\">");
     for(int i = 0; i < min(depth, int(lscore[lidx].size())); i ++) {
       getDetailed<T, U>(name, cstat0, stat0, input, lscore[lidx][i].second.second, words, detailtitle, detail, delimiter, szwindow, threshin);
       result += to_string(lscore[lidx][i].first) + U(" : ");
-      result += getTagged<T,U>(name + to_string(lscore[lidx][i].first), cstat0, stat0, lscore[lidx][i].first);
-      result += getTagged<T,U>(name + to_string(lscore[lidx][i].first), cstat0, cs, lscore[lidx][i].first);
+      result += getTagged<T,U>(name + to_string(lscore[lidx][i].second.first), cstat0, stat0, lscore[lidx][i].first);
+      result += getTagged<T,U>(name + to_string(lscore[lidx][i].second.first), cstat0, cs, lscore[lidx][i].first);
     }
-    result += U("</div><textarea name=\"entry\">");
+    result += U("</div></div><textarea name=\"entry\">");
     result += getCut<T,U>(input, lscore[lidx][0].second.first, szwindow);
     for(int i = 0; i < min(depth, int(lscore[lidx].size())); i ++) {
       result += getCut<T,U>(input, lscore[lidx][i].second.second, szwindow);
