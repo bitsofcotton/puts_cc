@@ -896,11 +896,14 @@ template <typename T, typename U> U getCut(const U& input, const int& idx, const
   return input.substr(idx * szwindow / 2, szwindow);
 }
 
-template <typename T, typename U> U getTagged(const U& name, corpus<T, U>& cstat0, corpushl<T, U>& cstat, const int& idx) {
+template <typename T, typename U> U getTagged(const U& name, corpus<T, U>& cstat0, corpushl<T, U>& cstat, const int& idx, const T& score, const U& input, const int& szwindow) {
   U tagged(U("<span id=\"") + name + to_string(idx) + U("\">"));
-  tagged += cstat.reverseLink(cstat0);
-  tagged += U("<br/> : ") + cstat0.getAttributed(cstat0.getWords());
-  tagged += U("</span><br/>");
+  tagged += U("score: ") + to_string(score) + U(" : ");
+  tagged += getCut<T, U>(input, idx, szwindow);
+  tagged += U("<input class=\"gatherdetail\" type=\"checkbox\"><div class=\"gatherdetail\">");
+  tagged += cstat.reverseLink(cstat0) + U("<br/>");
+  tagged += cstat0.getAttributed(cstat0.getWords());
+  tagged += U("</div></span>");
   return tagged;
 }
 
@@ -953,10 +956,13 @@ template <typename T, typename U> U preparedTOC(const U& input, const U& name, c
     for(int j = 0; j < min(int(topicidx.size()), depth); j ++) {
       getDetailed<T, U>(name, cstat0, stat0, topics[i], topicidx[j].second.first,  words, detailtitle, detail, delimiter, szwindow, threshin);
       getDetailed<T, U>(name, cstat1, stat1, input,     topicidx[j].second.second, words, detailtitle, detail, delimiter, szwindow, threshin);
-      result += U("score : ") + to_string(topicidx[j].first) + U(" : ");
-      result += getTagged<T,U>(name + to_string(i), cstat0, stat0, topicidx[j].second.first);
-      result += getTagged<T,U>(name + to_string(i), cstat1, stat1, topicidx[j].second.second);
+      result += topictitle[i] + U(" ");
+      result += getTagged<T,U>(name + to_string(i), cstat1, stat1, topicidx[j].second.second, topicidx[j].first, input, szwindow);
+      result += U("<input class=\"gatherdetail\" type=\"checkbox\"><div class=\"gatherdetail\">");
+      result += getCut<T,U>(topics[i], topicidx[j].second.first, szwindow);
+      result += U("</div><br/>");
     }
+    result += U("<br/><br/>");
   }
   return result;
 }
@@ -1017,21 +1023,16 @@ template <typename T, typename U> U optimizeTOC(const U& input, const U& name, c
     sort(phrases.begin(), phrases.end());
     result += U("<form action=\"../../../../puts.php\" method=\"POST\"><div>");
     result += U("base : ");
-    result += getTagged<T,U>(name + to_string(lscore[lidx][0].second.first), cstat0, stat0, lscore[lidx][0].second.first);
-    result += getTagged<T,U>(name + to_string(lscore[lidx][0].second.first), cstat0, cs, lscore[lidx][0].second.first);
-    result += cs.reverseLink(cstat0) + U("<br/>");
+    result += getTagged<T,U>(name + to_string(lscore[lidx][0].second.first), cstat0, cs, lscore[lidx][0].second.first, lscore[lidx][0].first, input, szwindow) + U("<br/>");
     result += U("<br/>Show/Hide : <input class=\"gather\" type=\"checkbox\"><div class=\"gather\">");
     for(int i = 0; i < min(depth, int(lscore[lidx].size())); i ++) {
       getDetailed<T, U>(name, cstat0, stat0, input, lscore[lidx][i].second.second, words, detailtitle, detail, delimiter, szwindow, threshin);
-      result += to_string(lscore[lidx][i].first) + U(" : ");
-      result += getTagged<T,U>(name + to_string(lscore[lidx][i].second.first), cstat0, stat0, lscore[lidx][i].first);
-      result += getTagged<T,U>(name + to_string(lscore[lidx][i].second.first), cstat0, cs, lscore[lidx][i].first);
+      result += getTagged<T,U>(name + to_string(lscore[lidx][i].second.second), cstat0, cs, lscore[lidx][i].second.second, lscore[lidx][i].first, input, szwindow) + U("<br/>");
     }
     result += U("</div></div><textarea name=\"entry\">");
-    result += getCut<T,U>(input, lscore[lidx][0].second.first, szwindow);
-    for(int i = 0; i < min(depth, int(lscore[lidx].size())); i ++) {
-      result += getCut<T,U>(input, lscore[lidx][i].second.second, szwindow);
-    }
+    result += getCut<T,U>(input, lscore[lidx][0].second.first, szwindow) + U("\n");
+    for(int i = 0; i < min(depth, int(lscore[lidx].size())); i ++)
+      result += getCut<T,U>(input, lscore[lidx][i].second.second, szwindow) + U("\n");
     result += U("</textarea>");
     result += U("<input type=\"hidden\" name=\"name\" value=\"append\" />");
     result += U("<input type=\"hidden\" name=\"adddict\" value=\"\" />");
