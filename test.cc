@@ -142,7 +142,7 @@ int main(int argc, const char* argv[]) {
     csv.erase(std::unique(csv.begin(), csv.end()), csv.end());
     std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
     std::cout << std::string("<body>");
-    std::cout << preparedTOC<double, std::string>(input, std::string("ref-"), csv, detailwords, details, tocwords, tocs, delimiter, szwindow, double(.125), threshin, .125, std::strcmp(argv[1], "lack") == 0) << std::string("<hr/>") << std::endl;
+    std::cout << preparedTOC<double, std::string>(input, std::string("ref-"), csv, detailwords, details, tocwords, tocs, delimiter, szwindow, 8, threshin, .125, std::strcmp(argv[1], "lack") == 0) << std::string("<hr/>") << std::endl;
     std::cout << std::string("</body></html>");
   } else if(std::strcmp(argv[1], "reconstruct") == 0) { 
     corpus<double, std::string> stat;
