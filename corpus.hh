@@ -423,6 +423,9 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
   const auto itr(lower_bound(words.begin(), words.end(), word));
   const int  eeidx(distance(words.begin(), itr));
   assert(0 <= eeidx && eeidx < words.size() && *itr == word);
+  const auto idxs(countIdx(T(0)));
+  if(!binary_search(idxs.begin(), idxs.end(), eeidx))
+    return *this;
   cerr << "withDetail : " << word << endl;
   corpushl<T, U> result(*this);
   const auto& oi0(other.corpust.iter());
