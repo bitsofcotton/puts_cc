@@ -142,7 +142,7 @@ int main(int argc, const char* argv[]) {
     csv.insert(csv.end(), detailwords.begin(), detailwords.end());
     std::sort(csv.begin(), csv.end());
     csv.erase(std::unique(csv.begin(), csv.end()), csv.end());
-    std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
+    std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>") << std::endl;
     std::cout << std::string("<body>");
     std::cout << preparedTOC<double, std::string>(input, std::string("ref-"), csv, detailwords, details, tocwords, tocs, delimiter, szwindow, 8, threshin, .125, std::strcmp(argv[1], "lack") == 0) << std::string("<hr/>") << std::endl;
     std::cout << std::string("</body></html>");
@@ -191,7 +191,7 @@ int main(int argc, const char* argv[]) {
     csv.insert(csv.end(), detailwords2.begin(), detailwords2.end());
     std::sort(csv.begin(), csv.end());
     csv.erase(std::unique(csv.begin(), csv.end()), csv.end());
-    std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
+    std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>") << std::endl;
     std::cout << std::string("<body>");
     std::cout << diff<double, std::string>(input, std::string("ref-"), csv, details, detailwords, details2, detailwords2, delimiter, szwindow, threshin) << std::string("<hr/>") << std::endl;
     std::cout << "</body></html>" << std::endl;
@@ -207,7 +207,7 @@ int main(int argc, const char* argv[]) {
     csv.insert(csv.end(), rdetailwords.begin(), rdetailwords.end());
     std::sort(csv.begin(), csv.end());
     csv.erase(std::unique(csv.begin(), csv.end()), csv.end());
-    std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
+    std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>") << std::endl;
     std::cout << std::string("<body>");
     std::cout << optimizeTOC<double, std::string>(input, std::string("ref-"), csv, rdetails, rdetailwords, delimiter, szwindow, 8, threshin, 1., std::strcmp(argv[1], "findroot") == 0) << std::string("<hr/>") << std::endl;
     std::cout << std::string("</body></html>");
