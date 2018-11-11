@@ -695,8 +695,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
       }
     }
   }
-  // XXX:
-  const auto okidx(countIdx(T(0)));
+  const auto okidx(result.countIdx(T(0)));
   for(int i = 0; i < okidx.size(); i ++) {
     if(i == widx) continue;
     const auto ii(okidx[i]);
