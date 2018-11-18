@@ -688,14 +688,14 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
   }
   const auto okidx(result.countIdx(T(0)));
   for(int i = 0; i < okidx.size(); i ++) {
-    if(i == widx) continue;
     const auto ii(okidx[i]);
+    if(ii == widx) continue;
     for(int j = 0; j < okidx.size(); j ++) {
-      if(j == widx) continue;
       const auto jj(okidx[j]);
+      if(jj == widx) continue;
       for(int k = 0; k < okidx.size(); k ++) {
-        if(k == widx) continue;
         const auto kk(okidx[k]);
+        if(kk == widx) continue;
         // XXX fixme ratio.
         const T score((const_cast<const Tensor&>(corpust))[ii][jj][kk] * (c_ij[ii][jj] + c_jk[jj][kk] + c_ik[ii][kk]) / result.words.size());
         result.corpust[widx][jj][kk] += score / T(3);
