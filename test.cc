@@ -28,7 +28,7 @@ void usage() {
 const int szwindow(200);
 const int szblock(8000);
 const int Mbalance(40);
-const double threshin(.01);
+const double threshin(.1);
 std::vector<std::string> delimiter;
 std::vector<std::string> csvelim;
 std::vector<std::string> csvdelim;
