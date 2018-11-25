@@ -331,13 +331,15 @@ template <typename T, typename U> corpushl<T,U>::~corpushl() {
 }
 
 template <typename T, typename U> corpushl<T,U>::corpushl(const corpus<T, U>& obj) {
-  words   = vector<U>(obj.getWords());
-  corpust = Tensor(obj.getCorpus());
+  words    = vector<U>(obj.getWords());
+  corpust  = Tensor(obj.getCorpus());
+  *this   /= cdot(*this);
 }
 
 template <typename T, typename U> corpushl<T,U>::corpushl(corpus<T, U>&& obj) {
   words   = move(obj.getWords());
   corpust = move(obj.getCorpus());
+  *this  /= cdot(*this);
 }
 
 template <typename T, typename U> corpushl<T,U>::corpushl(const corpushl<T, U>& obj) {
@@ -909,7 +911,7 @@ template <typename T, typename U> bool getDetailed(corpus<T, U>& cstat0, corpush
       lstat.compute(detail[i].substr(j * szwindow / 2, szwindow), delimiter, words);
       corpushl<T, U> work(lstat);
       work = work.simpleThresh(thresh);
-      cstat = cstat.withDetail(detailtitle[i], work, thresh);
+      cstat = cstat.withDetail(detailtitle[i], work, thresh).simpleThresh(thresh);
     }
   return true;
 }
@@ -945,10 +947,10 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
       getDetailed<T, U>(cstat0, stat0, topics[i], topicidx[j].second.first,  words, detailtitle, detail, delimiter, szwindow, threshin);
       getDetailed<T, U>(cstat1, stat1, input,     topicidx[j].second.second, words, detailtitle, detail, delimiter, szwindow, threshin);
       result += topictitle[i] + U(" ");
-      result += getTagged<T,U>(U("prepTOC_") + to_string(i), cstat1, stat1, topicidx[j].second.second, topicidx[j].first, input, szwindow);
-      result += U("<input class=\"gatherdetail\" type=\"checkbox\"><div class=\"gatherdetail\">");
-      result += getCut<T,U>(topics[i], topicidx[j].second.first, szwindow);
-      result += U("</div><br/>");
+      result += getTagged<T,U>(U("prepTOC_") + to_string(i) + U("-") + to_string(j) + U("-1"), cstat0, stat1, topicidx[j].second.second, topicidx[j].first, input, szwindow);
+      result += U("<br/>");
+      result += getTagged<T,U>(U("prepTOC_") + to_string(i) + U("-") + to_string(j) + U("-2"), cstat1, stat0, topicidx[j].second.first, topicidx[j].first, topics[i], szwindow);
+      result += U("<br/><br/>");
     }
     result += U("<br/><br/>");
   }
@@ -1041,8 +1043,10 @@ template <typename T, typename U> U diff(const U& input, const vector<U>& words,
     if(!getDetailed<T, U>(cstat0, cstat, input, i, words, detailtitle0, detail0, delimiter, szwindow, threshin) ||
        !getDetailed<T, U>(dstat0, dstat, input, i, words, detailtitle1, detail1, delimiter, szwindow, threshin))
       break;
+/*
     getAbbreved<T, U>(cstat, words, detailtitle1, detail1, delimiter, szwindow);
     getAbbreved<T, U>(dstat, words, detailtitle0, detail0, delimiter, szwindow);
+*/
     cstat.reDig(redig);
     dstat.reDig(redig);
     const auto score(abs(cstat.cdot(dstat)) / sqrt(cstat.cdot(cstat) * dstat.cdot(dstat)) - T(1));
@@ -1056,8 +1060,10 @@ template <typename T, typename U> U diff(const U& input, const vector<U>& words,
     if(!getDetailed<T, U>(cstat0, cstat, input, i, words, detailtitle0, detail0, delimiter, szwindow, threshin) ||
        !getDetailed<T, U>(dstat0, dstat, input, i, words, detailtitle1, detail1, delimiter, szwindow, threshin))
       break;
+/*
     getAbbreved<T, U>(cstat, words, detailtitle1, detail1, delimiter, szwindow);
     getAbbreved<T, U>(dstat, words, detailtitle0, detail0, delimiter, szwindow);
+*/
     cstat.reDig(redig);
     dstat.reDig(redig);
     auto diff(cstat - dstat);
