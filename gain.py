@@ -180,5 +180,4 @@ if(cnt < num):
 else:
   fn.write(str(num0 + numl))
 fn.close()
-  
 
