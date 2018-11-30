@@ -528,9 +528,9 @@ template <typename T, typename U> T corpushl<T, U>::absmax() const {
 
 template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T, U>& prejs) const {
 #if defined(_STRICT_WORD_ASSERT_)
-  assert(words == other.words);
+  assert(words == prejs.words);
 #else
-  assert(words.size() == other.words.size());
+  assert(words.size() == prejs.words.size());
 #endif
   static bool shown(false);
   if(!shown) {
@@ -674,9 +674,9 @@ template <typename T, typename U> U corpushl<T, U>::serializeSub(const vector<in
 
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U& word, const corpushl<T, U>& work, const T& thresh) const {
 #if defined(_STRICT_WORD_ASSERT_)
-  assert(words == other.words);
+  assert(words == work.words);
 #else
-  assert(words.size() == other.words.size());
+  assert(words.size() == work.words.size());
 #endif
   const T tn(     cdot(work));
   const T td(work.cdot(work));
