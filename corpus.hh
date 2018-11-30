@@ -112,8 +112,8 @@ template <typename T, typename U> const void corpus<T,U>::compute(const U& input
 }
 
 template <typename T, typename U> U corpus<T,U>::getAttributed(const vector<U>& highlight) const {
-  U result;
-  int    i;
+  U   result;
+  int i;
   for(i = 0; i < orig.size(); ) {
     const auto lb(upper_bound(highlight.begin(), highlight.end(), U(&(orig.c_str()[i])), lessEqualStrClip<U>));
     if(highlight.begin() <= lb && lb < highlight.end() && equalStrClip<U>(*lb, U(&(orig.c_str()[i])))) {
@@ -156,10 +156,8 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
     for(int j = i; j < dM; j ++)
       workd[i] += U(" ");
   }
-  orig = U("");
-  for(int i = 0; i < input.size(); i ++)
-    orig += input[i];
-  int  i(0), i0(0);
+  orig = U(input);
+  int i(0), i0(0);
   for( ; i < input.size(); i ++) {
     work += input[i];
     for(int ii = 0; ii < workd.size(); ii ++) {
@@ -196,17 +194,12 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
     work = U();
   }
   pdelim.push_back(Midx + 2);
-  vector<int> headtail;
-  headtail.push_back(0);
-  for(int i = 0; i < pdelim.size(); i ++)
-    headtail.push_back(pdelim[i]);
-  sort(headtail.begin(), headtail.end());
   const auto headidx(distance(words.begin(), lower_bound(words.begin(), words.end(), U("^"))));
   const auto tailidx(distance(words.begin(), lower_bound(words.begin(), words.end(), U("$"))));
   assert(0 <= headidx && headidx < words.size());
   assert(0 <= tailidx && tailidx < words.size());
-  ptrs[headidx] = headtail;
-  ptrs[tailidx] = headtail;
+  ptrs[headidx] = pdelim;
+  ptrs[tailidx] = pdelim;
   return;
 }
 
@@ -224,9 +217,9 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
            words[i] == U("$") || words[j] == U("$") || words[k] == U("$") ||
            words[i] == U("^") || words[j] == U("^") || words[k] == U("^"))
           continue;
-        int ctru  = 0;
-        int ctrv  = 0;
-        int kk    = 0;
+        int ctru = 0;
+        int ctrv = 0;
+        int kk   = 0;
         for(auto itr = ptrs[k].begin(); itr != ptrs[k].end(); ++ itr) {
           while(ctru < ptrs[i].size() && ptrs[i][ctru] < *itr) ctru ++;
           ctru --;
@@ -331,9 +324,9 @@ template <typename T, typename U> corpushl<T,U>::~corpushl() {
 }
 
 template <typename T, typename U> corpushl<T,U>::corpushl(const corpus<T, U>& obj) {
-  words    = vector<U>(obj.getWords());
-  corpust  = Tensor(obj.getCorpus());
-  *this   /= cdot(*this);
+  words   = vector<U>(obj.getWords());
+  corpust = Tensor(obj.getCorpus());
+  *this  /= cdot(*this);
 }
 
 template <typename T, typename U> corpushl<T,U>::corpushl(corpus<T, U>&& obj) {
@@ -367,18 +360,30 @@ template <typename T, typename U> bool corpushl<T, U>::operator == (const corpus
 }
 
 template <typename T, typename U> bool corpushl<T, U>::operator != (const corpushl<T, U>& other) const {
+#if defined(_STRICT_WORD_ASSERT_)
   assert(words == other.words);
+#else
+  assert(words.size() == other.words.size());
+#endif
   return corpust != other.corpust;
 }
 
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator += (const corpushl<T, U>& other) {
+#if defined(_STRICT_WORD_ASSERT_)
   assert(words == other.words);
+#else
+  assert(words.size() == other.words.size());
+#endif
   corpust += other.corpust;
   return *this;
 }
 
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator -= (const corpushl<T, U>& other) {
+#if defined(_STRICT_WORD_ASSERT_)
   assert(words == other.words);
+#else
+  assert(words.size() == other.words.size());
+#endif
   corpust -= other.corpust;
   return *this;
 }
@@ -420,7 +425,11 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator / (con
 }
 
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(const U& word, const corpushl<T, U>& other, const T& thresh) const {
+#if defined(_STRICT_WORD_ASSERT_)
   assert(words == other.words);
+#else
+  assert(words.size() == other.words.size());
+#endif
   const auto itr(lower_bound(words.begin(), words.end(), word));
   const int  eeidx(distance(words.begin(), itr));
   assert(0 <= eeidx && eeidx < words.size() && *itr == word);
@@ -440,10 +449,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
       for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
         // Sum-up detailed word into result pool without definition row, col.
         const int& kk(itr2->first);
-        if(itr2->second == T(0) ||
-           ! ( (ii != eeidx && jj != eeidx) ||
-               (jj != eeidx && kk != eeidx) ||
-               (kk != eeidx && ii != eeidx) ) )
+        if(itr2->second == T(0) || !(ii == eeidx || jj == eeidx || kk == eeidx))
           continue;
         // add crossing points
         const auto& ti0(corpust.iter());
@@ -486,7 +492,11 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
 }
 
 template <typename T, typename U> T corpushl<T, U>::cdot(const corpushl<T, U>& other) const {
+#if defined(_STRICT_WORD_ASSERT_)
   assert(words == other.words);
+#else
+  assert(words.size() == other.words.size());
+#endif
   T res(0);
   const auto& oi0(other.corpust.iter());
   for(auto itr0(oi0.begin()); itr0 != oi0.end(); ++ itr0)
@@ -517,7 +527,11 @@ template <typename T, typename U> T corpushl<T, U>::absmax() const {
 }
 
 template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T, U>& prejs) const {
-  assert(words == prejs.words);
+#if defined(_STRICT_WORD_ASSERT_)
+  assert(words == other.words);
+#else
+  assert(words.size() == other.words.size());
+#endif
   static bool shown(false);
   if(!shown) {
     cerr << "XXX : confirm me corpushl::prej function." << endl;
@@ -659,7 +673,11 @@ template <typename T, typename U> U corpushl<T, U>::serializeSub(const vector<in
 }
 
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U& word, const corpushl<T, U>& work, const T& thresh) const {
-  assert(words == work.words);
+#if defined(_STRICT_WORD_ASSERT_)
+  assert(words == other.words);
+#else
+  assert(words.size() == other.words.size());
+#endif
   const T tn(     cdot(work));
   const T td(work.cdot(work));
   if(td <= T(0))
@@ -668,7 +686,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
   auto result((*this * td - work * tn) / td);
   const int widx(distance(result.words.begin(), lower_bound(result.words.begin(), result.words.end(), word)));
   assert(0 <= widx && widx < result.words.size() && result.words[widx] == word);
-  result.corpust[widx][widx][widx] += sqrt(td);
+  result.corpust[widx][widx][widx] += (tn < T(0) ? - T(1) : T(1)) * sqrt(abs(tn));
   const auto& ci0(result.corpust.iter());
   Mat c_ij, c_jk, c_ik;
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {

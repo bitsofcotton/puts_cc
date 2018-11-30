@@ -141,7 +141,7 @@ template <typename T> inline bool SimpleSparseVector<T>::operator != (const Simp
     if(itr->second != other[itr->first])
       return true;
   for(auto itr(other.entity.begin()); itr != other.entity.end(); ++ itr)
-    if(itr->second != (*this)[itr->first])
+    if(itr->second != const_cast<const SimpleSparseVector<T>&>(*this)[itr->first])
       return true;
   return false;
 }
