@@ -1061,10 +1061,8 @@ template <typename T, typename U> U diff(const U& input, const vector<U>& words,
     if(!getDetailed<T, U>(cstat0, cstat, input, i, words, detailtitle0, detail0, delimiter, szwindow, threshin) ||
        !getDetailed<T, U>(dstat0, dstat, input, i, words, detailtitle1, detail1, delimiter, szwindow, threshin))
       break;
-/*
     getAbbreved<T, U>(cstat, words, detailtitle1, detail1, delimiter, szwindow);
     getAbbreved<T, U>(dstat, words, detailtitle0, detail0, delimiter, szwindow);
-*/
     cstat.reDig(redig);
     dstat.reDig(redig);
     const auto score(abs(cstat.cdot(dstat)) / sqrt(cstat.cdot(cstat) * dstat.cdot(dstat)) - T(1));
@@ -1078,10 +1076,8 @@ template <typename T, typename U> U diff(const U& input, const vector<U>& words,
     if(!getDetailed<T, U>(cstat0, cstat, input, i, words, detailtitle0, detail0, delimiter, szwindow, threshin) ||
        !getDetailed<T, U>(dstat0, dstat, input, i, words, detailtitle1, detail1, delimiter, szwindow, threshin))
       break;
-/*
     getAbbreved<T, U>(cstat, words, detailtitle1, detail1, delimiter, szwindow);
     getAbbreved<T, U>(dstat, words, detailtitle0, detail0, delimiter, szwindow);
-*/
     cstat.reDig(redig);
     dstat.reDig(redig);
     auto diff(cstat - dstat);
