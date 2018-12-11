@@ -47,7 +47,7 @@ And, please configure the executable paths.
 prep.py needs legacy \_mysql library with python2.7, this can cause compatibility problem, so then, please rewrite prep.py file. And, database references are done only with prep.py, please configure first.
 
 # Importing wiktionary database (GFDL)
-We needs mediawiki and xml2sql softwares. And if you need, please import wiktionary huge database into your database to run with.
+We needs mediawiki and xml2sql softwares. And if you need, please import wiktionary huge database into your database to run with. And, dictating wiktionary needs huge amounts of memory.
 
 # Tips
 These programs may have a algorithm that is *not carefully confirmed*.  
