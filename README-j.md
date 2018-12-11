@@ -49,6 +49,7 @@ prep.py はとても古い python2.7 および \_mysql ライブラリを必要�
 # wiktionary のインポート (GFDL)
 mediawiki さんの最新バージョンと xml2sql さんが必要です。
 必要であれば莫大なデータベースである wikipedia さんの wiktionary をインポートしてください。
+また、wiktionary 辞書引きはとても大きなメモリ領域を必要とします。
 
 # Tips
 これらのプログラムはまだよく検証されたアルゴリズムを使用して*いない可能性があります*。  
