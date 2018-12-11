@@ -67,7 +67,7 @@ public:
   ~corpus();
   
   corpus<T, U>&    operator = (const corpus<T, U>& other);
-  const void       compute(const U& input, const vector<U>& delimiter, const vector<U>& words);
+  corpus<T, U>&    compute(const U& input, const vector<U>& delimiter, const vector<U>& words);
         U          getAttributed(const vector<U>& highlight) const;
   const U&         getOrig() const;
   const vector<U>& getWords() const;
@@ -103,12 +103,12 @@ template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator = (const 
   return *this;
 }
 
-template <typename T, typename U> const void corpus<T,U>::compute(const U& input, const vector<U>& delimiter, const vector<U>& words) {
+template <typename T, typename U> corpus<T, U>& corpus<T,U>::compute(const U& input, const vector<U>& delimiter, const vector<U>& words) {
   this->words = words;
   cerr << "c" << flush;
   getWordPtrs(input, delimiter);
   corpusEach();
-  return;
+  return *this;
 }
 
 template <typename T, typename U> U corpus<T,U>::getAttributed(const vector<U>& highlight) const {
@@ -891,12 +891,7 @@ template <typename T, typename U> const SimpleSparseTensor<T>& corpushl<T, U>::g
 template <typename T, typename U> void getAbbreved(corpushl<T, U>& cstat, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow) {
   assert(detailtitle.size() == detail.size());
   for(int i = 0; i < detail.size(); i ++)
-    for(int j = 0; j < detail[i].size() / szwindow * 2 + 1; j ++) {
-      corpus<T, U> lstat;
-      lstat.compute(detail[i].substr(j * szwindow / 2, szwindow), delimiter, words);
-      corpushl<T, U> work(lstat);
-      cstat = cstat.abbrev(detailtitle[i], work);
-    }
+    cstat = cstat.abbrev(detailtitle[i], corpushl<T, U>(corpus<T, U>().compute(detail[i], delimiter, words)));
   return;
 }
 
@@ -904,7 +899,7 @@ template <typename T, typename U> U getCut(const U& input, const int& idx, const
   return input.substr(idx * szwindow / 2, szwindow);
 }
 
-template <typename T, typename U> U getTagged(const U& name, corpus<T, U>& cstat0, corpushl<T, U>& cstat, const int& idx, const T& score, const U& input, const int& szwindow) {
+template <typename T, typename U> U getTagged(const U& name, const corpus<T, U>& cstat0, const corpushl<T, U>& cstat, const int& idx, const T& score, const U& input, const int& szwindow) {
   U tagged(U("<span id=\"") + name + to_string(idx) + U("\">"));
   tagged += U("score: ") + to_string(score) + U(" : ");
   tagged += getCut<T, U>(input, idx, szwindow);
@@ -924,13 +919,7 @@ template <typename T, typename U> bool getDetailed(corpus<T, U>& cstat0, corpush
   cstat0.compute(input.substr(idx * szwindow / 2, szwindow), delimiter, words);
   cstat  = corpushl<T, U>(cstat0).simpleThresh(thresh);
   for(int i = 0; i < detail.size(); i ++)
-    for(int j = 0; j < detail[i].size() / szwindow * 2 + 1; j ++) {
-      corpus<T, U> lstat;
-      lstat.compute(detail[i].substr(j * szwindow / 2, szwindow), delimiter, words);
-      corpushl<T, U> work(lstat);
-      work = work.simpleThresh(thresh);
-      cstat = cstat.withDetail(detailtitle[i], work, thresh).simpleThresh(thresh);
-    }
+    cstat = cstat.withDetail(detailtitle[i], corpushl<T, U>(corpus<T, U>().compute(detail[i], delimiter, words)).simpleThresh(thresh), thresh).simpleThresh(thresh);
   return true;
 }
 
@@ -942,15 +931,24 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
   if(!topics.size())
     result += U("zero input.<br/>");
   for(int i = 0; i < topics.size(); i ++) {
-    corpus<T, U>   cstat0, cstat1;
-    corpushl<T, U> stat0,  stat1;
     vector<pair<T, pair<int, int> > > topicidx;
-    for(int j = 0; getDetailed<T, U>(cstat0, stat0, topics[i], j, words, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
-      stat0.reDig(redig);
+    vector<corpus<T, U> >   cstats;
+    vector<corpushl<T, U> > stats;
+    cstats.push_back(corpus<T, U>());
+    stats.push_back(corpushl<T, U>());
+    for(int j = 0; getDetailed<T, U>(cstats[cstats.size() - 1], stats[stats.size() - 1], topics[i], j, words, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
+      stats[j].reDig(redig);
+      cstats.push_back(corpus<T, U>());
+      stats.push_back(corpushl<T, U>());
+    }
+    for(int j = 0; j < stats.size() - 1; j ++) {
+      const auto& cstat0(cstats[j]);
+      const auto& stat0(stats[j]);
       int idx(0);
       T   score(0);
-      for(int k = 0; getDetailed<T, U>(cstat1, stat1, input, k, words, detailtitle, detail, delimiter, szwindow, threshin); k ++) {
-        stat1.reDig(redig);
+      for(int k = 0; k < stats.size() - 1; k ++) {
+        const auto& cstat1(cstats[k]);
+        const auto& stat1(stats[k]);
         const T lscore(reverse ? T(1) / abs(stat0.prej(stat1))
                                :            stat0.prej(stat1) );
         if(isfinite(lscore) && score <= lscore) {
@@ -962,8 +960,10 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
     }
     sort(topicidx.begin(), topicidx.end());
     for(int j = 0; j < min(int(topicidx.size()), depth); j ++) {
-      getDetailed<T, U>(cstat0, stat0, topics[i], topicidx[j].second.first,  words, detailtitle, detail, delimiter, szwindow, threshin);
-      getDetailed<T, U>(cstat1, stat1, input,     topicidx[j].second.second, words, detailtitle, detail, delimiter, szwindow, threshin);
+      const auto& cstat0(cstats[topicidx[j].second.first]);
+      const auto& cstat1(cstats[topicidx[j].second.second]);
+      const auto& stat0(stats[topicidx[j].second.first]);
+      const auto& stat1(stats[topicidx[j].second.second]);
       result += topictitle[i] + U(" ");
       result += getTagged<T,U>(U("prepTOC_") + to_string(i) + U("-") + to_string(j) + U("-1"), cstat0, stat1, topicidx[j].second.second, topicidx[j].first, input, szwindow);
       result += U("<br/>");
@@ -979,16 +979,26 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
   assert(notcheck == U(""));
   cerr << "optimizeTOC..." << endl;
   SimpleSparseMatrix<T> scores;
-  corpus<T, U>   cstat0, cstat1;
-  corpushl<T, U> stat0,  stat1;
   int Midx(0);
-  for(int i = 0; getDetailed<T, U>(cstat0, stat0, input, i, words, detailtitle, detail, delimiter, szwindow, threshin); i ++)
-    for(int j = i + 1; getDetailed<T, U>(cstat1, stat1, input, j, words, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
+  vector<corpus<T, U> >   cstats;
+  vector<corpushl<T, U> > stats;
+  cstats.push_back(corpus<T, U>());
+  stats.push_back(corpushl<T, U>());
+  for(int i = 0; getDetailed<T, U>(cstats[cstats.size() - 1], stats[stats.size() - 1], input, i, words, detailtitle, detail, delimiter, szwindow, threshin); i ++) {
+    stats[i].reDig(redig);
+    cstats.push_back(corpus<T, U>());
+    stats.push_back(corpushl<T, U>());
+  }
+  for(int i = 0; i < cstats.size() - 2; i ++) {
+    const auto& stat0(stats[i]);
+    for(int j = i + 1; j < cstats.size() - 2; j ++) {
+      const auto& stat1(stats[j]);
       scores[i][j] = - stat0.prej(stat1);
       Midx = max(Midx, j);
     }
+  }
   cerr << "OK" << flush;
-  U result;
+  U   result;
   int idx(0);
   vector<int> phrases;
   for(int ii = 0; phrases.size() < Midx; ii ++) {
@@ -1019,13 +1029,13 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
       }
     if(lscore[lidx].size() <= 0)
       break;
-    phrases.push_back(lscore[lidx][0].first);
+    phrases.push_back(lscore[lidx][0].second.first);
     sort(phrases.begin(), phrases.end());
-    getDetailed<T, U>(cstat0, stat0, input, lscore[lidx][0].second.first, words, detailtitle, detail, delimiter, szwindow, threshin);
+    const auto& cstat0(cstats[lscore[lidx][0].second.first]);
+    const auto& stat0(stats[lscore[lidx][0].second.first]);
     auto cs(stat0);
     for(int i = 0; i < min(depth, int(lscore[lidx].size())); i ++) {
-      getDetailed<T, U>(cstat0, stat0, input, lscore[lidx][i].second.second, words, detailtitle, detail, delimiter, szwindow, threshin);
-      cs += stat0;
+      cs += stats[lscore[lidx][i].second.second];
       phrases.push_back(lscore[lidx][i].second.second);
     }
     sort(phrases.begin(), phrases.end());
@@ -1034,7 +1044,8 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
     result += getTagged<T,U>(U("optTOC_") + to_string(lscore[lidx][0].second.first), cstat0, cs, lscore[lidx][0].second.first, lscore[lidx][0].first, input, szwindow) + U("<br/>");
     result += U("<br/>Show/Hide : <input class=\"gather\" type=\"checkbox\"><div class=\"gather\">");
     for(int i = 0; i < min(depth, int(lscore[lidx].size())); i ++) {
-      getDetailed<T, U>(cstat0, stat0, input, lscore[lidx][i].second.second, words, detailtitle, detail, delimiter, szwindow, threshin);
+      const auto& cstat0(cstats[lscore[lidx][i].second.second]);
+      const auto& stat0(stats[lscore[lidx][i].second.second]);
       result += getTagged<T,U>(U("optTOC_") + to_string(lscore[lidx][i].second.second), cstat0, cs, lscore[lidx][i].second.second, lscore[lidx][i].first, input, szwindow) + U("<br/>");
     }
     result += U("</div></div><textarea name=\"entry\">");
@@ -1046,7 +1057,6 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
     result += U("<input type=\"hidden\" name=\"adddict\" value=\"\" />");
     result += U("<input type=\"submit\" value=\"Append\" />");
     result += U("</form><br/>");
-    sort(phrases.begin(), phrases.end());
   }
   return result;
 }
