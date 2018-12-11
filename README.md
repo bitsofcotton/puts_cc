@@ -5,7 +5,7 @@ And this program is implemented with a deterministic way.
 This IS NOT the program that judges it is true or false, this IS ONLY the program that seines
 the score that seems to be true or that seems to be false FROM INPUT (with NO deductions for logics).
 
-This program uses large amount of region on the memory. And, very slow because of the scans on large regions.
+This program uses large amount of region on the memory. And, very slow because of the scans on large regions. And, almost all of memory caches are not works on this.
 
 # Usage
     make tools
