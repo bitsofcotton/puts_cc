@@ -981,9 +981,9 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
       const auto& stat0(istats[topicidx[j].second.first]);
       const auto& stat1(stats[topicidx[j].second.second]);
       result += topictitle[i] + U(" ");
-      result += getTagged<T,U>(U("prepTOC_") + to_string(i) + U("-") + to_string(j) + U("-1"), cstat0, stat1, topicidx[j].second.second, topicidx[j].first, input, szwindow);
+      result += getTagged<T,U>(U("prepTOC_") + to_string(i) + U("-") + to_string(j) + U("-1"), cstat0, stat1, topicidx[j].second.first, topicidx[j].first, input, szwindow);
       result += U("<br/>");
-      result += getTagged<T,U>(U("prepTOC_") + to_string(i) + U("-") + to_string(j) + U("-2"), cstat1, stat0, topicidx[j].second.first, topicidx[j].first, topics[i], szwindow);
+      result += getTagged<T,U>(U("prepTOC_") + to_string(i) + U("-") + to_string(j) + U("-2"), cstat1, stat0, topicidx[j].second.second, topicidx[j].first, topics[i], szwindow);
       result += U("<br/><br/>");
     }
     result += U("<br/><br/>");
