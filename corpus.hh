@@ -76,6 +76,7 @@ private:
   U                    orig;
   vector<U>            words;
   vector<vector<int> > ptrs;
+  vector<int>          uptrs;
   vector<int>          pdelim;
   Tensor               corpust;
   int                  Midx;
@@ -97,6 +98,7 @@ template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator = (const 
   orig    = other.orig;
   words   = other.words;
   ptrs    = other.ptrs;
+  uptrs   = other.uptrs;
   pdelim  = other.pdelim;
   corpust = other.corpust;
   Midx    = other.Midx;
@@ -183,6 +185,7 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
     if(matchwidx.size() > 0) {
       const int j(matchwidx.size() - 1);
       ptrs[matchwidx[j]].push_back(matchidxs[j]);
+      uptrs.emplace_back(matchwidx[j]);
       Midx = matchidxs[j];
       matchwidx = vector<int>();
       matchidxs = vector<int>();
@@ -200,21 +203,23 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
   assert(0 <= tailidx && tailidx < words.size());
   ptrs[headidx] = pdelim;
   ptrs[tailidx] = pdelim;
+  uptrs.emplace_back(headidx);
+  uptrs.emplace_back(tailidx);
+  sort(uptrs.begin(), uptrs.end());
+  uptrs.erase(unique(uptrs.begin(), uptrs.end()), uptrs.end());
   return;
 }
 
 template <typename T, typename U> void corpus<T,U>::corpusEach() {
   corpust = Tensor();
-  for(int i = 0; i < words.size(); i ++) {
-    if(!ptrs[i].size())
-      continue;
-    for(int j = i; j < words.size(); j ++) {
-      if(!ptrs[j].size())
-        continue;
-      for(int k = j; k < words.size(); k ++) {
+  for(auto itr0(uptrs.begin()); itr0 != uptrs.end(); ++ itr0) {
+    const int i(*itr0);
+    for(auto itr1(itr0); itr1 != uptrs.end(); ++ itr1) {
+      const int j(*itr1);
+      for(auto itr2(itr1); itr2 != uptrs.end(); ++ itr2) {
+        const int k(*itr2);
         // XXX checkme:
-        if(!ptrs[k].size() ||
-           words[i] == U("$") || words[j] == U("$") || words[k] == U("$") ||
+        if(words[i] == U("$") || words[j] == U("$") || words[k] == U("$") ||
            words[i] == U("^") || words[j] == U("^") || words[k] == U("^"))
           continue;
         int ctru = 0;
@@ -896,6 +901,8 @@ template <typename T, typename U> void getAbbreved(corpushl<T, U>& cstat, const 
 }
 
 template <typename T, typename U> U getCut(const U& input, const int& idx, const int& szwindow) {
+  if(input.size() < idx * szwindow / 2)
+    return "XXX: getCut";
   return input.substr(idx * szwindow / 2, szwindow);
 }
 
@@ -930,6 +937,15 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
   U result;
   if(!topics.size())
     result += U("zero input.<br/>");
+  vector<corpus<T, U> >   cistats;
+  vector<corpushl<T, U> > istats;
+  cistats.push_back(corpus<T, U>());
+  istats.push_back(corpushl<T, U>());
+  for(int j = 0; getDetailed<T, U>(cistats[cistats.size() - 1], istats[istats.size() - 1], input, j, words, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
+    istats[j].reDig(redig);
+    cistats.push_back(corpus<T, U>());
+    istats.push_back(corpushl<T, U>());
+  }
   for(int i = 0; i < topics.size(); i ++) {
     vector<pair<T, pair<int, int> > > topicidx;
     vector<corpus<T, U> >   cstats;
@@ -941,9 +957,9 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
       cstats.push_back(corpus<T, U>());
       stats.push_back(corpushl<T, U>());
     }
-    for(int j = 0; j < stats.size() - 1; j ++) {
-      const auto& cstat0(cstats[j]);
-      const auto& stat0(stats[j]);
+    for(int j = 0; j < istats.size() - 1; j ++) {
+      const auto& cstat0(cistats[j]);
+      const auto& stat0(istats[j]);
       int idx(0);
       T   score(0);
       for(int k = 0; k < stats.size() - 1; k ++) {
