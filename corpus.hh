@@ -208,10 +208,10 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
   for(int i = 0; i < words.size(); i ++) {
     if(!ptrs[i].size())
       continue;
-    for(int j = 0; j < words.size(); j ++) {
+    for(int j = i; j < words.size(); j ++) {
       if(!ptrs[j].size())
         continue;
-      for(int k = 0; k < words.size(); k ++) {
+      for(int k = j; k < words.size(); k ++) {
         // XXX checkme:
         if(!ptrs[k].size() ||
            words[i] == U("$") || words[j] == U("$") || words[k] == U("$") ||
