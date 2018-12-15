@@ -1036,13 +1036,14 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
         } else {
           T lllscore(0);
           for(int j = 0; j < min(depth, int(llscore.size())); j ++)
-            lllscore += llscore[j].first;
+            lllscore -= llscore[j].first;
           ok = Mscore < lllscore;
           Mscore = max(Mscore, lllscore);
         }
         if(ok)
           lidx = i;
-      }
+      } else
+        lscore.push_back(vector<pair<T, pair<int, int> > >());
     if(lscore[lidx].size() <= 0)
       break;
     phrases.push_back(lscore[lidx][0].second.first);
