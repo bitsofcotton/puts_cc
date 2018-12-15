@@ -1005,9 +1005,9 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
     cstats.push_back(corpus<T, U>());
     stats.push_back(corpushl<T, U>());
   }
-  for(int i = 0; i < cstats.size() - 2; i ++) {
+  for(int i = 0; i < cstats.size() - 1; i ++) {
     const auto& stat0(stats[i]);
-    for(int j = i + 1; j < cstats.size() - 2; j ++) {
+    for(int j = i + 1; j < cstats.size() - 1; j ++) {
       const auto& stat1(stats[j]);
       scores[i][j] = - stat0.prej(stat1);
       Midx = max(Midx, j);
