@@ -214,10 +214,13 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
   corpust = Tensor();
   for(auto itr0(uptrs.begin()); itr0 != uptrs.end(); ++ itr0) {
     const int i(*itr0);
+    if(!ptrs[i].size()) continue;
     for(auto itr1(itr0); itr1 != uptrs.end(); ++ itr1) {
       const int j(*itr1);
+      if(!ptrs[j].size()) continue;
       for(auto itr2(itr1); itr2 != uptrs.end(); ++ itr2) {
         const int k(*itr2);
+        if(!ptrs[k].size()) continue;
         // XXX checkme:
         if(words[i] == U("$") || words[j] == U("$") || words[k] == U("$") ||
            words[i] == U("^") || words[j] == U("^") || words[k] == U("^"))
@@ -229,7 +232,7 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
           while(ctru < ptrs[i].size() && ptrs[i][ctru] < *itr) ctru ++;
           ctru --;
           if(ctru < 0) ctru = 0;
-          assert(0 <= ctru && ctru < ptrs[i][ptrs[i].size() - 1]);
+          assert(0 <= ctru && ctru < ptrs[i].size());
           if(*itr <= ptrs[i][ctru])
             continue;
           while(ctrv < ptrs[j].size() && ptrs[j][ctrv] < *itr) ctrv ++;
