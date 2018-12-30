@@ -229,7 +229,7 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
           while(ctru < ptrs[i].size() && ptrs[i][ctru] < *itr) ctru ++;
           ctru --;
           if(ctru < 0) ctru = 0;
-          assert(0 <= ctru && ctru < ptrs[i].size());
+          assert(0 <= ctru && ctru < ptrs[i][ptrs[i].size() - 1]);
           if(*itr <= ptrs[i][ctru])
             continue;
           while(ctrv < ptrs[j].size() && ptrs[j][ctrv] < *itr) ctrv ++;
