@@ -90,10 +90,10 @@ int main(int argc, const char* argv[]) {
     std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
     for(int j = 0; j < inputs.size(); j ++) {
       std::u32string itrans(converter.from_bytes(inputs[j]));
-      for(int i0 = 0; i0 <= input.size() / szblock; i0 ++)
+      for(int i0 = 0; i0 <= itrans.size() / szblock; i0 ++)
         for(int i = 2; i < 20; i ++) {
           stat.init(60, i, i);
-          auto words(stat.compute(itrans.substr(i0 * szblock, szblock)));
+          auto words(stat.compute(itrans.substr(i0 * szblock, std::min(szblock, int(itrans.size()) - szblock * i0))));
           for(auto itr = words.begin(); itr != words.end(); ++ itr)
             if(itr->str.size() > 2 && itr->count >= i) {
               std::cout << converter.to_bytes(itr->str) << ", ";
@@ -112,7 +112,7 @@ int main(int argc, const char* argv[]) {
     for(int i = 0; i < input.size() / szwindow + 1; i ++) {
       stat.init(csv, 0, 120);
       const auto& words(stat.getWords());
-      stat.compute(input.substr(i * szwindow, szwindow), delimiter);
+      stat.compute(input.substr(i * szwindow, std::min(szwindow, int(input.size()) - i * szwindow)), delimiter);
       const auto& corpus(stat.getCorpus());
       std::cout << words  << std::endl;
       // std::cout << corpus << std::endl;
@@ -159,7 +159,7 @@ int main(int argc, const char* argv[]) {
     for(int ei = 0; ei < emph.size(); ei ++) {
       for(int i = 0; i < input.size() / szwindow + 1; i ++) {
         corpus<double, std::string> stat; 
-        stat.compute(input.substr(i * szwindow, szwindow), delimiter, csv);
+        stat.compute(input.substr(i * szwindow, std::min(szwindow, int(input.size()) - i * szwindow)), delimiter, csv);
         corpushl<double, std::string> recons(stat);
         recons.reDig(emph[ei]);
         std::cout << recons.serialize() << std::endl;
@@ -215,7 +215,7 @@ int main(int argc, const char* argv[]) {
     std::vector<std::string> buf;
     corpus<double, std::string> stat;
     for(int i = 0; i < input.size() / szwindow + 1; i ++) {
-      stat.compute(input.substr(i * szwindow, szwindow), delimiter, csv);
+      stat.compute(input.substr(i * szwindow, std::min(szwindow, int(input.size()) - i * szwindow)), delimiter, csv);
       const auto work(corpushl<double,std::string>(stat).reverseLink());
       buf.insert(buf.end(), work.begin(), work.end());
     }
