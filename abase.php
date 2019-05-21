@@ -19,7 +19,7 @@ function prepdicts($cwd, $txt, $text, $env) {
   $f  = fopen($txt . "-prep.txt", "r");
   while(($buf = fgets($f)) !== false) {
     doexecp($cwd . "/pdict/" . basename(chop($buf)), "/dev/null",
-            "python ../../prep.py" . escapeshellarg(basename(chop($buf))),
+            "python ../../prep.py " . escapeshellarg(basename(chop($buf))),
             "\n", $cwd, $env);
   }
   doexecp("/dev/null", "/dev/null", "sh -c 'find pdict/ -empty | xargs rm'", "\n", $cwd, $env);
