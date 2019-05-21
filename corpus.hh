@@ -1044,8 +1044,10 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
           ok = Mscore < lllscore;
           if(fixed)
             Mscore = max(Mscore, lllscore);
-          else
+          else {
             Mscore = lllscore;
+            fixed  = true;
+          }
         }
         if(ok)
           lidx  = i;
