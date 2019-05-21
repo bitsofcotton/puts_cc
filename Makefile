@@ -1,14 +1,13 @@
 CXX=	clang++
 
 # compiler flags.
-CXXFLAGS+=	-I/usr/local/include/eigen3
-CXXFLAGS+=	-Ofast -g0
+CXXFLAGS+=	-I/Users/kazunobbu/altroot/include
+CXXFLAGS+=	-Ofast -g2
 #CXXFLAGS+=	-O2 -g2
 CXXFLAGS+=	-std=c++11
 LDFLAGS+=	-lc++
 
-# assertion
-# CXXFLAGS+=	-D_STRICT_WORD_ASSERT_
+#CXXFLAGS+=	-D_STRICT_WORD_ASSERT_
 
 CLEANFILES= *.o tools test
 

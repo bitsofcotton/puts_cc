@@ -19,7 +19,7 @@ function prepdicts($cwd, $txt, $text, $env) {
   $f  = fopen($txt . "-prep.txt", "r");
   while(($buf = fgets($f)) !== false) {
     doexecp($cwd . "/pdict/" . basename(chop($buf)), "/dev/null",
-            "python ../../prep.py " . basename(chop($buf)),
+            "python ../../prep.py" . escapeshellarg(basename(chop($buf))),
             "\n", $cwd, $env);
   }
   doexecp("/dev/null", "/dev/null", "sh -c 'find pdict/ -empty | xargs rm'", "\n", $cwd, $env);
@@ -51,18 +51,18 @@ function analyse($cwd, $pathb2, $do_stat) {
   foreach (new DirectoryIterator($cwd . '/dicts') as $fileInfo) {
     if($fileInfo->isDot()) continue;
     $name = $fileInfo->getFilename();
-    $buf .= "\"dicts/" . $name . "\" ";
+    $buf .= escapeshellarg("dicts/" . $name) . " ";
   }
   foreach (new DirectoryIterator($cwd . '/pdict') as $fileInfo) {
     if($fileInfo->isDot()) continue;
     $name = $fileInfo->getFilename();
-    $buf .= "\"pdict/" . $name . "\" ";
+    $buf .= escapeshellarg("pdict/" . $name) . " ";
   }
   $buf .= " -toc ";
   foreach (new DirectoryIterator($cwd . '/topics') as $fileInfo) {
     if($fileInfo->isDot()) continue;
     $name = $fileInfo->getFilename();
-    $buf .= "\"topics/" . $name . "\" ";
+    $buf .= escapeshellarg("topics/" . $name) . " ";
   }
   doexecp($pathb2 . "-detail.html", $pathb2 . "-detail-error.txt",
           "../../puts toc words.txt " . $buf, $text, $cwd, $env);
@@ -74,12 +74,12 @@ function analyse($cwd, $pathb2, $do_stat) {
     foreach (new DirectoryIterator($cwd . '/dicts') as $fileInfo) {
       if($fileInfo->isDot()) continue;
       $name = $fileInfo->getFilename();
-      $buf .= "\"dicts/" . $name . "\" ";
+      $buf .= escapeshellarg("dicts/" . $name) . " ";
     }
     foreach (new DirectoryIterator($cwd . '/pdict') as $fileInfo) {
       if($fileInfo->isDot()) continue;
       $name = $fileInfo->getFilename();
-      $buf .= "\"pdict/" . $name . "\" ";
+      $buf .= escapeshellarg("pdict/" . $name) . " ";
     }
     doexecp($pathb2 . "-stat.html", $pathb2 . "-stat-error.txt",
             "../../puts stat words.txt " . $buf, $text, $cwd, $env);
@@ -106,23 +106,23 @@ function analyse($cwd, $pathb2, $do_stat) {
       foreach (new DirectoryIterator($cwd . '/dicts') as $fileInfo) {
         if($fileInfo->isDot()) continue;
         $name = $fileInfo->getFilename();
-        $buf .= "\"dicts/" . $name . "\" ";
+        $buf .= escapeshellarg("dicts/" . $name) . " ";
       }
       foreach (new DirectoryIterator($cwd . '/pdict') as $fileInfo) {
         if($fileInfo->isDot()) continue;
         $name = $fileInfo->getFilename();
-        $buf .= "\"pdict/" . $name . "\" ";
+        $buf .= escapeshellarg("pdict/" . $name) . " ";
       }
       $buf .= " -dict2 ";
       foreach (new DirectoryIterator($cwd . '/' . $pathc . '/dicts') as $fileInfo) {
         if($fileInfo->isDot()) continue;
         $name = $fileInfo->getFilename();
-        $buf .= "\"" . $pathc . "/dicts/" . $name . "\" ";
+        $buf .= escapeshellarg($pathc . "/dicts/" . $name) . " ";
       }
       foreach (new DirectoryIterator($cwd . '/pdict') as $fileInfo) {
         if($fileInfo->isDot()) continue;
         $name = $fileInfo->getFilename();
-        $buf .= "\"pdict/" . $name . "\" ";
+        $buf .= escapeshellarg("pdict/" . $name) . " ";
       }
       doexecp($pathb2 . $df . "diff.html", $pathb2 . $df . "diff-error.txt",
           "../../puts diff words.txt " . $buf, $text, $cwd, $env);

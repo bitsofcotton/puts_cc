@@ -13,7 +13,7 @@ foreach(new DirectoryIterator($bpath) as $fileInfo) {
     if($fileInfoSub->isDot())
       continue;
     if(file_exists($pathb2 . "orig.txt") && !file_exists($pathb2 . ".lock")) {
-      system('touch ' . $pathb2 . '.lock');
+      system('touch ' . escapeshellarg($pathb2 . '.lock'));
       analyse($pathb . '../', $pathb2 . "orig.txt", true);
     }
   }

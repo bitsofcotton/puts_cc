@@ -1022,8 +1022,9 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
   vector<int> phrases;
   for(int ii = 0; phrases.size() < Midx; ii ++) {
     vector<vector<pair<T, pair<int, int> > > > lscore;
-    int lidx(0);
-    T   Mscore(0);
+    int  lidx(0);
+    T    Mscore(0);
+    bool fixed(false);
     for(int i = 0; i < Midx; i ++)
       if(!binary_search(phrases.begin(), phrases.end(), i)) {
         vector<pair<T, pair<int, int> > > llscore;
@@ -1043,8 +1044,10 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
           ok = Mscore < lllscore;
           Mscore = max(Mscore, lllscore);
         }
-        if(ok)
-          lidx = i;
+        if(ok || !fixed) {
+          lidx  = i;
+          fixed = true;
+        }
       } else
         lscore.push_back(vector<pair<T, pair<int, int> > >());
     if(lscore[lidx].size() <= 0)
