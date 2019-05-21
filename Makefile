@@ -1,7 +1,7 @@
 CXX=	clang++
 
 # compiler flags.
-CXXFLAGS+=	-I/Users/kazunobbu/altroot/include
+CXXFLAGS+=	-I/usr/local/include
 CXXFLAGS+=	-Ofast -g2
 #CXXFLAGS+=	-O2 -g2
 CXXFLAGS+=	-std=c++11
