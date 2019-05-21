@@ -1042,12 +1042,13 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
           for(int j = 0; j < min(depth, int(llscore.size())); j ++)
             lllscore -= llscore[j].first;
           ok = Mscore < lllscore;
-          Mscore = max(Mscore, lllscore);
+          if(fixed)
+            Mscore = max(Mscore, lllscore);
+          else
+            Mscore = lllscore;
         }
-        if(ok || !fixed) {
+        if(ok)
           lidx  = i;
-          fixed = true;
-        }
       } else
         lscore.push_back(vector<pair<T, pair<int, int> > >());
     if(lscore[lidx].size() <= 0)
