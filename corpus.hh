@@ -1059,11 +1059,9 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
     sort(phrases.begin(), phrases.end());
     const auto& cstat0(cstats[lscore[lidx][0].second.first]);
     const auto& stat0(stats[lscore[lidx][0].second.first]);
-    auto cs(stat0);
-    for(int i = 0; i < min(depth, int(lscore[lidx].size())); i ++) {
-      cs += stats[lscore[lidx][i].second.second];
+    const auto& cs(stat0);
+    for(int i = 0; i < min(depth, int(lscore[lidx].size())); i ++)
       phrases.push_back(lscore[lidx][i].second.second);
-    }
     sort(phrases.begin(), phrases.end());
     result += U("<form action=\"../../../../puts.php\" method=\"POST\"><div>");
     result += U("base : ");
