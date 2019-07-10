@@ -243,8 +243,6 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
         const gram_t<U>& idxkey2(find(key2));
         U workkey(idxkey.str);
         workkey += *itr2;
-        if(isin(workkey))
-          continue;
         vector<int> idxwork[4];
         for(int j = 0; j < 4; j ++)
           idxwork[j] = vector<int>();
