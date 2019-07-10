@@ -17,9 +17,12 @@ function prepdicts($cwd, $txt, $text, $env) {
   doexecp($txt . "-prep.txt", $txt . "-prep-err.txt",
           "../../puts prep words.txt", $text, $cwd, $env);
   $f  = fopen($txt . "-prep.txt", "r");
+  $buf = "python ../../prep.py . ";
   while(($buf = fgets($f)) !== false) {
-    doexecp($cwd . "/pdict/" . basename(chop($buf)), "/dev/null",
-            "python ../../prep.py " . escapeshellarg(basename(chop($buf))),
+    $buf .= escapeshellarg(basename(chop($buf))) . " ";
+  }
+  while(($buf = fgets($f)) !== false) {
+    doexecp($cwd . "/pdict/" . basename(chop($buf)), "/dev/null", $buf,
             "\n", $cwd, $env);
   }
   doexecp("/dev/null", "/dev/null", "sh -c 'find pdict/ -empty | xargs rm'", "\n", $cwd, $env);
