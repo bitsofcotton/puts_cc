@@ -16,17 +16,15 @@ function doexecp($so, $se, $cmd, $text, $cwd, $env) {
 function prepdicts($cwd, $txt, $text, $env) {
   doexecp($txt . "-prep.txt", $txt . "-prep-err.txt",
           "../../puts prep words.txt", $text, $cwd, $env);
-  $f  = fopen($txt . "-prep.txt", "r");
-  $buf = "python ../../prep.py . ";
+  $f    = fopen($txt . "-prep.txt", "r");
+  $bufc = "python ../../prep.py . ";
   while(($buf = fgets($f)) !== false) {
-    $buf .= escapeshellarg(basename(chop($buf))) . " ";
+    $bufc .= escapeshellarg(basename(chop($buf))) . " ";
   }
-  while(($buf = fgets($f)) !== false) {
-    doexecp($cwd . "/pdict/" . basename(chop($buf)), "/dev/null", $buf,
-            "\n", $cwd, $env);
-  }
-  doexecp("/dev/null", "/dev/null", "sh -c 'find pdict/ -empty | xargs rm'", "\n", $cwd, $env);
   fclose($f);
+  doexecp("/dev/null", "/dev/null", $bufc, "\n", $cwd, $env);
+  doexecp("/dev/null", "/dev/null", "sh -c 'find pdict/ -empty | xargs rm'", "\n", $cwd, $env);
+  return;
 }
 
 function analyse($cwd, $pathb2, $do_stat) {
