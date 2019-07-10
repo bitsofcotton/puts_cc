@@ -14,6 +14,8 @@
 
 #include "sparse.hh"
 
+extern std::vector<std::string> words;
+
 using std::cerr;
 using std::endl;
 using std::flush;
@@ -67,14 +69,12 @@ public:
   ~corpus();
   
   corpus<T, U>&    operator = (const corpus<T, U>& other);
-  corpus<T, U>&    compute(const U& input, const vector<U>& delimiter, const vector<U>& words);
+  corpus<T, U>&    compute(const U& input, const vector<U>& delimiter);
         U          getAttributed(const vector<U>& highlight) const;
   const U&         getOrig() const;
-  const vector<U>& getWords() const;
   const Tensor&    getCorpus() const;
 private:
   U                    orig;
-  vector<U>            words;
   vector<vector<int> > ptrs;
   vector<int>          uptrs;
   vector<int>          pdelim;
@@ -96,7 +96,6 @@ template <typename T, typename U> corpus<T,U>::~corpus() {
 
 template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator = (const corpus<T, U>& other) {
   orig    = other.orig;
-  words   = other.words;
   ptrs    = other.ptrs;
   uptrs   = other.uptrs;
   pdelim  = other.pdelim;
@@ -105,8 +104,7 @@ template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator = (const 
   return *this;
 }
 
-template <typename T, typename U> corpus<T, U>& corpus<T,U>::compute(const U& input, const vector<U>& delimiter, const vector<U>& words) {
-  this->words = words;
+template <typename T, typename U> corpus<T, U>& corpus<T,U>::compute(const U& input, const vector<U>& delimiter) {
   cerr << "c" << flush;
   getWordPtrs(input, delimiter);
   corpusEach();
@@ -131,10 +129,6 @@ template <typename T, typename U> U corpus<T,U>::getAttributed(const vector<U>& 
 
 template <typename T, typename U> const U& corpus<T,U>::getOrig() const {
   return orig;
-}
-
-template <typename T, typename U> const vector<U>& corpus<T,U>::getWords() const {
-  return words;
 }
 
 template <typename T, typename U> const SimpleSparseTensor<T>& corpus<T,U>::getCorpus() const {
@@ -297,7 +291,6 @@ public:
   const T               prej2(const vector<corpushl<T, U> >& prej0, const vector<corpushl<T, U> >& prej1, const T& thresh) const;
         corpushl<T, U>& invertInsist();
   const corpushl<T, U>  conflictPart() const;
-  const vector<U>&      getWords()  const;
   const Tensor&         getCorpus() const;
         U               serialize() const;
         corpushl<T, U>  abbrev(const U& word, const corpushl<T, U>& work, const T& thresh = T(0)) const;
@@ -313,14 +306,12 @@ private:
   vector<int>  countIdx(const T& thresh = T(0)) const;
   void         merge5(Tensor& d, const int& i, const int& ki, const int& kk, const int& kj, const int& j, const T& intensity) const;
   
-  vector<U>    words;
   Tensor       corpust;
 };
 
 template <typename T, typename U> corpushl<T,U>::corpushl() {
   // already initialized by compiler, do not need to initialize same.
 /*
-  words   = vector<U>();
   corpust = Tensor();
 */
   ;
@@ -332,13 +323,11 @@ template <typename T, typename U> corpushl<T,U>::~corpushl() {
 }
 
 template <typename T, typename U> corpushl<T,U>::corpushl(const corpus<T, U>& obj) {
-  words   = vector<U>(obj.getWords());
   corpust = Tensor(obj.getCorpus());
   *this  /= cdot(*this);
 }
 
 template <typename T, typename U> corpushl<T,U>::corpushl(corpus<T, U>&& obj) {
-  words   = move(obj.getWords());
   corpust = move(obj.getCorpus());
   *this  /= cdot(*this);
 }
@@ -352,13 +341,11 @@ template <typename T, typename U> corpushl<T,U>::corpushl(corpushl<T, U>&& obj) 
 }
 
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator = (const corpushl<T, U>& other) {
-  words   = vector<U>(other.words);
   corpust = Tensor(other.corpust);
   return *this;
 }
 
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator = (corpushl<T, U>&& other) {
-  words   = move(other.words);
   corpust = move(other.corpust);
   return *this;
 }
@@ -368,30 +355,15 @@ template <typename T, typename U> bool corpushl<T, U>::operator == (const corpus
 }
 
 template <typename T, typename U> bool corpushl<T, U>::operator != (const corpushl<T, U>& other) const {
-#if defined(_STRICT_WORD_ASSERT_)
-  assert(words == other.words);
-#else
-  assert(words.size() == other.words.size());
-#endif
   return corpust != other.corpust;
 }
 
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator += (const corpushl<T, U>& other) {
-#if defined(_STRICT_WORD_ASSERT_)
-  assert(words == other.words);
-#else
-  assert(words.size() == other.words.size());
-#endif
   corpust += other.corpust;
   return *this;
 }
 
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator -= (const corpushl<T, U>& other) {
-#if defined(_STRICT_WORD_ASSERT_)
-  assert(words == other.words);
-#else
-  assert(words.size() == other.words.size());
-#endif
   corpust -= other.corpust;
   return *this;
 }
@@ -433,11 +405,6 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::operator / (con
 }
 
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(const U& word, const corpushl<T, U>& other, const T& thresh) const {
-#if defined(_STRICT_WORD_ASSERT_)
-  assert(words == other.words);
-#else
-  assert(words.size() == other.words.size());
-#endif
   const auto itr(lower_bound(words.begin(), words.end(), word));
   const int  eeidx(distance(words.begin(), itr));
   assert(0 <= eeidx && eeidx < words.size() && *itr == word);
@@ -500,11 +467,6 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
 }
 
 template <typename T, typename U> T corpushl<T, U>::cdot(const corpushl<T, U>& other) const {
-#if defined(_STRICT_WORD_ASSERT_)
-  assert(words == other.words);
-#else
-  assert(words.size() == other.words.size());
-#endif
   T res(0);
   const auto& oi0(other.corpust.iter());
   for(auto itr0(oi0.begin()); itr0 != oi0.end(); ++ itr0)
@@ -535,11 +497,6 @@ template <typename T, typename U> T corpushl<T, U>::absmax() const {
 }
 
 template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T, U>& prejs) const {
-#if defined(_STRICT_WORD_ASSERT_)
-  assert(words == prejs.words);
-#else
-  assert(words.size() == prejs.words.size());
-#endif
   static bool shown(false);
   if(!shown) {
     cerr << "XXX : confirm me corpushl::prej function." << endl;
@@ -557,7 +514,6 @@ template <typename T, typename U> const T corpushl<T, U>::prej(const corpushl<T,
 }
 
 template <typename T, typename U> const T corpushl<T, U>::prej2(const vector<corpushl<T, U> >& prej0, const vector<corpushl<T, U> >& prej1, const T& thresh) const {
-  assert(words == prej0.words && words == prej1.words());
   static bool shown(false);
   if(!shown) {
     cerr << "XXX confirm me: corpushl::prej2" << endl;
@@ -571,7 +527,7 @@ template <typename T, typename U> const T corpushl<T, U>::prej2(const vector<cor
     p1 = p1.abbrev(string("Q") + to_string(i), prej1[i]);
   p0 = p0.simpleThresh(thresh);
   p1 = p1.simpleThresh(thresh);
-  return T(p0.words.size() - prej0.size()) / T(p1.words.size() - prej1.size());
+  return T(words.size() - prej0.size()) / T(words.size() - prej1.size());
 }
 
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::invertInsist() {
@@ -681,19 +637,14 @@ template <typename T, typename U> U corpushl<T, U>::serializeSub(const vector<in
 }
 
 template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U& word, const corpushl<T, U>& work, const T& thresh) const {
-#if defined(_STRICT_WORD_ASSERT_)
-  assert(words == work.words);
-#else
-  assert(words.size() == work.words.size());
-#endif
   const T tn(     cdot(work));
   const T td(work.cdot(work));
   if(td <= T(0))
     return *this;
   cerr << "abbrev: " << word << " : fixme ratio." << endl;
   auto result((*this * td - work * tn) / td);
-  const int widx(distance(result.words.begin(), lower_bound(result.words.begin(), result.words.end(), word)));
-  assert(0 <= widx && widx < result.words.size() && result.words[widx] == word);
+  const int widx(distance(words.begin(), lower_bound(words.begin(), words.end(), word)));
+  assert(0 <= widx && widx < words.size() && words[widx] == word);
   result.corpust[widx][widx][widx] += (tn < T(0) ? - T(1) : T(1)) * sqrt(abs(tn));
   const auto& ci0(result.corpust.iter());
   Mat c_ij, c_jk, c_ik;
@@ -725,7 +676,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
         const auto kk(okidx[k]);
         if(kk == widx) continue;
         // XXX fixme ratio.
-        const T score((const_cast<const Tensor&>(corpust))[ii][jj][kk] * (c_ij[ii][jj] + c_jk[jj][kk] + c_ik[ii][kk]) / result.words.size());
+        const T score((const_cast<const Tensor&>(corpust))[ii][jj][kk] * (c_ij[ii][jj] + c_jk[jj][kk] + c_ik[ii][kk]) / words.size());
         result.corpust[widx][jj][kk] += score / T(3);
         result.corpust[ii][widx][kk] += score / T(3);
         result.corpust[ii][jj][widx] += score / T(3);
@@ -810,7 +761,6 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::simpleThresh(co
   const auto thisabsmax(absmax());
   const auto okidx(countIdx(ratio * thisabsmax));
   corpushl<T, U> result;
-  result.words   = words;
   result.corpust = Tensor();
   for(int i = 0; i < okidx.size(); i ++) {
     const auto ii(okidx[i]);
@@ -886,20 +836,16 @@ template <typename T, typename U> Eigen::Matrix<T, Eigen::Dynamic, 1> corpushl<T
   return svd.singularValues();
 }
 
-template <typename T, typename U> const vector<U>& corpushl<T, U>::getWords() const {
-  return words;
-}
-
 template <typename T, typename U> const SimpleSparseTensor<T>& corpushl<T, U>::getCorpus() const {
   return corpust;
 }
 
 
 
-template <typename T, typename U> void getAbbreved(corpushl<T, U>& cstat, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow) {
+template <typename T, typename U> void getAbbreved(corpushl<T, U>& cstat, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow) {
   assert(detailtitle.size() == detail.size());
   for(int i = 0; i < detail.size(); i ++)
-    cstat = cstat.abbrev(detailtitle[i], corpushl<T, U>(corpus<T, U>().compute(detail[i], delimiter, words)));
+    cstat = cstat.abbrev(detailtitle[i], corpushl<T, U>(corpus<T, U>().compute(detail[i], delimiter)));
   return;
 }
 
@@ -915,25 +861,25 @@ template <typename T, typename U> U getTagged(const U& name, const corpus<T, U>&
   tagged += getCut<T, U>(input, idx, szwindow);
   tagged += U("<input class=\"gatherdetail\" type=\"checkbox\"><div class=\"gatherdetail\">");
   tagged += cstat.reverseLink(cstat0) + U("<br/>");
-  tagged += cstat0.getAttributed(cstat0.getWords());
+  tagged += cstat0.getAttributed(words);
   tagged += U("</div></span>");
   return tagged;
 }
 
-template <typename T, typename U> bool getDetailed(corpus<T, U>& cstat0, corpushl<T, U>& cstat, const U& input, const int& idx, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const T& thresh) {
+template <typename T, typename U> bool getDetailed(corpus<T, U>& cstat0, corpushl<T, U>& cstat, const U& input, const int& idx, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const T& thresh) {
   assert(detailtitle.size() == detail.size());
   cstat0 = corpus<T, U>();
   cstat  = corpushl<T, U>();
   if(! (0 <= idx && idx < input.size() / szwindow * 2 + 1))
     return false;
-  cstat0.compute(input.substr(idx * szwindow / 2, szwindow), delimiter, words);
+  cstat0.compute(input.substr(idx * szwindow / 2, szwindow), delimiter);
   cstat  = corpushl<T, U>(cstat0).simpleThresh(thresh);
   for(int i = 0; i < detail.size(); i ++)
-    cstat = cstat.withDetail(detailtitle[i], corpushl<T, U>(corpus<T, U>().compute(detail[i], delimiter, words)).simpleThresh(thresh), thresh).simpleThresh(thresh);
+    cstat = cstat.withDetail(detailtitle[i], corpushl<T, U>(corpus<T, U>().compute(detail[i], delimiter)).simpleThresh(thresh), thresh).simpleThresh(thresh);
   return true;
 }
 
-template <typename T, typename U> U preparedTOC(const U& input, const vector<U>& words, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& topictitle, const vector<U>& topics, const vector<U>& delimiter, const int& szwindow, const int& depth, const T& threshin, const T& redig = T(1), const bool& reverse = false) {
+template <typename T, typename U> U preparedTOC(const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& topictitle, const vector<U>& topics, const vector<U>& delimiter, const int& szwindow, const int& depth, const T& threshin, const T& redig = T(1), const bool& reverse = false) {
   assert(detailtitle.size() == detail.size());
   assert(topictitle.size()  == topics.size());
   cerr << "preparedTOC..." << flush;
@@ -944,7 +890,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
   vector<corpushl<T, U> > istats;
   cistats.push_back(corpus<T, U>());
   istats.push_back(corpushl<T, U>());
-  for(int j = 0; getDetailed<T, U>(cistats[cistats.size() - 1], istats[istats.size() - 1], input, j, words, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
+  for(int j = 0; getDetailed<T, U>(cistats[cistats.size() - 1], istats[istats.size() - 1], input, j, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
     istats[j].reDig(redig);
     cistats.push_back(corpus<T, U>());
     istats.push_back(corpushl<T, U>());
@@ -955,7 +901,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
     vector<corpushl<T, U> > stats;
     cstats.push_back(corpus<T, U>());
     stats.push_back(corpushl<T, U>());
-    for(int j = 0; getDetailed<T, U>(cstats[cstats.size() - 1], stats[stats.size() - 1], topics[i], j, words, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
+    for(int j = 0; getDetailed<T, U>(cstats[cstats.size() - 1], stats[stats.size() - 1], topics[i], j, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
       stats[j].reDig(redig);
       cstats.push_back(corpus<T, U>());
       stats.push_back(corpushl<T, U>());
@@ -994,7 +940,7 @@ template <typename T, typename U> U preparedTOC(const U& input, const vector<U>&
   return result;
 }
 
-template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>& words, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const int& szwindow, const int& depth, const T& threshin, const T& redig = T(1), const bool& countnum = false, const U& notcheck = U("")) {
+template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const int& szwindow, const int& depth, const T& threshin, const T& redig = T(1), const bool& countnum = false, const U& notcheck = U("")) {
   assert(notcheck == U(""));
   cerr << "optimizeTOC..." << endl;
   SimpleSparseMatrix<T> scores;
@@ -1003,7 +949,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
   vector<corpushl<T, U> > stats;
   cstats.push_back(corpus<T, U>());
   stats.push_back(corpushl<T, U>());
-  for(int i = 0; getDetailed<T, U>(cstats[cstats.size() - 1], stats[stats.size() - 1], input, i, words, detailtitle, detail, delimiter, szwindow, threshin); i ++) {
+  for(int i = 0; getDetailed<T, U>(cstats[cstats.size() - 1], stats[stats.size() - 1], input, i, detailtitle, detail, delimiter, szwindow, threshin); i ++) {
     stats[i].reDig(redig);
     cstats.push_back(corpus<T, U>());
     stats.push_back(corpushl<T, U>());
@@ -1085,18 +1031,18 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
   return result;
 }
 
-template <typename T, typename U> U diff(const U& input, const vector<U>& words, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const T& threshin, const int& depth = T(20), const T& redig = T(1)) {
+template <typename T, typename U> U diff(const U& input, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const T& threshin, const int& depth = T(20), const T& redig = T(1)) {
   cerr << "diff..." << flush;
   corpus<T, U>   cstat0, dstat0;
   corpushl<T, U> cstat,  dstat;
   U result;
   vector<pair<T, int> > scores;
   for(int i = 0; ; i ++) {
-    if(!getDetailed<T, U>(cstat0, cstat, input, i, words, detailtitle0, detail0, delimiter, szwindow, threshin) ||
-       !getDetailed<T, U>(dstat0, dstat, input, i, words, detailtitle1, detail1, delimiter, szwindow, threshin))
+    if(!getDetailed<T, U>(cstat0, cstat, input, i, detailtitle0, detail0, delimiter, szwindow, threshin) ||
+       !getDetailed<T, U>(dstat0, dstat, input, i, detailtitle1, detail1, delimiter, szwindow, threshin))
       break;
-    getAbbreved<T, U>(cstat, words, detailtitle1, detail1, delimiter, szwindow);
-    getAbbreved<T, U>(dstat, words, detailtitle0, detail0, delimiter, szwindow);
+    getAbbreved<T, U>(cstat, detailtitle1, detail1, delimiter, szwindow);
+    getAbbreved<T, U>(dstat, detailtitle0, detail0, delimiter, szwindow);
     cstat.reDig(redig);
     dstat.reDig(redig);
     const auto score(abs(cstat.cdot(dstat)) / sqrt(cstat.cdot(cstat) * dstat.cdot(dstat)) - T(1));
@@ -1107,11 +1053,11 @@ template <typename T, typename U> U diff(const U& input, const vector<U>& words,
   for(int ii = 0; ii < min(depth, int(scores.size())); ii ++) {
     const T&   score(scores[ii].first);
     const int& i(scores[ii].second);
-    if(!getDetailed<T, U>(cstat0, cstat, input, i, words, detailtitle0, detail0, delimiter, szwindow, threshin) ||
-       !getDetailed<T, U>(dstat0, dstat, input, i, words, detailtitle1, detail1, delimiter, szwindow, threshin))
+    if(!getDetailed<T, U>(cstat0, cstat, input, i, detailtitle0, detail0, delimiter, szwindow, threshin) ||
+       !getDetailed<T, U>(dstat0, dstat, input, i, detailtitle1, detail1, delimiter, szwindow, threshin))
       break;
-    getAbbreved<T, U>(cstat, words, detailtitle1, detail1, delimiter, szwindow);
-    getAbbreved<T, U>(dstat, words, detailtitle0, detail0, delimiter, szwindow);
+    getAbbreved<T, U>(cstat, detailtitle1, detail1, delimiter, szwindow);
+    getAbbreved<T, U>(dstat, detailtitle0, detail0, delimiter, szwindow);
     cstat.reDig(redig);
     dstat.reDig(redig);
     auto diff(cstat - dstat);
