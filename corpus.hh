@@ -982,7 +982,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
         bool ok(false);
         if(countnum) {
           T lllscore(0);
-          for(int j = 0; j < min(depth, int(llscore.size()); j ++)
+          for(int j = 0; j < min(depth, int(llscore.size())); j ++)
             if(llscore[j].first < T(0))
               lllscore += T(1);
           ok = Mscore < lllscore;
