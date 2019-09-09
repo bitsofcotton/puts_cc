@@ -256,7 +256,7 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
             idxwork[3].push_back(tt);
             ss ++;
             tt ++;
-          } else if(idxkey2.ptr1[tt] > idxkey.ptr1[ss])
+          } else if(idxkey2.ptr1[tt] >= idxkey.ptr1[ss])
             ss ++;
           else
             tt ++;
