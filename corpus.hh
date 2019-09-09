@@ -1001,8 +1001,15 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
           lidx  = i;
       } else
         lscore.push_back(vector<pair<T, pair<int, int> > >());
-    if(lscore[lidx].size() <= 0)
-      break;
+    if(lscore[lidx].size() <= 0) {
+      for(int i = 0; i < lscore.size(); i ++)
+        if(lscore[i].size()) {
+          lidx = i;
+          break;
+        }
+      if(! lscore[lidx].size())
+        break;
+    }
     phrases.push_back(lscore[lidx][0].second.first);
     sort(phrases.begin(), phrases.end());
     const auto& cstat0(cstats[lscore[lidx][0].second.first]);
