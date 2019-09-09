@@ -133,6 +133,7 @@ template <typename T> inline SimpleSparseVector<T>& SimpleSparseVector<T>::opera
 
 template <typename T> inline SimpleSparseVector<T>& SimpleSparseVector<T>::operator = (SimpleSparseVector<T>&& other) {
   entity = move(other.entity);
+  other.~SimpleSparseVector<T>();
   return *this;
 }
 
