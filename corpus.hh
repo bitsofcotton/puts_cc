@@ -237,10 +237,7 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
             if(pdelim[kk] <= *itr && *itr < pdelim[kk + 1])
               break;
           assert(0 <= kk && kk < pdelim.size());
-          if(ptrs[i][ctru] < pdelim[kk] ||
-             ptrs[j][ctrv] < pdelim[kk] ||
-               pdelim[min(kk + 1, int(pdelim.size() - 1))] <= ptrs[i][ctru] ||
-               pdelim[min(kk + 1, int(pdelim.size() - 1))] <= ptrs[j][ctrv])
+          if(ptrs[i][ctru] < pdelim[kk] || pdelim[kk] <= ptrs[j][ctrv])
             continue;
           // XXX configure me:
           const T buf0(log(T(abs(*itr + .5 - ptrs[i][ctru])) * T(2) * exp(T(1))));
@@ -323,13 +320,13 @@ template <typename T, typename U> corpushl<T,U>::~corpushl() {
 }
 
 template <typename T, typename U> corpushl<T,U>::corpushl(const corpus<T, U>& obj) {
-  corpust = Tensor(obj.getCorpus());
-  *this  /= cdot(*this);
+  corpust = obj.getCorpus();
+  *this  /= sqrt(cdot(*this));
 }
 
 template <typename T, typename U> corpushl<T,U>::corpushl(corpus<T, U>&& obj) {
   corpust = move(obj.getCorpus());
-  *this  /= cdot(*this);
+  *this  /= sqrt(cdot(*this));
 }
 
 template <typename T, typename U> corpushl<T,U>::corpushl(const corpushl<T, U>& obj) {
@@ -341,7 +338,7 @@ template <typename T, typename U> corpushl<T,U>::corpushl(corpushl<T, U>&& obj) 
 }
 
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator = (const corpushl<T, U>& other) {
-  corpust = Tensor(other.corpust);
+  corpust = other.corpust;
   return *this;
 }
 
@@ -413,7 +410,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
     return *this;
   cerr << "withDetail : " << word << endl;
   corpushl<T, U> result(*this + other);
-  const T x0(corpust[eeidx][eeidx][eeidx]);
+  const T x0(const_cast<const auto&>(corpust)[eeidx][eeidx][eeidx]);
   const auto& ci0(other.corpust.iter());
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     const auto& ci1(itr0->second.iter());
@@ -440,7 +437,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
           }
         }
         for(auto titr0(ti0.begin()); titr0 != ti0.end(); ++ titr0) {
-          const auto& ti2(titr0->second[eeidx].iter());
+          const auto& ti2(const_cast<const auto&>(titr0->second)[eeidx].iter());
           const int& tii(titr0->first);
           if(tii == eeidx) continue;
           for(auto titr2(ti2.begin()); titr2 != ti2.end(); ++ titr2) {
@@ -449,7 +446,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
             merge5(result.corpust, tii, tkk, ii, kk, jj, titr2->second * itr2->second * x0);
           }
         }
-        const auto& ti1(corpust[eeidx].iter());
+        const auto& ti1(const_cast<const auto&>(corpust)[eeidx].iter());
         for(auto titr1(ti1.begin()); titr1 != ti1.end(); ++ titr1) {
           const auto& ti2(titr1->second.iter());
           const int& tjj(titr1->first);
@@ -457,7 +454,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
           for(auto titr2(ti2.begin()); titr2 != ti2.end(); ++ titr2) {
             const int& tkk(titr2->first);
             if(tkk == eeidx) continue;
-            merge5(result.corpust, ii, kk, jj, tjj, tkk, titr2->second * itr2->second * x0);
+            merge5(result.corpust, ii, kk, jj, tkk, tjj, titr2->second * itr2->second * x0);
           }
         }
       }
@@ -675,11 +672,11 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
       for(int k = 0; k < okidx.size(); k ++) {
         const auto kk(okidx[k]);
         if(kk == widx) continue;
-        // XXX fixme ratio.
-        const T score((const_cast<const Tensor&>(corpust))[ii][jj][kk] * (c_ij[ii][jj] + c_jk[jj][kk] + c_ik[ii][kk]) / words.size());
-        result.corpust[widx][jj][kk] += score / T(3);
-        result.corpust[ii][widx][kk] += score / T(3);
-        result.corpust[ii][jj][widx] += score / T(3);
+        const auto  denom(c_ij[ii][jj] + c_jk[jj][kk] + c_ik[ii][kk]);
+        const auto& score((const_cast<const Tensor&>(corpust))[ii][jj][kk]);
+        result.corpust[widx][jj][kk] += score * c_jk / denom;
+        result.corpust[ii][widx][kk] += score * c_ik / denom;
+        result.corpust[ii][jj][widx] += score * c_ij / denom;
         result.corpust[ii][jj][kk]   -= score;
       }
     }
@@ -761,7 +758,6 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::simpleThresh(co
   const auto thisabsmax(absmax());
   const auto okidx(countIdx(ratio * thisabsmax));
   corpushl<T, U> result;
-  result.corpust = Tensor();
   for(int i = 0; i < okidx.size(); i ++) {
     const auto ii(okidx[i]);
     if((const_cast<const Tensor&>(corpust))[okidx[i]].iter().size())

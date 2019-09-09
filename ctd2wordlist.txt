@@ -1,0 +1,13 @@
+#! /usr/bin/env python2.7
+# -*- coding: utf-8 -*-
+
+import re
+import sys
+
+for u in range(1, len(sys.argv)):
+  for line in open(sys.argv[u], "ro"):
+    ar = re.split("[ \n\r]+", line)
+    for s in ar:
+      if(len(s) > 1 and s[0] != "#"):
+        print s
+
