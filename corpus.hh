@@ -410,7 +410,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
     return *this;
   cerr << "withDetail : " << word << endl;
   corpushl<T, U> result(*this + other);
-  const T x0(const_cast<const auto&>(corpust)[eeidx][eeidx][eeidx]);
+  const T x0(const_cast<const Tensor&>(corpust)[eeidx][eeidx][eeidx]);
   const auto& ci0(other.corpust.iter());
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
     const auto& ci1(itr0->second.iter());
@@ -437,7 +437,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
           }
         }
         for(auto titr0(ti0.begin()); titr0 != ti0.end(); ++ titr0) {
-          const auto& ti2(const_cast<const auto&>(titr0->second)[eeidx].iter());
+          const auto& ti2(const_cast<const Mat&>(titr0->second)[eeidx].iter());
           const int& tii(titr0->first);
           if(tii == eeidx) continue;
           for(auto titr2(ti2.begin()); titr2 != ti2.end(); ++ titr2) {
@@ -446,7 +446,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
             merge5(result.corpust, tii, tkk, ii, kk, jj, titr2->second * itr2->second * x0);
           }
         }
-        const auto& ti1(const_cast<const auto&>(corpust)[eeidx].iter());
+        const auto& ti1(const_cast<const Tensor&>(corpust)[eeidx].iter());
         for(auto titr1(ti1.begin()); titr1 != ti1.end(); ++ titr1) {
           const auto& ti2(titr1->second.iter());
           const int& tjj(titr1->first);
@@ -674,9 +674,9 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
         if(kk == widx) continue;
         const auto  denom(c_ij[ii][jj] + c_jk[jj][kk] + c_ik[ii][kk]);
         const auto& score((const_cast<const Tensor&>(corpust))[ii][jj][kk]);
-        result.corpust[widx][jj][kk] += score * c_jk / denom;
-        result.corpust[ii][widx][kk] += score * c_ik / denom;
-        result.corpust[ii][jj][widx] += score * c_ij / denom;
+        result.corpust[widx][jj][kk] += score * c_jk[jj][kk] / denom;
+        result.corpust[ii][widx][kk] += score * c_ik[ii][kk] / denom;
+        result.corpust[ii][jj][widx] += score * c_ij[ii][jj] / denom;
         result.corpust[ii][jj][kk]   -= score;
       }
     }
