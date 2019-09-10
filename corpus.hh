@@ -237,7 +237,7 @@ template <typename T, typename U> void corpus<T,U>::corpusEach() {
             if(pdelim[kk] <= *itr && *itr < pdelim[kk + 1])
               break;
           assert(0 <= kk && kk < pdelim.size());
-          if(ptrs[i][ctru] < pdelim[kk] || pdelim[kk] <= ptrs[j][ctrv])
+          if(ptrs[i][ctru] < pdelim[kk] && pdelim[kk] <= ptrs[j][ctrv])
             continue;
           // XXX configure me:
           const T buf0(log(T(abs(*itr + .5 - ptrs[i][ctru])) * T(2) * exp(T(1))));
@@ -263,9 +263,7 @@ public:
   
   corpushl();
   corpushl(const corpus<T, U>&   obj);
-  corpushl(corpus<T, U>&&   obj);
   corpushl(const corpushl<T, U>& obj);
-  corpushl(corpushl<T, U>&& obj);
   ~corpushl();
   
         corpushl<T, U>& operator += (const corpushl<T, U>& other);
@@ -278,7 +276,6 @@ public:
         corpushl<T, U>  operator *  (const T& t)                  const;
         corpushl<T, U>  operator /  (const T& t)                  const;
         corpushl<T, U>& operator =  (const corpushl<T, U>& other);
-        corpushl<T, U>& operator =  (corpushl<T,U>&& other);
         bool            operator == (const corpushl<T, U>& other) const;
         bool            operator != (const corpushl<T, U>& other) const;
         corpushl<T, U>  withDetail(const U& word, const corpushl<T, U>& other, const T& thresh = T(0)) const;
@@ -321,29 +318,15 @@ template <typename T, typename U> corpushl<T,U>::~corpushl() {
 
 template <typename T, typename U> corpushl<T,U>::corpushl(const corpus<T, U>& obj) {
   corpust = obj.getCorpus();
-  *this  /= sqrt(cdot(*this));
-}
-
-template <typename T, typename U> corpushl<T,U>::corpushl(corpus<T, U>&& obj) {
-  corpust = move(obj.getCorpus());
-  *this  /= sqrt(cdot(*this));
+//  *this  /= sqrt(cdot(*this));
 }
 
 template <typename T, typename U> corpushl<T,U>::corpushl(const corpushl<T, U>& obj) {
   *this = obj;
 }
 
-template <typename T, typename U> corpushl<T,U>::corpushl(corpushl<T, U>&& obj) {
-  *this = obj;
-}
-
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator = (const corpushl<T, U>& other) {
   corpust = other.corpust;
-  return *this;
-}
-
-template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator = (corpushl<T, U>&& other) {
-  corpust = move(other.corpust);
   return *this;
 }
 
