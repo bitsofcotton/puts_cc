@@ -392,7 +392,9 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
   if(!binary_search(idxs.begin(), idxs.end(), eeidx))
     return *this;
   cerr << "withDetail : " << word << endl;
-  corpushl<T, U> result(*this + other);
+  corpushl<T, U> result(*this);
+  // XXX:
+  // corpushl<T, U> result(*this + other);
   const T x0(const_cast<const Tensor&>(corpust)[eeidx][eeidx][eeidx]);
   const auto& ci0(other.corpust.iter());
   for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
@@ -622,7 +624,9 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
   if(td <= T(0))
     return *this;
   cerr << "abbrev: " << word << " : fixme ratio." << endl;
-  auto result((*this * td - work * tn) / td);
+  auto result(*this);
+  // XXX:
+  //   auto result((*this * td - work * tn) / td);
   const int widx(distance(words.begin(), lower_bound(words.begin(), words.end(), word)));
   assert(0 <= widx && widx < words.size() && words[widx] == word);
   result.corpust[widx][widx][widx] += (tn < T(0) ? - T(1) : T(1)) * sqrt(abs(tn));
