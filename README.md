@@ -58,6 +58,7 @@ abbrev is needed to be the inverse of withDetail function, but now, NOT so.
 serialize function is needed to be the inverse of corpushl(corpus(...)) but now, NOT so.  
 This is from simply interest, so don't use this for the reason other than standing under the context.  
 If there's large numbers of the sets that correctly defined texts, it may optimizable out to get opposite side's claim, but this is only the what's able to be said, so this isn't what's the matter.  
+If the dictionary we use is not valid for the text input, we cannot make text orders correct, this is because we calculate text orders by the dictionaries only.  
 
 # Another downloads
 * https://ja.osdn.net/projects/puts-cc/
