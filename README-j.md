@@ -30,10 +30,6 @@ jemalloc などのより効率の良いアロケータを使うとヒープメ�
 # 状態
 test.cc を通しての実装のチェックとテストをしています。lword.hh, corpus.hh に関してはほぼ安定、それ以外はテスト中です。
 
-# デモ
-https://services.limpid-intensity.info/puts.php にサンプルがあります。
-擬似的なログインですので、登録は必要ありません。
-
 # ライブラリとしての使い方
 tools.cc を参照してください。また、namespace ブロックで括ってください。ただし、インクルードガードの定義が高確率で有害です。
 
@@ -65,7 +61,7 @@ serialize 関数は、理想的には corpushl(corpus(...)) イニシャライ�
 # その他のダウンロードサイト
 * https://ja.osdn.net/projects/puts-cc/
 * https://www.sourceforge.net/projects/puts-cc/
-* https://files.limpid-intensity.info/
+* https://sites.google.com/view/bitsofcotton/
 
 # 頓挫されたもの
 これらのプログラムと形態素解析および論理演算をカテゴリ - 関係性 - 尺度の領域ペアでテンソルを記述すると現在よりも正しい結果が得られると推測され、また、末端の論理演算により有用な使用ができる可能性がありますが、実装されていません。これらは話題を整理して目次を作成するだけのものには不要です。また、それを使用した場合には、2 つ以上の事象に対してまたは 2 人以上の人からの記述の場合には示されるテーブルは意味のないものになります。また、そのような事象をこのプログラムはきちんと処理できません。  
