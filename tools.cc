@@ -193,7 +193,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>") << std::endl;
     std::cout << std::string("<body>");
-    std::cout << diff<double, std::string>(input, details, detailwords, details2, detailwords2, delimiter, szwindow, threshin, 200, strcmp(argv[1], "same") == 0) << std::string("<hr/>") << std::endl;
+    std::cout << diff<double, std::string>(input, details, detailwords, details2, detailwords2, delimiter, szwindow, threshin, 8, strcmp(argv[1], "same") == 0) << std::string("<hr/>") << std::endl;
     std::cout << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "stat") == 0 ||
             std::strcmp(argv[1], "findroot") == 0) {
