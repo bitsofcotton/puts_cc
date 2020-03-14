@@ -1029,7 +1029,7 @@ template <typename T, typename U> U optimizeTOC(const U& input, const vector<U>&
   return result;
 }
 
-template <typename T, typename U> U diff(const U& input, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const T& threshin, const int& depth = T(20), const bool& same = false, const T& redig = T(1)) {
+template <typename T, typename U> U diff(const U& input, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const T& depth, const T& threshin, const T& redig = T(1), const bool& same = false) {
   cerr << "diff..." << flush;
   corpus<T, U>   cstat0, dstat0;
   corpushl<T, U> cstat,  dstat;
@@ -1054,7 +1054,7 @@ template <typename T, typename U> U diff(const U& input, const vector<U>& detail
     }
   }
   sort(scores.begin(), scores.end());
-  for(int ii = 0; ii < min(depth, int(scores.size())); ii ++) {
+  for(int ii = 0; ii < scores.size() && scores[ii].first < depth; ii ++) {
     const T&   score(scores[ii].first);
     const int& i(scores[ii].second);
     if(!getDetailed<T, U>(cstat0, cstat, input, i, detailtitle0, detail0, delimiter, szwindow, threshin) ||
