@@ -23,11 +23,11 @@ std::vector<std::string> words;
 using namespace corpus;
 
 void usage() {
-  std::cout << "tools (lword|lbalance|corpus|toc|redig|stat|reconstruct|diff|prep)" << std::endl;
+  std::cout << "tools (lword|lbalance|toc|lack|redig|stat|findroot|diff|same|prep)" << std::endl;
 }
 
 const int szwindow(120);
-const int szblock(1200);
+const int szblock(120000);
 const int Mbalance(40);
 const double threshin(.1);
 std::vector<std::string> delimiter;
@@ -94,14 +94,22 @@ int main(int argc, const char* argv[]) {
       for(int i0 = 0; i0 <= itrans.size() / szblock; i0 ++)
         for(int i = 2; i < 20; i ++) {
           stat.init(60, i, i);
-          auto words(stat.compute(itrans.substr(i0 * szblock, std::min(szblock, int(itrans.size()) - szblock * i0))));
-          for(auto itr = words.begin(); itr != words.end(); ++ itr)
+          auto lwords(stat.compute(itrans.substr(i0 * szblock, std::min(szblock, int(itrans.size()) - szblock * i0))));
+          for(auto itr = lwords.begin(); itr != lwords.end(); ++ itr) {
             if(itr->str.size() > 2 && itr->count >= i) {
               std::cout << converter.to_bytes(itr->str) << ", ";
               std::cout << itr->count << std::endl;
             }
+            words.push_back(converter.to_bytes(itr->str));
+          }
         }
     }
+    std::cout << std::endl << std::endl;
+    std::sort(words.begin(), words.end());
+    words.erase(std::unique(words.begin(), words.end()), words.end());
+    const auto inputs0(cutText(input, words, delimiter));
+    for(int i = 0; i < inputs0.size(); i ++)
+      std::cout << inputs[i] << std::endl;
   } else if(std::strcmp(argv[1], "lbalance") == 0) {
     const auto cinput(cutText(input, csvelim, delimiter));
     const auto idxs(pseudoWordsBalance<double, std::string>(cinput, words, Mbalance));
@@ -135,13 +143,13 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>") << std::endl;
     std::cout << std::string("<body>");
-    std::cout << preparedTOC<double, std::string>(input, detailwords, details, tocwords, tocs, delimiter, szwindow, 8, threshin, .125, std::strcmp(argv[1], "lack") == 0) << std::string("<hr/>") << std::endl;
+    std::cout << preparedTOC<double, std::string>(input, detailwords, details, tocwords, tocs, delimiter, szwindow, - .25, threshin, .125, std::strcmp(argv[1], "lack") == 0) << std::string("<hr/>") << std::endl;
     std::cout << std::string("</body></html>");
   } else if(std::strcmp(argv[1], "reconstruct") == 0) { 
     corpus<double, std::string> stat;
     stat.compute(input, delimiter);
     corpushl<double, std::string> recons(stat);
-    std::cout << recons.serialize();
+    std::cout << recons.serialize() << std::endl;
   } else if(std::strcmp(argv[1], "redig") == 0) {
     std::vector<double> emph;
     emph.push_back(4.);
@@ -157,7 +165,8 @@ int main(int argc, const char* argv[]) {
       }
       std::cout << std::endl << std::endl;
     }
-  } else if(std::strcmp(argv[1], "diff") == 0) {
+  } else if(std::strcmp(argv[1], "diff") == 0 ||
+            std::strcmp(argv[1], "same") == 0) {
     std::vector<std::string> details, details2;
     std::vector<std::string> detailwords, detailwords2;
     bool second(false);
@@ -184,7 +193,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>") << std::endl;
     std::cout << std::string("<body>");
-    std::cout << diff<double, std::string>(input, details, detailwords, details2, detailwords2, delimiter, szwindow, threshin) << std::string("<hr/>") << std::endl;
+    std::cout << diff<double, std::string>(input, details, detailwords, details2, detailwords2, delimiter, szwindow, threshin, 200, strcmp(argv[1], "same") == 0) << std::string("<hr/>") << std::endl;
     std::cout << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "stat") == 0 ||
             std::strcmp(argv[1], "findroot") == 0) {
@@ -200,7 +209,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>") << std::endl;
     std::cout << std::string("<body>");
-    std::cout << optimizeTOC<double, std::string>(input, rdetails, rdetailwords, delimiter, szwindow, 8, threshin, 1., std::strcmp(argv[1], "findroot") == 0) << std::string("<hr/>") << std::endl;
+    std::cout << optimizeTOC<double, std::string>(input, rdetails, rdetailwords, delimiter, szwindow, - .25, threshin, 1., std::strcmp(argv[1], "findroot") == 0) << std::string("<hr/>") << std::endl;
     std::cout << std::string("</body></html>");
   } else if(std::strcmp(argv[1], "prep") == 0) {
     std::vector<std::string> buf;

@@ -14,7 +14,7 @@ foreach(new DirectoryIterator($bpath) as $fileInfo) {
       continue;
     if(file_exists($pathb2 . "orig.txt") && !file_exists($pathb2 . ".lock")) {
       system('touch ' . escapeshellarg($pathb2 . '.lock'));
-      analyse($pathb . '../', $pathb2 . "orig.txt", true);
+      analyse($pathb . '../', $pathb2 . "orig.txt");
     }
   }
 }

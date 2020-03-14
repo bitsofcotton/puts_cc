@@ -27,7 +27,7 @@ function prepdicts($cwd, $txt, $text, $env) {
   return;
 }
 
-function analyse($cwd, $pathb2, $do_stat) {
+function analyse($cwd, $pathb2) {
   echo $pathb2;
   $text = "";
   $file = fopen($pathb2, "r");
@@ -69,24 +69,21 @@ function analyse($cwd, $pathb2, $do_stat) {
           "../../puts toc words.txt " . $buf, $text, $cwd, $env);
   doexecp($pathb2 . "-lack.html", $pathb2 . "-lack-error.txt",
           "../../puts lack words.txt " . $buf, $text, $cwd, $env);
-  
-  if($do_stat) {
-    $buf = "";
-    foreach (new DirectoryIterator($cwd . '/dicts') as $fileInfo) {
-      if($fileInfo->isDot()) continue;
-      $name = $fileInfo->getFilename();
-      $buf .= escapeshellarg("dicts/" . $name) . " ";
-    }
-    foreach (new DirectoryIterator($cwd . '/pdict') as $fileInfo) {
-      if($fileInfo->isDot()) continue;
-      $name = $fileInfo->getFilename();
-      $buf .= escapeshellarg("pdict/" . $name) . " ";
-    }
-    doexecp($pathb2 . "-stat.html", $pathb2 . "-stat-error.txt",
-            "../../puts stat words.txt " . $buf, $text, $cwd, $env);
-    doexecp($pathb2 . "-root.html", $pathb2 . "-root-error.txt",
-            "../../puts findroot words.txt " . $buf, $text, $cwd, $env);
+  $buf = "";
+  foreach (new DirectoryIterator($cwd . '/dicts') as $fileInfo) {
+    if($fileInfo->isDot()) continue;
+    $name = $fileInfo->getFilename();
+    $buf .= escapeshellarg("dicts/" . $name) . " ";
   }
+  foreach (new DirectoryIterator($cwd . '/pdict') as $fileInfo) {
+    if($fileInfo->isDot()) continue;
+    $name = $fileInfo->getFilename();
+    $buf .= escapeshellarg("pdict/" . $name) . " ";
+  }
+  doexecp($pathb2 . "-stat.html", $pathb2 . "-stat-error.txt",
+          "../../puts stat words.txt " . $buf, $text, $cwd, $env);
+  doexecp($pathb2 . "-root.html", $pathb2 . "-root-error.txt",
+          "../../puts findroot words.txt " . $buf, $text, $cwd, $env);
   doexecp($pathb2 . "-lbalance.txt", $pathb2 . "-lbalance-error.txt",
           "../../puts lbalance words.txt", $text, $cwd, $env);
   doexecp($pathb2 . "-lword.txt", $pathb2 . "-lword-error.txt",
@@ -127,6 +124,8 @@ function analyse($cwd, $pathb2, $do_stat) {
       }
       doexecp($pathb2 . $df . "diff.html", $pathb2 . $df . "diff-error.txt",
           "../../puts diff words.txt " . $buf, $text, $cwd, $env);
+      doexecp($pathb2 . $df . "same.html", $pathb2 . $df . "same-error.txt",
+          "../../puts same words.txt " . $buf, $text, $cwd, $env);
     }
   }
   return;

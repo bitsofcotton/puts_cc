@@ -87,7 +87,7 @@ def writeSub(stra, f, flog):
     br   = initBrowser()
     r    = br.open(stra)
     html = r.read()
-    flog.write(datetime.datetime.now().strftime("%c") + stra + " : " + hashlib.sha256(html).hexdigest() + "\n")
+    flog.write(datetime.datetime.now().strftime("%c") + " : " + hashlib.sha256(html).hexdigest() + " : " + stra + "\n")
     f.write(re.sub(elimiter, '', innerHTMLs(html).decode("utf-8")))
   except Exception as inst:
     sinst = str(repr(inst))
