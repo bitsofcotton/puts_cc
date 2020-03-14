@@ -29,7 +29,9 @@ void usage() {
 const int szwindow(120);
 const int szblock(120000);
 const int Mbalance(40);
-const double threshin(.1);
+const double scorethresh(.25);
+const double threshin(0.);
+const double redig(1.1);
 std::vector<std::string> delimiter;
 std::vector<std::string> csvelim;
 std::vector<std::string> csvdelim;
@@ -143,7 +145,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>") << std::endl;
     std::cout << std::string("<body>");
-    std::cout << preparedTOC<double, std::string>(input, detailwords, details, tocwords, tocs, delimiter, szwindow, - .25, threshin, .125, std::strcmp(argv[1], "lack") == 0) << std::string("<hr/>") << std::endl;
+    std::cout << preparedTOC<double, std::string>(input, detailwords, details, tocwords, tocs, delimiter, szwindow, - scorethresh, threshin, redig, std::strcmp(argv[1], "lack") == 0) << std::string("<hr/>") << std::endl;
     std::cout << std::string("</body></html>");
   } else if(std::strcmp(argv[1], "reconstruct") == 0) { 
     corpus<double, std::string> stat;
@@ -193,7 +195,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>") << std::endl;
     std::cout << std::string("<body>");
-    std::cout << diff<double, std::string>(input, details, detailwords, details2, detailwords2, delimiter, szwindow, threshin, 8, strcmp(argv[1], "same") == 0) << std::string("<hr/>") << std::endl;
+    std::cout << diff<double, std::string>(input, details, detailwords, details2, detailwords2, delimiter, szwindow, threshin, 200, strcmp(argv[1], "same") == 0) << std::string("<hr/>") << std::endl;
     std::cout << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "stat") == 0 ||
             std::strcmp(argv[1], "findroot") == 0) {
@@ -209,7 +211,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>") << std::endl;
     std::cout << std::string("<body>");
-    std::cout << optimizeTOC<double, std::string>(input, rdetails, rdetailwords, delimiter, szwindow, - .25, threshin, 1., std::strcmp(argv[1], "findroot") == 0) << std::string("<hr/>") << std::endl;
+    std::cout << optimizeTOC<double, std::string>(input, rdetails, rdetailwords, delimiter, szwindow, - scorethresh, threshin, redig, std::strcmp(argv[1], "findroot") == 0) << std::string("<hr/>") << std::endl;
     std::cout << std::string("</body></html>");
   } else if(std::strcmp(argv[1], "prep") == 0) {
     std::vector<std::string> buf;
