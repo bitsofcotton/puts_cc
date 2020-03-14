@@ -626,7 +626,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
   cerr << "abbrev: " << word << " : fixme ratio." << endl;
   auto result(*this);
   // XXX:
-  //   auto result((*this * td - work * tn) / td);
+  //auto result((*this * td - work * tn) / td);
   const int widx(distance(words.begin(), lower_bound(words.begin(), words.end(), word)));
   assert(0 <= widx && widx < words.size() && words[widx] == word);
   result.corpust[widx][widx][widx] += (tn < T(0) ? - T(1) : T(1)) * sqrt(abs(tn));
@@ -660,6 +660,8 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::abbrev(const U&
         const auto kk(okidx[k]);
         if(kk == widx) continue;
         const auto  denom(c_ij[ii][jj] + c_jk[jj][kk] + c_ik[ii][kk]);
+        // XXX:
+        if(denom == T(0)) continue;
         const auto& score((const_cast<const Tensor&>(corpust))[ii][jj][kk]);
         result.corpust[widx][jj][kk] += score * c_jk[jj][kk] / denom;
         result.corpust[ii][widx][kk] += score * c_ik[ii][kk] / denom;
@@ -1042,6 +1044,7 @@ template <typename T, typename U> U diff(const U& input, const vector<U>& detail
     cstat.reDig(redig);
     dstat.reDig(redig);
     const auto score(abs(cstat.cdot(dstat)) / sqrt(cstat.cdot(cstat) * dstat.cdot(dstat)) - T(1));
+    std::cerr << score << std::endl;
     if(isfinite(score) && ! same)
       scores.push_back(make_pair(score, i));
     else if (same){

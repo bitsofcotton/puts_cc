@@ -31,6 +31,10 @@ There's preceders Tensor representation of the text set (with a way different to
 # Status
 Checking and testing implementation through test.cc . lword.hh, corpus.hh is a little stable, others are being in test.
 
+# Demos
+https://services.limpid-intensity.info/puts.php have a working sample.
+Please pseudo-login with e-mail address - salt pair.
+
 # Example of using as a library
 Please refer tools.cc, and please include with namespace block but include guard should harms.
 
@@ -54,12 +58,11 @@ abbrev is needed to be the inverse of withDetail function, but now, NOT so.
 serialize function is needed to be the inverse of corpushl(corpus(...)) but now, NOT so.  
 This is from simply interest, so don't use this for the reason other than standing under the context.  
 If there's large numbers of the sets that correctly defined texts, it may optimizable out to get opposite side's claim, but this is only the what's able to be said, so this isn't what's the matter.  
-If the dictionary we use is not valid for the text input, we cannot make text orders correct, this is because we calculate text orders by the dictionaries only.  
 
 # Another downloads
 * https://ja.osdn.net/projects/puts-cc/
 * https://www.sourceforge.net/projects/puts-cc/
-* https://sites.google.com/view/bitsofcotton/
+* https://files.limpid-intensity.info/
 
 # The things undone
 If we use similar things with category - relation - region of measure tensor, and with morphological analysis, we might get better results and low memory condition, but there's NO implementation here. So that isn't needed by making TOCs. And if so, if there's two or more phenomenon or people, shrink into one table, it's meaningless. In such case, this program returns broken results.  
