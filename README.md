@@ -12,12 +12,13 @@ This program uses large amount of region on the memory. And, very slow because o
     ./tools lword < data.txt
     ./tools lword prepared_word_list.txt < data.txt
     ./tools lbalance wordlist.txt < data.txt
-    ./tools corpus wordlist.txt < data.txt
-    ./tools toc wordlist.txt dictionaries ... -toc topics ... < data.txt
+    ./tools toc  wordlist.txt dictionaries ... -toc topics ... < data.txt
+    ./tools lack wordlist.txt dictionaries ... -toc topics ... < data.txt
     ./tools redig wordlist.txt < data.txt
     ./tools stat wordlist.txt dictionaries ... < data.txt
-    ./tools reconstruct wordlist.txt < data.txt
+    ./tools findroot wordlist.txt dictionaries ... < data.txt
     ./tools diff wordlist.txt -dict ... -dict2 ... < data.txt
+    ./tools same wordlist.txt -dict ... -dict2 ... < data.txt
     ./tools prep wordlist.txt < data.txt
 
 # Memory Fragments
@@ -29,13 +30,14 @@ Inspired from morphological analysis softwares and parameter auto configuring al
 There's preceders Tensor representation of the text set (with a way different to this) R.B. ieee 2004.
 
 # Status
-Checking and testing implementation through test.cc . lword.hh, corpus.hh is a little stable, others are being in test.
+Checking the implementation before to freeze.
+abbrev function is a little unstable now.
 
 # Example of using as a library
 Please refer tools.cc, and please include with namespace block but include guard should harms.
 
 # Example of using as web interface
-Please move to directory that php file and prep.py file and tools executable as puts executable.
+Please move the files to directory that php files and prep.py file and tools executable as puts executable.
 And please mkdir data directory as configured permissions.  
 And for normal use, mysql compatible database and php executable environment and python-mysql environment is needed.
 And, please configure the executable paths.
@@ -69,3 +71,4 @@ And, if we try to use this program to produce some mob character want to say, we
 # The things didn't determined.
 If we use NOT word with accurate handle, we can roughly (but deeply differed to now) divide some insists.
 Being determined whether implement or not.
+

@@ -12,12 +12,13 @@
     ./tools lword < data.txt
     ./tools lword prepared_word_list.txt < data.txt
     ./tools lbalance wordlist.txt < data.txt
-    ./tools corpus wordlist.txt < data.txt
     ./tools toc wordlist.txt dictionaries ... -toc topics ... < data.txt
+    ./tools lack wordlist.txt dictionaries ... -toc topics ... < data.txt
     ./tools redig wordlist.txt < data.txt
     ./tools stat wordlist.txt dictionaries ... < data.txt
-    ./tools reconstruct wordlist.txt < data.txt
+    ./tools findroot wordlist.txt dictionaries ... < data.txt
     ./tools diff wordlist.txt -dict ... -dict2 ... < data.txt
+    ./tools same wordlist.txt -dict ... -dict2 ... < data.txt
     ./tools prep wordlist.txt < data.txt
 
 # メモリフラグメント
@@ -28,7 +29,8 @@ jemalloc などのより効率の良いアロケータを使うとヒープメ�
 また、テンソルによるテキストの表現については、先行がありましたが、これとは若干コンセプトが異なりました。(R.B. ieee 2004)
 
 # 状態
-test.cc を通しての実装のチェックとテストをしています。lword.hh, corpus.hh に関してはほぼ安定、それ以外はテスト中です。
+Freeze 前の細かな実装のチェックをしています。
+abbrev 関数はまだ若干不安定です。
 
 # ライブラリとしての使い方
 tools.cc を参照してください。また、namespace ブロックで括ってください。ただし、インクルードガードの定義が高確率で有害です。
@@ -71,3 +73,4 @@ serialize 関数は、理想的には corpushl(corpus(...)) イニシャライ�
 # 検討されている途中のもの
 論理否定をきちんと処理できると、主張の大まかな(現状よりより細かな)類別ができます。検討中です。not a を新しい単語と置いて出来るか検討中です。
 また、辞書との有為な情報のデルタを取れるか検討中です。
+
