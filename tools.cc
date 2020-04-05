@@ -16,6 +16,7 @@
 #include <vector>
 #include <map>
 #include <utility>
+#include <assert.h>
 
 namespace corpusns {
 #include "simplelin.hh"
