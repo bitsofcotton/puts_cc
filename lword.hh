@@ -337,8 +337,8 @@ template <typename T> vector<T> cutText(const T& input, const vector<T>& elimina
   return result;
 }
 
-template <typename T, typename U> Eigen::Matrix<T, Eigen::Dynamic, 1> countWords(const U& orig, const vector<U>& words) {
-  Eigen::Matrix<T, Eigen::Dynamic, 1> result(words.size());
+template <typename T, typename U> SimpleVector<T> countWords(const U& orig, const vector<U>& words) {
+  SimpleVector<T> result(words.size());
   for(int i = 0; i < result.size(); i ++)
     result[i] = T(0);
   for(int i = 0; i < orig.size(); i ++) {
@@ -356,9 +356,9 @@ template <typename T, typename U> vector<int> pseudoWordsBalance(const vector<U>
   sort(words.begin(), words.end());
   words.erase(unique(words.begin(), words.end()), words.end());
   
-  Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> result(words.size(), orig.size());
+  SimpleMatrix<T> result(words.size(), orig.size());
   for(int i = 0; i < orig.size(); i ++)
-    result.col(i) = countWords<T, U>(orig[i], words);
+    result.setCol(i, countWords<T, U>(orig[i], words));
   
   vector<int> vres;
   if(nloop <= 0)

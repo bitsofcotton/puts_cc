@@ -1,7 +1,10 @@
+#if !defined(_WITHOUT_EIGEN_)
 #include <Eigen/Core>
 #include <Eigen/SVD>
+#endif
 #include <cstdio>
 #include <cstring>
+#include <cmath>
 #include <string>
 #include <iterator>
 #include <iostream>
@@ -14,13 +17,14 @@
 #include <map>
 #include <utility>
 
-namespace corpus {
+namespace corpusns {
+#include "simplelin.hh"
 #include "lword.hh"
 #include "corpus.hh"
 #include "file2eigen.hh"
 std::vector<std::string> words;
 };
-using namespace corpus;
+using namespace corpusns;
 
 void usage() {
   std::cout << "tools (lword|lbalance|toc|lack|redig|stat|findroot|diff|same|prep)" << std::endl;

@@ -25,7 +25,7 @@ template <typename T> ostream& operator << (ostream& os, const vector<T>& p) {
   return os;
 }
 
-template <typename T> ostream& operator << (ostream& os, const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& p) {
+template <typename T> ostream& operator << (ostream& os, const SimpleMatrix<T>& p) {
   os << p.rows() << endl << p.cols() << endl;
   for(int i = 0; i < p.rows(); i ++) {
     for(int j = 0; j < p.cols(); j ++)
@@ -35,26 +35,26 @@ template <typename T> ostream& operator << (ostream& os, const Eigen::Matrix<T, 
   return os;
 }
 
-template <typename T> ostream& operator << (ostream& os, const Eigen::Matrix<T, Eigen::Dynamic, 1>& p) {
-  Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> work(p.size(), 1);
-  work.col(0) = p;
+template <typename T> ostream& operator << (ostream& os, const SimpleVector<T>& p) {
+  SimpleMatrix<T> work(p.size(), 1);
+  work.setCol(0, p);
   os << work;
   return os;
 }
 
-template <typename T> istream& operator >> (istream& is, Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& work) {
+template <typename T> istream& operator >> (istream& is, SimpleMatrix<T>& work) {
   int rows, cols;
   is >> rows;
   is >> cols;
-  work = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>(rows, cols);
+  work = SimpleMatrix<T>(rows, cols);
   for(int i = 0; i < work.rows(); i ++)
     for(int j = 0; j < work.cols(); j ++)
       is >> work(i, j);
   return is;
 }
 
-template <typename T> istream& operator >> (istream& is, Eigen::Matrix<T, Eigen::Dynamic, 1>& work) {
-  Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> buf;
+template <typename T> istream& operator >> (istream& is, SimpleVector<T>& work) {
+  SimpleMatrix<T> buf;
   is >> buf;
   work = buf.col(0);
   return is;

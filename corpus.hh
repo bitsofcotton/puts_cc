@@ -290,13 +290,17 @@ public:
         corpushl<T, U>  abbrev(const U& word, const corpushl<T, U>& work, const T& thresh = T(0)) const;
         vector<U>       reverseLink() const;
         U               reverseLink(const corpus<T, U>& orig) const;
+#if defined(_WITHOUT_EIGEN_)
         pair<T, T>      compareStructure(const corpushl<T, U>& src, const T& thresh = T(1e-4), const T& thresh2 = T(.125)) const;
+#endif
         corpushl<T, U>& reDig(const T& ratio);
         corpushl<T, U>  simpleThresh(const T& ratio) const;
 
 private:
   U            serializeSub(const vector<int>& idxs) const;
+#if !defined(_WITHOUT_EIGEN_)
   Eigen::Matrix<T, Eigen::Dynamic, 1> singularValues() const;
+#endif
   vector<int>  countIdx(const T& thresh = T(0)) const;
   void         merge5(Tensor& d, const int& i, const int& ki, const int& kk, const int& kj, const int& j, const T& intensity) const;
   
@@ -686,6 +690,7 @@ template <typename T, typename U> U corpushl<T, U>::reverseLink(const corpus<T, 
   return orig.getAttributed(reverseLink());
 }
 
+#if !defined(_WITHOUT_EIGEN_)
 template <typename T, typename U> pair<T, T> corpushl<T, U>::compareStructure(const corpushl<T, U>& src, const T& thresh, const T& thresh2) const {
   // get H-SVD singular values for each of them and sort:
   const auto s0(singularValues()), s1(src.singularValues());
@@ -728,6 +733,7 @@ template <typename T, typename U> pair<T, T> corpushl<T, U>::compareStructure(co
     result.second += ss1[j] * ss1[j];
   return result;
 }
+#endif
 
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::reDig(const T& ratio) {
   auto& ci0(corpust.iter());
@@ -799,6 +805,7 @@ template <typename T, typename U> void corpushl<T,U>::merge5(Tensor& d, const in
   return;
 }
 
+#if !defined(_WITHOUT_EIGEN_)
 template <typename T, typename U> Eigen::Matrix<T, Eigen::Dynamic, 1> corpushl<T, U>::singularValues() const {
   Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> planes(words.size(), words.size());
   for(int i = 0; i < words.size(); i ++) {
@@ -820,6 +827,7 @@ template <typename T, typename U> Eigen::Matrix<T, Eigen::Dynamic, 1> corpushl<T
   Eigen::JacobiSVD<Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic> > svd(planes, 0);
   return svd.singularValues();
 }
+#endif
 
 template <typename T, typename U> const SimpleSparseTensor<T>& corpushl<T, U>::getCorpus() const {
   return corpust;
