@@ -33,9 +33,8 @@ void usage() {
   std::cout << "tools (lword|lbalance|toc|lack|redig|stat|findroot|diff|same|prep)" << std::endl;
 }
 
-const int  szwindow(120);
-const auto szblock(2LL * 1024LL * 1024LL * 1024LL);
-const int  Mbalance(40);
+const int    szwindow(120);
+const int    Mbalance(40);
 const double scorethresh(.25);
 const double dscorethresh(.001);
 const double threshin(0.);
