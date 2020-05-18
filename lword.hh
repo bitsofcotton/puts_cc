@@ -27,7 +27,7 @@ using std::min;
 
 template <typename T> class word_t;
 template <typename T> bool less0w(const word_t<T>& dst, const word_t<T>& src) {
-  return dst.str < dst.str;
+  return dst.str < src.str;
 }
 
 template <typename T> class word_t {
