@@ -1,10 +1,7 @@
-#if !defined(_WITHOUT_EIGEN_)
 #include <Eigen/Core>
 #include <Eigen/SVD>
-#endif
 #include <cstdio>
 #include <cstring>
-#include <cmath>
 #include <string>
 #include <iterator>
 #include <iostream>
@@ -16,29 +13,22 @@
 #include <vector>
 #include <map>
 #include <utility>
-#include <assert.h>
 
-#define int int64_t
-
-namespace corpusns {
-#include "simplelin.hh"
+namespace corpus {
 #include "lword.hh"
 #include "corpus.hh"
 #include "file2eigen.hh"
-std::vector<std::string> words;
 };
-using namespace corpusns;
+using namespace corpus;
 
 void usage() {
-  std::cout << "tools (lword|lbalance|toc|lack|redig|stat|findroot|diff|same|prep)" << std::endl;
+  std::cout << "tools (lword|lbalance|corpus|toc|redig|stat|reconstruct|diff)" << std::endl;
 }
 
-const int    szwindow(120);
-const int    Mbalance(40);
-const double scorethresh(.25);
-const double dscorethresh(.001);
-const double threshin(0.);
-const double redig(1.1);
+const int szwindow(200);
+const int szblock(8000);
+const int Mbalance(40);
+const double threshin(.1);
 std::vector<std::string> delimiter;
 std::vector<std::string> csvelim;
 std::vector<std::string> csvdelim;
@@ -68,9 +58,7 @@ std::pair<std::string, std::string> loadbuf(const char* filename) {
   return std::make_pair(name, inbuf);
 }
 
-#undef int
 int main(int argc, const char* argv[]) {
-#define int int64_t
   if(argc < 3) {
     usage();
     return - 2;
@@ -90,56 +78,51 @@ int main(int argc, const char* argv[]) {
   csvdelim.push_back(string(","));
   csvdelim.push_back(string("\r"));
   csvdelim.push_back(string("\n"));
-  words = cutText(loadbuf(argv[2]).second, csvelim, csvdelim, true);
-  std::string input, line;
-  while(std::getline(std::cin, line))
-    input += line + std::string("\n");
+        auto csv(cutText(loadbuf(argv[3]).second, csvelim, csvdelim, true));
+  const auto input(loadbuf(argv[2]).second);
   if(std::strcmp(argv[1], "lword") == 0) {
-    words.insert(words.end(), csvelim.begin(),  csvelim.end());
-    words.insert(words.end(), csvdelim.begin(), csvdelim.end());
+    csv.insert(csv.end(), csvelim.begin(),  csvelim.end());
+    csv.insert(csv.end(), csvdelim.begin(), csvdelim.end());
+    const auto inputs(cutText(input, csv, delimiter));
+    lword<char32_t, std::u32string> stat;
     std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
-    std::vector<word_t<std::u32string> > found;
-    for(int i = 2; i < 20; i ++) {
-      const auto lwords(lword<char32_t, std::u32string>(i + 4, i, i).compute(converter.from_bytes(input)));
-      for(auto itr = lwords.begin(); itr != lwords.end(); ++ itr) {
-        if(itr->count < 2 && itr->str.size() < 2)
-          continue;
-        const auto lb(std::lower_bound(found.begin(), found.end(), *itr, less0w<std::u32string>));
-        if(found.begin() <= lb && lb < found.end() && lb->str == itr->str)
-          lb->count = max(lb->count, itr->count);
-        else {
-          found.push_back(*itr);
-          std::sort(found.begin(), found.end(), less0w<std::u32string>);
+    for(int j = 0; j < inputs.size(); j ++) {
+      std::u32string itrans(converter.from_bytes(inputs[j]));
+      for(int i0 = 0; i0 <= input.size() / szblock; i0 ++)
+        for(int i = 2; i < 20; i ++) {
+          stat.init(60, i, i);
+          auto words(stat.compute(itrans.substr(i0 * szblock, szblock)));
+          for(auto itr = words.begin(); itr != words.end(); ++ itr)
+            if(itr->str.size() > 2 && itr->count >= i) {
+              std::cout << converter.to_bytes(itr->str) << ", ";
+              std::cout << itr->count << std::endl;
+            }
         }
-      }
     }
-    std::sort(found.begin(), found.end());
-    words.reserve(words.size() + found.size());
-    for(auto itr(found.begin()); itr < found.end(); ++ itr) {
-      const auto tob(converter.to_bytes(itr->str));
-      words.push_back(tob);
-      std::cout << tob << ", " << itr->count << std::endl;
-    }
-    std::sort(words.begin(), words.end());
-    auto inputs(cutText(input, words, delimiter));
-    std::sort(inputs.begin(), inputs.end());
-    inputs.erase(std::unique(inputs.begin(), inputs.end()), inputs.end());
-    for(int i = 0; i < inputs.size(); i ++)
-      std::cout << inputs[i] << ", 1" << std::endl;
   } else if(std::strcmp(argv[1], "lbalance") == 0) {
     const auto cinput(cutText(input, csvelim, delimiter));
-    const auto idxs(pseudoWordsBalance<double, std::string>(cinput, words, Mbalance));
+    const auto idxs(pseudoWordsBalance<double, std::string>(cinput, csv, Mbalance));
     std::cout << idxs.size() << "sets." << std::endl;
     for(int i = 0; i < idxs.size(); i ++)
       std::cout << cinput[idxs[i]] << std::endl;
-  } else if(std::strcmp(argv[1], "toc") == 0 ||
+  } /* else if(std::strcmp(argv[1], "corpus") == 0) {
+    corpus<double, std::string> stat;
+    for(int i = 0; i < input.size() / szwindow + 1; i ++) {
+      stat.init(csv, 0, 120);
+      const auto& words(stat.getWords());
+      stat.compute(input.substr(i * szwindow, szwindow), delimiter);
+      const auto& corpus(stat.getCorpus());
+      std::cout << words  << std::endl;
+      // std::cout << corpus << std::endl;
+    }
+  } */ else if(std::strcmp(argv[1], "toc") == 0 ||
             std::strcmp(argv[1], "lack") == 0) {
     std::vector<std::string> details;
     std::vector<std::string> tocs;
     std::vector<std::string> detailwords;
     std::vector<std::string> tocwords;
     bool toc(false);
-    for(int iidx = 3; iidx < argc; iidx ++) {
+    for(int iidx = 4; iidx < argc; iidx ++) {
       if(std::string(argv[iidx]) == std::string("-toc")) {
         toc = true;
         continue;
@@ -153,19 +136,19 @@ int main(int argc, const char* argv[]) {
         detailwords.push_back(work.first);
       }
     }
-    words.insert(words.end(), tocwords.begin(),    tocwords.end());
-    words.insert(words.end(), detailwords.begin(), detailwords.end());
-    std::sort(words.begin(), words.end());
-    words.erase(std::unique(words.begin(), words.end()), words.end());
-    std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>") << std::endl;
+    csv.insert(csv.end(), tocwords.begin(),    tocwords.end());
+    csv.insert(csv.end(), detailwords.begin(), detailwords.end());
+    std::sort(csv.begin(), csv.end());
+    csv.erase(std::unique(csv.begin(), csv.end()), csv.end());
+    std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
     std::cout << std::string("<body>");
-    std::cout << preparedTOC<double, std::string>(input, detailwords, details, tocwords, tocs, delimiter, szwindow, - scorethresh, threshin, redig, std::strcmp(argv[1], "lack") == 0) << std::string("<hr/>") << std::endl;
+    std::cout << preparedTOC<double, std::string>(input, csv, detailwords, details, tocwords, tocs, delimiter, szwindow, 8, threshin, .125, std::strcmp(argv[1], "lack") == 0) << std::string("<hr/>") << std::endl;
     std::cout << std::string("</body></html>");
   } else if(std::strcmp(argv[1], "reconstruct") == 0) { 
     corpus<double, std::string> stat;
-    stat.compute(input, delimiter);
+    stat.compute(input, delimiter, csv);
     corpushl<double, std::string> recons(stat);
-    std::cout << recons.serialize() << std::endl;
+    std::cout << recons.serialize();
   } else if(std::strcmp(argv[1], "redig") == 0) {
     std::vector<double> emph;
     emph.push_back(4.);
@@ -174,19 +157,18 @@ int main(int argc, const char* argv[]) {
     for(int ei = 0; ei < emph.size(); ei ++) {
       for(int i = 0; i < input.size() / szwindow + 1; i ++) {
         corpus<double, std::string> stat; 
-        stat.compute(input.substr(i * szwindow, std::min(szwindow, int(input.size()) - i * szwindow)), delimiter);
+        stat.compute(input.substr(i * szwindow, szwindow), delimiter, csv);
         corpushl<double, std::string> recons(stat);
         recons.reDig(emph[ei]);
         std::cout << recons.serialize() << std::endl;
       }
       std::cout << std::endl << std::endl;
     }
-  } else if(std::strcmp(argv[1], "diff") == 0 ||
-            std::strcmp(argv[1], "same") == 0) {
+  } else if(std::strcmp(argv[1], "diff") == 0) {
     std::vector<std::string> details, details2;
     std::vector<std::string> detailwords, detailwords2;
     bool second(false);
-    for(int iidx = 3; iidx < argc; iidx ++) {
+    for(int iidx = 4; iidx < argc; iidx ++) {
       if(std::string(argv[iidx]) == std::string("-dict")) {
         second = false;
         continue;
@@ -203,35 +185,35 @@ int main(int argc, const char* argv[]) {
         detailwords.push_back(work.first);
       }
     }
-    words.insert(words.end(), detailwords.begin(),  detailwords.end());
-    words.insert(words.end(), detailwords2.begin(), detailwords2.end());
-    std::sort(words.begin(), words.end());
-    words.erase(std::unique(words.begin(), words.end()), words.end());
-    std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>") << std::endl;
+    csv.insert(csv.end(), detailwords.begin(),  detailwords.end());
+    csv.insert(csv.end(), detailwords2.begin(), detailwords2.end());
+    std::sort(csv.begin(), csv.end());
+    csv.erase(std::unique(csv.begin(), csv.end()), csv.end());
+    std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
     std::cout << std::string("<body>");
-    std::cout << diff<double, std::string>(input, details, detailwords, details2, detailwords2, delimiter, szwindow, - dscorethresh, threshin, redig, strcmp(argv[1], "same") == 0) << std::string("<hr/>") << std::endl;
+    std::cout << diff<double, std::string>(input, csv, details, detailwords, details2, detailwords2, delimiter, szwindow, threshin) << std::string("<hr/>") << std::endl;
     std::cout << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "stat") == 0 ||
             std::strcmp(argv[1], "findroot") == 0) {
     std::vector<std::string> rdetails;
     std::vector<std::string> rdetailwords;
-    for(int iidx = 3; iidx < argc; iidx ++) {
+    for(int iidx = 4; iidx < argc; iidx ++) {
       const auto work(loadbuf(argv[iidx]));
       rdetails.push_back(work.second);
       rdetailwords.push_back(work.first);
     }
-    words.insert(words.end(), rdetailwords.begin(), rdetailwords.end());
-    std::sort(words.begin(), words.end());
-    words.erase(std::unique(words.begin(), words.end()), words.end());
-    std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>") << std::endl;
+    csv.insert(csv.end(), rdetailwords.begin(), rdetailwords.end());
+    std::sort(csv.begin(), csv.end());
+    csv.erase(std::unique(csv.begin(), csv.end()), csv.end());
+    std::cout << std::string("<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"></head>") << std::endl;
     std::cout << std::string("<body>");
-    std::cout << optimizeTOC<double, std::string>(input, rdetails, rdetailwords, delimiter, szwindow, - scorethresh, threshin, redig, std::strcmp(argv[1], "findroot") == 0) << std::string("<hr/>") << std::endl;
+    std::cout << optimizeTOC<double, std::string>(input, csv, rdetails, rdetailwords, delimiter, szwindow, 8, threshin, 1., std::strcmp(argv[1], "findroot") == 0) << std::string("<hr/>") << std::endl;
     std::cout << std::string("</body></html>");
   } else if(std::strcmp(argv[1], "prep") == 0) {
     std::vector<std::string> buf;
     corpus<double, std::string> stat;
     for(int i = 0; i < input.size() / szwindow + 1; i ++) {
-      stat.compute(input.substr(i * szwindow, std::min(szwindow, int(input.size()) - i * szwindow)), delimiter);
+      stat.compute(input.substr(i * szwindow, szwindow), delimiter, csv);
       const auto work(corpushl<double,std::string>(stat).reverseLink());
       buf.insert(buf.end(), work.begin(), work.end());
     }

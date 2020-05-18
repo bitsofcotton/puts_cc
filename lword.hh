@@ -25,6 +25,11 @@ using std::flush;
 using std::max;
 using std::min;
 
+template <typename T> class word_t;
+template <typename T> bool less0w(const word_t<T>& dst, const word_t<T>& src) {
+  return dst.str < dst.str;
+}
+
 template <typename T> class word_t {
 public:
   T   str;
@@ -42,6 +47,9 @@ public:
     str    = other.str;
     count  = other.count;
     return *this;
+  }
+  bool operator == (const word_t<T>& s) const {
+    return str == s.str;
   }
   bool operator < (const word_t<T>& x1) const {
     return (count < x1.count) || (count == x1.count && str < x1.str);
@@ -77,9 +85,8 @@ public:
 
 template <typename T, typename U> class lword {
 public:
-  lword();
+  lword(const int& loop, const int& mthresh, const int& Mthresh);
   ~lword();
-  void init(const int& loop, const int& mthresh, const int& Mthresh);
   
   const vector<word_t<U> >& compute(const U& input);
 private:
@@ -98,25 +105,20 @@ private:
   void       assign(const gram_t<U>& val);
 };
 
-template <typename T, typename U> lword<T, U>::lword() {
-  init(60, 2, 2);
+template <typename T, typename U> lword<T, U>::lword(const int& loop, const int& mthresh, const int& Mthresh) {
+/*
+  this->dict0   = vector<T>();
+  this->dicts   = vector<vector<gram_t<U> > >();
+*/
+  this->mthresh = mthresh;
+  this->Mthresh = Mthresh;
+  this->dicts.resize(loop, vector<gram_t<U> >());
+//  this->words   = vector<word_t<U> >();
 }
 
 template <typename T, typename U> lword<T, U>::~lword() {
   // already freed in another places.
   ;
-}
-
-template <typename T, typename U> void lword<T, U>::init(const int& loop, const int& mthresh, const int& Mthresh) {
-  this->mthresh = mthresh;
-  this->Mthresh = Mthresh;
-/*
-  this->dict0   = vector<T>();
-  this->dicts   = vector<vector<gram_t<U> > >();
-*/
-  this->dicts.resize(loop, vector<gram_t<U> >());
-//  this->words   = vector<word_t<U> >();
-  return;
 }
 
 template <typename T, typename U> bool lword<T, U>::isin(const U& key) {
@@ -177,6 +179,7 @@ template <typename T, typename U> void lword<T, U>::assign(const gram_t<U>& val)
 }
 
 template <typename T, typename U> const vector<word_t<U> >& lword<T, U>::compute(const U& input) {
+  cerr << "lword::compute(" << dicts.size() << ", " << input.size() << ", " << mthresh << ", " << Mthresh << ")" << endl;
   makeBigram(input);
   constructNwords();
   for(auto itr = dicts.begin(); itr != dicts.end(); ++ itr)
@@ -225,13 +228,11 @@ template <typename T, typename U> void lword<T, U>::makeBigram(const U& input) {
 
 template <typename T, typename U> void lword<T, U>::constructNwords() {
   int i;
-  for(i = 2; i < dicts.size(); i ++) {
-    cerr << i << flush;
+  for(i = 2; i < dicts.size() - 1; i ++) {
     map<U, vector<int> > map0;
     map<U, vector<int> > map1;
     map<U, vector<int> > dmap;
     for(auto itr = dicts[i].begin(); itr != dicts[i].end(); ++ itr) {
-      cerr << "." << flush;
       const gram_t<U>& idxkey(*itr);
       for(auto itr2 = dict0.begin(); itr2 != dict0.end(); ++ itr2) {
         U key2;
@@ -295,7 +296,6 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
       work.ptr1 = map1[itr->first];
       assign(work);
     }
-    cerr << endl;
   }
   return;
 }
