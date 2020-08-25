@@ -66,6 +66,8 @@ public:
   typedef SimpleSparseTensor<T> Tensor;
   
   corpus();
+  corpus(const corpus<T, U>& other);
+  corpus(corpus<T, U>&& other);
   ~corpus();
   
   corpus<T, U>&    operator = (const corpus<T, U>& other);
@@ -88,6 +90,14 @@ private:
 
 template <typename T, typename U> corpus<T,U>::corpus() {
   ;
+}
+
+template <typename T, typename U> corpus<T,U>::corpus(const corpus<T, U>& other) {
+  *this = other;
+}
+
+template <typename T, typename U> corpus<T,U>::corpus(corpus<T, U>&& other) {
+  *this = other;
 }
 
 template <typename T, typename U> corpus<T,U>::~corpus() {
@@ -126,7 +136,7 @@ template <typename T, typename U> U corpus<T,U>::getAttributed(const vector<U>& 
   U   result;
   int i;
   for(i = 0; i < orig.size(); ) {
-    const auto lb(upper_bound(highlight.begin(), highlight.end(), U(&(orig.c_str()[i])), lessNotEqualStrClip<U>));
+    const auto lb(upper_bound(highlight.begin(), highlight.end(), U(&(orig.c_str()[i])), lessEqualStrClip<U>));
     if(highlight.begin() <= lb && lb < highlight.end() && equalStrClip<U>(*lb, U(&(orig.c_str()[i])))) {
       result += U("<font class=\"match\">");
       result += *lb;
@@ -174,8 +184,8 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
         if(workd[ii] == delimiter[j] && pdelim[pdelim.size() - 1] < i)
           pdelim.push_back(i);
     }
-    auto lo(upper_bound(words.begin(), words.end(), work, lessNotEqualStrClip<U>));
-    auto up(upper_bound(words.begin(), words.end(), work, lessEqualStrClip<U>));
+    auto lo(upper_bound(words.begin(), words.end(), work, lessEqualStrClip<U>));
+    auto up(upper_bound(words.begin(), words.end(), work, lessNotEqualStrClip<U>));
     bool match(false);
     for(auto itr(lo); itr < up; ++ itr)
       if(equalStrClip<U>(work, *itr)) {
