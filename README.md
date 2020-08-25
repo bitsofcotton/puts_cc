@@ -1,6 +1,6 @@
 # Puts_CC
 Cluster large documents from small elementary document sets and collect a TOC and make links to medium sized set of documents.
-And this program is implemented with a deterministic way. So this library don't use machine learning methods.
+And this program is implemented with a deterministic way.
 
 This IS NOT the program that judges it is true or false, this IS ONLY the program that seines
 the score that seems to be true or that seems to be false FROM INPUT (with NO deductions for logics).

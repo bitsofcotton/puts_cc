@@ -1,5 +1,5 @@
 /* BSD 3-Clause License:
- * Copyright (c) 2018, bitsofcotton.
+ * Copyright (c) 2018-2020, bitsofcotton.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
@@ -69,6 +69,7 @@ public:
   ~corpus();
   
   corpus<T, U>&    operator = (const corpus<T, U>& other);
+  corpus<T, U>&    operator = (corpus<T, U>&& other);
   corpus<T, U>&    compute(const U& input, const vector<U>& delimiter);
         U          getAttributed(const vector<U>& highlight) const;
   const U&         getOrig() const;
@@ -104,6 +105,16 @@ template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator = (const 
   return *this;
 }
 
+template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator = (corpus<T, U>&& other) {
+  orig    = move(other.orig);
+  ptrs    = move(other.ptrs);
+  uptrs   = move(other.uptrs);
+  pdelim  = move(other.pdelim);
+  corpust = move(other.corpust);
+  Midx    = move(other.Midx);
+  return *this;
+}
+
 template <typename T, typename U> corpus<T, U>& corpus<T,U>::compute(const U& input, const vector<U>& delimiter) {
   cerr << "c" << flush;
   getWordPtrs(input, delimiter);
@@ -115,7 +126,7 @@ template <typename T, typename U> U corpus<T,U>::getAttributed(const vector<U>& 
   U   result;
   int i;
   for(i = 0; i < orig.size(); ) {
-    const auto lb(upper_bound(highlight.begin(), highlight.end(), U(&(orig.c_str()[i])), lessEqualStrClip<U>));
+    const auto lb(upper_bound(highlight.begin(), highlight.end(), U(&(orig.c_str()[i])), lessNotEqualStrClip<U>));
     if(highlight.begin() <= lb && lb < highlight.end() && equalStrClip<U>(*lb, U(&(orig.c_str()[i])))) {
       result += U("<font class=\"match\">");
       result += *lb;
@@ -163,8 +174,8 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
         if(workd[ii] == delimiter[j] && pdelim[pdelim.size() - 1] < i)
           pdelim.push_back(i);
     }
-    auto lo(upper_bound(words.begin(), words.end(), work, lessEqualStrClip<U>));
-    auto up(upper_bound(words.begin(), words.end(), work, lessNotEqualStrClip<U>));
+    auto lo(upper_bound(words.begin(), words.end(), work, lessNotEqualStrClip<U>));
+    auto up(upper_bound(words.begin(), words.end(), work, lessEqualStrClip<U>));
     bool match(false);
     for(auto itr(lo); itr < up; ++ itr)
       if(equalStrClip<U>(work, *itr)) {
@@ -264,6 +275,7 @@ public:
   corpushl();
   corpushl(const corpus<T, U>&   obj);
   corpushl(const corpushl<T, U>& obj);
+  corpushl(corpushl<T, U>&& obj);
   ~corpushl();
   
         corpushl<T, U>& operator += (const corpushl<T, U>& other);
@@ -276,6 +288,7 @@ public:
         corpushl<T, U>  operator *  (const T& t)                  const;
         corpushl<T, U>  operator /  (const T& t)                  const;
         corpushl<T, U>& operator =  (const corpushl<T, U>& other);
+        corpushl<T, U>& operator =  (corpushl<T, U>&& other);
         bool            operator == (const corpushl<T, U>& other) const;
         bool            operator != (const corpushl<T, U>& other) const;
         corpushl<T, U>  withDetail(const U& word, const corpushl<T, U>& other, const T& thresh = T(0)) const;
@@ -329,8 +342,17 @@ template <typename T, typename U> corpushl<T,U>::corpushl(const corpushl<T, U>& 
   *this = obj;
 }
 
+template <typename T, typename U> corpushl<T,U>::corpushl(corpushl<T, U>&& obj) {
+  *this = obj;
+}
+
 template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator = (const corpushl<T, U>& other) {
   corpust = other.corpust;
+  return *this;
+}
+
+template <typename T, typename U> corpushl<T, U>& corpushl<T, U>::operator = (corpushl<T, U>&& other) {
+  corpust = move(other.corpust);
   return *this;
 }
 
@@ -422,7 +444,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
           for(auto titr1(ti1.begin()); titr1 != ti1.end(); ++ titr1) {
             const int& tjj(titr1->first);
             if(tjj == eeidx) continue;
-            merge5(result.corpust, tii, ii, kk, jj, tjj, titr1->second[eeidx] * itr2->second * x0);
+            merge5(result.corpust, tii, ii, kk, jj, tjj, titr1->second[eeidx] * itr2->second * (x0 + T(1)));
           }
         }
         for(auto titr0(ti0.begin()); titr0 != ti0.end(); ++ titr0) {
@@ -432,7 +454,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
           for(auto titr2(ti2.begin()); titr2 != ti2.end(); ++ titr2) {
             const int& tkk(titr2->first);
             if(tkk == eeidx) continue;
-            merge5(result.corpust, tii, tkk, ii, kk, jj, titr2->second * itr2->second * x0);
+            merge5(result.corpust, tii, tkk, ii, kk, jj, titr2->second * itr2->second * (x0 + T(1)));
           }
         }
         const auto& ti1(const_cast<const Tensor&>(corpust)[eeidx].iter());
@@ -443,7 +465,7 @@ template <typename T, typename U> corpushl<T, U> corpushl<T, U>::withDetail(cons
           for(auto titr2(ti2.begin()); titr2 != ti2.end(); ++ titr2) {
             const int& tkk(titr2->first);
             if(tkk == eeidx) continue;
-            merge5(result.corpust, ii, kk, jj, tkk, tjj, titr2->second * itr2->second * x0);
+            merge5(result.corpust, ii, kk, jj, tkk, tjj, titr2->second * itr2->second * (x0 + T(1)));
           }
         }
       }

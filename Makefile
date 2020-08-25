@@ -2,19 +2,16 @@ CXX=	clang++
 
 # compiler flags.
 CXXFLAGS+=	-I/usr/local/include/eigen3
-CXXFLAGS+=	-Ofast -g0
-#CXXFLAGS+=	-O2 -g2
+CXXFLAGS+=	-Ofast -mtune=native -g2
 CXXFLAGS+=	-std=c++11
 LDFLAGS+=	-lc++
 
-# assertion
-# CXXFLAGS+=	-D_STRICT_WORD_ASSERT_
 # without eigen, this lacks comparestructure function.
 # CXXFLAGS+=	-D_WITHOUT_EIGEN_
 
-CLEANFILES= *.o tools test
+CLEANFILES= *.o tools
 
-all:	tools test
+all:	tools
 
 clean:
 	@rm -rf ${CLEANFILES}

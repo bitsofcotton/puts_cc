@@ -100,9 +100,9 @@ int main(int argc, const char* argv[]) {
     std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> converter;
     std::vector<word_t<std::u32string> > found;
     for(int i = 2; i < 20; i ++) {
-      const auto lwords(lword<char32_t, std::u32string>(i + 4, i, i).compute(converter.from_bytes(input)));
+      const auto lwords(lword<char32_t, std::u32string>(80, i, i).compute(converter.from_bytes(input)));
       for(auto itr = lwords.begin(); itr != lwords.end(); ++ itr) {
-        if(itr->count < 2 && itr->str.size() < 2)
+        if(itr->count < 2 && itr->str.size() < 3)
           continue;
         const auto lb(std::lower_bound(found.begin(), found.end(), *itr, less0w<std::u32string>));
         if(found.begin() <= lb && lb < found.end() && lb->str == itr->str)
