@@ -61,9 +61,10 @@ serialize 関数は、理想的には corpushl(corpus(...)) イニシャライ�
 きちんとした辞書を用いない場合には、このプログラムは順序をきちんと処理できない事があります。これは、文同士の順序を辞書のみを考慮して計測していることによります。  
 
 # その他のダウンロードサイト
+* https://konbu.azurewebsites.net/ (Sample Site)
+* https://sites.google.com/view/bitsofcotton/
 * https://ja.osdn.net/projects/puts-cc/
 * https://www.sourceforge.net/projects/puts-cc/
-* https://sites.google.com/view/bitsofcotton/
 
 # 頓挫されたもの
 これらのプログラムと形態素解析および論理演算をカテゴリ - 関係性 - 尺度の領域ペアでテンソルを記述すると現在よりも正しい結果が得られると推測され、また、末端の論理演算により有用な使用ができる可能性がありますが、実装されていません。これらは話題を整理して目次を作成するだけのものには不要です。また、それを使用した場合には、2 つ以上の事象に対してまたは 2 人以上の人からの記述の場合には示されるテーブルは意味のないものになります。また、そのような事象をこのプログラムはきちんと処理できません。  
