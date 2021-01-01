@@ -60,9 +60,9 @@ If the dictionary we use is not valid for the text input, we cannot make text or
 
 # Another downloads
 * https://konbu.azurewebsites.net/ (Sample Site)
-* https://sites.google.com/view/bitsofcotton/
-* https://ja.osdn.net/projects/puts-cc/
-* https://www.sourceforge.net/projects/puts-cc/
+* https://drive.google.com/drive/folders/1B71X1BMttL6yyi76REeOTNRrpopO8EAR?usp=sharing
+* https://1drv.ms/u/s!AnqkwcwMjB_PaDIfXya_M3-aLXw?e=qzfKcU
+* https://ja.osdn.net/users/bitsofcotton/
 
 # The things undone
 If we use similar things with category - relation - region of measure tensor, and with morphological analysis, we might get better results and low memory condition, but there's NO implementation here. So that isn't needed by making TOCs. And if so, if there's two or more phenomenon or people, shrink into one table, it's meaningless. In such case, this program returns broken results.  
