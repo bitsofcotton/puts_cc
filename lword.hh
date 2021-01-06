@@ -282,10 +282,11 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
             gram_t<U>  after(before);
       after.ptr0 = vector<int>();
       after.ptr1 = vector<int>();
-      for(int j = 0; j < itr->second.size(); j ++) {
-        after.ptr0.push_back(before.ptr0[itr->second[j]]);
-        after.ptr1.push_back(before.ptr1[itr->second[j]]);
-      }
+      for(int j = 0; j < before.ptr1.size(); j ++)
+        if(!binary_search(itr->second.begin(), itr->second.end(), j)) {
+          after.ptr0.push_back(before.ptr0[j]);
+          after.ptr1.push_back(before.ptr1[j]);
+        }
       assign(after);
     }
     // construct next stage.
