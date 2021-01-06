@@ -73,3 +73,5 @@ And, if we try to use this program to produce some mob character want to say, we
 If we use NOT word with accurate handle, we can roughly (but deeply differed to now) divide some insists.
 Being determined whether implement or not.
 
+# Archived
+This repository is archived, so without bug report, will no change.
