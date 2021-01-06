@@ -69,9 +69,7 @@ If we use similar things with category - relation - region of measure tensor, an
 And, if we use this program to produce brand-new data from input, we need some materials and/or relations to view from and on, and so on. And, if we use this for produce some kind of stories, we need multiple tables (on the destination and on the source of identity) transition, and some relation on the world that to be described, so to apply this for the kind of it, entity space and glues is needed other than dictating.  
 And, if we try to use this program to produce some mob character want to say, we need what tend to been saw by the character, this can be made a role by the sets of dictionary but, if the characters' state is unchanged, we can't make conversation with.
 
-# The things didn't determined.
 If we use NOT word with accurate handle, we can roughly (but deeply differed to now) divide some insists.
-Being determined whether implement or not.
 
 # Archived
 This repository is archived, so without bug report, will no change.
