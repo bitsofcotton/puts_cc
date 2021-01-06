@@ -33,7 +33,8 @@ void usage() {
   std::cout << "tools (lword|lbalance|toc|lack|redig|stat|findroot|diff|same|prep)" << std::endl;
 }
 
-const int    szwindow(120);
+//const int    szwindow(120);
+const int    szwindow(1500);
 const int    Mbalance(40);
 const double scorethresh(.25);
 const double dscorethresh(.001);
@@ -49,6 +50,8 @@ std::pair<std::string, std::string> loadbuf(const char* filename) {
   std::string   inbuf;
   input.open(filename);
   while(getline(input, line)) {
+    for(int i = 0; i < line.size(); i ++)
+      if(line[i] == '<' || line[i] == '>' || line[i] == '&') line[i] = '!';
     inbuf += line + std::string("\n");
     if(input.eof() || input.bad())
       break;
@@ -92,8 +95,11 @@ int main(int argc, const char* argv[]) {
   csvdelim.push_back(string("\n"));
   words = cutText(loadbuf(argv[2]).second, csvelim, csvdelim, true);
   std::string input, line;
-  while(std::getline(std::cin, line))
+  while(std::getline(std::cin, line)) {
+    for(int i = 0; i < line.size(); i ++)
+      if(line[i] == '<' || line[i] == '>' || line[i] == '&') line[i] = '!';
     input += line + std::string("\n");
+  }
   if(std::strcmp(argv[1], "lword") == 0) {
     words.insert(words.end(), csvelim.begin(),  csvelim.end());
     words.insert(words.end(), csvdelim.begin(), csvdelim.end());

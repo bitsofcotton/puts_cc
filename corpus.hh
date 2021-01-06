@@ -43,7 +43,7 @@ using std::replace;
 template <typename T> bool equalStrClip(const T& a, const T& b) {
   int cmp(0), jidx(0);
   for( ; !cmp && jidx < min(a.size(), b.size()); jidx ++)
-    cmp = a[jidx] - b[jidx];
+    cmp = a[jidx] ^ b[jidx];
   return !cmp && min(a.size(), b.size()) <= jidx;
 }
 
@@ -53,10 +53,6 @@ template <typename T> bool lessEqualStrClip(const T& a, const T& b) {
 
 template <typename T> bool lessNotEqualStrClip(const T& a, const T& b) {
   return a < b && !equalStrClip<T>(a, b);
-}
-
-template <typename T> bool lessFirst(const T& a, const T& b) {
-  return a.first < b.first;
 }
 
 template <typename T, typename U> class corpus {
@@ -175,11 +171,11 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
   }
   orig = U(input);
   int i(0), i0(0);
-  for( ; i < input.size(); i ++) {
-    work += input[i];
+  for( ; i < orig.size(); i ++) {
+    work += orig[i];
     for(int ii = 0; ii < workd.size(); ii ++) {
       workd[ii]  = workd[ii].substr(1, workd[ii].size() - 1);
-      workd[ii] += input[i];
+      workd[ii] += orig[i];
       for(int j = 0; j < delimiter.size(); j ++)
         if(workd[ii] == delimiter[j] && pdelim[pdelim.size() - 1] < i)
           pdelim.push_back(i);
@@ -195,7 +191,7 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
         } else if(work.size() < itr->size())
           match = true;
       }
-    if(match && i < input.size() - 1)
+    if(match && i < orig.size() - 1)
       continue;
     if(matchwidx.size() > 0) {
       const int j(matchwidx.size() - 1);
@@ -205,7 +201,7 @@ template <typename T, typename U> void corpus<T,U>::getWordPtrs(const U& input, 
       matchwidx = vector<int>();
       matchidxs = vector<int>();
     }
-    if(i == input.size() - 1)
+    if(i == orig.size() - 1)
       break;
     i   -= work.size() - 1;
     i0   = i;
@@ -867,7 +863,7 @@ template <typename T, typename U> const SimpleSparseTensor<T>& corpushl<T, U>::g
 
 
 
-template <typename T, typename U> void getAbbreved(corpushl<T, U>& cstat, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow) {
+template <typename T, typename U> void getAbbreved(corpushl<T, U>& cstat, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter) {
   assert(detailtitle.size() == detail.size());
   for(int i = 0; i < detail.size(); i ++)
     cstat = cstat.abbrev(detailtitle[i], corpushl<T, U>(corpus<T, U>().compute(detail[i], delimiter)));
@@ -1079,8 +1075,8 @@ template <typename T, typename U> U diff(const U& input, const vector<U>& detail
     if(!getDetailed<T, U>(cstat0, cstat, input, i, detailtitle0, detail0, delimiter, szwindow, threshin) ||
        !getDetailed<T, U>(dstat0, dstat, input, i, detailtitle1, detail1, delimiter, szwindow, threshin))
       break;
-    getAbbreved<T, U>(cstat, detailtitle1, detail1, delimiter, szwindow);
-    getAbbreved<T, U>(dstat, detailtitle0, detail0, delimiter, szwindow);
+    getAbbreved<T, U>(cstat, detailtitle1, detail1, delimiter);
+    getAbbreved<T, U>(dstat, detailtitle0, detail0, delimiter);
     cstat.reDig(redig);
     dstat.reDig(redig);
     const auto score(abs(cstat.cdot(dstat)) / sqrt(cstat.cdot(cstat) * dstat.cdot(dstat)) - T(1));
@@ -1100,8 +1096,8 @@ template <typename T, typename U> U diff(const U& input, const vector<U>& detail
     if(!getDetailed<T, U>(cstat0, cstat, input, i, detailtitle0, detail0, delimiter, szwindow, threshin) ||
        !getDetailed<T, U>(dstat0, dstat, input, i, detailtitle1, detail1, delimiter, szwindow, threshin))
       break;
-    getAbbreved<T, U>(cstat, detailtitle1, detail1, delimiter, szwindow);
-    getAbbreved<T, U>(dstat, detailtitle0, detail0, delimiter, szwindow);
+    getAbbreved<T, U>(cstat, detailtitle1, detail1, delimiter);
+    getAbbreved<T, U>(dstat, detailtitle0, detail0, delimiter);
     cstat.reDig(redig);
     dstat.reDig(redig);
     auto diff(cstat - dstat);

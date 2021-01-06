@@ -234,11 +234,12 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
     map<U, vector<int> > dmap;
     for(auto itr = dicts[i].begin(); itr != dicts[i].end(); ++ itr) {
       const gram_t<U>& idxkey(*itr);
+      U key2;
+      for(int j = 1; j < idxkey.str.size(); j ++)
+        key2 += idxkey.str[j];
+      key2 += T(' ');
       for(auto itr2 = dict0.begin(); itr2 != dict0.end(); ++ itr2) {
-        U key2;
-        for(int j = 1; j < idxkey.str.size(); j ++)
-          key2 += idxkey.str[j];
-        key2 += T(*itr2);
+        key2[key2.size() - 1] = T(*itr2);
         if(!isin(key2))
           continue;
         const gram_t<U>& idxkey2(find(key2));
@@ -281,11 +282,10 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
             gram_t<U>  after(before);
       after.ptr0 = vector<int>();
       after.ptr1 = vector<int>();
-      for(int j = 0; j < before.ptr1.size(); j ++)
-        if(!binary_search(itr->second.begin(), itr->second.end(), j)) {
-          after.ptr0.push_back(before.ptr0[j]);
-          after.ptr1.push_back(before.ptr1[j]);
-        }
+      for(int j = 0; j < itr->second.size(); j ++) {
+        after.ptr0.push_back(before.ptr0[itr->second[j]]);
+        after.ptr1.push_back(before.ptr1[itr->second[j]]);
+      }
       assign(after);
     }
     // construct next stage.
