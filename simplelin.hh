@@ -1,6 +1,6 @@
 /* You can use one of the both BSD 3-Clause License or GNU Lesser General Public License 3.0 for this source. */
 /* BSD 3-Clause License:
- * Copyright (c) 2013 - 2018, kazunobu watatsu.
+ * Copyright (c) 2013 - 2021, kazunobu watatsu.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
@@ -45,7 +45,6 @@ public:
   template <typename U> inline SimpleVector<U> cast() const;
   inline const int& size() const;
   inline       void resize(const int& size);
-private:
   T*  entity;
   int esize;
 };
@@ -288,8 +287,10 @@ public:
   // N.B. transpose : exhaust of the resource, so Eigen library handles better.
   inline       SimpleMatrix<T>  transpose() const;
   inline       T                determinant() const;
+  inline       SimpleMatrix<T>  inverse() const;
   inline       SimpleVector<T>  solve(SimpleVector<T> other) const;
   inline       SimpleVector<T>  projectionPt(const SimpleVector<T>& other) const;
+  inline       SimpleMatrix<T>  LSVD() const;
   template <typename U> inline SimpleMatrix<U> real() const;
   template <typename U> inline SimpleMatrix<U> imag() const;
   template <typename U> inline SimpleMatrix<U> cast() const;
@@ -301,12 +302,14 @@ private:
   SimpleVector<T>* entity;
   int              erows;
   int              ecols;
+  T                epsilon;
 };
 
 template <typename T> inline SimpleMatrix<T>::SimpleMatrix() {
   erows  = 0;
   ecols  = 0;
   entity = NULL;
+  epsilon = pow(T(1), - T(8));
   return;
 }
 
@@ -320,6 +323,7 @@ template <typename T> inline SimpleMatrix<T>::SimpleMatrix(const int& rows, cons
     entity[i].resize(cols);
   erows = rows;
   ecols = cols;
+  epsilon = pow(T(1), - T(8));
   return; 
 }
 
@@ -577,6 +581,17 @@ template <typename T> inline T SimpleMatrix<T>::determinant() const {
   return isfinite(det) ? det : T(0);
 }
 
+template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::inverse() const {
+  // XXX: extremely slow implementation.
+  SimpleMatrix<T> result(erows, ecols);
+  for(int i = 0; i < result.rows(); i ++)
+    for(int j = 0; j < result.cols(); j ++)
+      result(i, j) = i == j ? T(1) : T(0);
+  for(int i = 0; i < result.cols(); i ++)
+    result.setCol(i, solve(result.col(i)));
+  return result;
+}
+
 template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solve(SimpleVector<T> other) const {
   assert(0 <= erows && 0 <= ecols && erows == ecols && entity && erows == other.size());
   SimpleMatrix<T> work(*this);
@@ -593,20 +608,21 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solve(SimpleVector
     other[xchg]       = buf2;
     const SimpleVector<T>& ei(work.entity[i]);
     const T&               eii(ei[i]);
+    if(epsilon < abs(eii)) {
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-    for(int j = i + 1; j < erows; j ++) {
-      const T ratio(work.entity[j][i] / eii);
-      work.entity[j] -= ei       * ratio;
-      other[j]       -= other[i] * ratio;
+      for(int j = i + 1; j < erows; j ++) {
+        const T ratio(work.entity[j][i] / eii);
+        work.entity[j] -= ei       * ratio;
+        other[j]       -= other[i] * ratio;
+      }
     }
   }
   for(int i = erows - 1; 0 <= i; i --) {
     const T buf(other[i] / work.entity[i][i]);
     if(!isfinite(buf) || isnan(buf)) {
-      // throw "Non full rank";
-      // assert(!isfinite(work.entity[i][i] / other[i]) || isnan(work.entity[i][i] / other[i]));
+    //  assert(!isfinite(work.entity[i][i] / other[i]) || isnan(work.entity[i][i] / other[i]));
       continue;
     }
     other[i]    = buf;
@@ -638,6 +654,76 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::projectionPt(const
       res[i] += work(j, i);
   }
   return res;
+}
+
+template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::LSVD() const {
+  auto s((*this) * this->transpose());
+  SimpleMatrix<T> left(s.rows(), s.rows());
+  for(int i = 0; i < left.rows(); i ++)
+    for(int j = 0; j < left.cols(); j ++)
+      left(i, j) = i == j ? T(1) : T(0);
+  for(int ii = 0; ii < s.rows(); ii ++) {
+    // find eigen max on working matrix:
+    SimpleMatrix<T> work(s.rows() - ii, s.rows() - ii);
+    for(int i = 0; i < work.rows(); i ++)
+      for(int j = 0; j < work.cols(); j ++)
+        work(i, j) = s(ii + i, ii + j);
+    SimpleVector<T>   d(work.rows());
+    SimpleVector<int> idx(work.rows());
+    // LDLt:
+    for(int i = 0; i < work.rows(); i ++) {
+      int xchg = i;
+      for(int j = i + 1; j < work.rows(); j ++)
+        if(abs(work.entity[j][i]) > abs(work.entity[xchg][i]))
+          xchg = j;
+      idx[i] = xchg;
+      auto buf(work.row(i));
+      work.row(i)    = work.row(xchg);
+      work.row(xchg) = buf;
+      const auto& ei(work.row(i));
+      const auto& eii(ei[i]);
+      d[i] = eii;
+      if(epsilon < abs(eii)) {
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
+        for(int j = i + 1; j < work.rows(); j ++) {
+          const T ratio(work(j, i) / eii);
+          work.row(j) -= ei * ratio;
+        }
+      }
+    }
+    for(int i = 0; i < idx.size(); i ++)
+      std::swap(work.row(idx[idx.size() - 1 - i]), work.row(idx.size() - 1 - i));
+    auto eMidx(0);
+    for(int i = 1; i < d.size(); i ++)
+      if(abs(d[eMidx]) < abs(d[i]))
+        eMidx = i;
+    SimpleVector<T> ev(work.rows());
+    for(int i = 0; i < ev.size(); i ++)
+      ev[i] = i == eMidx ? T(1) : T(0);
+    ev    = work.solve(ev);
+    ev   /= sqrt(ev.dot(ev));
+    work *= T(0);
+    work.row(0) = ev;
+    SimpleVector<T> ek(ev.size());
+    for(int i = 0, i2 = 1; i < work.rows() && i2 < work.rows(); i ++) {
+      for(int j = 0; j < ek.size(); j ++)
+        ek[j] = i == j ? T(1) : T(0);
+      ek -= work.projectionPt(ek);
+      if(sqrt(ek.dot(ek)) <= epsilon)
+        continue;
+      work.row(i2 ++) = ek / sqrt(ek.dot(ek));
+    }
+    SimpleMatrix<T> mul(s.rows(), s.cols());
+    for(int i = 0; i < mul.rows(); i ++)
+      for(int j = 0; j < mul.cols(); j ++)
+        mul(i, j) = i < ii || j < ii ? (i == j ? T(1) : T(0)) :
+          work(i - ii, j - ii);
+    left = left * mul;
+    s    = mul.transpose() * s * mul;
+  }
+  return left;
 }
 
 template <typename T> template <typename U> inline SimpleMatrix<U> SimpleMatrix<T>::real() const {
