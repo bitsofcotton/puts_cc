@@ -152,22 +152,17 @@ template <typename T, typename U> void lword<T, U>::assign(const gram_t<U>& val)
     // delete duplicates:
     gram_t<U> work;
     work.str = val.str;
-    // XXX can spped up with sorting.
-    for(int i = 0; i < val.ptr0.size(); i ++) {
-      bool flag(false);
-      for(int j = 0; j < work.ptr0.size(); j ++)
-        if(work.ptr0[j] == val.ptr0[i] &&
-           work.ptr1[j] == val.ptr1[i]) {
-          flag = true;
-          break;
-        }
-      if(flag)
-        continue;
-      work.ptr0.push_back(val.ptr0[i]);
-      work.ptr1.push_back(val.ptr1[i]);
+    auto vptr0(val.ptr0);
+    auto vptr1(val.ptr1);
+    std::sort(vptr0.begin(), vptr0.end());
+    std::sort(vptr1.begin(), vptr1.end());
+    assert(vptr0.size() == vptr1.size());
+    for(int i = 0; i < vptr0.size(); i ++) {
+      if(i && work.ptr0[work.ptr0.size() - 1] == vptr0[i] &&
+              work.ptr1[work.ptr1.size() - 1] == vptr1[i]) continue;
+      work.ptr0.push_back(vptr0[i]);
+      work.ptr1.push_back(vptr1[i]);
     }
-    sort(work.ptr0.begin(), work.ptr0.end());
-    sort(work.ptr1.begin(), work.ptr1.end());
     if(p < dict.begin() || dict.end() <= p || p->str != work.str) {
       dict.push_back(work);
       sort(dict.begin(), dict.end());

@@ -596,8 +596,8 @@ template <typename T, typename U> U corpushl<T, U>::serializeSub(const vector<in
       return words[idxs[0]];
     return U();
   }
-  vector<pair<int, int> > cscore;
-  cscore.reserve(idxs.size());
+  vector<pair<int, int> > score;
+  score.reserve(idxs.size());
   // N.B. i0 - i1 - i2 is stored in corpust[i0][i2][i1].
   for(int i = 0; i < idxs.size(); i ++) {
     int lscore(0);
@@ -605,48 +605,26 @@ template <typename T, typename U> U corpushl<T, U>::serializeSub(const vector<in
       for(int k = 0; k < idxs.size(); k ++)
         if((const_cast<const Tensor&>(corpust))[idxs[j]][idxs[k]][idxs[i]] != T(0))
           lscore --;
-    cscore.push_back(make_pair(lscore, idxs[i]));
+    const auto& ii(const_cast<const Tensor&>(corpust)[idxs[i]].iter());
+    if(ii.size())
+      for(auto iii(ii.begin()); iii != ii.end(); ++ iii)
+        lscore += iii->second.iter().size();
+    score.push_back(make_pair(lscore, idxs[i]));
   }
-  sort(cscore.begin(), cscore.end());
-  for(int si = 0; si < cscore.size(); si ++) {
-    vector<int> middle, left, right;
-    left.reserve(idxs.size());
-    middle.reserve(idxs.size());
-    right.reserve(idxs.size());
-    middle.push_back(cscore[si].second);
-    if(!cscore[si].first)
-      goto symmetric;
-    vector<pair<int, int> > score;
-    for(int i = 0; i < idxs.size(); i ++) {
-      if(idxs[i] == middle[0]) continue;
-      int lscore(0);
-      for(int j = 0; j < idxs.size(); j ++)
-        if(idxs[j] != middle[0]) {
-          if((const_cast<const Tensor&>(corpust))[idxs[i]][idxs[j]][middle[0]] != T(0))
-            lscore --;
-          if((const_cast<const Tensor&>(corpust))[idxs[j]][idxs[i]][middle[0]] != T(0))
-            lscore ++;
-        }
-      score.push_back(make_pair(lscore, idxs[i]));
-    }
-    sort(score.begin(), score.end());
-    int i(0);
-    for( ; i < score.size() && score[i].first < 0; i ++)
-      left.push_back(score[i].second);
-    for( ; i < score.size() && !score[i].first; i ++)
-      middle.push_back(score[i].second);
-    for( ; i < score.size(); i ++)
-      right.push_back(score[i].second);
-    if((middle.size() && (left.size() || right.size())) || (left.size() && right.size()))
-      return serializeSub(left) + serializeSub(middle) + serializeSub(right);
-    // XXX checkme with some speed matter.
-    break;
-  }
- symmetric:
+  sort(score.begin(), score.end());
+  vector<int> left, right;
+  left.reserve(idxs.size());
+  right.reserve(idxs.size());
+  int i(0);
+  for( ; i < score.size() && score[i].first < 0; i ++)
+    left.push_back(score[i].second);
+  for( ; i < score.size(); i ++)
+    right.push_back(score[i].second);
+  if(left.size() && right.size())
+    return serializeSub(left) + serializeSub(right);
   U result;
-  for(int i = 0; i < cscore.size(); i ++)
-    if(cscore[i].first != T(0))
-      result += words[cscore[i].second];
+  for(int i = 0; i < idxs.size(); i ++)
+    result += words[idxs[i]];
   return result;
 }
 
