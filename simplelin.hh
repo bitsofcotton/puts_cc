@@ -291,6 +291,7 @@ public:
   inline       SimpleVector<T>  solve(SimpleVector<T> other) const;
   inline       SimpleVector<T>  projectionPt(const SimpleVector<T>& other) const;
   inline       SimpleMatrix<T>  LSVD() const;
+  inline       std::pair<std::pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > GSVD(const SimpleMatrix<T>& src) const;
   template <typename U> inline SimpleMatrix<U> real() const;
   template <typename U> inline SimpleMatrix<U> imag() const;
   template <typename U> inline SimpleMatrix<U> cast() const;
@@ -309,7 +310,7 @@ template <typename T> inline SimpleMatrix<T>::SimpleMatrix() {
   erows  = 0;
   ecols  = 0;
   entity = NULL;
-  epsilon = pow(T(1), - T(8));
+  epsilon = pow(T(2), - T(6));
   return;
 }
 
@@ -323,7 +324,7 @@ template <typename T> inline SimpleMatrix<T>::SimpleMatrix(const int& rows, cons
     entity[i].resize(cols);
   erows = rows;
   ecols = cols;
-  epsilon = pow(T(1), - T(8));
+  epsilon = pow(T(2), - T(6));
   return; 
 }
 
@@ -657,6 +658,31 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::projectionPt(const
 }
 
 template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::LSVD() const {
+  if(this->cols() < this->rows()) {
+    auto res((* this) * this->transpose().LSVD());
+    for(int i = 0; i < res.cols(); i ++) {
+      const auto rnorm(sqrt(res.col(i).dot(res.col(i))));
+      if(epsilon < rnorm)
+        res.setCol(i, res.col(i) / rnorm);
+      else {
+        res = res.transpose();
+        for(int j = i; j < res.rows(); j ++)
+          res.row(j) *= T(0);
+        SimpleVector<T> ek(res.cols());
+        for(int j = 0; j < res.rows() && i < res.rows(); j ++) {
+          for(int k = 0; k < ek.size(); k ++)
+            ek[k] = j == k ? T(1) : T(0);
+          const auto ekp(ek - res.projectionPt(ek));
+          const auto nekp(sqrt(ekp.dot(ekp)));
+          if(nekp <= epsilon) continue;
+          res.row(i ++) = ekp / nekp;
+        }
+        res = res.transpose();
+        break;
+      }
+    }
+    return res;
+  }
   auto s((*this) * this->transpose());
   SimpleMatrix<T> left(s.rows(), s.rows());
   for(int i = 0; i < left.rows(); i ++)
@@ -693,8 +719,10 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::LSVD() const {
         }
       }
     }
-    for(int i = 0; i < idx.size(); i ++)
+    for(int i = 0; i < idx.size(); i ++) {
       std::swap(work.row(idx[idx.size() - 1 - i]), work.row(idx.size() - 1 - i));
+      std::swap(d[idx[idx.size() - 1 - i]], d[idx.size() - 1 - i]);
+    }
     auto eMidx(0);
     for(int i = 1; i < d.size(); i ++)
       if(abs(d[eMidx]) < abs(d[i]))
@@ -724,6 +752,49 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::LSVD() const {
     s    = mul.transpose() * s * mul;
   }
   return left;
+}
+
+// N.B. for full rank.
+template <typename T> inline std::pair<std::pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > SimpleMatrix<T>::GSVD(const SimpleMatrix<T>& src) const {
+  // refered from : https://en.wikipedia.org/wiki/Generalized_singular_value_decomposition .
+  assert(this->cols() == src.cols());
+  SimpleMatrix<T> C(this->rows() + src.rows(), this->cols());
+  for(int i = 0; i < this->rows(); i ++)
+    C.row(i) = this->row(i);
+  for(int i = 0; i < src.rows(); i ++)
+    C.row(i + this->rows()) = src.row(i);
+  const auto P(C.LSVD());
+  SimpleVector<T> d(this->cols());
+  const auto PtC(P.transpose() * C);
+        auto Qt(PtC);
+  for(int i = 0; i < d.size(); i ++)
+    Qt.row(i) /= (d[i] = sqrt(PtC.row(i).dot(PtC.row(i))));
+  SimpleMatrix<T> P1(this->rows(), d.size());
+  for(int i = 0; i < P1.rows(); i ++)
+    P1.row(i) = P.row(i);
+  auto U1(P1.LSVD());
+  auto Wt(U1.transpose() * P1);
+  for(int i = 0; i < Wt.rows(); i ++)
+    Wt.row(i) /= sqrt(Wt.row(i).dot(Wt.row(i)));
+  SimpleMatrix<T> P2(src.rows(), d.size());
+  for(int i = 0; i < P2.rows(); i ++)
+    P2.row(i) = P.row(i + P1.rows());
+  const auto P21W(P2 * Wt.transpose());
+  const auto U2(P21W.LSVD());
+  auto& WtD(Wt);
+  for(int i = 0; i < WtD.cols(); i ++)
+    WtD.setCol(i, WtD.col(i) * d[i]);
+  assert(WtD.rows() == WtD.cols());
+  SimpleMatrix<T> QtonWtDt(WtD.rows(), WtD.cols());
+  for(int i = 0; i < QtonWtDt.rows(); i ++)
+    for(int j = 0; j < QtonWtDt.cols(); j ++)
+      QtonWtDt(i, j) = T(0);
+  QtonWtDt.row(0) = WtD.row(0) / sqrt(WtD.row(0).dot(WtD.row(0)));
+  for(int i = 1; i < QtonWtDt.rows(); i ++) {
+    QtonWtDt.row(i)  = WtD.row(i) - QtonWtDt.projectionPt(WtD.row(i));
+    QtonWtDt.row(i) /= sqrt(QtonWtDt.row(i).dot(QtonWtDt.row(i)));
+  }
+  return std::make_pair(std::make_pair(std::move(U1), std::move(U2)), QtonWtDt * Qt);
 }
 
 template <typename T> template <typename U> inline SimpleMatrix<U> SimpleMatrix<T>::real() const {
