@@ -59,12 +59,10 @@ public:
 template <typename T> class gram_t {
 public:
   T           str;
-  vector<int> ptr0;
-  vector<int> ptr1;
+  vector<int> rptr;
   gram_t() {
     this->str  = T();
-    this->ptr0 = vector<int>();
-    this->ptr1 = vector<int>();
+    this->rptr = vector<int>();
   }
   ~gram_t() {
     ;
@@ -74,8 +72,7 @@ public:
   }
   gram_t& operator = (const gram_t<T>& x) {
     str  = x.str;
-    ptr0 = x.ptr0;
-    ptr1 = x.ptr1;
+    rptr = x.rptr;
     return *this;
   }
   bool operator < (const gram_t<T>& x1) const {
@@ -148,20 +145,15 @@ template <typename T, typename U> void lword<T, U>::assign(const gram_t<U>& val)
   assert(val.str.size() < dicts.size());
   vector<gram_t<U> >& dict(dicts[val.str.size()]);
   auto p(lower_bound(dict.begin(), dict.end(), val));
-  if(val.ptr0.size()) {
+  if(val.rptr.size()) {
     // delete duplicates:
     gram_t<U> work;
     work.str = val.str;
-    auto vptr0(val.ptr0);
-    auto vptr1(val.ptr1);
-    std::sort(vptr0.begin(), vptr0.end());
-    std::sort(vptr1.begin(), vptr1.end());
-    assert(vptr0.size() == vptr1.size());
-    for(int i = 0; i < vptr0.size(); i ++) {
-      if(i && work.ptr0[work.ptr0.size() - 1] == vptr0[i] &&
-              work.ptr1[work.ptr1.size() - 1] == vptr1[i]) continue;
-      work.ptr0.push_back(vptr0[i]);
-      work.ptr1.push_back(vptr1[i]);
+    auto vptr(val.rptr);
+    std::sort(vptr.begin(), vptr.end());
+    for(int i = 0; i < vptr.size(); i ++) {
+      if(i && work.rptr[work.rptr.size() - 1] == vptr[i]) continue;
+      work.rptr.push_back(vptr[i]);
     }
     if(p < dict.begin() || dict.end() <= p || p->str != work.str) {
       dict.push_back(work);
@@ -180,7 +172,7 @@ template <typename T, typename U> const vector<word_t<U> >& lword<T, U>::compute
   for(auto itr = dicts.begin(); itr != dicts.end(); ++ itr)
     for(auto itr2 = itr->begin(); itr2 != itr->end(); ++ itr2) {
       word_t<U> work;
-      work.count = itr2->ptr0.size();
+      work.count = itr2->rptr.size();
       if(!work.count)
         continue;
       work.str   = itr2->str;
@@ -212,10 +204,7 @@ template <typename T, typename U> void lword<T, U>::makeBigram(const U& input) {
   for(auto itr = mapw.begin(); itr != mapw.end(); ++ itr) {
     gram_t<U> work;
     work.str = itr->first;
-    for(auto itr2 = itr->second.begin(); itr2 != itr->second.end(); ++ itr2) {
-      work.ptr0.push_back(*itr2 - 1);
-      work.ptr1.push_back(*itr2);
-    }
+    work.rptr.insert(work.rptr.end(), itr->second.begin(), itr->second.end());
     assign(work);
   }
   return;
@@ -224,8 +213,7 @@ template <typename T, typename U> void lword<T, U>::makeBigram(const U& input) {
 template <typename T, typename U> void lword<T, U>::constructNwords() {
   int i;
   for(i = 2; i < dicts.size() - 1; i ++) {
-    map<U, vector<int> > map0;
-    map<U, vector<int> > map1;
+    map<U, vector<int> > amap;
     map<U, vector<int> > dmap;
     for(auto itr = dicts[i].begin(); itr != dicts[i].end(); ++ itr) {
       const gram_t<U>& idxkey(*itr);
@@ -240,34 +228,32 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
         const gram_t<U>& idxkey2(find(key2));
         U workkey(idxkey.str);
         workkey += *itr2;
-        vector<int> idxwork[4];
-        for(int j = 0; j < 4; j ++)
+        vector<int> idxwork[3];
+        for(int j = 0; j < 3; j ++)
           idxwork[j] = vector<int>();
         int tt = 0;
         int ss = 0;
-        while(tt < idxkey2.ptr0.size() && ss < idxkey.ptr0.size()) {
-          if(idxkey2.ptr1[tt] == idxkey.ptr1[ss] + 1) {
-            idxwork[0].push_back(idxkey.ptr0[ss]);
-            idxwork[1].push_back(idxkey2.ptr1[tt]);
-            idxwork[2].push_back(ss);
-            idxwork[3].push_back(tt);
+        while(tt < idxkey2.rptr.size() && ss < idxkey.rptr.size()) {
+          if(idxkey2.rptr[tt] == idxkey.rptr[ss] + 1) {
+            idxwork[0].push_back(idxkey2.rptr[tt]);
+            idxwork[1].push_back(ss);
+            idxwork[2].push_back(tt);
             ss ++;
             tt ++;
-          } else if(idxkey2.ptr1[tt] >= idxkey.ptr1[ss])
+          } else if(idxkey2.rptr[tt] >= idxkey.rptr[ss])
             ss ++;
           else
             tt ++;
         }
         if(idxwork[0].size() < Mthresh)
           continue;
-        const int diff(min( idxkey.ptr0.size(), idxkey2.ptr0.size()) - idxwork[0].size());
-        const int diffM(max(idxkey.ptr0.size(), idxkey2.ptr0.size()) - idxwork[0].size());
+        const int diff(min( idxkey.rptr.size(), idxkey2.rptr.size()) - idxwork[0].size());
+        const int diffM(max(idxkey.rptr.size(), idxkey2.rptr.size()) - idxwork[0].size());
         if(diff < 0 || mthresh < diffM)
           continue;
-        map0[workkey].insert(map0[workkey].end(), idxwork[0].begin(), idxwork[0].end());
-        map1[workkey].insert(map1[workkey].end(), idxwork[1].begin(), idxwork[1].end());
-        dmap[idxkey.str].insert(dmap[idxkey.str].end(), idxwork[2].begin(), idxwork[2].end());
-        dmap[key2].insert(dmap[key2].end(), idxwork[3].begin(), idxwork[3].end());
+        amap[workkey].insert(amap[workkey].end(), idxwork[0].begin(), idxwork[0].end());
+        dmap[idxkey.str].insert(dmap[idxkey.str].end(), idxwork[1].begin(), idxwork[1].end());
+        dmap[key2].insert(dmap[key2].end(), idxwork[2].begin(), idxwork[2].end());
       }
     }
     // delete this stage garbage.
@@ -275,21 +261,17 @@ template <typename T, typename U> void lword<T, U>::constructNwords() {
       sort(itr->second.begin(), itr->second.end());
       const gram_t<U>& before(find(itr->first));
             gram_t<U>  after(before);
-      after.ptr0 = vector<int>();
-      after.ptr1 = vector<int>();
-      for(int j = 0; j < before.ptr1.size(); j ++)
-        if(!binary_search(itr->second.begin(), itr->second.end(), j)) {
-          after.ptr0.push_back(before.ptr0[j]);
-          after.ptr1.push_back(before.ptr1[j]);
-        }
+      after.rptr = vector<int>();
+      for(int j = 0; j < before.rptr.size(); j ++)
+        if(!binary_search(itr->second.begin(), itr->second.end(), j))
+          after.rptr.push_back(before.rptr[j]);
       assign(after);
     }
     // construct next stage.
-    for(auto itr = map0.begin(); itr != map0.end(); ++ itr) {
+    for(auto itr = amap.begin(); itr != amap.end(); ++ itr) {
       gram_t<U> work;
       work.str  = itr->first;
-      work.ptr0 = itr->second;
-      work.ptr1 = map1[itr->first];
+      work.rptr.insert(work.rptr.end(), itr->second.begin(), itr->second.end());
       assign(work);
     }
   }

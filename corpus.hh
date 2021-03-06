@@ -601,14 +601,19 @@ template <typename T, typename U> U corpushl<T, U>::serializeSub(const vector<in
   // N.B. i0 - i1 - i2 is stored in corpust[i0][i2][i1].
   for(int i = 0; i < idxs.size(); i ++) {
     int lscore(0);
-    for(int j = 0; j < idxs.size(); j ++) if((const_cast<const Tensor&>(corpust))[idxs[j]].iter().size())
-      for(int k = 0; k < idxs.size(); k ++)
-        if((const_cast<const Tensor&>(corpust))[idxs[j]][idxs[k]][idxs[i]] != T(0))
-          lscore --;
+    for(int j = 0; j < idxs.size(); j ++)
+      if(const_cast<const Tensor&>(corpust)[idxs[j]].iter().size()) {
+        for(int k = 0; k < idxs.size(); k ++)
+          if(const_cast<const Tensor&>(corpust)[idxs[j]][idxs[i]][idxs[k]] != T(0))
+            lscore --;
+      }
     const auto& ii(const_cast<const Tensor&>(corpust)[idxs[i]].iter());
-    if(ii.size())
-      for(auto iii(ii.begin()); iii != ii.end(); ++ iii)
-        lscore += iii->second.iter().size();
+    if(ii.size()) for(int j = 0; j < idxs.size(); j ++)
+      if(const_cast<const Tensor&>(corpust)[idxs[i]][idxs[j]].iter().size()) {
+        for(int k = 0; k < idxs.size(); k ++)
+          if(const_cast<const Tensor&>(corpust)[idxs[i]][idxs[j]][idxs[k]] != T(0))
+            lscore ++;
+      }
     score.push_back(make_pair(lscore, idxs[i]));
   }
   sort(score.begin(), score.end());
