@@ -303,14 +303,15 @@ private:
   SimpleVector<T>* entity;
   int              erows;
   int              ecols;
-  T                epsilon;
+  num_t            epsilon;
 };
 
 template <typename T> inline SimpleMatrix<T>::SimpleMatrix() {
   erows  = 0;
   ecols  = 0;
   entity = NULL;
-  epsilon = pow(T(2), - T(6));
+  epsilon = pow(num_t(2), - num_t(6));
+  assert(isfinite(epsilon));
   return;
 }
 
@@ -324,7 +325,8 @@ template <typename T> inline SimpleMatrix<T>::SimpleMatrix(const int& rows, cons
     entity[i].resize(cols);
   erows = rows;
   ecols = cols;
-  epsilon = pow(T(2), - T(6));
+  epsilon = pow(num_t(2), - num_t(6));
+  assert(isfinite(epsilon));
   return; 
 }
 
@@ -337,6 +339,7 @@ template <typename T> inline SimpleMatrix<T>::SimpleMatrix(const SimpleMatrix<T>
 #endif
   for(int i = 0; i < erows; i ++)
     entity[i] = other.entity[i];
+  epsilon = other.epsilon;
   return;
 }
 
@@ -345,6 +348,7 @@ template <typename T> inline SimpleMatrix<T>::SimpleMatrix(SimpleMatrix<T>&& oth
   ecols  = move(other.ecols);
   entity = move(other.entity);
   other.entity = NULL;
+  epsilon = move(other.epsilon);
   return;
 }
 
@@ -601,12 +605,8 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solve(SimpleVector
     for(int j = i + 1; j < erows; j ++)
       if(abs(work.entity[j][i]) > abs(work.entity[xchg][i]))
         xchg = j;
-    SimpleVector<T> buf(work.entity[i]);
-    T               buf2(other[i]);
-    work.entity[i]    = work.entity[xchg];
-    other[i]          = other[xchg];
-    work.entity[xchg] = buf;
-    other[xchg]       = buf2;
+    std::swap(work.entity[i], work.entity[xchg]);
+    std::swap(other[i], other[xchg]);
     const SimpleVector<T>& ei(work.entity[i]);
     const T&               eii(ei[i]);
     if(epsilon < abs(eii)) {
@@ -621,6 +621,7 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solve(SimpleVector
     }
   }
   for(int i = erows - 1; 0 <= i; i --) {
+    if(work.entity[i][i] == T(0)) continue;
     const T buf(other[i] / work.entity[i][i]);
     if(!isfinite(buf) || isnan(buf)) {
     //  assert(!isfinite(work.entity[i][i] / other[i]) || isnan(work.entity[i][i] / other[i]));
@@ -688,6 +689,12 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::LSVD() const {
   for(int i = 0; i < left.rows(); i ++)
     for(int j = 0; j < left.cols(); j ++)
       left(i, j) = i == j ? T(1) : T(0);
+  for(int i = 0; i < this->rows(); i ++)
+    for(int j = 0; j < this->cols(); j ++)
+      assert(isfinite((*this)(i, j)));
+  for(int i = 0; i < s.rows(); i ++)
+    for(int j = 0; j < s.cols(); j ++)
+      assert(isfinite(s(i, j)));
   for(int ii = 0; ii < s.rows(); ii ++) {
     // find eigen max on working matrix:
     SimpleMatrix<T> work(s.rows() - ii, s.rows() - ii);
@@ -702,10 +709,7 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::LSVD() const {
       for(int j = i + 1; j < work.rows(); j ++)
         if(abs(work.entity[j][i]) > abs(work.entity[xchg][i]))
           xchg = j;
-      idx[i] = xchg;
-      auto buf(work.row(i));
-      work.row(i)    = work.row(xchg);
-      work.row(xchg) = buf;
+      std::swap(work.row(i), work.row(idx[i] = xchg));
       const auto& ei(work.row(i));
       const auto& eii(ei[i]);
       d[i] = eii;
@@ -715,6 +719,7 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::LSVD() const {
 #endif
         for(int j = i + 1; j < work.rows(); j ++) {
           const T ratio(work(j, i) / eii);
+          assert(isfinite(ratio));
           work.row(j) -= ei * ratio;
         }
       }
@@ -748,8 +753,15 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::LSVD() const {
       for(int j = 0; j < mul.cols(); j ++)
         mul(i, j) = i < ii || j < ii ? (i == j ? T(1) : T(0)) :
           work(i - ii, j - ii);
-    left = left * mul;
-    s    = mul.transpose() * s * mul;
+    left = left * mul.transpose();
+    s    = mul * s * mul.transpose();
+  }
+  for(int i = 0; i < left.rows(); i ++) {
+    int jj(i);
+    for(int j = i + 1; j < left.cols(); j ++)
+      if(abs(left(jj, i)) < abs(left(j, i)))
+        jj = j;
+    std::swap(left.row(i), left.row(jj));
   }
   return left;
 }
