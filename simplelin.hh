@@ -20,6 +20,8 @@ using std::vector;
 using std::sort;
 using std::pair;
 using std::make_pair;
+using std::min;
+using std::max;
 
 template <typename T> class SimpleVector {
 public:
@@ -295,8 +297,11 @@ public:
   inline       SimpleMatrix<T>  inverse() const;
   inline       SimpleVector<T>  solve(SimpleVector<T> other) const;
   inline       SimpleVector<T>  projectionPt(const SimpleVector<T>& other) const;
-  inline       SimpleMatrix<T>  LSVD() const;
-  inline       pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > GSVD(const SimpleMatrix<T>& src) const;
+  inline       SimpleMatrix<T>& fillP(const vector<int>& idx);
+  inline       SimpleMatrix<T>  QR() const;
+  inline       SimpleMatrix<T>  SVD() const;
+  inline       pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > SVD(const SimpleMatrix<T>& src) const;
+  inline       vector<int>      innerFix(const SimpleMatrix<T>& A, vector<pair<T, int> >& fidx);
   inline       SimpleVector<T>  inner(const SimpleVector<T>& bl, const SimpleVector<T>& bu) const;
   template <typename U> inline SimpleMatrix<U> real() const;
   template <typename U> inline SimpleMatrix<U> imag() const;
@@ -304,12 +309,12 @@ public:
   inline const int& rows() const;
   inline const int& cols() const;
   inline       void resize(const int& rows, const int& cols);
+  num_t        epsilon;
 private:
   // this isn't better idea for faster calculations.
   SimpleVector<T>* entity;
   int              erows;
   int              ecols;
-  num_t            epsilon;
 };
 
 template <typename T> inline SimpleMatrix<T>::SimpleMatrix() {
@@ -317,9 +322,9 @@ template <typename T> inline SimpleMatrix<T>::SimpleMatrix() {
   ecols  = 0;
   entity = NULL;
 #if defined(_FLOAT_BITS_)
-  epsilon = T(1) >> int64_t(mybits - 1);
+  epsilon = num_t(1) >> int64_t(mybits - 1);
 #else
-  epsilon = std::numeric_limits<T>::epsilon();
+  epsilon = std::numeric_limits<num_t>::epsilon();
 #endif
   return;
 }
@@ -335,9 +340,9 @@ template <typename T> inline SimpleMatrix<T>::SimpleMatrix(const int& rows, cons
   erows = rows;
   ecols = cols;
 #if defined(_FLOAT_BITS_)
-  epsilon = T(1) >> int64_t(mybits - 1);
+  epsilon = num_t(1) >> int64_t(mybits - 1);
 #else
-  epsilon = std::numeric_limits<T>::epsilon();
+  epsilon = std::numeric_limits<num_t>::epsilon();
 #endif
   return; 
 }
@@ -670,43 +675,70 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::projectionPt(const
   return res;
 }
 
-template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::LSVD() const {
+template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::fillP(const vector<int>& idx) {
+  int ii(0);
+  for(int j = 0; j < this->cols() && ii < idx.size(); j ++) {
+    SimpleVector<T> ek(this->cols());
+    for(int k = 0; k < this->cols(); k ++)
+      ek[k] = T(j == k ? 1 : 0);
+    ek -= this->projectionPt(ek);
+    const auto n2(ek.dot(ek));
+    if(n2 <= epsilon) continue;
+    assert(0 <= idx[ii] && idx[ii] < this->rows());
+    this->row(idx[ii ++]) = ek / sqrt(n2);
+  }
+  assert(idx.size() <= ii);
+  return *this;
+}
+
+template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::QR() const {
+  assert(0 < this->cols() && this->cols() <= this->rows());
+  SimpleMatrix<T> Q(this->cols(), this->rows());
+  for(int i = 0; i < Q.rows(); i ++)
+    for(int j = 0; j < Q.cols(); j ++)
+      Q(i, j) = T(0);
+  vector<int> residue;
+  residue.reserve(Q.rows());
+  for(int i = 0; i < Q.rows(); i ++) {
+    const auto Atrowi(this->col(i));
+    const auto work(Atrowi - Q.projectionPt(Atrowi));
+    const auto n2(work.dot(work));
+    if(n2 <= epsilon) {
+      residue.emplace_back(i);
+      continue;
+    }
+    Q.row(i) = work / sqrt(n2);
+  }
+  return Q.fillP(residue);
+}
+
+template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD() const {
   if(this->cols() < this->rows()) {
-    auto res((* this) * this->transpose().LSVD());
+    auto res((* this) * this->transpose().SVD());
+    vector<int> residue;
+    residue.reserve(res.cols());
     for(int i = 0; i < res.cols(); i ++) {
       const auto r2(res.col(i).dot(res.col(i)));
       if(epsilon < r2)
         res.setCol(i, res.col(i) / sqrt(r2));
-      else {
-        res = res.transpose();
-        for(int j = i; j < res.rows(); j ++)
-          res.row(j) *= T(0);
-        SimpleVector<T> ek(res.cols());
-        for(int j = 0; j < res.rows() && i < res.rows(); j ++) {
-          for(int k = 0; k < ek.size(); k ++)
-            ek[k] = j == k ? T(1) : T(0);
-          const auto ekp(ek - res.projectionPt(ek));
-          const auto e2(ekp.dot(ekp));
-          if(e2 <= epsilon) continue;
-          res.row(i ++) = ekp / sqrt(e2);
-        }
-        res = res.transpose();
-        break;
-      }
+      else
+        residue.emplace_back(i);
     }
+    if(residue.size())
+      return res.transpose().fillP(residue).transpose();
     return res;
   }
-  auto s((*this) * this->transpose());
-  SimpleMatrix<T> left(s.rows(), s.rows());
-  for(int i = 0; i < left.rows(); i ++)
-    for(int j = 0; j < left.cols(); j ++)
-      left(i, j) = i == j ? T(1) : T(0);
   for(int i = 0; i < this->rows(); i ++)
     for(int j = 0; j < this->cols(); j ++)
       assert(isfinite((*this)(i, j)));
+  auto s((*this) * this->transpose());
   for(int i = 0; i < s.rows(); i ++)
     for(int j = 0; j < s.cols(); j ++)
       assert(isfinite(s(i, j)));
+  SimpleMatrix<T> left(s.rows(), s.rows());
+  for(int i = 0; i < left.rows(); i ++)
+    for(int j = 0; j < left.cols(); j ++)
+      left(i, j) = T(i == j ? 1 : 0);
   for(int ii = 0; ii < s.rows(); ii ++) {
     // find eigen max on working matrix:
     SimpleMatrix<T> work(s.rows() - ii, s.rows() - ii);
@@ -730,7 +762,7 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::LSVD() const {
 #pragma omp parallel for schedule(static, 1)
 #endif
         for(int j = i + 1; j < work.rows(); j ++) {
-          const T ratio(work(j, i) / eii);
+          const auto ratio(work(j, i) / eii);
           assert(isfinite(ratio));
           work.row(j) -= ei * ratio;
         }
@@ -751,22 +783,18 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::LSVD() const {
     ev   /= sqrt(ev.dot(ev));
     work *= T(0);
     work.row(0) = ev;
-    SimpleVector<T> ek(ev.size());
-    for(int i = 0, i2 = 1; i < work.rows() && i2 < work.rows(); i ++) {
-      for(int j = 0; j < ek.size(); j ++)
-        ek[j] = i == j ? T(1) : T(0);
-      ek -= work.projectionPt(ek);
-      if(ek.dot(ek) <= epsilon)
-        continue;
-      work.row(i2 ++) = ek / sqrt(ek.dot(ek));
-    }
-    SimpleMatrix<T> mul(s.rows(), s.cols());
+    vector<int> fp;
+    fp.reserve(work.rows() - 1);
+    for(int i = 1; i < work.rows(); i ++)
+      fp.emplace_back(i);
+    work.fillP(fp);
+    auto mul(left);
     for(int i = 0; i < mul.rows(); i ++)
       for(int j = 0; j < mul.cols(); j ++)
-        mul(i, j) = i < ii || j < ii ? (i == j ? T(1) : T(0)) :
+        mul(i, j) = i < ii || j < ii ? T(i == j ? 1 : 0) :
           work(i - ii, j - ii);
-    left = left * mul.transpose();
-    s    = mul * s * mul.transpose();
+    left = left * mul;
+    s    = mul.transpose() * s * mul;
   }
   for(int i = 0; i < left.rows(); i ++) {
     int jj(i);
@@ -779,7 +807,7 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::LSVD() const {
 }
 
 // N.B. for full rank.
-template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > SimpleMatrix<T>::GSVD(const SimpleMatrix<T>& src) const {
+template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > SimpleMatrix<T>::SVD(const SimpleMatrix<T>& src) const {
   // refered from : https://en.wikipedia.org/wiki/Generalized_singular_value_decomposition .
   assert(this->cols() == src.cols());
   SimpleMatrix<T> C(this->rows() + src.rows(), this->cols());
@@ -787,38 +815,28 @@ template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, Simpl
     C.row(i) = this->row(i);
   for(int i = 0; i < src.rows(); i ++)
     C.row(i + this->rows()) = src.row(i);
-  const auto P(C.LSVD());
+  const auto P(C.SVD());
   SimpleVector<T> d(this->cols());
-  const auto PtC(P.transpose() * C);
-        auto Qt(PtC);
+        auto Qt(P.transpose() * C);
   for(int i = 0; i < d.size(); i ++)
-    Qt.row(i) /= (d[i] = sqrt(PtC.row(i).dot(PtC.row(i))));
+    Qt.row(i) /= (d[i] = sqrt(Qt.row(i).dot(Qt.row(i))));
+  const auto D(P.transpose() * C * Qt.transpose());
   SimpleMatrix<T> P1(this->rows(), d.size());
+  SimpleMatrix<T> P2(src.rows(), d.size());
   for(int i = 0; i < P1.rows(); i ++)
     P1.row(i) = P.row(i);
-  auto U1(P1.LSVD());
+  for(int i = 0; i < P2.rows(); i ++)
+    P2.row(i) = P.row(i + P1.rows());
+  auto U1(P1.SVD());
   auto Wt(U1.transpose() * P1);
   for(int i = 0; i < Wt.rows(); i ++)
     Wt.row(i) /= sqrt(Wt.row(i).dot(Wt.row(i)));
-  SimpleMatrix<T> P2(src.rows(), d.size());
-  for(int i = 0; i < P2.rows(); i ++)
-    P2.row(i) = P.row(i + P1.rows());
-  const auto P21W(P2 * Wt.transpose());
-  const auto U2(P21W.LSVD());
-  auto& WtD(Wt);
-  for(int i = 0; i < WtD.cols(); i ++)
-    WtD.setCol(i, WtD.col(i) * d[i]);
-  assert(WtD.rows() == WtD.cols());
-  SimpleMatrix<T> QtonWtDt(WtD.rows(), WtD.cols());
-  for(int i = 0; i < QtonWtDt.rows(); i ++)
-    for(int j = 0; j < QtonWtDt.cols(); j ++)
-      QtonWtDt(i, j) = T(0);
-  QtonWtDt.row(0) = WtD.row(0) / sqrt(WtD.row(0).dot(WtD.row(0)));
-  for(int i = 1; i < QtonWtDt.rows(); i ++) {
-    QtonWtDt.row(i)  = WtD.row(i) - QtonWtDt.projectionPt(WtD.row(i));
-    QtonWtDt.row(i) /= sqrt(QtonWtDt.row(i).dot(QtonWtDt.row(i)));
+  auto U2(P2 * Wt.transpose());
+  for(int i = 0; i < U2.cols(); i ++) {
+    const auto u2i(U2.col(i));
+    U2.setCol(u2i / sqrt(u2i.dot(u2i)));
   }
-  return make_pair(make_pair(move(U1), move(U2)), QtonWtDt * Qt);
+  return make_pair(make_pair(move(U1), move(U2)), (Wt * D).transpose().QR().transpose() * Qt);
 }
 
 template <typename T> template <typename U> inline SimpleMatrix<U> SimpleMatrix<T>::real() const {
@@ -876,6 +894,43 @@ template <typename T> inline void SimpleMatrix<T>::resize(const int& rows, const
   return;
 }
 
+template <typename T> inline vector<int> SimpleMatrix<T>::innerFix(const SimpleMatrix<T>& A, vector<pair<T, int> >& fidx) {
+  // N.B. we now have |[A -bb] [x t]| <= 1 condition.
+  // N.B. there's no difference |[A - bb] [x t]|^2 <= 1 condition in this.
+  //      but not with mixed condition.
+  const auto R((*this) * A);
+  SimpleVector<T> one(this->cols());
+  for(int i = 0; i < one.size(); i ++)
+    one[i] = T(1);
+  // we now have: Q [R [x t] ] <= {0, 1}^m cond.
+  const auto on(projectionPt(one));
+  fidx.reserve(fidx.size() + on.size());
+  for(int i = 0; i < on.size(); i ++)
+    fidx.emplace_back(make_pair(abs(on[i]), i));
+  sort(fidx.begin(), fidx.end());
+  vector<int> fix;
+  fix.reserve(this->rows());
+  // sort by: |<Q^t(1), q_k>|, we subject to minimize each, to do this,
+  //   maximize minimum q_k orthogonality.
+  for(int idx = 0; fix.size() < this->rows() - 1 && idx < fidx.size(); idx ++) {
+    const auto& iidx(fidx[idx].second);
+    const auto  orth(this->col(iidx));
+    const auto  n2(orth.dot(orth));
+    if(n2 <= epsilon)
+      continue;
+    fix.emplace_back(fidx[idx].second);
+    // N.B. O(mn) can be writed into O(lg m + lg n) in many core cond.
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
+    for(int j = 0; j < this->cols(); j ++)
+      this->setCol(j, this->col(j) - orth * this->col(j).dot(orth) / n2);
+  }
+  // N.B. now we have fix indexes that to be A_fix [x 1] * t == 0.
+  assert(fix.size() == this->rows() - 1);
+  return fix;
+}
+
 template <typename T> inline SimpleVector<T> SimpleMatrix<T>::inner(const SimpleVector<T>& bl, const SimpleVector<T>& bu) const {
   static const auto ee(pow(epsilon, T(1) / T(8)));
   assert(this->rows() == bl.size() && this->rows() == bu.size() &&
@@ -884,14 +939,12 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::inner(const Simple
   const auto bb((bu + bl) / T(2));
   const auto upper(bu - bb);
   SimpleMatrix<T> A(this->rows() * 2 - 1 + this->cols() * 2, this->cols() + 1);
-  SimpleVector<T> one(A.rows());
   vector<pair<T, int> > fidx;
   fidx.reserve(this->rows());
   for(int i = 0; i < this->rows(); i ++) {
     for(int j = 0; j < this->cols(); j ++)
       A(i, j) = (*this)(i, j);
     A(i, this->cols()) = - bb[i];
-    one[i]          = T(1);
     assert(T(0) <= upper[i]);
     if(upper[i] == T(0)) {
       const auto n2(A.row(i).dot(A.row(i)));
@@ -906,7 +959,6 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::inner(const Simple
     assert(isfinite(A2) && ! isnan(A2));
     if(this->rows() - 1 <= i) break;
     A.row(i + this->rows()) = - A.row(i);
-    one[i + this->rows()] = T(1);
   }
   // this is tricky but one of them is fixed if it is needed.
   for(int i = this->rows() * 2 - 1; i < A.rows(); i ++) {
@@ -915,64 +967,12 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::inner(const Simple
       A(i, j) = T(j == ii / 2 ? (ii & 1 ? - 1 : 1) : 0);
     A(i, this->cols()) = T(ii & 1 ? 1 : - 1);
     A.row(i) /= ee;
-    one[i] = T(1);
   }
   // N.B. we now have |[A -bb] [x t]| <= 1 condition.
   // N.B. there's no difference |[A - bb] [x t]|^2 <= 1 condition in this.
   //      but not with mixed condition.
-  SimpleMatrix<T> Pt(A.cols(), A.rows());
-  for(int i = 0; i < Pt.rows(); i ++)
-    for(int j = 0; j < Pt.cols(); j ++)
-      Pt(i, j) = T(0);
-  vector<int> residue;
-  for(int i = 0; i < Pt.rows(); i ++) {
-    const auto Atrowi(A.col(i));
-    const auto work(Atrowi - Pt.projectionPt(Atrowi));
-    const auto n2(work.dot(work));
-    if(n2 <= epsilon) {
-      residue.emplace_back(i);
-      continue;
-    }
-    Pt.row(i) = work / sqrt(n2);
-  }
-  int ii(0);
-  for(int j = 0; j < Pt.cols() && ii < residue.size(); j ++) {
-    SimpleVector<T> ek(Pt.cols());
-    for(int k = 0; k < Pt.cols(); k ++)
-      ek[k] = T(j == k ? 1 : 0);
-    ek -= Pt.projectionPt(ek);
-    const auto n2(ek.dot(ek));
-    if(n2 <= epsilon) continue;
-    Pt.row(residue[ii ++]) = ek / sqrt(n2);
-  }
-  assert(residue.size() <= ii);
-  const auto R(Pt * A);
-  // we now have: Q [R [x t] ] <= {0, 1}^m cond.
-  const auto on(Pt.projectionPt(one));
-  fidx.reserve(fidx.size() + on.size());
-  for(int i = 0; i < on.size(); i ++)
-    if(isfinite(on[i]) && ! isnan(on[i]))
-      fidx.emplace_back(make_pair(abs(on[i]), i));
-  if(fidx.size())
-    sort(fidx.begin(), fidx.end());
-  vector<int> fix;
-  fix.reserve(this->cols());
-  // sort by: |<Q^t(1), q_k>|, we subject to minimize each, to do this,
-  //   maximize minimum q_k orthogonality.
-  for(int idx = 0; fix.size() < this->cols() && idx < fidx.size(); idx ++) {
-    const auto& iidx(fidx[idx].second);
-    const auto  orth(Pt.col(iidx));
-    const auto  n2(orth.dot(orth));
-    if(n2 <= epsilon)
-      continue;
-    fix.emplace_back(fidx[idx].second);
-    // N.B. O(mn) can be writed into O(lg m + lg n) in many core cond.
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-    for(int j = 0; j < Pt.cols(); j ++)
-      Pt.setCol(j, Pt.col(j) - orth * Pt.col(j).dot(orth) / n2);
-  }
+        auto Pt(A.QR());
+  const auto fix(Pt.innerFix(A, fidx));
   // N.B. now we have fix indexes that to be A_fix [x 1] * t == 0.
   assert(fix.size() == this->cols());
   SimpleMatrix<T> Afix(fix.size(), fix.size());
@@ -983,6 +983,151 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::inner(const Simple
     f[i] = - A(fix[i], Afix.cols());
   }
   return Afix.solve(f);
+}
+
+
+// some non class functions:
+template <typename T> const SimpleMatrix<complex<T> >& dft(const int& size0) {
+  const auto size(abs(size0));
+  if(! size) {
+    const static SimpleMatrix<complex<T> > m0;
+    return m0;
+  }
+  static vector<SimpleMatrix<complex<T> > > adft;
+  static vector<SimpleMatrix<complex<T> > > aidft;
+  if(adft.size() <= size)
+    adft.resize(size + 1, SimpleMatrix<complex<T> >());
+  if(aidft.size() <= size)
+    aidft.resize(size + 1, SimpleMatrix<complex<T> >());
+  auto& edft(  adft[size]);
+  auto& eidft(aidft[size]);
+  if(edft.rows() != size || edft.cols() != size) {
+    edft.resize( size, size);
+    eidft.resize(size, size);
+    static const auto Pi(T(4) * atan2(T(1), T(1)));
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
+    for(int i = 0; i < edft.rows(); i ++) {
+      for(int j = 0; j < edft.cols(); j ++) {
+        const auto theta(- T(2) * Pi * T(i) * T(j) / T(edft.rows()));
+        edft( i, j) = complex<T>(cos(  theta), sin(  theta));
+        eidft(i, j) = complex<T>(cos(- theta), sin(- theta)) / complex<T>(T(size));
+      }
+    }
+  }
+  return size0 < 0 ? eidft : edft;
+}
+
+template <typename T> const SimpleMatrix<T>& diff(const int& size0) {
+  const auto size(abs(size0));
+  if(! size) {
+    static const SimpleMatrix<T> m0;
+    return m0;
+  }
+  static vector<SimpleMatrix<T> > D;
+  static vector<SimpleMatrix<T> > I;
+  if(D.size() <= size)
+    D.resize(size + 1, SimpleMatrix<T>());
+  if(I.size() <= size)
+    I.resize(size + 1, SimpleMatrix<T>());
+  auto& dd(D[size]);
+  auto& ii(I[size]);
+  if(dd.rows() != size || dd.cols() != size) {
+    auto DD(dft<T>(size));
+    auto II(dft<T>(size));
+    static const auto Pi(T(4) * atan2(T(1), T(1)));
+#if defined(_OPENMP)
+#pragma omp parallel
+#pragma omp for schedule(static, 1)
+#endif
+    for(int i = 0; i < DD.rows(); i ++)
+      DD.row(i) *= - complex<T>(T(0), T(2) * Pi * T(i) / T(DD.rows()));
+#if defined(_OPENMP)
+#pragma omp for schedule(static, 1)
+#endif
+    for(int i = 1; i < II.rows(); i ++)
+      II.row(i) /= - complex<T>(T(0), T(2) * Pi * T(i) / T(DD.rows()) / Pi);
+    dd = (dft<T>(-size) * DD).template real<T>() / Pi;
+    ii = (dft<T>(-size) * II).template real<T>();
+  }
+  return size0 < 0 ? ii : dd;
+}
+
+template <typename T> inline SimpleVector<T> taylor(const int& size, const T& step) {
+  const int  step00(max(int(0), min(size - 1, int(floor(step)))));
+  const auto residue0(step - T(step00));
+  const auto step0(step00 == size - 1 || abs(residue0) <= T(1) / T(2) ? step00 : step00 + 1);
+  const auto residue(step - T(step0));
+  SimpleVector<T> res(size);
+  for(int i = 0; i < res.size(); i ++)
+    res[i] = T(i == step0 ? 1 : 0);
+  if(residue == T(0)) return res;
+  const auto& D(diff<T>(size));
+        auto  dt(D.col(step0) * residue);
+  // N.B.
+  // if we deal with (D *= r, residue /= r), it is identical with (D, residue)
+  // So ||D^n * residue^n|| / T(n!) < 1 case, this loop converges.
+  // but with n^n v.s. n!, differential of n! is faster than n^n.
+  // (n! < n^n but a^n < n! somewhere).
+  // And, we treat D * residue as a block, so Readme.md's condition 1/x^k needs
+  // to be in the series in this.
+  for(int i = 2; ; i ++) {
+    const auto last(res);
+    res += dt;
+    if(last == res) break;
+    dt   = D * dt * residue / T(i);
+  }
+  return res;
+}
+
+template <typename T> SimpleVector<T> linearInvariant(const vector<SimpleVector<T> >& in) {
+  SimpleMatrix<T> A(in.size() * 2 - 1, in[0].size());
+  assert(in[0].size() <= in.size());
+  SimpleVector<T> fvec(A.cols());
+  SimpleVector<T> one(A.rows());
+#if defined(_OPENMP)
+#pragma omp for schedule(static, 1)
+#endif
+  for(int i = 0; i < fvec.size(); i ++)
+    fvec[i] = T(0);
+#if defined(_OPENMP)
+#pragma omp for schedule(static, 1)
+#endif
+  for(int i = 0; i < A.rows(); i ++)
+    one[i] = T(1);
+  for(int i = 0; i < in.size(); i ++) {
+    assert(in[i].size() == in[0].size());
+    for(int j = 0; j < in[0].size(); j ++)
+      A(i, j) = in[i][j];
+    assert(isfinite(A.row(i).dot(A.row(i))));
+    if(i + in.size() < A.rows())
+      A.row(i + in.size()) = - A.row(i);
+  }
+        auto Pt(A.QR());
+  const auto R(Pt * A);
+  vector<pair<T, int> > sute;
+  Pt.innerFix(A, sute);
+  fvec = R.solve(Pt * one);
+  return isfinite(fvec.dot(fvec)) ? fvec : fvec * T(0);
+}
+
+// N.B. please refer bitsofcotton/randtools.
+template <typename T> SimpleVector<T> makeProgramInvariant(const SimpleVector<T>& in, const int& complexity, const T& index = T(1)) {
+  SimpleVector<T> res(in.size() + (T(0) <= index ? 2 : 1));
+  for(int i = 0; i < in.size(); i ++) {
+    assert(- T(1) <= in[i] && in[i] <= T(1) && isfinite(in[i]));
+    res[i] = tan((in[i] + T(1)) / T(2) * atan2(T(1), T(1)));
+  }
+  res[in.size()] = T(1);
+  if(T(0) <= index)
+    res[in.size() + 1] = index;
+  T pd(0);
+  for(int i = 0; i < res.size(); i ++)
+    pd += log(abs(res[i]));
+  if(0 <= complexity)
+    res *= exp((complexity ? T(complexity) * pd : - pd) / T(res.size()));
+  return res;
 }
 
 #define _SIMPLELIN_
