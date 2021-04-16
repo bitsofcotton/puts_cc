@@ -22,6 +22,12 @@ using std::pair;
 using std::make_pair;
 using std::min;
 using std::max;
+using std::map;
+using std::stringstream;
+using std::endl;
+
+using std::cerr;
+using std::flush;
 
 template <typename T> class SimpleVector {
 public:
@@ -52,6 +58,10 @@ public:
   template <typename U> inline SimpleVector<U> cast() const;
   inline const int& size() const;
   inline       void resize(const int& size);
+  
+  // friend std::ostream& operator << (std::ostream& os, const SimpleVector<T>& v);
+  // friend std::istream& operator >> (std::istream& os, SimpleVector<T>& v);
+  
   T*  entity;
   int esize;
 };
@@ -260,6 +270,45 @@ template <typename T> inline void SimpleVector<T>::resize(const int& size) {
   return;
 }
 
+template <typename T> std::ostream& operator << (std::ostream& os, const SimpleVector<T>& v) {
+  SimpleVector<std::string> buf(v.size());
+  int M(0);
+  for(int i = 0; i < v.size(); i ++) {
+    stringstream ss;
+    ss << v[i];
+    buf[i] = ss.str();
+    M = max(int(buf[i].size()), M);
+  }
+  os << v.size() << " : [";
+  for(int i = 0; i < buf.size(); i ++) {
+    for(int j = buf[i].size(); j <= M; j ++)
+      os << " ";
+    os << buf[i];
+    if(i < buf.size() - 1) os << ", ";
+  }
+  os << "]" << endl;
+  return os;
+}
+
+template <typename T> std::istream& operator >> (std::istream& is, SimpleVector<T>& v) {
+  int s;
+  is >> s;
+  if(s <= 0) return is;
+  v.resize(s);
+  int i(0);
+  for( ; i < v.size() && ! is.eof() && ! is.bad(); ) {
+    const auto c(is.get());
+    if(c == ' ' || c == '\t' || c == '[' || c == ',' || c == ']') continue;
+    is >> v[i ++];
+  }
+  if(i < v.size()) {
+    cerr << "XXX SimpleVector<T>::operator >>" << flush;
+    for( ; i < v.size(); i ++)
+      v[i] = T(0);
+  }
+  return is;
+}
+
 
 template <typename T> class SimpleMatrix {
 public:
@@ -310,6 +359,10 @@ public:
   inline const int& cols() const;
   inline       void resize(const int& rows, const int& cols);
   num_t        epsilon;
+
+  // friend std::ostream& operator << (std::ostream& os, const SimpleVector<T>& v);
+  // friend std::istream& operator >> (std::istream& os, SimpleVector<T>& v);
+
 private:
   // this isn't better idea for faster calculations.
   SimpleVector<T>* entity;
@@ -985,6 +1038,105 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::inner(const Simple
   return Afix.solve(f);
 }
 
+template <typename T> std::ostream& operator << (std::ostream& os, const SimpleMatrix<T>& v) {
+  SimpleMatrix<std::string> buf(v.rows(), v.cols());
+  int M(0);
+  for(int i = 0; i < v.rows(); i ++)
+    for(int j = 0; j < v.cols(); j ++) {
+      stringstream ss;
+      ss << v(i, j);
+      buf(i, j) = ss.str();
+      M = max(int(buf(i, j).size()), M);
+    }
+  os << "(" << buf.rows() << ", " << buf.cols() << ")" << "[" << endl;
+  for(int i = 0; i < buf.rows(); i ++) {
+    os << "[";
+    for(int j = 0; j < buf.cols(); j ++) {
+      for(int k = buf(i, j).size(); k <= M; k ++)
+        os << " ";
+      os << buf(i, j);
+      if(j < buf.cols() - 1) os << ", ";
+    }
+    os << "]";
+    if(i < buf.rows() - 1) os << ", ";
+    os << endl;
+  }
+  os << "]" << endl;
+  return os;
+}
+
+template <typename T> std::istream& operator >> (std::istream& is, SimpleMatrix<T>& v) {
+  while(! is.eof() && ! is.bad()) {
+    const auto c(is.get());
+    if(c == ' ' || c == '\t' || c == '(') continue;
+    else {
+      is.unget();
+      break;
+    }
+  }
+  int r, c;
+  is >> r;
+  if(r <= 0) return is;
+  while(! is.eof() && ! is.bad()) {
+    const auto c(is.get());
+    if(c == ' ' || c == '\t' || c == ',') continue;
+    else {
+      is.unget();
+      break;
+    }
+  }
+  is >> c;
+  while(! is.eof() && ! is.bad()) {
+    const auto c(is.get());
+    if(c == ' ' || c == '\t' || c == ')') continue;
+    else {
+      is.unget();
+      break;
+    }
+  }
+  if(c <= 0) return is;
+  v.resize(r, c);
+  int i(0);
+  int j(0);
+  for( ; i < v.rows() && ! is.eof() && ! is.bad(); i ++) {
+    while(! is.eof() && ! is.bad()) {
+      const auto c(is.get());
+      if(c == ' ' || c == '\t' || c == '[') continue;
+      else {
+        is.unget();
+        break;
+      }
+    }
+    for( ; j < v.cols() && ! is.eof() && ! is.bad(); j ++) {
+      is >> v(i, j);
+      if(v.cols() - 1 <= j) break;
+      while(! is.eof() && ! is.bad()) {
+        const auto c(is.get());
+        if(c == ' ' || c == '\t' || c == ',') continue;
+        else {
+          is.unget();
+          break;
+        }
+      }
+    }
+    while(! is.eof() && ! is.bad()) {
+      const auto c(is.get());
+      if(c == ' ' || c == '\t' || c == ']') continue;
+      else {
+        is.unget();
+        break;
+      }
+    }
+  }
+  if(i < v.rows() || j < v.cols()) {
+    cerr << "XXX SimpleMatrix<T>::operator >>" << flush;
+    for( ; i < v.rows(); i ++)
+      for( ; j < v.cols(); j ++)
+        v(i, j) = T(0);
+  }
+  return is;
+}
+
 
 // some non class functions:
 template <typename T> const SimpleMatrix<complex<T> >& dft(const int& size0) {
@@ -1129,6 +1281,191 @@ template <typename T> SimpleVector<T> makeProgramInvariant(const SimpleVector<T>
     res *= exp((complexity ? T(complexity) * pd : - pd) / T(res.size()));
   return res;
 }
+
+
+template <typename T> class SimpleSparseVector {
+public:
+  inline SimpleSparseVector();
+  inline SimpleSparseVector(const int& sute);
+  inline SimpleSparseVector(const SimpleSparseVector<T>& other);
+  inline SimpleSparseVector(SimpleSparseVector<T>&& other);
+  inline ~SimpleSparseVector();
+  
+  inline SimpleSparseVector<T>  operator -  () const;
+  inline SimpleSparseVector<T>  operator +  (const SimpleSparseVector<T>& other) const;
+  inline SimpleSparseVector<T>& operator += (const SimpleSparseVector<T>& other);
+  inline SimpleSparseVector<T>  operator -  (const SimpleSparseVector<T>& other) const;
+  inline SimpleSparseVector<T>& operator -= (const SimpleSparseVector<T>& other);
+  template <typename U> inline SimpleSparseVector<T>  operator *  (const U& other) const;
+  template <typename U> inline SimpleSparseVector<T>& operator *= (const U& other);
+  template <typename U> inline SimpleSparseVector<T>  operator /  (const U& other) const;
+  template <typename U> inline SimpleSparseVector<T>& operator /= (const U& other);
+  inline       SimpleSparseVector<T>& operator =  (const SimpleSparseVector<T>& other);
+  inline       SimpleSparseVector<T>& operator =  (SimpleSparseVector<T>&& other);
+  inline       bool                   operator != (const SimpleSparseVector<T>& other) const;
+  inline       bool                   operator == (const SimpleSparseVector<T>& other) const;
+  inline       T  dot         (const SimpleSparseVector<T>& other) const;
+  inline       T& operator [] (const int& idx);
+  inline const T& operator [] (const int& idx) const;
+  inline void     clear();
+  inline       map<int, T>& iter();
+  inline const map<int, T>& iter() const;
+private:
+  map<int, T>  entity;
+};
+
+template <typename T> inline SimpleSparseVector<T>::SimpleSparseVector() {
+  // already initialized by compiler, initializer doesn't need this.
+//  entity = map<int, T>();
+  return;
+}
+
+template <typename T> inline SimpleSparseVector<T>::SimpleSparseVector(const int& sute) {
+  assert(sute == 0);
+  // already initialized by compiler, initializer doesn't need this.
+//  entity = map<int, T>();
+  return;
+}
+
+template <typename T> inline SimpleSparseVector<T>::SimpleSparseVector(const SimpleSparseVector<T>& other) {
+  *this = other;
+}
+
+template <typename T> inline SimpleSparseVector<T>::SimpleSparseVector(SimpleSparseVector<T>&& other) {
+  *this = other;
+}
+
+template <typename T> inline SimpleSparseVector<T>::~SimpleSparseVector() {
+  return;
+}
+
+template <typename T> inline SimpleSparseVector<T> SimpleSparseVector<T>::operator - () const {
+  SimpleSparseVector<T> res(*this);
+  for(auto itr(res.entity.begin()); itr != res.entity.end(); ++ itr)
+    itr->second = - itr->second;
+  return res;
+}
+
+template <typename T> inline SimpleSparseVector<T> SimpleSparseVector<T>::operator + (const SimpleSparseVector<T>& other) const {
+  SimpleSparseVector<T> res(*this);
+  return res += other;
+}
+
+template <typename T> inline SimpleSparseVector<T>& SimpleSparseVector<T>::operator += (const SimpleSparseVector<T>& other) {
+  for(auto itr(other.entity.begin()); itr != other.entity.end(); ++ itr) {
+    if(itr->second == T(0)) continue;
+    auto search(entity.lower_bound(itr->first));
+    if(search == entity.end() || search->first != itr->first)
+      (*this)[itr->first] = itr->second;
+    else
+      search->second += itr->second;
+  }
+  return *this;
+}
+
+template <typename T> inline SimpleSparseVector<T> SimpleSparseVector<T>::operator - (const SimpleSparseVector<T>& other) const {
+  SimpleSparseVector<T> res(*this);
+  return res -= other;
+}
+
+template <typename T> inline SimpleSparseVector<T>& SimpleSparseVector<T>::operator -= (const SimpleSparseVector<T>& other) {
+  return *this += - other;
+}
+
+template <typename T> template <typename U> inline SimpleSparseVector<T> SimpleSparseVector<T>::operator * (const U& other) const {
+  SimpleSparseVector<T> res(*this);
+  return res *= other;
+}
+
+template <typename T> template <typename U> inline SimpleSparseVector<T>& SimpleSparseVector<T>::operator *= (const U& other) {
+  for(auto itr(entity.begin()); itr != entity.end(); ++ itr)
+    itr->second *= other;
+  return *this;
+}
+
+template <typename T> template <typename U> inline SimpleSparseVector<T> SimpleSparseVector<T>::operator / (const U& other) const {
+  SimpleSparseVector<T> res(*this);
+  return res /= other;
+}
+
+template <typename T> inline SimpleSparseVector<T>& SimpleSparseVector<T>::operator = (const SimpleSparseVector<T>& other) {
+  entity = other.entity;
+  return *this;
+}
+
+template <typename T> inline SimpleSparseVector<T>& SimpleSparseVector<T>::operator = (SimpleSparseVector<T>&& other) {
+  entity = move(other.entity);
+  return *this;
+}
+
+template <typename T> inline bool SimpleSparseVector<T>::operator != (const SimpleSparseVector<T>& other) const {
+  for(auto itr(entity.begin()); itr != entity.end(); ++ itr)
+    if(itr->second != other[itr->first])
+      return true;
+  for(auto itr(other.entity.begin()); itr != other.entity.end(); ++ itr)
+    if(itr->second != const_cast<const SimpleSparseVector<T>&>(*this)[itr->first])
+      return true;
+  return false;
+}
+
+template <typename T> inline bool SimpleSparseVector<T>::operator == (const SimpleSparseVector<T>& other) const {
+  return ! (*this != other);
+}
+
+template <typename T> template <typename U> inline SimpleSparseVector<T>& SimpleSparseVector<T>::operator /= (const U& other) {
+  for(auto itr(entity.begin()); itr != entity.end(); ++ itr)
+    itr->second /= other;
+  return *this;
+}
+
+template <typename T> inline T SimpleSparseVector<T>::dot(const SimpleSparseVector<T>& other) const {
+  T res(0);
+  for(auto itr(other.entity.begin()); itr < other.entity.end(); ++ itr) {
+    auto search(entity.lower_bound(itr->first));
+    if(search != entity.end() && search->first == itr->first)
+      res += search->second * itr->second;
+  }
+  return res;
+}
+
+template <typename T> inline T& SimpleSparseVector<T>::operator [] (const int& idx) {
+  assert(0 <= idx);
+  const auto search(entity.lower_bound(idx));
+  if(search != entity.end() && search->first == idx)
+    return search->second;
+  else
+    entity[idx] = T(0);
+  const auto search2(entity.lower_bound(idx));
+  assert(search2 != entity.end() && search2->first == idx);
+  return search2->second;
+}
+
+template <typename T> inline const T& SimpleSparseVector<T>::operator [] (const int& idx) const {
+  assert(0 <= idx);
+  if(entity.size()) {
+    const auto search(entity.lower_bound(idx));
+    if(search != entity.end() && search->first == idx)
+      return search->second;
+  }
+  const static T zero(0);
+  return zero;
+}
+
+template <typename T> inline void SimpleSparseVector<T>::clear() {
+  entity = map<int, T>();
+  return;
+}
+
+template <typename T> inline map<int, T>& SimpleSparseVector<T>::iter() {
+  return entity;
+}
+
+template <typename T> inline const map<int, T>& SimpleSparseVector<T>::iter() const {
+  return entity;
+}
+
+template <typename T> using SimpleSparseMatrix = SimpleSparseVector<SimpleSparseVector<T> >;
+template <typename T> using SimpleSparseTensor = SimpleSparseVector<SimpleSparseVector<SimpleSparseVector<T> > >;
 
 #define _SIMPLELIN_
 #endif

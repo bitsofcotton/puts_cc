@@ -1,13 +1,17 @@
 CXX=	clang++
 
 # compiler flags.
-CXXFLAGS+=	-I/usr/local/include/eigen3
-CXXFLAGS+=	-Ofast -mtune=native -g2
+CXXFLAGS+=	-Ofast -mtune=native -gfull
+CXXFLAGS+=	-L/usr/local/lib -lomp -fopenmp
 CXXFLAGS+=	-std=c++11
-LDFLAGS+=	-lc++
+LDFLAGS+=	-lc++ -L/usr/local/lib
+#LDFLAGS+=	-static
 
-# without eigen, this lacks comparestructure function.
-# CXXFLAGS+=	-D_WITHOUT_EIGEN_
+#CXXFLAGS+=	-D_FLOAT_BITS_=32
+#CXXFLAGS+=	-D_FLOAT_BITS_=64
+#CXXFLAGS+=	-D_FLOAT_BITS_=128
+#CXXFLAGS+=	-D_FLOAT_BITS_=256
+#CXXFLAGS+=	-D_FLOAT_BITS_=512
 
 CLEANFILES= *.o tools
 
@@ -16,6 +20,5 @@ all:	tools
 clean:
 	@rm -rf ${CLEANFILES}
 
-tools.o:        tools.cc sparse.hh corpus.hh file2eigen.hh lword.hh
-test.o:		test.cc  sparse.hh corpus.hh file2eigen.hh lword.hh
+tools.o:        tools.cc simplelin.hh corpus.hh lword.hh file2eigen.hh
 
