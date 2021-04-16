@@ -323,10 +323,7 @@ private:
   void         merge5(Tensor& d, const int& i, const int& ki, const int& kk, const int& kj, const int& j, const T& intensity) const;
   
   Tensor corpust;
-  U                    orig;
-  vector<vector<int> > ptrs;
-  vector<int>          uptrs;
-  vector<int>          pdelim;
+  U      orig;
 };
 
 template <typename T, typename U> corpus<T,U>::corpus() {
@@ -343,9 +340,10 @@ template <typename T, typename U> corpus<T,U>::corpus(corpus<T, U>&& other) {
 
 template <typename T, typename U> corpus<T,U>::corpus(const U& input, const vector<U>& delimiter) {
   // get word ptrs.
-  ptrs   = vector<vector<int> >();
+  vector<vector<int> > ptrs;
+  vector<int>          uptrs;
+  vector<int>          pdelim;
   ptrs.resize(words.size(), vector<int>());
-  pdelim = vector<int>();
   pdelim.emplace_back(0);
   U work;
   vector<int> matchwidx;
@@ -466,18 +464,12 @@ template <typename T, typename U> corpus<T,U>::~corpus() {
 template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator = (const corpus<T, U>& other) {
   corpust = other.corpust;
   orig    = other.orig;
-  ptrs    = other.ptrs;
-  uptrs   = other.uptrs;
-  pdelim  = other.pdelim;
   return *this;
 }
 
 template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator = (corpus<T, U>&& other) {
   corpust = move(other.corpust);
   orig    = move(other.orig);
-  ptrs    = move(other.ptrs);
-  uptrs   = move(other.uptrs);
-  pdelim  = move(other.pdelim);
   return *this;
 }
 
@@ -496,16 +488,19 @@ template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator += (const
 }
 
 template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator -= (const corpus<T, U>& other) {
+  orig    += U("-") + other.orig;
   corpust -= other.corpust;
   return *this;
 }
 
 template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator *= (const T& t) {
+  orig    += U("*") + U(to_string(t));
   corpust *= t;
   return *this;
 }
 
 template <typename T, typename U> corpus<T, U>& corpus<T, U>::operator /= (const T& t) {
+  orig    += U("/") + U(to_string(t));
   corpust /= t;
   return *this;
 }
@@ -618,6 +613,7 @@ template <typename T, typename U> corpus<T, U> corpus<T, U>::simpleThresh(const 
   const auto thisabsmax(absmax());
   const auto okidx(countIdx(ratio * thisabsmax));
   corpus<T, U> result;
+  result.orig = orig;
   for(int i = 0; i < okidx.size(); i ++) {
     const auto& ii(okidx[i]);
     if((const_cast<const Tensor&>(corpust))[okidx[i]].iter().size())
@@ -982,8 +978,8 @@ template <typename T, typename U> U getCut(const U& input, const int& idx, const
 }
 
 template <typename T, typename U> std::ostream& outTagged(std::ostream& os, const U& name, const corpus<T, U>& cstat, const int& idx, const T& score, const U& input, const int& szwindow) {
-  os << "<span id=\"" << name << to_string(idx) << "\">";
-  os << "score: " + to_string(score) + " : ";
+  os << "<span id=\"" << name << idx << "\">";
+  os << "score: " << score << " : ";
   os << getCut<T, U>(input, idx, szwindow);
   os << "<input class=\"gatherdetail\" type=\"checkbox\"><div class=\"gatherdetail\">";
   os << cstat.reverseLink().second << "<br/>";
@@ -1049,9 +1045,9 @@ template <typename T, typename U> std::ostream& preparedTOC(std::ostream& os, co
       if(depth < topicidx[j].first)
         break;
       os << topictitle[i] << " ";
-      outTagged<T, U>(os, U("prepTOC_") + to_string(i) + U("-") + to_string(j) + U("-1"), stat0, topicidx[j].second.first, topicidx[j].first, input, szwindow);
+      outTagged<T,U>(os, U("prepTOC0_") + to_string(i) + U("_"), stat0, topicidx[j].second.first, topicidx[j].first, input, szwindow);
       os << "<br/>";
-      outTagged<T,U>(os, U("prepTOC_") + to_string(i) + U("-") + to_string(j) + U("-2"), stat1, topicidx[j].second.second, topicidx[j].first, topics[i], szwindow);
+      outTagged<T,U>(os, U("prepTOC_")  + to_string(i) + U("_"), stat1, topicidx[j].second.second, topicidx[j].first, topics[i], szwindow);
       os << "<br/><br/>" << endl;
     }
     os << "<br/><br/>" << endl;
@@ -1132,10 +1128,10 @@ template <typename T, typename U> std::ostream& optimizeTOC(std::ostream& os, co
     sort(phrases.begin(), phrases.end());
     os << "<form action=\"../../../../puts.php\" method=\"POST\"><div>";
     os << "base : ";
-    outTagged<T,U>(os, U("optTOC_") + to_string(lscore[lidx][0].second.first), cs, lscore[lidx][0].second.first, lscore[lidx][0].first, input, szwindow) << "<br/>";
+    outTagged<T,U>(os, U("optTOC0_"), cs, lscore[lidx][0].second.first, lscore[lidx][0].first, input, szwindow) << "<br/>";
     os << "<br/>Show/Hide : <input class=\"gather\" type=\"checkbox\"><div class=\"gather\">";
     for(int i = 0; i < lscore[lidx].size(); i ++)
-      outTagged<T,U>(os, U("optTOC_") + to_string(lscore[lidx][i].second.second), stats[lscore[lidx][i].second.second], lscore[lidx][i].second.second, lscore[lidx][i].first, input, szwindow) << "<br/>";
+      outTagged<T,U>(os, U("optTOC_"), stats[lscore[lidx][i].second.second], lscore[lidx][i].second.second, lscore[lidx][i].first, input, szwindow) << "<br/>";
     os << "</div></div><textarea name=\"entry\">";
     os << getCut<T,U>(input, lscore[lidx][0].second.first, szwindow);
     os << "\n";
@@ -1153,7 +1149,7 @@ template <typename T, typename U> std::ostream& optimizeTOC(std::ostream& os, co
 template <typename T, typename U> std::ostream& diff(std::ostream& os, const U& input, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const T& depth, const T& threshin, const T& redig = T(1), const bool& same = false) {
   assert(detail0.size() == detailtitle0.size() &&
          detail1.size() == detailtitle1.size());
-  cerr << "diff:" << flush;
+  os << "diff:" << flush;
   corpus<T, U> cstat, dstat;
   vector<pair<T, int> > scores;
   for(int i = 0; ; i ++) {
@@ -1187,12 +1183,10 @@ template <typename T, typename U> std::ostream& diff(std::ostream& os, const U& 
     dstat.reDig(redig);
     auto diff(cstat - dstat);
     diff.reDig(redig);
-    os << "(" << to_string(score) << ") : ";
-    os << diff.serialize() << "<br/>" << endl;
-    outTagged<T,U>(os, U("optTOC_") + to_string(i), cstat, i, i, input, szwindow) << "<br/>";
-    outTagged<T,U>(os, U("optTOC_") + to_string(i), dstat, i, i, input, szwindow) << "<br/>";
-    outTagged<T,U>(os, U("optTOC_") + to_string(i), diff, i, i, input, szwindow) << "<br/>";
-    os << "<br/>" << endl;
+    os << "score: " << score << " : " << diff.serialize() << "<br/>" << endl;
+    outTagged<T,U>(os, U("optTOC_src"), cstat, i, score, input, szwindow) << "<br/>" << endl;
+    outTagged<T,U>(os, U("optTOC_dst"), dstat, i, score, input, szwindow) << "<br/>" << endl;
+    outTagged<T,U>(os, U("optTOC_diff"), diff, i, score, input, szwindow) << "<br/><br/>" << endl;
   }
   return os << endl;
 }
