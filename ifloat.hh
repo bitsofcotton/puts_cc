@@ -426,7 +426,7 @@ template <typename T, int bits> std::ostream&  operator << (std::ostream& os, DU
   vector<char> buf;
   while(v) {
     const auto div(v / ten);
-    buf.push_back(int(v - div * ten));
+    buf.emplace_back(int(v - div * ten));
     v = div;
   }
   if(buf.size()) {
@@ -897,7 +897,9 @@ template <typename T, typename W, int bits, typename U> template <typename V> in
 }
 
 template <typename T, typename W, int bits, typename U> inline SimpleFloat<T,W,bits,U>& SimpleFloat<T,W,bits,U>::ensureFlag() {
-  if(! m || (s & (1 << DWRK))) {
+  if(s & (1 << INF))
+    s &= ~ (1 << DWRK);
+  else if(! m || (s & (1 << DWRK))) {
     e ^= e;
     m ^= m;
     s &= ~ ((1 << DWRK) | (1 << INF));
@@ -1019,12 +1021,8 @@ template <typename T, typename W, int bits, typename U> SimpleFloat<T,W,bits,U> 
         auto  work(this->abs());
         auto  result(one());
   for(int i = 1; 0 <= i && i < min(en.size(), ien.size()) && work.floor(); i ++, work >>= U(1))
-    if(work.residue2()) {
-      if(s & (1 << SIGN))
-        result *= ien[i];
-      else
-        result *= en[i];
-    }
+    if(work.residue2())
+      result *= s & (1 << SIGN) ? ien[i] : en[i];
   if(work.floor()) {
     work.s |= 1 << INF;
     return work;
@@ -1035,8 +1033,11 @@ template <typename T, typename W, int bits, typename U> SimpleFloat<T,W,bits,U> 
 }
 
 template <typename T, typename W, int bits, typename U> SimpleFloat<T,W,bits,U> SimpleFloat<T,W,bits,U>::sin() const {
-  if(s & ((1 << INF) | (1 << NaN)))
-    return *this;
+  if(s & ((1 << INF) | (1 << NaN))) {
+    auto res(*this);
+    res.s |= 1 << NaN;
+    return res;
+  }
   if(- one() <= *this && *this <= one()) {
     // sin(x) = x - x^3/3! + x^5/5! - ...
     const auto sqx(*this * *this);
@@ -1065,8 +1066,11 @@ template <typename T, typename W, int bits, typename U> SimpleFloat<T,W,bits,U> 
 }
 
 template <typename T, typename W, int bits, typename U> SimpleFloat<T,W,bits,U> SimpleFloat<T,W,bits,U>::cos() const {
-  if(s & ((1 << INF) | (1 << NaN)))
-    return *this;
+  if(s & ((1 << INF) | (1 << NaN))) {
+    auto res(*this);
+    res.s |= 1 << NaN;
+    return res;
+  }
   if(- one() <= *this && *this <= one()) {
     // cos(x) = 1 - x^2/2! + x^4/4! - ...
     const auto sqx(*this * *this);
@@ -1097,8 +1101,11 @@ template <typename T, typename W, int bits, typename U> SimpleFloat<T,W,bits,U> 
 }
 
 template <typename T, typename W, int bits, typename U> SimpleFloat<T,W,bits,U> SimpleFloat<T,W,bits,U>::atan() const {
-  if(s & ((1 << INF) | (1 << NaN)))
+  if(s & ((1 << INF) | (1 << NaN))) {
+    if(! (s & (1 << NaN)))
+      return s & (1 << SIGN) ? - halfpi() : halfpi();
     return *this;
+  }
   static const auto half(one() >> U(1));
   static const auto four(one() << U(2));
   static const auto five((one() << U(2)) + one());
@@ -1153,12 +1160,12 @@ template <typename T, typename W, int bits, typename U> const vector<SimpleFloat
   static vector<SimpleFloat<T,W,bits,U> > ebuf;
   if(ebuf.size())
     return ebuf;
-  ebuf.push_back(one());
-  ebuf.push_back(ebuf[0].exp());
+  ebuf.emplace_back(one());
+  ebuf.emplace_back(ebuf[0].exp());
   for(int i = 1; 0 <= i; i ++) {
     const auto en(ebuf[i] * ebuf[i]);
     if(en && isfinite(en))
-      ebuf.push_back(en);
+      ebuf.emplace_back(en);
     else
       break;
   }
@@ -1173,7 +1180,7 @@ template <typename T, typename W, int bits, typename U> const vector<SimpleFloat
   for(int i = 0; 0 <= i && i < ea.size(); i ++) {
     const auto ien(one() / ea[i]);
     if(ien && isfinite(ien))
-      iebuf.push_back(ien);
+      iebuf.emplace_back(ien);
     else
       break;
   }
@@ -1230,8 +1237,11 @@ template <typename T, typename W, int bits, typename U> const SimpleFloat<T,W,bi
 }
 
 template <typename T, typename W, int bits, typename U> inline SimpleFloat<T,W,bits,U> SimpleFloat<T,W,bits,U>::sqrt() const {
-  if(s & ((1 << INF) | (1 << NaN)))
-    return *this;
+  if(s & ((1 << INF) | (1 << NaN))) {
+    auto res(*this);
+    if(s & (1 << SIGN)) res.s |= 1 << NaN;
+    return res;
+  }
   auto res((this->log() >> U(1)).exp());
   // get better accuracy (is this enough?, double accuracy on one loop.)
   // newton's method: 0 == f'(x_n) (x_{n+1} - x_n) + f(x_n)

@@ -114,7 +114,7 @@ template <typename T> inline SimpleVector<T> SimpleVector<T>::operator - () cons
 }
 
 template <typename T> inline SimpleVector<T> SimpleVector<T>::operator + (const SimpleVector<T>& other) const {
-  SimpleVector<T> res(*this);
+  auto res(*this);
   return res += other;
 }
 
@@ -129,7 +129,7 @@ template <typename T> inline SimpleVector<T>& SimpleVector<T>::operator += (cons
 }
 
 template <typename T> inline SimpleVector<T> SimpleVector<T>::operator - (const SimpleVector<T>& other) const {
-  SimpleVector<T> res(*this);
+  auto res(*this);
   return res -= other;
 }
 
@@ -138,7 +138,7 @@ template <typename T> inline SimpleVector<T>& SimpleVector<T>::operator -= (cons
 }
 
 template <typename T> inline SimpleVector<T> SimpleVector<T>::operator * (const T& other) const {
-  SimpleVector<T> res(*this);
+  auto res(*this);
   return res *= other;
 }
 
@@ -152,7 +152,7 @@ template <typename T> inline SimpleVector<T>& SimpleVector<T>::operator *= (cons
 }
 
 template <typename T> inline SimpleVector<T> SimpleVector<T>::operator / (const T& other) const {
-  SimpleVector<T> res(*this);
+  auto res(*this);
   return res /= other;
 }
 
@@ -375,7 +375,7 @@ template <typename T> inline SimpleMatrix<T>::SimpleMatrix() {
   ecols  = 0;
   entity = NULL;
 #if defined(_FLOAT_BITS_)
-  epsilon = num_t(1) >> int64_t(mybits - 1);
+  epsilon = num_t(1) >> int64_t(_FLOAT_BITS_ - 1);
 #else
   epsilon = std::numeric_limits<num_t>::epsilon();
 #endif
@@ -393,7 +393,7 @@ template <typename T> inline SimpleMatrix<T>::SimpleMatrix(const int& rows, cons
   erows = rows;
   ecols = cols;
 #if defined(_FLOAT_BITS_)
-  epsilon = num_t(1) >> int64_t(mybits - 1);
+  epsilon = num_t(1) >> int64_t(_FLOAT_BITS_ - 1);
 #else
   epsilon = std::numeric_limits<num_t>::epsilon();
 #endif
@@ -440,7 +440,7 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::operator - () cons
 }
 
 template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::operator + (const SimpleMatrix<T>& other) const {
-  SimpleMatrix<T> res(*this);
+  auto res(*this);
   return res += other;
 }
 
@@ -455,7 +455,7 @@ template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::operator += (cons
 }
 
 template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::operator - (const SimpleMatrix<T>& other) const {
-  SimpleMatrix<T> res(*this);
+  auto res(*this);
   return res -= other;
 }
 
@@ -464,7 +464,7 @@ template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::operator -= (cons
 }
 
 template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::operator * (const T& other) const {
-  SimpleMatrix<T> res(*this);
+  auto res(*this);
   return res *= other;
 }
 
@@ -479,7 +479,7 @@ template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::operator *= (cons
 
 template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::operator * (const SimpleMatrix<T>& other) const {
   assert(ecols == other.erows && entity && other.entity);
-  SimpleMatrix<T> derived(other.transpose());
+  auto            derived(other.transpose());
   SimpleMatrix<T> res(erows, other.ecols);
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
@@ -510,7 +510,7 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::operator * (const 
 }
 
 template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::operator / (const T& other) const {
-  SimpleMatrix<T> res(*this);
+  auto res(*this);
   return res /= other;
 }
 
@@ -527,12 +527,14 @@ template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::operator = (const
   if(entity == other.entity && erows == other.erows && ecols == other.ecols)
     return *this;
   if(erows != other.erows || ecols != other.ecols) {
-    if(entity)
-      delete[] entity;
-    if(other.erows)
-      entity = new SimpleVector<T>[other.erows];
-    else
-      entity = NULL;
+    if(erows != other.erows) {
+      if(entity)
+        delete[] entity;
+      if(other.erows)
+        entity = new SimpleVector<T>[other.erows];
+      else
+        entity = NULL;
+    }
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -633,25 +635,25 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::transpose() const 
 template <typename T> inline T SimpleMatrix<T>::determinant() const {
   assert(0 <= erows && 0 <= ecols && erows == ecols);
   T det(1);
-  SimpleMatrix<T> work(*this);
+  auto work(*this);
   for(int i = 0; i < erows; i ++) {
     int xchg = i;
     for(int j = i + 1; j < erows; j ++)
       if(abs(work.entity[j][i]) > abs(work.entity[xchg][i]))
         xchg = j;
-    SimpleVector<T> buf(work.entity[i]);
+          auto  buf(work.entity[i]);
     work.entity[i]    = work.entity[xchg];
     work.entity[xchg] = buf;
-    const SimpleVector<T>& ei(work.entity[i]);
-    const T&               eii(ei[i]);
+    const auto& ei(work.entity[i]);
+    const auto& eii(ei[i]);
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
     for(int j = i + 1; j < erows; j ++) {
-      const T ratio(work.entity[j][i] / eii);
+      const auto ratio(work.entity[j][i] / eii);
       work.entity[j] -= ei * ratio;
     }
-    det *= ei[i];
+    det *= eii;
   }
   return isfinite(det) ? det : T(0);
 }
@@ -669,7 +671,7 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::inverse() const {
 
 template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solve(SimpleVector<T> other) const {
   assert(0 <= erows && 0 <= ecols && erows == ecols && entity && erows == other.size());
-  SimpleMatrix<T> work(*this);
+  auto work(*this);
   for(int i = 0; i < erows; i ++) {
     int xchg = i;
     for(int j = i + 1; j < erows; j ++)
@@ -677,14 +679,14 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solve(SimpleVector
         xchg = j;
     swap(work.entity[i], work.entity[xchg]);
     swap(other[i], other[xchg]);
-    const SimpleVector<T>& ei(work.entity[i]);
-    const T&               eii(ei[i]);
+    const auto& ei(work.entity[i]);
+    const auto& eii(ei[i]);
     if(epsilon < eii * eii) {
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
       for(int j = i + 1; j < erows; j ++) {
-        const T ratio(work.entity[j][i] / eii);
+        const auto ratio(work.entity[j][i] / eii);
         work.entity[j] -= ei       * ratio;
         other[j]       -= other[i] * ratio;
       }
@@ -692,7 +694,7 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solve(SimpleVector
   }
   for(int i = erows - 1; 0 <= i; i --) {
     if(work.entity[i][i] == T(0)) continue;
-    const T buf(other[i] / work.entity[i][i]);
+    const auto buf(other[i] / work.entity[i][i]);
     if(!isfinite(buf) || isnan(buf)) {
     //  assert(!isfinite(work.entity[i][i] / other[i]) || isnan(work.entity[i][i] / other[i]));
       continue;
@@ -889,7 +891,7 @@ template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, Simpl
     const auto u2i(U2.col(i));
     U2.setCol(u2i / sqrt(u2i.dot(u2i)));
   }
-  return make_pair(make_pair(move(U1), move(U2)), (Wt * D).transpose().QR().transpose() * Qt);
+  return make_pair(make_pair(move(U1), move(U2)), (Wt * D).transpose().QR() * Qt);
 }
 
 template <typename T> template <typename U> inline SimpleMatrix<U> SimpleMatrix<T>::real() const {
@@ -1194,14 +1196,23 @@ template <typename T> const SimpleMatrix<T>& diff(const int& size0) {
 #pragma omp for schedule(static, 1)
 #endif
     for(int i = 0; i < DD.rows(); i ++)
-      DD.row(i) *= - complex<T>(T(0), T(2) * Pi * T(i) / T(DD.rows()));
+      DD.row(i) *=   complex<T>(T(0), - T(2) * Pi * T(i) / T(DD.rows()));
 #if defined(_OPENMP)
 #pragma omp for schedule(static, 1)
 #endif
     for(int i = 1; i < II.rows(); i ++)
-      II.row(i) /= - complex<T>(T(0), T(2) * Pi * T(i) / T(DD.rows()) / Pi);
-    dd = (dft<T>(-size) * DD).template real<T>() / Pi;
-    ii = (dft<T>(-size) * II).template real<T>();
+      II.row(i) /= - complex<T>(T(0), - T(2) * Pi * T(i) / T(DD.rows()));
+    // N.B. in continuous function, we don't divide dd by &pi;.
+    //      (d/dx sum exp(2 Pi i x theta / N) exp(- 2 Pi i y theta / N) f(y)).
+    // XXX: from some numerical test, sign on DD, II is reverse side.
+    // XXX: In discrete function, we had be chosen ||dd|| := 1, and not now.
+    //      (because the (left or right) differential itself cannot be
+    //       larger than |x_{k+1}-x_k| < ||x|| in discrete,
+    //       sum_0^1 - 2 Pi i (theta/n)^2/2 -&gt; Pi)
+    // XXX: if we make plain differential with no error on cosine curve,
+    //      it causes constant 0 vector.
+    dd = (dft<T>(- size) * DD).template real<T>();
+    ii = (dft<T>(- size) * II).template real<T>();
   }
   return size0 < 0 ? ii : dd;
 }
@@ -1340,14 +1351,14 @@ template <typename T> inline SimpleSparseVector<T>::~SimpleSparseVector() {
 }
 
 template <typename T> inline SimpleSparseVector<T> SimpleSparseVector<T>::operator - () const {
-  SimpleSparseVector<T> res(*this);
+  auto res(*this);
   for(auto itr(res.entity.begin()); itr != res.entity.end(); ++ itr)
     itr->second = - itr->second;
   return res;
 }
 
 template <typename T> inline SimpleSparseVector<T> SimpleSparseVector<T>::operator + (const SimpleSparseVector<T>& other) const {
-  SimpleSparseVector<T> res(*this);
+  auto res(*this);
   return res += other;
 }
 
@@ -1364,7 +1375,7 @@ template <typename T> inline SimpleSparseVector<T>& SimpleSparseVector<T>::opera
 }
 
 template <typename T> inline SimpleSparseVector<T> SimpleSparseVector<T>::operator - (const SimpleSparseVector<T>& other) const {
-  SimpleSparseVector<T> res(*this);
+  auto res(*this);
   return res -= other;
 }
 
@@ -1373,7 +1384,7 @@ template <typename T> inline SimpleSparseVector<T>& SimpleSparseVector<T>::opera
 }
 
 template <typename T> template <typename U> inline SimpleSparseVector<T> SimpleSparseVector<T>::operator * (const U& other) const {
-  SimpleSparseVector<T> res(*this);
+  auto res(*this);
   return res *= other;
 }
 
@@ -1384,7 +1395,7 @@ template <typename T> template <typename U> inline SimpleSparseVector<T>& Simple
 }
 
 template <typename T> template <typename U> inline SimpleSparseVector<T> SimpleSparseVector<T>::operator / (const U& other) const {
-  SimpleSparseVector<T> res(*this);
+  auto res(*this);
   return res /= other;
 }
 
