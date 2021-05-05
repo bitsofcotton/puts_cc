@@ -769,18 +769,18 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::QR() const {
 
 template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD() const {
   if(this->cols() < this->rows()) {
-    auto res((* this) * this->transpose().SVD());
+    auto res(((* this) * this->transpose().SVD()).transpose());
     vector<int> residue;
-    residue.reserve(res.cols());
-    for(int i = 0; i < res.cols(); i ++) {
-      const auto r2(res.col(i).dot(res.col(i)));
+    residue.reserve(res.rows());
+    for(int i = 0; i < res.rows(); i ++) {
+      const auto r2(res.row(i).dot(res.row(i)));
       if(epsilon < r2)
-        res.setCol(i, res.col(i) / sqrt(r2));
+        res.row(i) /= sqrt(r2);
       else
         residue.emplace_back(i);
     }
     if(residue.size())
-      return res.transpose().fillP(residue).transpose();
+      return res.fillP(residue);
     return res;
   }
   for(int i = 0; i < this->rows(); i ++)
@@ -849,7 +849,7 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD() const {
         mul(i, j) = i < ii || j < ii ? T(i == j ? 1 : 0) :
           work(i - ii, j - ii);
     left = left * mul;
-    s    = mul.transpose() * s * mul;
+    s    = mul * s * mul.transpose();
   }
   for(int i = 0; i < left.rows(); i ++) {
     int jj(i);
@@ -872,25 +872,23 @@ template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, Simpl
     C.row(i + this->rows()) = src.row(i);
   const auto P(C.SVD());
   SimpleVector<T> d(this->cols());
-        auto Qt(P.transpose() * C);
+        auto Qt(P * C);
   for(int i = 0; i < d.size(); i ++)
     Qt.row(i) /= (d[i] = sqrt(Qt.row(i).dot(Qt.row(i))));
-  const auto D(P.transpose() * C * Qt.transpose());
+  const auto D(P * C * Qt.transpose());
   SimpleMatrix<T> P1(this->rows(), d.size());
   SimpleMatrix<T> P2(src.rows(), d.size());
   for(int i = 0; i < P1.rows(); i ++)
-    P1.row(i) = P.row(i);
+    P1.row(i) = P.col(i);
   for(int i = 0; i < P2.rows(); i ++)
-    P2.row(i) = P.row(i + P1.rows());
+    P2.row(i) = P.col(i + P1.rows());
   auto U1(P1.SVD());
-  auto Wt(U1.transpose() * P1);
+  auto Wt(U1 * P1);
   for(int i = 0; i < Wt.rows(); i ++)
     Wt.row(i) /= sqrt(Wt.row(i).dot(Wt.row(i)));
-  auto U2(P2 * Wt.transpose());
-  for(int i = 0; i < U2.cols(); i ++) {
-    const auto u2i(U2.col(i));
-    U2.setCol(u2i / sqrt(u2i.dot(u2i)));
-  }
+  auto U2(Wt * P2.transpose());
+  for(int i = 0; i < U2.rows(); i ++)
+    U2.row(i) /= sqrt(U2.row(i).dot(U2.row(i)));
   return make_pair(make_pair(move(U1), move(U2)), (Wt * D).transpose().QR() * Qt);
 }
 
@@ -1276,20 +1274,15 @@ template <typename T> SimpleVector<T> linearInvariant(const vector<SimpleVector<
 }
 
 // N.B. please refer bitsofcotton/randtools.
-template <typename T> SimpleVector<T> makeProgramInvariant(const SimpleVector<T>& in, const int& complexity, const T& index = T(1)) {
+template <typename T> SimpleVector<T> makeProgramInvariant(const SimpleVector<T>& in, const T& index = - T(1)) {
   SimpleVector<T> res(in.size() + (T(0) <= index ? 2 : 1));
   for(int i = 0; i < in.size(); i ++) {
     assert(- T(1) <= in[i] && in[i] <= T(1) && isfinite(in[i]));
-    res[i] = tan((in[i] + T(1)) / T(2) * atan2(T(1), T(1)));
+    res[i] = tan((in[i] + T(1)) / T(4) * atan2(T(1), T(1)));
   }
   res[in.size()] = T(1);
   if(T(0) <= index)
-    res[in.size() + 1] = index;
-  T pd(0);
-  for(int i = 0; i < res.size(); i ++)
-    pd += log(abs(res[i]));
-  if(0 <= complexity)
-    res *= exp((complexity ? T(complexity) * pd : - pd) / T(res.size()));
+    res[in.size() + 1] = tan(index * atan2(T(1), T(1)));
   return res;
 }
 

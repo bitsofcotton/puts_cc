@@ -808,7 +808,7 @@ template <typename T, typename U> SimpleVector<T> corpus<T, U>::singularValues()
 }
 
 template <typename T, typename U> SimpleVector<T> corpus<T, U>::singularValues(const SimpleMatrix<T>& m) const {
-  const auto SV(m.SVD().transpose() * m);
+  const auto SV(m.SVD() * m);
   SimpleVector<T> w(SV.rows());
   for(int i = 0; i < w.size(); i ++)
     w[i] = sqrt(SV.row(i).dot(SV.row(i)));
