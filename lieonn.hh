@@ -39,6 +39,7 @@ using std::max;
 using std::min;
 using std::swap;
 using std::sort;
+using std::binary_search;
 using std::pair;
 using std::make_pair;
 using std::map;
@@ -2122,7 +2123,7 @@ public:
   inline       SimpleMatrix<T>  QR() const;
   inline       SimpleMatrix<T>  SVD() const;
   inline       pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > SVD(const SimpleMatrix<T>& src) const;
-  inline       vector<int>      innerFix(const SimpleMatrix<T>& A, vector<pair<T, int> >& fidx);
+  inline       SimpleVector<T>  innerFix(const SimpleMatrix<T>& A, vector<pair<T, int> >& fidx);
   inline       SimpleVector<T>  inner(const SimpleVector<T>& bl, const SimpleVector<T>& bu) const;
   template <typename U> inline SimpleMatrix<U> real() const;
   template <typename U> inline SimpleMatrix<U> imag() const;
@@ -2453,7 +2454,7 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solve(SimpleVector
     swap(other[i], other[xchg]);
     const auto& ei(work.entity[i]);
     const auto& eii(ei[i]);
-    if(epsilon < eii * eii) {
+    if(epsilon * ei.dot(ei) < eii * eii) {
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -2584,7 +2585,7 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD() const {
       const auto& ei(work.row(i));
       const auto& eii(ei[i]);
       d[i] = eii;
-      if(epsilon < eii * eii) {
+      if(epsilon * ei.dot(ei) < eii * eii) {
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -2719,57 +2720,57 @@ template <typename T> inline void SimpleMatrix<T>::resize(const int& rows, const
   return;
 }
 
-template <typename T> inline vector<int> SimpleMatrix<T>::innerFix(const SimpleMatrix<T>& A, vector<pair<T, int> >& fidx) {
+// XXX: if there exists |t| == 0 trivial result, this rturns bugly value.
+template <typename T> inline SimpleVector<T> SimpleMatrix<T>::innerFix(const SimpleMatrix<T>& A, vector<pair<T, int> >& fidx) {
   // N.B. we now have |[A -bb] [x t]| <= 1 condition.
   // N.B. there's no difference |[A - bb] [x t]|^2 <= 1 condition in this.
   //      but not with mixed condition.
   const auto R((*this) * A);
   SimpleVector<T> one(this->cols());
+  vector<int> ffidx;
+  ffidx.reserve(fidx.size());
+  for(int i = 0; i < fidx.size(); i ++)
+    ffidx.emplace_back(fidx[i].second);
+  sort(ffidx.begin(), ffidx.end());
   for(int i = 0; i < one.size(); i ++)
-    one[i] = T(1);
+    if(! binary_search(ffidx.begin(), ffidx.end(), i))
+      one[i] = T(1);
   // we now have: Q [R [x t] ] <= {0, 1}^m cond.
   const auto on(projectionPt(one));
-  fidx.reserve(fidx.size() + on.size());
-  for(int i = 0; i < on.size(); i ++)
+  fidx.reserve(fidx.size() + this->cols());
+  for(int i = 0; i < this->cols(); i ++)
     fidx.emplace_back(make_pair(abs(on[i]), i));
   sort(fidx.begin(), fidx.end());
-  vector<int> fix;
-  fix.reserve(this->rows());
   // sort by: |<Q^t(1), q_k>|, we subject to minimize each, to do this,
   //   maximize minimum q_k orthogonality.
-  for(int idx = 0; fix.size() < this->rows() - 1 && idx < fidx.size(); idx ++) {
+  for(int i = 0, idx = 0; i < this->rows() - 1 && idx < fidx.size(); idx ++) {
     const auto& iidx(fidx[idx].second);
     const auto  orth(this->col(iidx));
     const auto  n2(orth.dot(orth));
     if(n2 <= epsilon)
       continue;
-    fix.emplace_back(fidx[idx].second);
     // N.B. O(mn) can be writed into O(lg m + lg n) in many core cond.
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
     for(int j = 0; j < this->cols(); j ++)
       this->setCol(j, this->col(j) - orth * this->col(j).dot(orth) / n2);
+    i ++;
   }
-  // N.B. now we have fix indexes that to be A_fix [x 1] * t == 0.
-  assert(fix.size() == this->rows() - 1);
-  return fix;
+  // N.B. now we have fix indexes that to be P R [x 1] * t == 0.
+  return R.solve((*this) * one);
 }
 
 template <typename T> inline SimpleVector<T> SimpleMatrix<T>::inner(const SimpleVector<T>& bl, const SimpleVector<T>& bu) const {
-  static const auto ee(pow(epsilon, T(1) / T(8)));
   assert(this->rows() == bl.size() && this->rows() == bu.size() &&
-         0 < this->cols() && 0 < this->rows());
+         0 < this->cols() && 0 < this->rows() && this->cols() < this->rows());
   // bu - bb == A, bl - bb == - A <=> bu - bl == 2 A. 
   const auto bb((bu + bl) / T(2));
   const auto upper(bu - bb);
-  SimpleMatrix<T> A(this->rows() * 2 - 1 + this->cols() * 2, this->cols() + 1);
+  SimpleMatrix<T> A(*this);
   vector<pair<T, int> > fidx;
   fidx.reserve(this->rows());
   for(int i = 0; i < this->rows(); i ++) {
-    for(int j = 0; j < this->cols(); j ++)
-      A(i, j) = (*this)(i, j);
-    A(i, this->cols()) = - bb[i];
     assert(T(0) <= upper[i]);
     if(upper[i] == T(0)) {
       const auto n2(A.row(i).dot(A.row(i)));
@@ -2780,34 +2781,13 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::inner(const Simple
         A.row(i) *= n2;
     } else
       A.row(i) /= upper[i];
-    const auto A2(A.row(i).dot(A.row(i)));
-    assert(isfinite(A2) && ! isnan(A2));
-    if(this->rows() - 1 <= i) break;
-    A.row(i + this->rows()) = - A.row(i);
-  }
-  // this is tricky but one of them is fixed if it is needed.
-  for(int i = this->rows() * 2 - 1; i < A.rows(); i ++) {
-    const auto ii(i - (this->rows() * 2 - 1));
-    for(int j = 0; j < this->cols(); j ++)
-      A(i, j) = T(j == ii / 2 ? (ii & 1 ? - 1 : 1) : 0);
-    A(i, this->cols()) = T(ii & 1 ? 1 : - 1);
-    A.row(i) /= ee;
+    assert(isfinite(A.row(i).dot(A.row(i))));
   }
   // N.B. we now have |[A -bb] [x t]| <= 1 condition.
-  // N.B. there's no difference |[A - bb] [x t]|^2 <= 1 condition in this.
+  // N.B. there's no difference |[A -bb] [x t]|^2 <= 1 condition in this.
   //      but not with mixed condition.
-        auto Pt(A.QR());
-  const auto fix(Pt.innerFix(A, fidx));
-  // N.B. now we have fix indexes that to be A_fix [x 1] * t == 0.
-  assert(fix.size() == this->cols());
-  SimpleMatrix<T> Afix(fix.size(), fix.size());
-  SimpleVector<T> f(Afix.rows());
-  for(int i = 0; i < fix.size(); i ++) {
-    for(int j = 0; j < Afix.cols(); j ++)
-      Afix(i, j) = A(fix[i], j);
-    f[i] = - A(fix[i], Afix.cols());
-  }
-  return Afix.solve(f);
+  // N.B. we don't matter signs on [A -bb] [x t].
+  return A.QR().innerFix(A, fidx);
 }
 
 template <typename T> std::ostream& operator << (std::ostream& os, const SimpleMatrix<T>& v) {
@@ -3014,8 +2994,8 @@ template <typename T> inline SimpleVector<T> taylor(const int& size, const T& st
   return res;
 }
 
-template <typename T> SimpleVector<T> linearInvariant(const vector<SimpleVector<T> >& in) {
-  SimpleMatrix<T> A(in.size() * 2 - 1, in[0].size());
+template <typename T> SimpleVector<T> linearInvariant(const vector<SimpleVector<T> >& in, const bool& nonzero = false) {
+  SimpleMatrix<T> A(in.size(), in[0].size());
   assert(in[0].size() <= in.size());
   SimpleVector<T> fvec(A.cols());
   SimpleVector<T> one(A.rows());
@@ -3034,15 +3014,9 @@ template <typename T> SimpleVector<T> linearInvariant(const vector<SimpleVector<
     for(int j = 0; j < in[0].size(); j ++)
       A(i, j) = in[i][j];
     assert(isfinite(A.row(i).dot(A.row(i))));
-    if(i + in.size() < A.rows())
-      A.row(i + in.size()) = - A.row(i);
   }
-        auto Pt(A.QR());
-  const auto R(Pt * A);
   vector<pair<T, int> > sute;
-  Pt.innerFix(A, sute);
-  fvec = R.solve(Pt * one);
-  return isfinite(fvec.dot(fvec)) ? fvec : fvec * T(0);
+  return A.QR().innerFix(A, sute);
 }
 
 // N.B. please refer bitsofcotton/randtools.
