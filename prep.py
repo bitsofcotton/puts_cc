@@ -2,10 +2,6 @@
 # -*- coding: utf-8 -*-
 
 import sys
-
-reload(sys)
-sys.setdefaultencoding("utf-8")
-
 import MySQLdb
 
 conn  = MySQLdb.connect(user='root', passwd='', host='127.0.0.1', db='wiktionary', charset='utf8')

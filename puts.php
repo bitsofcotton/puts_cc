@@ -1,4 +1,6 @@
 <?php
+  $M_COUNT = 300;
+  $M_STR   = 80000;
   session_start();
   if(isset($_REQUEST["logout"])) {
     session_destroy();
@@ -11,24 +13,93 @@
     if(isset($_REQUEST["salt"]))
       $_SESSION["salt"]  = $_REQUEST["salt"];
     $pathb = "./datas/" . hash("sha256", $_SESSION["email"] . $_SESSION["salt"]) . "/";
-    exec("mkdir " . $pathb);
-    exec("mkdir " . $pathb . "topics");
-    exec("mkdir " . $pathb . "dicts");
-    exec("mkdir " . $pathb . "pdict");
-    exec("mkdir " . $pathb . "output");
-    exec("mkdir " . $pathb . "web");
-    exec("mkdir " . $pathb . "web/sub");
-    exec("mkdir " . $pathb . "crawl");
-    exec("rm -f " . $pathb . "puts.core");
+    exec("./mkdir " . $pathb);
+    exec("./mkdir " . $pathb . "topics");
+    exec("./mkdir " . $pathb . "dicts");
+    exec("./mkdir " . $pathb . "pdict");
+    exec("./mkdir " . $pathb . "output");
+    exec("./mkdir " . $pathb . "crawl");
+    exec("./rm -f " . $pathb . "puts.core");
     if(!file_exists($pathb . "words.txt"))
-      exec("cp ./words.txt " . $pathb);
-    exec("cp ./style.css " . $pathb);
+      exec("./cp ./words.txt " . $pathb);
+    exec("./cp ./style.css " . $pathb);
     if(!file_exists($pathb . "sentry.txt"))
-      exec("touch " . $pathb . "sentry.txt");
-    exec("touch " . $pathb . "urls.txt");
+      file_put_contents($pathb . "sentry.txt", "");
+    if(!file_exists($pathb . "urls.txt"))
+      file_put_contents($pathb . "urls.txt", "");
     file_put_contents($pathb . "email.txt", $_REQUEST["email"]);
   } else
     $pathb = "./datas/" . hash("sha256", $_SESSION["email"] . $_SESSION["salt"]) . "/";
+    if(isset($_REQUEST["cmd"])) {
+      $name = "";
+      if(isset($_REQUEST["name"]))
+        $name = basename($_REQUEST["name"]);
+      $containt = "";
+      if(isset($_REQUEST["containt"]))
+        $containt = $_REQUEST["containt"];
+      switch($_REQUEST["cmd"]) {
+      case "aa":
+        if(mb_strlen($containt) < $M_STR) {
+          $pathb2 = "output/" . hash("sha256", $containt) . "/";
+          exec("./mkdir -p " . $pathb . $pathb2);
+          file_put_contents($pathb . $pathb2 . "/orig.txt", $containt);
+          exec("./rm -f " . $pathb . $pathb2 . "/.lock");
+          echo "Your path is <a href=\"" . $pathb . $pathb2 . "\">Here</a>";
+        }
+        exec("php ./analyse.php");
+        break;
+      case "aw":
+        if($containt == "")
+          exec("./rm -f " . $pathb . "words.txt");
+        else
+          file_put_contents($pathb . "words.txt", $content);
+        break;
+      case "url":
+        file_put_contents($pathb . "urls.txt", $containt);
+        break;
+      case "st":
+        $pathc = "";
+        $ctr   = 0;
+        if(preg_match_all("/([0-9a-f]{64,64})/m", $containt, $match)) {
+          foreach($match[0] as $m) {
+            if(file\exists($pathb . "../" . $m)) {
+              $pathc .= $m . "\n";
+              $ctr   += 1;
+              if($ctr >= 8)
+                break;
+            }
+          }
+        }
+        file_put_contents($pathb . "sentry.txt", $pathc);
+        break;
+      case "at":
+        $fi = new FilesystemIterator($pathb . "topics/", FilesystemIterator::SKIP_DOTS);
+        if(iterator_count($fi) < $M_COUNT && mb_strlen($containt) < $M_STR)
+          file_put_contents($pathb . "topics/" . $name, $containt);
+        break;
+      case "dt":
+        unlink($pathb . "topics/" . $name);
+        break;
+      case "ad":
+        $fi = new FilesystemIterator($pathb . "dicts/", FilesystemIterator::SKIP_DOTS);
+        if(iterator_count($fi) < $M_COUNT && mb_strlen($containt) < $M_STR)
+          file_put_contents($pathb . "dicts/" . $name, $containt);
+        break;
+      case "dd":
+        unlink($pathb . "dicts/" . $name);
+        break;
+      case "da":
+        exec("./rm -fr " . $pathb . "/output && ./mkdir -p " . $pathb . "/output");
+        break;
+      case "ta":
+        exec("cd " . $pathb . " && ./rm -f *.core");
+        exec("cd " . $pathb . " && ./rm -f archive.tar.gz && tar cfz archive.tar.gz .");
+        break;
+      default:
+        echo "invalid cmd.";
+      }
+      exit(0);
+    } 
 ?>
 <html>
 <head>
@@ -58,7 +129,7 @@ function uploadAnalyse() {
   fd = new FormData();
   fd.append("cmd", "aa");
   fd.append("containt", document.getElementById("object").value);
-  asyncPost("./apply.php", fd);
+  asyncPost("./puts.php", fd);
   return;
 }
 
@@ -66,7 +137,7 @@ function updateWords() {
   fd = new FormData();
   fd.append("cmd", "aw");
   fd.append("containt", document.getElementById("words").value);
-  asyncPost("./apply.php", fd);
+  asyncPost("./puts.php", fd);
   return;
 }
 
@@ -74,7 +145,7 @@ function updateSentryList() {
   fd = new FormData();
   fd.append("cmd", "st");
   fd.append("containt", document.getElementById("sentry_list").value);
-  asyncPost("./apply.php", fd);
+  asyncPost("./puts.php", fd);
   return;
 }
 
@@ -82,7 +153,7 @@ function updateURLs() {
   fd = new FormData();
   fd.append("cmd", "url");
   fd.append("containt", document.getElementById("urls").value);
-  asyncPost("./apply.php", fd);
+  asyncPost("./puts.php", fd);
   return;
 }
 
@@ -96,11 +167,11 @@ function appendTopic() {
   fd.append("cmd", "at");
   fd.append("name", dom.value);
   fd.append("containt", "");
-  asyncPost("./apply.php", fd);
+  asyncPost("./puts.php", fd);
   var par   = document.getElementById("topic-ul");
   var last  = document.getElementById("topic-last");
   var newli = document.createElement("li");
-  newli.innerHTML = dom.value + " : <br/><textarea maxlength=\"80000\" rows=\"12\" cols=\"80\" id=\"topic-" + dom.value + "\"></textarea><br/><a href=\"javascript: ;\" onClick=\"applyTopic('" + dom.value + "', document.getElementById('topic-" + dom.value + "').value);\">Update</a>|<a href=\"javascript: ;\" onClick=\"deleteTopic('" + dom.value + "');\">-</a>";
+  newli.innerHTML = dom.value + " : <br/><textarea maxlength=\"?> echo $M_STR - 20; ?>\" rows=\"12\" cols=\"80\" id=\"topic-" + dom.value + "\"></textarea><br/><a href=\"javascript: ;\" onClick=\"applyTopic('" + dom.value + "', document.getElementById('topic-" + dom.value + "').value);\">Update</a>|<a href=\"javascript: ;\" onClick=\"deleteTopic('" + dom.value + "');\">-</a>";
   newli.id = "topic-li-" + dom.value;
   par.insertBefore(newli, last);
   dom.value  = "";
@@ -112,7 +183,7 @@ function applyTopic(name, containt) {
   fd.append("cmd", "at");
   fd.append("name", name);
   fd.append("containt", containt);
-  asyncPost("./apply.php", fd);
+  asyncPost("./puts.php", fd);
   return;
 }
 
@@ -120,7 +191,7 @@ function deleteTopic(name) {
   fd = new FormData();
   fd.append("cmd", "dt");
   fd.append("name", name);
-  asyncPost("./apply.php", fd);
+  asyncPost("./puts.php", fd);
   var dom = document.getElementById("topic-li-" + name);
   dom.parentElement.removeChild(dom);
   return;
@@ -136,11 +207,11 @@ function appendDict() {
   fd.append("cmd", "ad");
   fd.append("name", dom.value);
   fd.append("containt", "");
-  asyncPost("./apply.php", fd);
+  asyncPost("./puts.php", fd);
   var par   = document.getElementById("dicts-ul");
   var last  = document.getElementById("dicts-last");
   var newli = document.createElement("li");
-  newli.innerHTML = dom.value + " : <br/><textarea maxlength=\"80000\" rows=\"12\" cols=\"80\" id=\"dicts-" + dom.value + "\"></textarea><br/><a href=\"javascript: ;\" onClick=\"applyDict('" + dom.value + "', document.getElementById('dicts-" + dom.value + "').value);\">Update</a>|<a href=\"javascript: ;\" onClick=\"deleteDict('" + dom.value + "');\">-</a>";
+  newli.innerHTML = dom.value + " : <br/><textarea maxlength=\"?><?php echo $M_STR - 20; ?>\" rows=\"12\" cols=\"80\" id=\"dicts-" + dom.value + "\"></textarea><br/><a href=\"javascript: ;\" onClick=\"applyDict('" + dom.value + "', document.getElementById('dicts-" + dom.value + "').value);\">Update</a>|<a href=\"javascript: ;\" onClick=\"deleteDict('" + dom.value + "');\">-</a>";
   newli.id = "dicts-li-" + dom.value;
   par.insertBefore(newli, last);
   dom.value  = "";
@@ -152,7 +223,7 @@ function applyDict(name, containt) {
   fd.append("cmd", "ad");
   fd.append("name", name);
   fd.append("containt", containt);
-  asyncPost("./apply.php", fd);
+  asyncPost("./puts.php", fd);
   return;
 }
 
@@ -160,7 +231,7 @@ function deleteDict(name) {
   fd = new FormData();
   fd.append("cmd", "dd");
   fd.append("name", name);
-  asyncPost("./apply.php", fd);
+  asyncPost("./puts.php", fd);
   var dom = document.getElementById("dicts-li-" + name);
   dom.parentElement.removeChild(dom);
   return;
@@ -169,14 +240,14 @@ function deleteDict(name) {
 function deleteCache() {
   fd = new FormData();
   fd.append("cmd", "da");
-  asyncPost("./apply.php", fd);
+  asyncPost("./puts.php", fd);
   return;
 }
 
 function archive() {
   fd = new FormData();
   fd.append("cmd", "ta");
-  asyncPost("./apply.php", fd);
+  asyncPost("./puts.php", fd);
   return;
 }
 </script>
@@ -207,7 +278,7 @@ function archive() {
     echo "<ul id=\"dicts-ul\">";
     echo "<li>";
     echo "Please edit and paste:";
-    echo "<textarea maxlength=\"80000\" rows=\"30\" cols=\"90\" id=\"dicts-" . $name . "\">";
+    echo "<textarea maxlength=\"" . $M_STR - 20 . "\" rows=\"30\" cols=\"90\" id=\"dicts-" . $name . "\">";
     echo $_REQUEST["entry"] . "\n";
     echo "</textarea></li>";
     echo "<li id=\"dicts-last\"><input type=\"text\" id=\"new-dicts\" /><a href=\"javascript: ;\" onClick=\"appendDict();\">+</a></li>";
@@ -222,12 +293,12 @@ function archive() {
 <form action="./puts.php" method="GET"><input type="submit" value="logout" /><input type="hidden" name="logout" /></form>
 <a href="javascript:;" onClick="deleteCache();">Delete cache</a> |
 <a href="<?php echo $pathb; ?>">Your root path</a> |
-<a href="<?php echo $pathb; ?>/web">Per 6 hours news</a> |
+<a href="<?php echo $pathb; ?>/crawl">Per 6 hours news</a> |
 <a href="javascript:;" onClick="archive();">Archive all</a></p>
 </p>
 <p>
 Analyse text:<br/>
-<textarea maxlength="80000" rows="12" cols="80" name="object" id="object"></textarea><br/>
+<textarea maxlength="<?php echo $M_STR - 20; ?>" rows="12" cols="80" name="object" id="object"></textarea><br/>
 <a href="javascript:;" onClick="uploadAnalyse();">upload analyse base.</a>
 </p>
 <p>
@@ -273,7 +344,7 @@ Topics:<br/>
   foreach (new DirectoryIterator($pathb . 'topics') as $fileInfo) {
     if($fileInfo->isDot()) continue;
     $name = $fileInfo->getFilename();
-    echo "<li id=\"topic-li-" . $name . "\">" . $name . " : <br/><textarea maxlength=\"80000\" rows=\"12\" cols=\"80\" id=\"topic-" . $name . "\">";
+    echo "<li id=\"topic-li-" . $name . "\">" . $name . " : <br/><textarea maxlength=\"" . $M_STR - 20 . "\" rows=\"12\" cols=\"80\" id=\"topic-" . $name . "\">";
     $file = fopen($pathb . "topics/" . $name, "r");
     while(($buf = fgets($file)) !== false) {
       echo $buf;
@@ -294,7 +365,7 @@ Dictionaries:<br/>
   foreach (new DirectoryIterator($pathb . 'dicts') as $fileInfo) {
     if($fileInfo->isDot()) continue;
     $name = $fileInfo->getFilename();
-    echo "<li id=\"dicts-li-" . $name . "\">" . $name . " : <br/><textarea maxlength=\"80000\" rows=\"12\" cols=\"80\" id=\"dicts-" . $name . "\">";
+    echo "<li id=\"dicts-li-" . $name . "\">" . $name . " : <br/><textarea maxlength=\"" . $M_STR - 20 . "\" rows=\"12\" cols=\"80\" id=\"dicts-" . $name . "\">";
     $file = fopen($pathb . "dicts/" . $name, "r");
     while(($buf = fgets($file)) !== false) {
       echo $buf;

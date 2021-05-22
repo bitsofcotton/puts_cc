@@ -13,10 +13,9 @@
 #include <utility>
 #include <assert.h>
 
-#include "ifloat.hh"
 #define int int64_t
+#include "lieonn.hh"
 typedef myfloat num_t;
-#include "simplelin.hh"
 #include "corpus.hh"
 
 std::vector<std::string> words;

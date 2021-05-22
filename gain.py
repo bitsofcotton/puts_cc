@@ -1,4 +1,4 @@
-#! /usr/bin/env python2.7
+#! /usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import mechanize
@@ -11,8 +11,6 @@ import glob
 import hashlib
 import sys
 
-reload(sys)
-sys.setdefaultencoding("utf-8")
 mechanize._sockettimeout._GLOBAL_DEFAULT_TIMEOUT = 100
 textmime = re.compile(r"(\.(txt|html|htm|shtml|shtm|xml|mml)$|/[\/\.]*$)")
 elimiter = r"[ \t]+"
@@ -23,8 +21,8 @@ ipranges = [[u"153.126.0.0", u"153.126.127.255"],
             [u"153.127.128.0", u"153.127.191.255"]
             ]
 
-inbase   = '~/Sites/datas/*/urls.txt'
-outbase  = '~/Downloads/'
+inbase  = '/var/www/htdocs/datas/*/urls.txt'
+outbase = '/var/www/htdocs/datas/web/'
 urls  = re.compile(r'href=[\"\']([^\"\']+)[\"\']')
 urlsr = re.compile(r"([a-zA-Z0-9\.\-\_]+(:[0-9]+)?/[a-zA-Z0-9\=\?\~/\-\_\.\&]+)")
 replscriptstart = re.compile(r"<script")
@@ -93,16 +91,16 @@ def writeSub(stra, f, flog):
     sinst = str(repr(inst))
     if(re.search(r"robots\.txt", sinst)):
        return
-    print "mechanize err @ " + stra
+    print("mechanize err @ " + stra)
   except:
-    print "mechanize error @ " + stra
+    print("mechanize error @ " + stra)
   return
 
 inurls = glob.glob(inbase)
 for addr in inurls:
-  lbase = os.path.dirname(addr) + "/web/sub/" + datetime.datetime.now().strftime("%Y%m%d%H") + ".txt"
+  lbase = os.path.dirname(addr) + "/crawl/" + datetime.datetime.now().strftime("%Y%m%d%H") + ".txt"
   rbase = os.path.dirname(addr) + "/webhash.txt"
-  print lbase
+  print(lbase)
   f     = open(addr, "r")
   strs  = f.readlines()
   f.close()
@@ -120,7 +118,7 @@ for addr in inurls:
           li.append(l.url)
         li = list(set(li))
       except:
-        print "mechanize error @ " + stra
+        print("mechanize error @ " + stra)
         continue
       for strs1 in li:
         writeSub(strs1, f, flog)
@@ -131,14 +129,13 @@ for addr in inurls:
 
 lbase = outbase + "/" + datetime.datetime.now().strftime("%Y%m%d%H")
 fn    = open(outbase + "count.txt", "r")
-num   = fn.readlines()
-fn.close()
-cnt   = int(num[0])
+cnt   = int(fn.readline())
 num0  = cnt
+fn.close()
 num   = 100
 numl  = num
-f     = open(lbase + ".txt",     "w")
-fl    = open(lbase + "link.txt", "w")
+f     = open(lbase + ".txt",     "a")
+fl    = open(lbase + "link.txt", "a")
 for iprange in ipranges:
   if(num <= 0):
     break
@@ -151,7 +148,7 @@ for iprange in ipranges:
   cnt    = 0
   while(start < end and cnt < num):
     ips    = str(ipaddress.IPv4Address(start))
-    print ips, cnt, num
+    print(ips, cnt, num)
     num   -= 1
     start += 1
     if(not ping80(ips)):
@@ -163,7 +160,7 @@ for iprange in ipranges:
       r    = br.open("http://" + ips)
       html = r.read()
     except:
-      print "mechanize error @ " + ips
+      print("mechanize error @ " + ips)
       continue
     try:
       f.write("\n\n" + ips + "\n")
@@ -171,7 +168,7 @@ for iprange in ipranges:
       fl.write("\n\n" + ips + "\n")
       fl.write(cutLinks(html))
     except:
-      print "file open error."
+      print("file open error.")
 f.close()
 fl.close()
 fn = open(outbase + "count.txt", "w")

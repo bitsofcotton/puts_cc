@@ -2,10 +2,10 @@ CXX=	clang++
 
 # compiler flags.
 CXXFLAGS+=	-Ofast -mtune=native -gfull
-CXXFLAGS+=	-L/usr/local/lib -lomp -fopenmp
+#CXXFLAGS+=	-L/usr/local/lib -lomp -fopenmp
 CXXFLAGS+=	-std=c++11
 LDFLAGS+=	-lc++ -L/usr/local/lib
-#LDFLAGS+=	-static
+LDFLAGS+=	-static
 
 #CXXFLAGS+=	-D_FLOAT_BITS_=32
 #CXXFLAGS+=	-D_FLOAT_BITS_=64
@@ -20,5 +20,5 @@ all:	tools
 clean:
 	@rm -rf ${CLEANFILES}
 
-tools.o:        tools.cc simplelin.hh corpus.hh lword.hh file2eigen.hh
+tools.o:        tools.cc corpus.hh lienn.hh
 
