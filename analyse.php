@@ -25,7 +25,7 @@ function prepdicts($cwd, $text) {
 function analyse($cwd, $text) {
   global $dameji;
   echo $text;
-  /* prepare dicts */
+  // prepare dicts 
   exec("rm -f pdict/*");
   prepdicts($cwd, $text);
   foreach (new DirectoryIterator($cwd . '/topics') as $fileInfo) {
@@ -35,7 +35,7 @@ function analyse($cwd, $text) {
   }
   foreach (new DirectoryIterator($cwd . '/dicts') as $fileInfo) {
     if($fileInfo->isDot()) continue;
-    $lf = $cwd . '/topics/' . $fileInfo->getFilename();
+    $lf = $cwd . '/dicts/' . $fileInfo->getFilename();
     prepdicts($cwd, $lf);
   }
   
@@ -62,7 +62,6 @@ function analyse($cwd, $text) {
   exec("./puts findroot words.txt " . $buf . " < " . $text . " > " . $text . "-root.html");
   exec("./puts lword words.txt < " . $text . " > " . $text . "-lword.txt");
   exec("./puts lbalance words.txt < " . $text . " > " . $text . "-lbalance.txt");
-  
   $differs = "";
   $file = fopen($cwd . "/sentry.txt", "r");
   while(($buf = fgets($file)) !== false)
@@ -72,9 +71,10 @@ function analyse($cwd, $text) {
     return;
   }
   foreach($match[0] as $df) {
+    echo $df;
     $pathc = "../" . $df . "/";
     if(file_exists($cwd . '/' . $pathc . "dicts")) {
-      $buf3 = " -dict ";
+      $buf3 = " -dict2 ";
       foreach (new DirectoryIterator($cwd . "/" . $pathc . "dicts") as $fileInfo) {
         if($fileInfo->isDot()) continue;
         $name = $fileInfo->getFilename();
@@ -85,7 +85,7 @@ function analyse($cwd, $text) {
         $name = $fileInfo->getFilename();
         $buf3 .= $cwd . "/" . $pathc . "pdict/" . str_replace($dameji, "", $name) . " ";
       }
-      $buf3 = $buf . " -dict2 " . $buf3;
+      $buf3 = $buf . $buf3;
       exec("./puts diff words.txt " . $buf3 . " < " . $text . " > " . $text . $df . "diff.html");
       exec("./puts same words.txt " . $buf3 . " < " . $text . " > " . $text . $df . "same.html");
     }

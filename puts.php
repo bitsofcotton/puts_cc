@@ -62,7 +62,7 @@
         $ctr   = 0;
         if(preg_match_all("/([0-9a-f]{64,64})/m", $containt, $match)) {
           foreach($match[0] as $m) {
-            if(file\exists($pathb . "../" . $m)) {
+            if(file_exists($pathb . "../" . $m)) {
               $pathc .= $m . "\n";
               $ctr   += 1;
               if($ctr >= 8)
