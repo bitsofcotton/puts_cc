@@ -2710,12 +2710,12 @@ template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, Simpl
   SimpleMatrix<T> P1(this->rows(), d.size());
   SimpleMatrix<T> P2(src.rows(), d.size());
 #if defined(_OPENMP)
-#pragma omp for schedule(static, 1)
+#pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < P1.rows(); i ++)
     P1.row(i) = P.col(i);
 #if defined(_OPENMP)
-#pragma omp for schedule(static, 1)
+#pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < P2.rows(); i ++)
     P2.row(i) = P.col(i + P1.rows());
@@ -3039,13 +3039,12 @@ template <typename T> const SimpleMatrix<T>& diff(const int& size0) {
     auto II(dft<T>(size));
     static const auto Pi(T(4) * atan2(T(1), T(1)));
 #if defined(_OPENMP)
-#pragma omp parallel
-#pragma omp for schedule(static, 1)
+#pragma omp parallel for schedule(static, 1)
 #endif
     for(int i = 0; i < DD.rows(); i ++)
       DD.row(i) *=   complex<T>(T(0), - T(2) * Pi * T(i) / T(DD.rows()));
 #if defined(_OPENMP)
-#pragma omp for schedule(static, 1)
+#pragma omp parallel for schedule(static, 1)
 #endif
     for(int i = 1; i < II.rows(); i ++)
       II.row(i) /= - complex<T>(T(0), - T(2) * Pi * T(i) / T(DD.rows()));
@@ -3072,8 +3071,8 @@ template <typename T> inline SimpleVector<T> taylor(const int& size, const T& st
   SimpleVector<T> res(size);
   res.ek(step0);
   if(residue == T(0)) return res;
-  const auto& D(diff<T>(size));
-        auto  dt(D.col(step0) * residue);
+  const auto D(diff<T>(size));
+        auto dt(D.col(step0) * residue);
   // N.B.
   // if we deal with (D *= r, residue /= r), it is identical with (D, residue)
   // So ||D^n * residue^n|| / T(n!) < 1 case, this loop converges.
@@ -3132,6 +3131,68 @@ template <typename T> T revertProgramInvariant(const T& in, const bool& index = 
   return atan(in) / atan(T(1)) * T(4) - T(1);
 }
 
+template <typename T> class linearFeeder {
+public:
+  inline linearFeeder() { t = 0; full = false; }
+  inline linearFeeder(const int& size) {
+    res.resize(size);
+    for(int i = 0; i < res.size(); i ++)
+      res[i] = T(0);
+    t = 0;
+    full = false;
+  }
+  inline ~linearFeeder() { ; }
+  inline const SimpleVector<T>& next(const T& in) {
+    for(int i = 0; i < res.size() - 1; i ++)
+      res[i] = move(res[i + 1]);
+    res[res.size() - 1] = in;
+    if(res.size() < t ++) full = true;
+    return res;
+  }
+  SimpleVector<T> res;
+  bool full;
+private:
+  int t;
+};
+
+template <typename T, bool sumup = false> class arctanFeeder {
+public:
+  inline arctanFeeder() { t = 0; full = false; }
+  inline arctanFeeder(const int& size) {
+    res.resize(size);
+    buf.resize(int(ceil(T(1) / tan(T(1) * atan(T(1)) / T(res.size() - 1)))));
+    for(int i = 0; i < buf.size(); i ++)
+      buf[i] = T(0);
+    for(int i = 0; i < res.size(); i ++)
+      res[i] = T(0);
+    t = 0;
+    full = false;
+  }
+  inline ~arctanFeeder() { ; }
+  inline const SimpleVector<T>& next(const T& in) {
+    for(int i = 0; i < buf.size() - 1; i ++)
+      buf[i] = move(buf[i + 1]);
+    buf[buf.size() - 1] = in;
+    if(buf.size() < t ++) full = true;
+    if(sumup)
+      for(int i = 0; i < res.size(); i ++) {
+        res[res.size() - i - 1] = T(0);
+        for(int j = int(T(buf.size() - 1) * tan(T(i) * atan(T(1)) / T(res.size() - 1)) / tan(T(1) * atan(T(1)) / T(res.size() - 1)));
+                j < min(buf.size(), int(T(buf.size() - 1) * tan(T(i + 1) * atan(T(1)) / T(res.size() - 1)) / tan(T(1) * atan(T(1)) / T(res.size() - 1))));
+                j ++)
+          res[res.size() - i - 1] += buf[buf.size() - 1 - j];
+      }
+    else
+      for(int i = 0; i < res.size(); i ++)
+        res[res.size() - i - 1] = buf[buf.size() - 1 - int(T(buf.size() - 1) * tan(T(i) * atan(T(1)) / T(res.size() - 1)) / tan(T(1) * atan(T(1)) / T(res.size() - 1)))];
+    return res;
+  }
+  SimpleVector<T> res;
+  bool full;
+private:
+  SimpleVector<T> buf;
+  int t;
+};
 
 template <typename T> class SimpleSparseVector {
 public:

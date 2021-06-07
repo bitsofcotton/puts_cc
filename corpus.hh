@@ -196,7 +196,7 @@ template <typename T, typename U> vector<gram_t<U> > lword<T, U>::compute(const 
     map<U, vector<int> > amap;
     map<U, vector<int> > dmap;
 #if defined(_OPENMP)
-#pragma omp parallel for
+#pragma omp parallel for schedule(static, 1)
 #endif
     for(auto itr = dicts[i].begin(); itr < dicts[i].end(); ++ itr) {
       const gram_t<U>& idxkey(*itr);
