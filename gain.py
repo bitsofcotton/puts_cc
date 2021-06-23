@@ -86,7 +86,7 @@ def writeSub(stra, f, flog):
     r    = br.open(stra)
     html = r.read()
     flog.write(datetime.datetime.now().strftime("%c") + " : " + hashlib.sha256(html).hexdigest() + " : " + stra + "\n")
-    f.write(re.sub(elimiter, '', innerHTMLs(html).decode("utf-8")))
+    f.write(re.sub(elimiter, '', innerHTMLs(html.decode('utf-8'))))
   except Exception as inst:
     sinst = str(repr(inst))
     if(re.search(r"robots\.txt", sinst)):
@@ -122,8 +122,7 @@ for addr in inurls:
         continue
       for strs1 in li:
         writeSub(strs1, f, flog)
-    else:
-      writeSub(stra, f, flog)
+    writeSub(stra, f, flog)
   flog.close()
   f.close()
 
@@ -164,7 +163,7 @@ for iprange in ipranges:
       continue
     try:
       f.write("\n\n" + ips + "\n")
-      f.write(re.sub(elimiter, '', innerHTMLs(html).decode("utf-8")))
+      f.write(re.sub(elimiter, '', innerHTMLs(html.decode('utf-8'))))
       fl.write("\n\n" + ips + "\n")
       fl.write(cutLinks(html))
     except:

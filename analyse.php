@@ -2,8 +2,8 @@
 
 $dont_pdict = 1;
 
-$dameji = array("!", '"', "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/", ":", ";", "<", "=", ">", "?", "@", "[", "\\", "]", "^", "_", "`", "{", "|", "}", "~", " ");
-$damejinodir = array("!", '"', "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", ":", ";", "<", "=", ">", "?", "@", "[", "\\", "]", "^", "_", "`", "{", "|", "}", "~", " ");
+$dameji = array("!", '"', "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", "/", ":", ";", "<", "=", ">", "?", "@", "[", "\\", "]", "^", "_", "`", "{", "|", "}", "~", " ");
+$damejinodir = array("!", '"', "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ":", ";", "<", "=", ">", "?", "@", "[", "\\", "]", "^", "_", "`", "{", "|", "}", "~", " ");
 
 function prepdicts($cwd, $text) {
   global $dont_pdict;
@@ -98,33 +98,34 @@ foreach(new DirectoryIterator($bpath) as $fileInfo) {
   if(!is_dir($bpath . $fileInfo->getFilename()) || $fileInfo->isDot())
     continue;
   $pathb = $bpath . $fileInfo->getFilename() . "/output/";
-  if(!file_exists($pathb))
-    continue;
-  foreach(new DirectoryIterator($pathb) as $fileInfoSub) {
-    $pathb2 = $pathb . $fileInfoSub->getFilename() . "/";
-    if($fileInfoSub->isDot())
-      continue;
-    $pathb2 = str_replace($damejinodir, "", $pathb2);
-    if(strpos($pathb2, ".lock"))
-      continue;
-    if(file_exists($pathb2 . "orig.txt") && !file_exists($pathb2 . ".lock")) {
-      system('touch ' . $pathb2 . ".lock");
-      analyse($pathb . '../', $pathb2 . "orig.txt");
+  if(file_exists($pathb)) {
+    foreach(new DirectoryIterator($pathb) as $fileInfoSub) {
+      $pathb2 = $pathb . $fileInfoSub->getFilename() . "/";
+      if($fileInfoSub->isDot())
+        continue;
+      $pathb2 = str_replace($damejinodir, "", $pathb2);
+      if(strpos($pathb2, ".lock"))
+        continue;
+      if(file_exists($pathb2 . "orig.txt") && !file_exists($pathb2 . ".lock")) {
+        system('touch ' . $pathb2 . ".lock");
+        analyse($pathb . '../', $pathb2 . "orig.txt");
+      }
     }
   }
   $pathb = $bpath . $fileInfo->getFilename() . "/crawl/";
-  if(!file_exists($pathb))
-    continue;
-  foreach(new DirectoryIterator($pathb) as $fileInfoSub) {
-    $pathb2 = $pathb . $fileInfoSub->getFilename();
-    if($fileInfoSub->isDot())
-      continue;
-    if(strpos($pathb2, ".lock"))
-      continue;
-    $pathb2 = str_replace($damejinodir, "", $pathb2);
-    if(file_exists($pathb2) && !file_exists($pathb2 . ".lock")) {
-      system('touch ' . $pathb2 . '.lock');
-      analyse($pathb . '../',  $pathb2);
+  if(file_exists($pathb)) {
+    foreach(new DirectoryIterator($pathb) as $fileInfoSub) {
+      $pathb2 = $pathb . $fileInfoSub->getFilename();
+      if($fileInfoSub->isDot())
+        continue;
+      if(strpos($pathb2, ".lock"))
+        continue;
+      $pathb2 = str_replace($damejinodir, "", $pathb2);
+      if(strlen(basename($pathb2)) == 14 &&
+         file_exists($pathb2) && !file_exists($pathb2 . ".lock")) {
+        system('touch ' . $pathb2 . '.lock');
+        analyse($pathb . '../',  $pathb2);
+      }
     }
   }
 }
