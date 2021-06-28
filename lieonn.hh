@@ -72,9 +72,9 @@ public:
   inline ~DUInt();
   
   inline DUInt<T,bits>& operator ++ ();
-  inline DUInt<T,bits>  operator ++ (int);
+  inline DUInt<T,bits>  operator ++ (int32_t);
   inline DUInt<T,bits>& operator -- ();
-  inline DUInt<T,bits>  operator -- (int);
+  inline DUInt<T,bits>  operator -- (int32_t);
   inline DUInt<T,bits>  operator -  () const;
   inline DUInt<T,bits>  operator +  (const DUInt<T,bits>& src) const;
   inline DUInt<T,bits>& operator += (const DUInt<T,bits>& src);
@@ -163,7 +163,7 @@ template <typename T, int bits> inline DUInt<T,bits>& DUInt<T,bits>::operator ++
   return *this;
 }
 
-template <typename T, int bits> inline DUInt<T,bits>  DUInt<T,bits>::operator ++ (int) {
+template <typename T, int bits> inline DUInt<T,bits>  DUInt<T,bits>::operator ++ (int32_t) {
   const auto work(*this);
   ++ *this;
   return work;
@@ -176,7 +176,7 @@ template <typename T, int bits> inline DUInt<T,bits>& DUInt<T,bits>::operator --
   return *this;
 }
 
-template <typename T, int bits> inline DUInt<T,bits>  DUInt<T,bits>::operator -- (int) {
+template <typename T, int bits> inline DUInt<T,bits>  DUInt<T,bits>::operator -- (int32_t) {
   const auto work(*this);
   -- *this;
   return work;
@@ -3059,6 +3059,18 @@ template <typename T> const SimpleMatrix<T>& diff(const int& size0) {
     //      it causes constant 0 vector.
     dd = (dft<T>(- size) * DD).template real<T>();
     ii = (dft<T>(- size) * II).template real<T>();
+    if(2 < size) {
+      const auto ddo(dd);
+      const auto iio(ii);
+      const auto dd0(diff<T>(- (size - 1)));
+      const auto ii0(diff<T>(  (size - 1)));
+      dd.setMatrix(0, 0, ddo.subMatrix(0, 0, size - 1, size - 1) + dd0);
+      dd.setMatrix(1, 1, ddo.subMatrix(1, 1, size - 1, size - 1) + dd0);
+      ii.setMatrix(0, 0, iio.subMatrix(0, 0, size - 1, size - 1) + ii0);
+      ii.setMatrix(1, 1, iio.subMatrix(1, 1, size - 1, size - 1) + ii0);
+      dd /= T(2);
+      ii /= T(2);
+    }
   }
   return size0 < 0 ? ii : dd;
 }
