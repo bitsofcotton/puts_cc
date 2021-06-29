@@ -3062,8 +3062,8 @@ template <typename T> const SimpleMatrix<T>& diff(const int& size0) {
     if(2 < size) {
       const auto ddo(dd);
       const auto iio(ii);
-      const auto dd0(diff<T>(- (size - 1)) * T(size - 1));
-      const auto ii0(diff<T>(  (size - 1)) * T(size - 1));
+      const auto dd0(diff<T>(  (size - 1)) * T(size - 1));
+      const auto ii0(diff<T>(- (size - 1)) * T(size - 1));
       dd.setMatrix(0, 0, ddo.subMatrix(0, 0, size - 1, size - 1) + dd0);
       dd.setMatrix(1, 1, dd.subMatrix(1, 1, size - 1, size - 1) + dd0);
       ii.setMatrix(0, 0, iio.subMatrix(0, 0, size - 1, size - 1) + ii0);
