@@ -45,6 +45,8 @@ using std::make_pair;
 using std::map;
 using std::vector;
 using std::stringstream;
+using std::ifstream;
+using std::ofstream;
 
 using std::string;
 using std::cerr;
@@ -458,10 +460,11 @@ template <typename T, int bits> std::istream&  operator >> (std::istream& is, DU
     if('0' <= buf && buf <= '9') {
       v *= ten;
       v += DUInt<T,bits>(int(buf - '0'));
-    } else
-      goto ensure;
+    } else {
+      is.unget();
+      break;
+    }
   }
- ensure:
   return is;
 }
 
@@ -1258,10 +1261,10 @@ template <typename T, typename W, int bits, typename U> inline SimpleFloat<T,W,b
 
 template <typename T, typename W, int bits, typename U> std::ostream& operator << (std::ostream& os, const SimpleFloat<T,W,bits,U>& v) {
   if(isnan(v))
-    return os << "NaN";
+    return os << "NaN ";
   if(isinf(v))
-    return os << (const char*)(v.s & (1 << v.SIGN) ? "-" : "") << "Inf";
-  return os << (const char*)(v.s & (1 << v.SIGN) ? "-" : "") << T(v.m) << "*2^" << v.e;
+    return os << (const char*)(v.s & (1 << v.SIGN) ? "-" : "") << "Inf ";
+  return os << (const char*)(v.s & (1 << v.SIGN) ? "-" : "") << T(v.m) << "*2^" << v.e << " ";
 }
 
 template <typename T, typename W, int bits, typename U> std::istream& operator >> (std::istream& is, SimpleFloat<T,W,bits,U>& v) {
@@ -1275,12 +1278,12 @@ template <typename T, typename W, int bits, typename U> std::istream& operator >
   // skip white spaces.
   while(! is.eof()) {
     const auto buf(is.get());
-    if(buf != ' ' && buf != '\t') {
+    if(buf != ' ' && buf != '\t' && buf != '\n') {
       is.unget();
       break;
     }
   }
-  while(! is.eof() ) {
+  while(! is.eof() && ! is.bad() ) {
     const auto buf(is.get());
     switch(buf) {
     case '-':
@@ -1298,8 +1301,15 @@ template <typename T, typename W, int bits, typename U> std::istream& operator >
       mode  = true;
       sign  = false;
       fsign = false;
-      if(is.get() != '2') goto ensure;
-      if(is.get() != '^') goto ensure;
+      if(is.get() != '2') {
+        is.unget();
+        goto ensure;
+      }
+      if(is.get() != '^') {
+        is.unget();
+        is.unget();
+        goto ensure;
+      }
       break;
     case '.':
       throw "not implemented now";
@@ -1468,6 +1478,9 @@ public:
   inline             operator T    () const;
   
   const Complex<T>& i() const;
+
+  // friend std::ostream& operator << (std::ostream& os, const SimpleVector<T>& v);
+  // friend std::istream& operator >> (std::istream& os, SimpleVector<T>& v);
   
   inline T  abs() const;
   inline T  arg() const;
@@ -1694,6 +1707,24 @@ template <typename T> inline const T& Complex<T>::imag() const {
 
 template <typename T> std::ostream& operator << (std::ostream& os, const Complex<T>& v) {
   return os << v.real() << "+i" << v.imag();
+}
+
+template <typename T> std::istream& operator >> (std::istream& is, Complex<T>& v) {
+  is >> v._real;
+  if('+' != is.get()) {
+    is.unget();
+    goto ensure;
+  }
+  if('i' != is.get()) {
+    is.unget();
+    is.unget();
+    goto ensure;
+  }
+  is >> v._imag;
+  return is;
+ ensure:
+  v._imag = T(0);
+  return is;
 }
 
 
@@ -2147,11 +2178,28 @@ template <typename T> std::istream& operator >> (std::istream& is, SimpleVector<
   int i(0);
   for( ; i < v.size() && ! is.eof() && ! is.bad(); ) {
     const auto c(is.get());
-    if(c == ' ' || c == '\t' || c == '[' || c == ',' || c == ']') continue;
+    if(c == ' ' || c == '\t' || c == '[' || c == ',' || c == ']' || c == '\n') continue;
+    is.unget();
     is >> v[i ++];
   }
+  while(!is.eof() && ! is.bad()) {
+    const auto c(is.get());
+    if(c == ' ' || c == '\t' || c == '\n') continue;
+    else if(c == ']') break;
+    is.unget();
+    cerr << "XXX SimpleVector<T>::operator >> (\']\')" << flush;
+    break;
+  }
+  while(!is.eof() && ! is.bad()) {
+    const auto c(is.get());
+    if(c == ' ' || c == '\t') continue;
+    else if(c == '\n') break;
+    is.unget();
+    cerr << "XXX SimpleVector<T>::operator >> (\'\\n\')" << flush;
+    break;
+  }
   if(i < v.size()) {
-    cerr << "XXX SimpleVector<T>::operator >>" << flush;
+    cerr << "XXX SimpleVector<T>::operator >> (index)" << flush;
     for( ; i < v.size(); i ++)
       v[i] = T(0);
   }
@@ -2916,68 +2964,99 @@ template <typename T> std::ostream& operator << (std::ostream& os, const SimpleM
 template <typename T> std::istream& operator >> (std::istream& is, SimpleMatrix<T>& v) {
   while(! is.eof() && ! is.bad()) {
     const auto c(is.get());
-    if(c == ' ' || c == '\t' || c == '(') continue;
-    else {
-      is.unget();
-      break;
-    }
+    if(c == ' ' || c == '\t' || c == '\n') continue;
+    else if(c == '(') break;
+    is.unget();
+    break;
   }
   int r, c;
   is >> r;
   if(r <= 0) return is;
   while(! is.eof() && ! is.bad()) {
     const auto c(is.get());
-    if(c == ' ' || c == '\t' || c == ',') continue;
-    else {
-      is.unget();
-      break;
-    }
+    if(c == ' ' || c == '\t' || c == '\n') continue;
+    else if(c == ',') break;
+    is.unget();
+    break;
   }
   is >> c;
   while(! is.eof() && ! is.bad()) {
     const auto c(is.get());
-    if(c == ' ' || c == '\t' || c == ')') continue;
-    else {
-      is.unget();
-      break;
-    }
+    if(c == ' ' || c == '\t' || c == '\n') continue;
+    else if(c == ')') break;
+    is.unget();
+    break;
   }
   if(c <= 0) return is;
   v.resize(r, c);
   int i(0);
   int j(0);
+  while(! is.eof() && ! is.bad()) {
+    const auto c(is.get());
+    if(c == ' ' || c == '\t' || c == '\n') continue;
+    else if(c == '[') break;
+    is.unget();
+    break;
+  }
   for( ; i < v.rows() && ! is.eof() && ! is.bad(); i ++) {
     while(! is.eof() && ! is.bad()) {
       const auto c(is.get());
-      if(c == ' ' || c == '\t' || c == '[') continue;
-      else {
-        is.unget();
+      if(c == ' ' || c == '\t' || c == '\n') continue;
+      else if(c == '[') break;
+      is.unget();
+      break;
+    }
+    for(j = 0; j < v.cols() && ! is.eof() && ! is.bad(); j ++) {
+      is >> v(i, j);
+      if(v.cols() - 1 <= j) {
+        j ++;
         break;
       }
-    }
-    for( ; j < v.cols() && ! is.eof() && ! is.bad(); j ++) {
-      is >> v(i, j);
-      if(v.cols() - 1 <= j) break;
       while(! is.eof() && ! is.bad()) {
         const auto c(is.get());
-        if(c == ' ' || c == '\t' || c == ',') continue;
-        else {
-          is.unget();
-          break;
-        }
+        if(c == ' ' || c == '\t' || c == '\n') continue;
+        else if(c == ',') break;
+        is.unget();
+        break;
       }
     }
     while(! is.eof() && ! is.bad()) {
       const auto c(is.get());
-      if(c == ' ' || c == '\t' || c == ']') continue;
-      else {
-        is.unget();
-        break;
-      }
+      if(c == ' ' || c == '\t' || c == '\n') continue;
+      else if(c == ']') break;
+      is.unget();
+      break;
+    }
+    if(v.rows() - 1 <= i) {
+      i ++;
+      break;
+    }
+    while(! is.eof() && ! is.bad()) {
+      const auto c(is.get());
+      if(c == ' ' || c == '\t' || c == '\n') continue;
+      else if(c == ',') break;
+      is.unget();
+      break;
     }
   }
+  while(! is.eof() && ! is.bad()) {
+    const auto c(is.get());
+    if(c == ' ' || c == '\t' || c =='\n') continue;
+    else if(c == ']') break;
+    cerr << "XXX SimpleMatrix<T>::operator >> (\']\')" << flush;
+    is.unget();
+    break;
+  }
+  while(! is.eof() && ! is.bad()) {
+    const auto c(is.get());
+    if(c == ' ' || c == '\t') continue;
+    else if(c == '\n') break;
+    cerr << "XXX SimpleMatrix<T>::operator >> (\'\\n\')" << flush;
+    is.unget();
+    break;
+  }
   if(i < v.rows() || j < v.cols()) {
-    cerr << "XXX SimpleMatrix<T>::operator >>" << flush;
+    cerr << "XXX SimpleMatrix<T>::operator >> (index)" << flush;
     for( ; i < v.rows(); i ++)
       for( ; j < v.cols(); j ++)
         v(i, j) = T(0);
@@ -2986,23 +3065,27 @@ template <typename T> std::istream& operator >> (std::istream& is, SimpleMatrix<
 }
 
 
-template <typename T> const SimpleMatrix<complex<T> >& dft(const int& size0) {
+template <typename T> SimpleMatrix<complex<T> > dft(const int& size0) {
   const auto size(abs(size0));
   if(! size) {
     const static SimpleMatrix<complex<T> > m0;
     return m0;
   }
-  static vector<SimpleMatrix<complex<T> > > adft;
-  static vector<SimpleMatrix<complex<T> > > aidft;
-  if(adft.size() <= size)
-    adft.resize(size + 1, SimpleMatrix<complex<T> >());
-  if(aidft.size() <= size)
-    aidft.resize(size + 1, SimpleMatrix<complex<T> >());
-  auto& edft(  adft[size]);
-  auto& eidft(aidft[size]);
-  if(edft.rows() != size || edft.cols() != size) {
-    edft.resize( size, size);
-    eidft.resize(size, size);
+  SimpleMatrix<complex<T> > edft( size, size);
+  SimpleMatrix<complex<T> > eidft(size, size);
+  const auto file(std::string("./.cache/lieonn/dft-") + std::to_string(size) +
+#if defined(_FLOAT_BITS_)
+    std::string("-") + std::to_string(_FLOAT_BITS_)
+#else
+    std::string("-ld")
+#endif
+  );
+  ifstream cache(file.c_str());
+  if(cache.is_open()) {
+    cache >> edft;
+    cache >> eidft;
+    cache.close();
+  } else {
     static const auto Pi(T(4) * atan2(T(1), T(1)));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
@@ -3016,25 +3099,54 @@ template <typename T> const SimpleMatrix<complex<T> >& dft(const int& size0) {
         eidft(i, j) = complex<T>(c, - s) / complex<T>(T(size));
       }
     }
+    ofstream ocache(file.c_str());
+    ocache << edft;
+    ocache << eidft;
+    ocache.close();
   }
   return size0 < 0 ? eidft : edft;
 }
 
-template <typename T> const SimpleMatrix<T>& diff(const int& size0) {
+template <typename T> SimpleMatrix<T> diff(const int& size0) {
   const auto size(abs(size0));
   if(! size) {
     static const SimpleMatrix<T> m0;
     return m0;
   }
-  static vector<SimpleMatrix<T> > D;
-  static vector<SimpleMatrix<T> > I;
-  if(D.size() <= size)
-    D.resize(size + 1, SimpleMatrix<T>());
-  if(I.size() <= size)
-    I.resize(size + 1, SimpleMatrix<T>());
-  auto& dd(D[size]);
-  auto& ii(I[size]);
-  if(dd.rows() != size || dd.cols() != size) {
+  SimpleMatrix<T> dd;
+  SimpleMatrix<T> ii;
+  const auto file(std::string("./.cache/lieonn/diff-") + std::to_string(size) +
+#if defined(_FLOAT_BITS_)
+    std::string("-") + std::to_string(_FLOAT_BITS_)
+#else
+    std::string("-ld")
+#endif
+  );
+  ifstream cache(file.c_str());
+  if(cache.is_open()) {
+    cache >> dd;
+    cache >> ii;
+    cache.close();
+  } else {
+    if(2 < size) {
+      const auto dd0(diff<T>(  (size - 1)) * T(size - 1));
+      const auto ii0(diff<T>(- (size - 1)) * T(size - 1));
+      dd = SimpleMatrix<T>(size, size).O();
+      ii = SimpleMatrix<T>(size, size).O();
+            auto ddo(SimpleMatrix<T>(size, size).O().setMatrix(0, 0, dd0));
+            auto iio(SimpleMatrix<T>(size, size).O().setMatrix(0, 0, ii0));
+      ddo.setMatrix(1, 1, dd.subMatrix(1, 1, size - 1, size - 1) + dd0);
+      iio.setMatrix(1, 1, ii.subMatrix(1, 1, size - 1, size - 1) + ii0);
+      ddo.row(0) *= T(2);
+      ddo.row(ddo.rows() - 1) *= T(2);
+      iio.row(0) *= T(2);
+      iio.row(iio.rows() - 1) *= T(2);
+      dd = ddo / T(2);
+      ii = iio / T(2);
+    } else {
+      dd = SimpleMatrix<T>(size, size).O();
+      ii = SimpleMatrix<T>(size, size).O();
+    }
     auto DD(dft<T>(size));
     auto II(dft<T>(size));
     static const auto Pi(T(4) * atan2(T(1), T(1)));
@@ -3057,22 +3169,17 @@ template <typename T> const SimpleMatrix<T>& diff(const int& size0) {
     //       sum_0^1 - 2 Pi i (theta/n)^2/2 -&gt; Pi)
     // XXX: if we make plain differential with no error on cosine curve,
     //      it causes constant 0 vector.
-    dd = (dft<T>(- size) * DD).template real<T>();
-    ii = (dft<T>(- size) * II).template real<T>();
+    dd += (dft<T>(- size) * DD).template real<T>();
+    ii += (dft<T>(- size) * II).template real<T>();
     if(2 < size) {
-      const auto dd0(diff<T>(  (size - 1)) * T(size - 1));
-      const auto ii0(diff<T>(- (size - 1)) * T(size - 1));
-            auto ddo(SimpleMatrix<T>(size, size).O().setMatrix(0, 0, dd0));
-            auto iio(SimpleMatrix<T>(size, size).O().setMatrix(0, 0, ii0));
-      ddo.setMatrix(1, 1, dd.subMatrix(1, 1, size - 1, size - 1) + dd0);
-      iio.setMatrix(1, 1, ii.subMatrix(1, 1, size - 1, size - 1) + ii0);
-      ddo.row(0) *= T(2);
-      ddo.row(ddo.rows() - 1) *= T(2);
-      iio.row(0) *= T(2);
-      iio.row(iio.rows() - 1) *= T(2);
-      dd = (dd * T(2) + ddo) / T(size * 4);
-      ii = (ii * T(2) + ddo) / T(size * 4);
+      dd /= T(size);
+      ii /= T(size);
     }
+    ofstream ocache(file.c_str());
+    ocache << dd;
+    ocache << ii;
+    ocache.close();
+    cerr << "." << flush;
   }
   return size0 < 0 ? ii : dd;
 }
@@ -3085,8 +3192,8 @@ template <typename T> inline SimpleVector<T> taylor(const int& size, const T& st
   SimpleVector<T> res(size);
   res.ek(step0);
   if(residue == T(0)) return res;
-  const auto D(diff<T>(size));
-        auto dt(D.col(step0) * residue);
+  const auto Dt(diff<T>(size).transpose());
+        auto dt(Dt.row(step0) * residue);
   // N.B.
   // if we deal with (D *= r, residue /= r), it is identical with (D, residue)
   // So ||D^n * residue^n|| / T(n!) < 1 case, this loop converges.
@@ -3098,7 +3205,7 @@ template <typename T> inline SimpleVector<T> taylor(const int& size, const T& st
     const auto last(res);
     res += dt;
     if(last == res) break;
-    dt   = D * dt * residue / T(i);
+    dt   = Dt * dt * residue / T(i);
   }
   return res;
 }
