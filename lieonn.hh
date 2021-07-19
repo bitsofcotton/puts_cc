@@ -3249,7 +3249,8 @@ template <typename T> SimpleVector<T> makeProgramInvariant(const SimpleVector<T>
 template <typename T> T revertProgramInvariant(const T& in, const bool& index = false) {
   if(index)
     return atan(in) / atan(T(1));
-  return atan(in) / atan(T(1)) * T(4) - T(1);
+  const static T Pi(atan(T(1)) * T(4));
+  return atan(atan(tan(in * Pi)) / Pi) / atan(T(1)) * T(4) - T(1);
 }
 
 template <typename T> class linearFeeder {
