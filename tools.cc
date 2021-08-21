@@ -95,17 +95,15 @@ int main(int argc, const char* argv[]) {
     words.insert(words.end(), csvelim.begin(),  csvelim.end());
     words.insert(words.end(), csvdelim.begin(), csvdelim.end());
     std::vector<gram_t<std::string> > found;
-    for(int i = 2; i < 80; i ++) {
-      const auto lwords(lword<char, std::string>(80, i).compute(input));
-      for(auto itr = lwords.begin(); itr != lwords.end(); ++ itr) {
-        if(itr->rptr.size() < 2 && itr->str.size() < 3)
-          continue;
-        const auto lb(std::lower_bound(found.begin(), found.end(), *itr, lessCount<std::string>));
-        if(found.begin() <= lb && lb < found.end() && lb->str == itr->str)
-          lb->rptr.insert(lb->rptr.end(), itr->rptr.begin(), itr->rptr.end());
-        else
-          found.emplace_back(*itr);
-      }
+    const auto lwords(lword<char, std::string>(80).compute(input));
+    for(auto itr = lwords.begin(); itr != lwords.end(); ++ itr) {
+      if(itr->rptr.size() < 2 && itr->str.size() < 3)
+        continue;
+      const auto lb(std::lower_bound(found.begin(), found.end(), *itr, lessCount<std::string>));
+      if(found.begin() <= lb && lb < found.end() && lb->str == itr->str)
+        lb->rptr.insert(lb->rptr.end(), itr->rptr.begin(), itr->rptr.end());
+      else
+        found.emplace_back(*itr);
     }
     for(auto itr = found.begin(); itr != found.end(); ++ itr) {   
       std::sort(itr->rptr.begin(), itr->rptr.end());

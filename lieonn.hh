@@ -241,7 +241,7 @@ template <typename T, int bits> inline DUInt<T,bits>  DUInt<T,bits>::operator / 
 }
 
 template <typename T, int bits> inline DUInt<T,bits>& DUInt<T,bits>::operator /= (const DUInt<T,bits>& src) {
-  const static DUInt<T,bits> one(1);
+  const static DUInt<T,bits> one(int(1));
   if(! src)
     throw "Zero division";
   if(! *this)
@@ -893,7 +893,7 @@ template <typename T, typename W, int bits, typename U> inline                  
 }
 
 template <typename T, typename W, int bits, typename U> template <typename V> inline U SimpleFloat<T,W,bits,U>::normalize(V& src) const {
-  V   bt(1);
+  V   bt(int(1));
   int b(0);
   int tb(0);
   for( ; bt; tb ++) {
@@ -1867,7 +1867,7 @@ public:
   inline       void resize(const int& size);
   inline       SimpleVector<T>  subVector(const int& i, const int& s) const;
   inline       SimpleVector<T>& setVector(const int& i, const SimpleVector<T>& d);
-  inline       SimpleVector<T>& O();
+  inline       SimpleVector<T>& O(const T& r = T(0));
   inline       SimpleVector<T>& I(const T& r = T(1));
   inline       SimpleVector<T>& ek(const int& i, const T& r = T(1));
   
@@ -2118,9 +2118,8 @@ template <typename T> inline SimpleVector<T>& SimpleVector<T>::setVector(const i
   return *this;
 }
 
-template <typename T> inline SimpleVector<T>& SimpleVector<T>::O() {
-  const static T zero(0);
-  return I(zero);
+template <typename T> inline SimpleVector<T>& SimpleVector<T>::O(const T& r) {
+  return I(r);
 }
 
 template <typename T> inline SimpleVector<T>& SimpleVector<T>::I(const T& r) {
@@ -2241,7 +2240,7 @@ public:
   inline       SimpleMatrix<T>  transpose() const;
   inline       SimpleMatrix<T>  subMatrix(const int& y, const int& x, const int& h, const int& w) const;
   inline       SimpleMatrix<T>& setMatrix(const int& y, const int& x, const SimpleMatrix<T>& d);
-  inline       SimpleMatrix<T>& O();
+  inline       SimpleMatrix<T>& O(const T& r = T(0));
   inline       SimpleMatrix<T>& I(const T& r = T(1));
   inline       T                determinant() const;
   inline       SimpleMatrix<T>  inverse() const;
@@ -2559,9 +2558,14 @@ template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::setMatrix(const i
   return *this;
 }
 
-template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::O() {
-  const static T zero(0);
-  return I(zero);
+template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::O(const T& r) {
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
+  for(int i = 0; i < rows(); i ++)
+    for(int j = 0; j < cols(); j ++)
+      (*this)(i, j) = r;
+  return *this;
 }
 
 template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::I(const T& r) {
@@ -3131,18 +3135,16 @@ template <typename T> SimpleMatrix<T> diff(const int& size0) {
     if(2 < size) {
       const auto dd0(diff<T>(  (size - 1)) * T(size - 1));
       const auto ii0(diff<T>(- (size - 1)) * T(size - 1));
-      dd = SimpleMatrix<T>(size, size).O();
-      ii = SimpleMatrix<T>(size, size).O();
-            auto ddo(SimpleMatrix<T>(size, size).O().setMatrix(0, 0, dd0));
-            auto iio(SimpleMatrix<T>(size, size).O().setMatrix(0, 0, ii0));
-      ddo.setMatrix(1, 1, dd.subMatrix(1, 1, size - 1, size - 1) + dd0);
-      iio.setMatrix(1, 1, ii.subMatrix(1, 1, size - 1, size - 1) + ii0);
-      ddo.row(0) *= T(2);
-      ddo.row(ddo.rows() - 1) *= T(2);
-      iio.row(0) *= T(2);
-      iio.row(iio.rows() - 1) *= T(2);
-      dd = ddo / T(2);
-      ii = iio / T(2);
+      dd = SimpleMatrix<T>(size, size).O().setMatrix(0, 0, dd0);
+      ii = SimpleMatrix<T>(size, size).O().setMatrix(0, 0, ii0);
+      dd.setMatrix(1, 1, dd.subMatrix(1, 1, size - 1, size - 1) + dd0);
+      ii.setMatrix(1, 1, ii.subMatrix(1, 1, size - 1, size - 1) + ii0);
+      dd.row(0) *= T(2);
+      dd.row(dd.rows() - 1) *= T(2);
+      ii.row(0) *= T(2);
+      ii.row(ii.rows() - 1) *= T(2);
+      dd /= T(2);
+      ii /= T(2);
     } else {
       dd = SimpleMatrix<T>(size, size).O();
       ii = SimpleMatrix<T>(size, size).O();
@@ -3154,12 +3156,17 @@ template <typename T> SimpleMatrix<T> diff(const int& size0) {
 #pragma omp parallel for schedule(static, 1)
 #endif
     for(int i = 0; i < DD.rows(); i ++)
-      DD.row(i) *=   complex<T>(T(0), - T(2) * Pi * T(i) / T(DD.rows()));
+      DD.row(i) *=    complex<T>(T(0), - T(2) * Pi * T(i) / T(DD.rows()));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
     for(int i = 1; i < II.rows(); i ++)
       II.row(i) /= - complex<T>(T(0), - T(2) * Pi * T(i) / T(DD.rows()));
+    // N.B. if we apply DD onto 1 / (1 / f(x)) graph, it's reverse order.
+    //      if we average them, it's the only 0 vector.
+    // XXX: there exists also completely correct differential matrix,
+    //      but it's also be only 0 vector.
+    //      (because it's a imaginary part on originals.)
     // N.B. in continuous function, we don't divide dd by &pi;.
     //      (d/dx sum exp(2 Pi i x theta / N) exp(- 2 Pi i y theta / N) f(y)).
     // XXX: from some numerical test, sign on DD, II is reverse side.
@@ -3171,7 +3178,7 @@ template <typename T> SimpleMatrix<T> diff(const int& size0) {
     //      it causes constant 0 vector.
     dd += (dft<T>(- size) * DD).template real<T>();
     ii += (dft<T>(- size) * II).template real<T>();
-    if(3 < size) {
+    if(2 < size) {
       dd /= T(size);
       ii /= T(size);
     }
@@ -3210,24 +3217,9 @@ template <typename T> inline SimpleVector<T> taylor(const int& size, const T& st
   return res;
 }
 
-template <typename T> SimpleVector<T> linearInvariant(const vector<SimpleVector<T> >& in, const bool& nonzero = false) {
-  SimpleMatrix<T> A(in.size(), in[0].size());
-  assert(in[0].size() <= in.size());
-  SimpleVector<T> fvec(A.cols());
-  SimpleVector<T> one(A.rows());
-  fvec.O();
-  one.I();
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-  for(int i = 0; i < in.size(); i ++) {
-    assert(in[i].size() == in[0].size());
-    for(int j = 0; j < in[0].size(); j ++)
-      A(i, j) = in[i][j];
-    assert(isfinite(A.row(i).dot(A.row(i))));
-  }
+template <typename T> SimpleVector<T> linearInvariant(const SimpleMatrix<T>& in) {
   vector<pair<T, int> > sute;
-  return A.QR().innerFix(A, sute);
+  return in.QR().innerFix(in, sute);
 }
 
 // N.B. please refer bitsofcotton/randtools.
