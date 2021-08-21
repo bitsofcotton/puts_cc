@@ -24,9 +24,6 @@ using std::endl;
 using std::flush;
 using std::max;
 using std::min;
-using std::cerr;
-using std::endl;
-using std::flush;
 using std::string;
 using std::vector;
 using std::sort;
@@ -1117,13 +1114,7 @@ template <typename T, typename U> std::ostream& diff(std::ostream& os, const U& 
   return os << endl;
 }
 
-template <typename T> vector<T> cutText(const T& input, const vector<T>& eliminate0, const vector<T>& delimiter0, const bool& f_sort = false) {
-  vector<T> delimiter(delimiter0);
-  vector<T> eliminate(eliminate0);
-  sort(delimiter.begin(), delimiter.end());
-  sort(eliminate.begin(), eliminate.end());
-  delimiter.erase(unique(delimiter.begin(), delimiter.end()), delimiter.end());
-  eliminate.erase(unique(eliminate.begin(), eliminate.end()), eliminate.end());
+template <typename T> vector<T> cutText(const T& input, const vector<T>& eliminate, const vector<T>& delimiter, const bool& f_sort = false) {
   vector<T> result;
   T         workbuf;
   for(int i = 0; i < input.size(); i ++) {
@@ -1165,12 +1156,8 @@ template <typename T, typename U> SimpleVector<T> countWords(const U& orig, cons
   return result;
 }
 
-template <typename T, typename U> vector<int> pseudoWordsBalance(const vector<U>& orig, const vector<U>& words0, int nloop = - 1) {
-  cerr << "pseudoWordsBalance : " << orig.size() << ", " << words0.size() << flush;
-  vector<U> words(words0);
-  sort(words.begin(), words.end());
-  words.erase(unique(words.begin(), words.end()), words.end());
-  
+template <typename T, typename U> vector<int> pseudoWordsBalance(const vector<U>& orig, const vector<U>& words, int nloop = - 1) {
+  cerr << "pseudoWordsBalance : " << orig.size() << ", " << words.size() << flush;
   SimpleMatrix<T> result(words.size(), orig.size());
   for(int i = 0; i < orig.size(); i ++)
     result.setCol(i, countWords<T, U>(orig[i], words));

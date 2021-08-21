@@ -84,7 +84,12 @@ int main(int argc, const char* argv[]) {
   csvdelim.push_back(string(","));
   csvdelim.push_back(string("\r"));
   csvdelim.push_back(string("\n"));
+  std::sort(delimiter.begin(), delimiter.end());
+  std::sort(csvelim.begin(), csvelim.end());
+  std::sort(csvdelim.begin(), csvdelim.end());
   words = cutText(loadbuf(argv[2]).second, csvelim, csvdelim, true);
+  std::sort(words.begin(), words.end());
+  words.erase(std::unique(words.begin(), words.end()), words.end());
   std::string input, line;
   while(std::getline(std::cin, line)) {
     for(int i = 0; i < line.size(); i ++)
@@ -94,6 +99,8 @@ int main(int argc, const char* argv[]) {
   if(std::strcmp(argv[1], "lword") == 0) {
     words.insert(words.end(), csvelim.begin(),  csvelim.end());
     words.insert(words.end(), csvdelim.begin(), csvdelim.end());
+    std::sort(words.begin(), words.end());
+    words.erase(std::unique(words.begin(), words.end()), words.end());
     std::vector<gram_t<std::string> > found;
     const auto lwords(lword<char, std::string>(80).compute(input));
     for(auto itr = lwords.begin(); itr != lwords.end(); ++ itr) {
