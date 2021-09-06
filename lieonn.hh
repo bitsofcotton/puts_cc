@@ -135,7 +135,7 @@ template <typename T, int bits> inline DUInt<T,bits>::DUInt(const int& src) {
 }
 
 template <typename T, int bits> inline DUInt<T,bits>::DUInt(const T& src) {
-  const auto abssrc(src < T(0) ? - src : src);
+  const auto abssrc(src < T(int(0)) ? - src : src);
   e[0]   = abssrc;
   e[1]  ^= e[1];
   if(abssrc != src)
@@ -620,7 +620,7 @@ template <typename T, typename W, int bits, typename U> inline SimpleFloat<T,W,b
 template <typename T, typename W, int bits, typename U> template <typename V> inline SimpleFloat<T,W,bits,U>::SimpleFloat(const V& src) {
   const static V vzero(0);
   s ^= s;
-  m  = T(src < vzero ? - src : src);
+  m  = T(int(src < vzero ? - src : src));
   e ^= e;
   s |= safeAdd(e, normalize(m));
   if(src < vzero)
@@ -876,11 +876,11 @@ template <typename T, typename W, int bits, typename U> inline                  
   if(deci.s & (1 << NaN))
     throw "NaN to convert int";
   if(! deci.m)
-    return T(0);
+    return T(int(0));
   if(U(bits) <= deci.e || (uzero() < deci.e && (deci.m << int(deci.e)) >> int(deci.e) != deci.m))
     throw "Overflow to convert int.";
   if(deci.e <= - U(bits))
-    return T(0);
+    return T(int(0));
   if(deci.e <  uzero())
     deci.m >>= - int(deci.e);
   else if(uzero() < deci.e)
@@ -1441,7 +1441,7 @@ public:
   inline Complex();
   inline Complex(const Complex<T>& s);
   inline Complex(Complex<T>&& s);
-  inline Complex(const T& real, const T& imag = T(0));
+  inline Complex(const T& real, const T& imag = T(int(0)));
   inline Complex(T&& real);
   inline Complex(T&& real, T&& imag);
   inline ~Complex();
@@ -1677,7 +1677,7 @@ template <typename T> inline Complex<T>::operator T () const {
 }
 
 template <typename T> const Complex<T>& Complex<T>::i() const {
-  const static auto I(Complex<T>(T(0), T(1)));
+  const static auto I(Complex<T>(T(int(0)), T(int(1))));
   return I;
 }
 
@@ -1723,7 +1723,7 @@ template <typename T> std::istream& operator >> (std::istream& is, Complex<T>& v
   is >> v._imag;
   return is;
  ensure:
-  v._imag = T(0);
+  v._imag = T(int(0));
   return is;
 }
 
@@ -1754,15 +1754,15 @@ template <typename T> static inline Complex<T> log(const Complex<T>& s) {
 }
 
 template <typename T> static inline Complex<T> sqrt(const Complex<T>& s) {
-  return exp(log(s) * Complex<T>(T(1) / T(2)));
+  return exp(log(s) * Complex<T>(T(int(1)) / T(int(2))));
 }
 
 template <typename T> static inline Complex<T> csin(const Complex<T>& s) {
-  return (exp(Complex<T>(T(0), s)) - exp(Complex<T>(T(0), - s))) / Complex<T>(T(0), T(2));
+  return (exp(Complex<T>(T(int(0)), s)) - exp(Complex<T>(T(int(0)), - s))) / Complex<T>(T(int(0)), T(int(2)));
 }
 
 template <typename T> static inline Complex<T> ccos(const Complex<T>& s) {
-  return (exp(Complex<T>(T(0), s)) + exp(Complex<T>(T(0), - s))) / T(2);
+  return (exp(Complex<T>(T(int(0)), s)) + exp(Complex<T>(T(int(0)), - s))) / T(int(2));
 }
 
 template <typename T> static inline Complex<T> ctan(const Complex<T>& s) {
@@ -1770,15 +1770,15 @@ template <typename T> static inline Complex<T> ctan(const Complex<T>& s) {
 }
 
 template <typename T> static inline Complex<T> ccsc(const Complex<T>& s) {
-  return Complex<T>(T(1)) / csin(s);
+  return Complex<T>(T(int(1))) / csin(s);
 }
 
 template <typename T> static inline Complex<T> csec(const Complex<T>& s) {
-  return Complex<T>(T(1)) / ccos(s);
+  return Complex<T>(T(int(1))) / ccos(s);
 }
 
 template <typename T> static inline T ccot(const T& s) {
-  return Complex<T>(T(1)) / ctan(s);
+  return Complex<T>(T(int(1))) / ctan(s);
 }
 
 template <typename T> using complex = Complex<T>;
@@ -1867,9 +1867,9 @@ public:
   inline       void resize(const int& size);
   inline       SimpleVector<T>  subVector(const int& i, const int& s) const;
   inline       SimpleVector<T>& setVector(const int& i, const SimpleVector<T>& d);
-  inline       SimpleVector<T>& O(const T& r = T(0));
-  inline       SimpleVector<T>& I(const T& r = T(1));
-  inline       SimpleVector<T>& ek(const int& i, const T& r = T(1));
+  inline       SimpleVector<T>& O(const T& r = T(int(0)));
+  inline       SimpleVector<T>& I(const T& r = T(int(1)));
+  inline       SimpleVector<T>& ek(const int& i, const T& r = T(int(1)));
   
   // friend std::ostream& operator << (std::ostream& os, const SimpleVector<T>& v);
   // friend std::istream& operator >> (std::istream& os, SimpleVector<T>& v);
@@ -2200,7 +2200,7 @@ template <typename T> std::istream& operator >> (std::istream& is, SimpleVector<
   if(i < v.size()) {
     cerr << "XXX SimpleVector<T>::operator >> (index)" << flush;
     for( ; i < v.size(); i ++)
-      v[i] = T(0);
+      v[i] = T(int(0));
   }
   return is;
 }
@@ -2240,8 +2240,8 @@ public:
   inline       SimpleMatrix<T>  transpose() const;
   inline       SimpleMatrix<T>  subMatrix(const int& y, const int& x, const int& h, const int& w) const;
   inline       SimpleMatrix<T>& setMatrix(const int& y, const int& x, const SimpleMatrix<T>& d);
-  inline       SimpleMatrix<T>& O(const T& r = T(0));
-  inline       SimpleMatrix<T>& I(const T& r = T(1));
+  inline       SimpleMatrix<T>& O(const T& r = T(int(0)));
+  inline       SimpleMatrix<T>& I(const T& r = T(int(1)));
   inline       T                determinant() const;
   inline       SimpleMatrix<T>  inverse() const;
   inline       SimpleVector<T>  solve(SimpleVector<T> other) const;
@@ -2275,7 +2275,7 @@ template <typename T> inline SimpleMatrix<T>::SimpleMatrix() {
   ecols  = 0;
   entity = NULL;
 #if defined(_FLOAT_BITS_)
-  epsilon = myfloat(1) >> int64_t(_FLOAT_BITS_ - 1);
+  epsilon = myfloat(int(1)) >> int64_t(_FLOAT_BITS_ - 1);
 #else
   epsilon = std::numeric_limits<myfloat>::epsilon();
 #endif
@@ -2296,7 +2296,7 @@ template <typename T> inline SimpleMatrix<T>::SimpleMatrix(const int& rows, cons
   erows = rows;
   ecols = cols;
 #if defined(_FLOAT_BITS_)
-  epsilon = myfloat(1) >> int64_t(_FLOAT_BITS_ - 1);
+  epsilon = myfloat(int(1)) >> int64_t(_FLOAT_BITS_ - 1);
 #else
   epsilon = std::numeric_limits<myfloat>::epsilon();
 #endif
@@ -2638,7 +2638,7 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solve(SimpleVector
     }
   }
   for(int i = erows - 1; 0 <= i; i --) {
-    if(work.entity[i][i] == T(0)) continue;
+    if(work.entity[i][i] == T(int(0))) continue;
     const auto buf(other[i] / work.entity[i][i]);
     if(!isfinite(buf) || isnan(buf)) {
     //  assert(!isfinite(work.entity[i][i] / other[i]) || isnan(work.entity[i][i] / other[i]));
@@ -2668,7 +2668,7 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::projectionPt(const
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < other.size(); i ++) {
-    res[i] = T(0);
+    res[i] = T(int(0));
     for(int j = 0; j < erows; j ++)
       res[i] += work(j, i);
   }
@@ -2869,12 +2869,12 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::innerFix(const Sim
   //      but not with mixed condition.
   const auto R((*this) * A);
   SimpleVector<T> one(this->cols());
-  one.I(T(1));
+  one.I(T(int(1)));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < fidx.size(); i ++)
-    one[fidx[i].second] = T(0);
+    one[fidx[i].second] = T(int(0));
   // we now have: Q [R [x t] ] <= {0, 1}^m cond.
   const auto on(projectionPt(one));
   fidx.reserve(fidx.size() + this->cols());
@@ -2905,17 +2905,17 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::inner(const Simple
   assert(this->rows() == bl.size() && this->rows() == bu.size() &&
          0 < this->cols() && 0 < this->rows() && this->cols() < this->rows());
   // bu - bb == A, bl - bb == - A <=> bu - bl == 2 A. 
-  const auto bb((bu + bl) / T(2));
+  const auto bb((bu + bl) / T(int(2)));
   const auto upper(bu - bb);
   SimpleMatrix<T> A(*this);
   vector<pair<T, int> > fidx;
   fidx.reserve(this->rows());
   for(int i = 0; i < this->rows(); i ++) {
-    assert(T(0) <= upper[i]);
-    if(upper[i] == T(0)) {
+    assert(T(int(0)) <= upper[i]);
+    if(upper[i] == T(int(0))) {
       const auto n2(A.row(i).dot(A.row(i)));
-      if(n2 != T(0)) {
-        fidx.emplace_back(make_pair(- T(1), i));
+      if(n2 != T(int(0))) {
+        fidx.emplace_back(make_pair(- T(int(1)), i));
         A.row(i) /= sqrt(n2);
       } else
         A.row(i) *= n2;
@@ -3063,11 +3063,42 @@ template <typename T> std::istream& operator >> (std::istream& is, SimpleMatrix<
     cerr << "XXX SimpleMatrix<T>::operator >> (index)" << flush;
     for( ; i < v.rows(); i ++)
       for( ; j < v.cols(); j ++)
-        v(i, j) = T(0);
+        v(i, j) = T(int(0));
   }
   return is;
 }
 
+template <typename T> static inline SimpleMatrix<T> log(const SimpleMatrix<T>& m, const int& cut = 200) {
+  SimpleMatrix<T> res(m.rows(), m.cols());
+  const auto c(m.determinant() * T(20));
+  const auto residue(SimpleMatrix<T>(m.rows(), m.cols()).I() - m / c);
+        auto buf(residue);
+  res.I(c);
+  for(int i = 1; 0 < i && i < cut; i ++) {
+    const auto before(res);
+    res -= buf / T(i);
+    if(before == res) break;
+    buf *= residue;
+  }
+  return res;
+}
+
+template <typename T> static inline SimpleMatrix<T> exp(const SimpleMatrix<T>& m) {
+  SimpleMatrix<T> res(m.rows(), m.cols());
+  auto buf(m);
+  res.I();
+  for(int i = 1; 0 < i ; i ++) {
+    const auto before(res);
+    res += buf;
+    if(before == res) break;
+    buf *= m / T(i + 1);
+  }
+  return res;
+}
+
+template <typename T> static inline SimpleMatrix<T> pow(const SimpleMatrix<T>& m, const T& p) {
+  return exp(log(m) * p);
+}
 
 template <typename T> SimpleMatrix<complex<T> > dft(const int& size0) {
   const auto size(abs(size0));
@@ -3090,13 +3121,13 @@ template <typename T> SimpleMatrix<complex<T> > dft(const int& size0) {
     cache >> eidft;
     cache.close();
   } else {
-    static const auto Pi(T(4) * atan2(T(1), T(1)));
+    static const auto Pi(T(int(4)) * atan2(T(int(1)), T(int(1))));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
     for(int i = 0; i < edft.rows(); i ++) {
       for(int j = 0; j < edft.cols(); j ++) {
-        const auto theta(- T(2) * Pi * T(i) * T(j) / T(edft.rows()));
+        const auto theta(- T(int(2)) * Pi * T(i) * T(j) / T(edft.rows()));
         const auto c(cos(theta));
         const auto s(sin(theta));
         edft( i, j) = complex<T>(c,   s);
@@ -3132,36 +3163,21 @@ template <typename T> SimpleMatrix<T> diff(const int& size0) {
     cache >> ii;
     cache.close();
   } else {
-    if(2 < size) {
-      const auto dd0(diff<T>(  (size - 1)) * T(size - 1));
-      const auto ii0(diff<T>(- (size - 1)) * T(size - 1));
-      dd = SimpleMatrix<T>(size, size).O().setMatrix(0, 0, dd0);
-      ii = SimpleMatrix<T>(size, size).O().setMatrix(0, 0, ii0);
-      dd.setMatrix(1, 1, dd.subMatrix(1, 1, size - 1, size - 1) + dd0);
-      ii.setMatrix(1, 1, ii.subMatrix(1, 1, size - 1, size - 1) + ii0);
-      dd.row(0) *= T(2);
-      dd.row(dd.rows() - 1) *= T(2);
-      ii.row(0) *= T(2);
-      ii.row(ii.rows() - 1) *= T(2);
-      dd /= T(2);
-      ii /= T(2);
-    } else {
-      dd = SimpleMatrix<T>(size, size).O();
-      ii = SimpleMatrix<T>(size, size).O();
-    }
+    // XXX: if we return recursive each size diff,
+    //      taylor series should be broken.
     auto DD(dft<T>(size));
     auto II(dft<T>(size));
-    static const auto Pi(T(4) * atan2(T(1), T(1)));
+    static const auto Pi(T(int(4)) * atan2(T(int(1)), T(int(1))));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
     for(int i = 0; i < DD.rows(); i ++)
-      DD.row(i) *=    complex<T>(T(0), - T(2) * Pi * T(i) / T(DD.rows()));
+      DD.row(i) *=    complex<T>(T(int(0)), - T(int(2)) * Pi * T(i) / T(DD.rows()));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
     for(int i = 1; i < II.rows(); i ++)
-      II.row(i) /= - complex<T>(T(0), - T(2) * Pi * T(i) / T(DD.rows()));
+      II.row(i) /= - complex<T>(T(int(0)), - T(int(2)) * Pi * T(i) / T(DD.rows()));
     // N.B. if we apply DD onto 1 / (1 / f(x)) graph, it's reverse order.
     //      if we average them, it's the only 0 vector.
     // XXX: there exists also completely correct differential matrix,
@@ -3176,12 +3192,8 @@ template <typename T> SimpleMatrix<T> diff(const int& size0) {
     //       sum_0^1 - 2 Pi i (theta/n)^2/2 -&gt; Pi)
     // XXX: if we make plain differential with no error on cosine curve,
     //      it causes constant 0 vector.
-    dd += (dft<T>(- size) * DD).template real<T>();
-    ii += (dft<T>(- size) * II).template real<T>();
-    if(2 < size) {
-      dd /= T(size);
-      ii /= T(size);
-    }
+    dd = (dft<T>(- size) * DD).template real<T>();
+    ii = (dft<T>(- size) * II).template real<T>();
     ofstream ocache(file.c_str());
     ocache << dd;
     ocache << ii;
@@ -3191,14 +3203,14 @@ template <typename T> SimpleMatrix<T> diff(const int& size0) {
   return size0 < 0 ? ii : dd;
 }
 
-template <typename T> inline SimpleVector<T> taylor(const int& size, const T& step) {
+template <typename T> static inline SimpleVector<T> taylor(const int& size, const T& step) {
   const int  step00(max(int(0), min(size - 1, int(floor(step)))));
   const auto residue0(step - T(step00));
-  const auto step0(step00 == size - 1 || abs(residue0) <= T(1) / T(2) ? step00 : step00 + 1);
+  const auto step0(step00 == size - 1 || abs(residue0) <= T(int(1)) / T(int(2)) ? step00 : step00 + 1);
   const auto residue(step - T(step0));
   SimpleVector<T> res(size);
   res.ek(step0);
-  if(residue == T(0)) return res;
+  if(residue == T(int(0))) return res;
   const auto Dt(diff<T>(size).transpose());
         auto dt(Dt.col(step0) * residue);
   // N.B.
@@ -3217,90 +3229,126 @@ template <typename T> inline SimpleVector<T> taylor(const int& size, const T& st
   return res;
 }
 
-template <typename T> SimpleVector<T> linearInvariant(const SimpleMatrix<T>& in) {
+template <typename T> static inline SimpleVector<T> linearInvariant(const SimpleMatrix<T>& in) {
   vector<pair<T, int> > sute;
   return in.QR().innerFix(in, sute);
 }
 
 // N.B. please refer bitsofcotton/randtools.
-template <typename T> inline pair<SimpleVector<T>, T> makeProgramInvariant(const SimpleVector<T>& in, const T& index = - T(1)) {
-  SimpleVector<T> res(in.size() + (T(0) <= index ? 3 : 2));
+template <typename T> static inline pair<SimpleVector<T>, T> makeProgramInvariant(const SimpleVector<T>& in, const T& index = - T(int(1))) {
+  SimpleVector<T> res(in.size() + (T(int(0)) <= index ? 3 : 2));
   res.setVector(0, in);
-  res[in.size()] = T(1);
-  if(T(0) <= index)
+  res[in.size()] = T(int(1));
+  if(T(int(0)) <= index)
     res[in.size() + 1] = T(index);
-  res[res.size() - 1] = T(0);
+  res[res.size() - 1] = T(int(0));
   T   lsum(0);
   for(int i = 0; i < res.size() - 1; i ++) {
-    assert(- T(1) <= res[i] && res[i] <= T(1));
-    res[i] += T(1);
-    if(res[i] != T(0)) lsum += log(res[i]);
+    assert(- T(int(1)) <= res[i] && res[i] <= T(int(1)));
+    res[i] += T(int(1));
+    if(res[i] != T(int(0))) lsum += log(res[i]);
   }
   T ratio(1);
   // N.B. x_1 ... x_n == 1.
   // <=> x_1 / (x_1 ... x_n)^(1/n) ... == 1.
-  if(lsum != T(0)) res /= ratio = exp(lsum / T(res.size() - 1));
-  res[res.size() - 1] = T(1);
+  if(lsum != T(int(0))) res /= ratio = exp(lsum / T(res.size() - 1));
+  res[res.size() - 1] = T(int(1));
   return make_pair(res, ratio);
 }
 
-template <typename T> inline T revertProgramInvariant(const pair<T, T>& in) {
-  return in.first * in.second - T(1);
+template <typename T> static inline T revertProgramInvariant(const pair<T, T>& in) {
+  return max(T(int(0)), min(T(int(2)), abs(in.first * in.second))) - T(int(1));
 }
 
-template <typename T> class linearFeeder {
+template <typename T> class idFeeder {
 public:
-  inline linearFeeder() { t = 0; full = false; }
-  inline linearFeeder(const int& size) {
-    res.resize(size);
-    for(int i = 0; i < res.size(); i ++)
-      res[i] = T(0);
-    t = 0;
-    full = false;
-  }
-  inline ~linearFeeder() { ; }
+  inline idFeeder() { full = false; t = 0;}
+  inline idFeeder(const int& size) { res.resize(size); res.O(); full = false; t = 0; }
+  inline ~idFeeder() { ; }
   inline const SimpleVector<T>& next(const T& in) {
-    for(int i = 0; i < res.size() - 1; i ++)
-      res[i] = move(res[i + 1]);
+    for(int i = 1; i < res.size(); i ++)
+      res[i - 1] = move(res[i]);
     res[res.size() - 1] = in;
-    if(res.size() < t ++) full = true;
+    if(res.size() <= t ++) full = true;
     return res;
   }
   SimpleVector<T> res;
   bool full;
 private:
-  int t;
+  int  t;
 };
 
-template <typename T> class arctanFeeder {
+template <typename T, typename feeder> class sumFeeder {
 public:
-  inline arctanFeeder() { t = 0; full = false; }
+  inline sumFeeder() { full = false; }
+  inline sumFeeder(const int& size) {
+    f = feeder(size);
+    res.resize(size);
+    res.O();
+    full = false;
+  }
+  inline ~sumFeeder() { ; }
+  inline const SimpleVector<T>& next(const T& in) {
+    const auto& buf(f.next(in));
+    full = f.full;
+    res[0] = buf[0];
+    for(int i = 1; i < res.size(); i ++)
+      res[i] = res[i - 1] + buf[i];
+    return res;
+  }
+  SimpleVector<T> res;
+  bool full;
+private:
+  feeder f;
+};
+
+template <typename T, typename feeder> class linearFeeder {
+public:
+  inline linearFeeder() { full = false; }
+  inline linearFeeder(const int& size) { f = feeder(size); full = false; }
+  inline ~linearFeeder() { ; }
+  inline const SimpleVector<T>& next(const T& in) {
+    res  = f.next(in);
+    full = f.full;
+    return res;
+  }
+  SimpleVector<T> res;
+  bool full;
+private:
+  feeder f;
+};
+
+template <typename T, typename feeder> class arctanFeeder {
+public:
+  inline arctanFeeder() { full = false; }
   inline arctanFeeder(const int& size) {
     res.resize(size);
-    buf.resize(1 + int(ceil(T(1) / tan(T(1) * atan(T(1)) / T(res.size() - 1)))));
-    for(int i = 0; i < buf.size(); i ++)
-      buf[i] = T(0);
     for(int i = 0; i < res.size(); i ++)
-      res[i] = T(0);
-    t = 0;
+      res[i] = T(int(0));
+    f = feeder(1 + int(ceil(T(int(1)) / tan(T(int(1)) * atan(T(int(1))) / T(res.size() - 1)))));
     full = false;
   }
   inline ~arctanFeeder() { ; }
   inline const SimpleVector<T>& next(const T& in) {
-    for(int i = 0; i < buf.size() - 1; i ++)
-      buf[i] = move(buf[i + 1]);
-    buf[buf.size() - 1] = in;
-    if(buf.size() < t ++) full = true;
+    const auto& buf(f.next(in));
+    full = f.full;
     for(int i = 0; i < res.size(); i ++)
-      res[res.size() - i - 1] = buf[buf.size() - 1 - int(tan(T(i) * atan(T(1)) / T(res.size() - 1)) / tan(T(1) * atan(T(1)) / T(res.size() - 1)))];
+      res[res.size() - i - 1] = buf[buf.size() - 1 - int(tan(T(i) * atan(T(int(1))) / T(res.size() - 1)) / tan(T(int(1)) * atan(T(int(1))) / T(res.size() - 1)))];
     return res;
   }
   SimpleVector<T> res;
   bool full;
 private:
-  SimpleVector<T> buf;
-  int t;
+  feeder f;
 };
+
+
+template <typename T> const T& sgn(const T& x) {
+  static const T zero(0);
+  static const T one(1);
+  static const T mone(- T(int(1)));
+  return x != zero ? (zero < x ? one : mone) : zero;
+}
 
 template <typename T> class SimpleSparseVector {
 public:
@@ -3368,7 +3416,7 @@ template <typename T> inline SimpleSparseVector<T> SimpleSparseVector<T>::operat
 
 template <typename T> inline SimpleSparseVector<T>& SimpleSparseVector<T>::operator += (const SimpleSparseVector<T>& other) {
   for(auto itr(other.entity.begin()); itr != other.entity.end(); ++ itr) {
-    if(itr->second == T(0)) continue;
+    if(itr->second == T(int(0))) continue;
     auto search(entity.lower_bound(itr->first));
     if(search == entity.end() || search->first != itr->first)
       (*this)[itr->first] = itr->second;
@@ -3449,7 +3497,7 @@ template <typename T> inline T& SimpleSparseVector<T>::operator [] (const int& i
   if(search != entity.end() && search->first == idx)
     return search->second;
   else
-    entity[idx] = T(0);
+    entity[idx] = T(int(0));
   const auto search2(entity.lower_bound(idx));
   assert(search2 != entity.end() && search2->first == idx);
   return search2->second;
