@@ -1083,7 +1083,7 @@ template <typename T, typename U> std::ostream& diff(std::ostream& os, const U& 
     getAbbreved<T, U>(dstat, detailtitle0, detail0, delimiter);
     cstat.reDig(redig);
     dstat.reDig(redig);
-    const auto score(abs(cstat.cdot(dstat)) / sqrt(cstat.cdot(cstat) * dstat.cdot(dstat)) - T(1));
+    const auto score(cstat.prej(dstat));
     os << score << ":" << flush;
     if(isfinite(score))
       scores.emplace_back(make_pair(same ? - score : score, i));

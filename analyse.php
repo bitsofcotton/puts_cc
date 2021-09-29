@@ -45,18 +45,18 @@ function analyse($cwd, $text) {
   foreach (new DirectoryIterator($cwd . '/dicts') as $fileInfo) {
     if($fileInfo->isDot()) continue;
     $name = $fileInfo->getFilename();
-    $buf .= "dicts/" . str_replace($dameji, "", $name) . " ";
+    $buf .= $cwd . "/dicts/" . str_replace($dameji, "", $name) . " ";
   }
   foreach (new DirectoryIterator($cwd . '/pdict') as $fileInfo) {
     if($fileInfo->isDot()) continue;
     $name = $fileInfo->getFilename();
-    $buf .= "pdict/" . str_replace($dameji, "", $name) . " ";
+    $buf .= $cwd . "/pdict/" . str_replace($dameji, "", $name) . " ";
   }
   $buf2 = $buf . " -toc ";
   foreach (new DirectoryIterator($cwd . '/topics') as $fileInfo) {
     if($fileInfo->isDot()) continue;
     $name = $fileInfo->getFilename();
-    $buf2 .= "topics/" . str_replace($dameji, "", $name) . " ";
+    $buf2 .= $cwd . "/topics/" . str_replace($dameji, "", $name) . " ";
   }
   exec("./puts toc  words.txt " . $buf2 . " < " . $text . " > " . $text . "-detail.html");
   exec("./puts lack words.txt " . $buf2 . " < " . $text . " > " . $text . "-lack.html");
