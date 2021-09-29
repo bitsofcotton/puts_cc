@@ -30,12 +30,14 @@ function analyse($cwd, $text) {
   prepdicts($cwd, $text);
   foreach (new DirectoryIterator($cwd . '/topics') as $fileInfo) {
     if($fileInfo->isDot()) continue;
-    $lf = $cwd . '/topics/' . $fileInfo->getFilename();
+    $name = $fileInfo->getFilename();
+    $lf = $cwd . '/topics/' . str_replace($dameji, "", $name);
     prepdicts($cwd, $lf);
   }
   foreach (new DirectoryIterator($cwd . '/dicts') as $fileInfo) {
     if($fileInfo->isDot()) continue;
-    $lf = $cwd . '/dicts/' . $fileInfo->getFilename();
+    $name = $fileInfo->getFilename();
+    $lf = $cwd . '/dicts/' . str_replace($dameji, "", $name);
     prepdicts($cwd, $lf);
   }
   

@@ -1085,13 +1085,8 @@ template <typename T, typename U> std::ostream& diff(std::ostream& os, const U& 
     dstat.reDig(redig);
     const auto score(abs(cstat.cdot(dstat)) / sqrt(cstat.cdot(cstat) * dstat.cdot(dstat)) - T(1));
     os << score << ":" << flush;
-    if(isfinite(score) && ! same)
-      scores.emplace_back(make_pair(score, i));
-    else if (same){
-      const auto invscore(T(1) / score);
-      if(isfinite(invscore))
-        scores.emplace_back(make_pair(invscore, i));
-    }
+    if(isfinite(score))
+      scores.emplace_back(make_pair(same ? - score : score, i));
   }
   sort(scores.begin(), scores.end());
   for(int ii = 0; ii < scores.size() && scores[ii].first < depth; ii ++) {

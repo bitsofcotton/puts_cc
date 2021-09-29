@@ -2177,7 +2177,7 @@ template <typename T> std::istream& operator >> (std::istream& is, SimpleVector<
   int i(0);
   for( ; i < v.size() && ! is.eof() && ! is.bad(); ) {
     const auto c(is.get());
-    if(c == ' ' || c == '\t' || c == '[' || c == ',' || c == ']' || c == '\n') continue;
+    if(c == ' ' || c == '\t' || c == ':' || c == ',' || c == '[' || c == '\n') continue;
     is.unget();
     is >> v[i ++];
   }
@@ -2250,7 +2250,7 @@ public:
   inline       SimpleMatrix<T>  QR() const;
   inline       SimpleMatrix<T>  SVD() const;
   inline       pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > SVD(const SimpleMatrix<T>& src) const;
-  inline       SimpleVector<T>  innerFix(const SimpleMatrix<T>& A, vector<pair<T, int> >& fidx);
+  inline       SimpleVector<T>  zeroFix(const SimpleMatrix<T>& A, vector<pair<T, int> > fidx);
   inline       SimpleVector<T>  inner(const SimpleVector<T>& bl, const SimpleVector<T>& bu) const;
   template <typename U> inline SimpleMatrix<U> real() const;
   template <typename U> inline SimpleMatrix<U> imag() const;
@@ -2591,6 +2591,7 @@ template <typename T> inline T SimpleMatrix<T>::determinant() const {
     swap(work.entity[i], work.entity[xchg]);
     const auto& ei(work.entity[i]);
     const auto& eii(ei[i]);
+    det *= eii;
     if(epsilon * ei.dot(ei) < eii * eii) {
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
@@ -2600,7 +2601,6 @@ template <typename T> inline T SimpleMatrix<T>::determinant() const {
         work.entity[j] -= ei * ratio;
       }
     }
-    det *= eii;
   }
   return det;
 }
@@ -2863,7 +2863,7 @@ template <typename T> inline void SimpleMatrix<T>::resize(const int& rows, const
   return;
 }
 
-template <typename T> inline SimpleVector<T> SimpleMatrix<T>::innerFix(const SimpleMatrix<T>& A, vector<pair<T, int> >& fidx) {
+template <typename T> inline SimpleVector<T> SimpleMatrix<T>::zeroFix(const SimpleMatrix<T>& A, vector<pair<T, int> > fidx) {
   // N.B. we now have |[A -bb] [x t]| <= 1 condition.
   // N.B. there's no difference |[A - bb] [x t]|^2 <= 1 condition in this.
   //      but not with mixed condition.
@@ -2873,8 +2873,10 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::innerFix(const Sim
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int i = 0; i < fidx.size(); i ++)
-    one[fidx[i].second] = T(int(0));
+  for(int i = 0; i < fidx.size(); i ++) {
+    one[fidx[i].second] = - fidx[i].first;
+    fidx[i].first = - T(int(1));
+  }
   // we now have: Q [R [x t] ] <= {0, 1}^m cond.
   const auto on(projectionPt(one));
   fidx.reserve(fidx.size() + this->cols());
@@ -2904,30 +2906,25 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::innerFix(const Sim
 template <typename T> inline SimpleVector<T> SimpleMatrix<T>::inner(const SimpleVector<T>& bl, const SimpleVector<T>& bu) const {
   assert(this->rows() == bl.size() && this->rows() == bu.size() &&
          0 < this->cols() && 0 < this->rows() && this->cols() < this->rows());
-  // bu - bb == A, bl - bb == - A <=> bu - bl == 2 A. 
-  const auto bb((bu + bl) / T(int(2)));
-  const auto upper(bu - bb);
+  // |(2 / bu) A x - 1 - bl / bu| <= |1 - bl / bu|
+  // <=> with (-A, -bu, -bl), |bl| <= |bu|, |(2 / bu) A x - 2| <= 2(1 - bl / bu)
+  auto bU(bu);
+  auto bL(bl);
   SimpleMatrix<T> A(*this);
   vector<pair<T, int> > fidx;
-  fidx.reserve(this->rows());
-  for(int i = 0; i < this->rows(); i ++) {
-    assert(T(int(0)) <= upper[i]);
-    if(upper[i] == T(int(0))) {
-      const auto n2(A.row(i).dot(A.row(i)));
-      if(n2 != T(int(0))) {
-        fidx.emplace_back(make_pair(- T(int(1)), i));
-        A.row(i) /= sqrt(n2);
-      } else
-        A.row(i) *= n2;
-    } else
-      A.row(i) /= upper[i];
+  for(int i = 0; i < bU.size(); i ++) {
+    if(abs(bu[i]) < abs(bl[i])) {
+      bU[i] = - bl[i];
+      bL[i] = - bu[i];
+      A.row(i) = - this->row(i);
+    } else if(bu[i] == bl[i])
+      fidx.emplace_back(make_pair(- T(int(bu[i] == T(0) ? 0 : 1)), i));
+    assert(bL[i] <= bU[i] && abs(bL[i]) <= abs(bU[i]));
+    A.row(i) /= T(2) * bU[i] - bL[i];
     assert(isfinite(A.row(i).dot(A.row(i))));
   }
-  // N.B. we now have |[A -bb] [x t]| <= 1 condition.
-  // N.B. there's no difference |[A -bb] [x t]|^2 <= 1 condition in this.
-  //      but not with mixed condition.
-  // N.B. we don't matter signs on [A -bb] [x t].
-  return A.QR().innerFix(A, fidx);
+  // N.B. in zeroFix, we get linear Invariant s.t. |Ax| <= 1 possible enough.
+  return A.QR().zeroFix(A, fidx);
 }
 
 template <typename T> std::ostream& operator << (std::ostream& os, const SimpleMatrix<T>& v) {
@@ -3068,9 +3065,9 @@ template <typename T> std::istream& operator >> (std::istream& is, SimpleMatrix<
   return is;
 }
 
-template <typename T> static inline SimpleMatrix<T> log(const SimpleMatrix<T>& m, const int& cut = 200) {
+template <typename T> static inline SimpleMatrix<T> log(const SimpleMatrix<T>& m, const int& cut = 20) {
   SimpleMatrix<T> res(m.rows(), m.cols());
-  const auto c(m.determinant() * T(20));
+  const auto c(abs(m.determinant() * T(20)));
   const auto residue(SimpleMatrix<T>(m.rows(), m.cols()).I() - m / c);
         auto buf(residue);
   res.I(c);
@@ -3203,6 +3200,59 @@ template <typename T> SimpleMatrix<T> diff(const int& size0) {
   return size0 < 0 ? ii : dd;
 }
 
+template <typename T> SimpleMatrix<T> diffRecur(const int& size0) {
+  const auto size(abs(size0));
+  if(! size) {
+    static const SimpleMatrix<T> m0;
+    return m0;
+  }
+  SimpleMatrix<T> dd;
+  SimpleMatrix<T> ii;
+  const auto file(std::string("./.cache/lieonn/diff-recur-") + std::to_string(size) +
+#if defined(_FLOAT_BITS_)
+    std::string("-") + std::to_string(_FLOAT_BITS_)
+#else
+    std::string("-ld")
+#endif
+  );
+  ifstream cache(file.c_str());
+  if(cache.is_open()) {
+    cache >> dd;
+    cache >> ii;
+    cache.close();
+  } else {
+    if(2 < size) {
+      const auto d0(diffRecur<T>(   size - 1 ) * T(size - 1));
+      const auto i0(diffRecur<T>(- (size - 1)) * T(size - 1));
+      dd = SimpleMatrix<T>(size, size).O().setMatrix(0, 0, d0);
+      ii = SimpleMatrix<T>(size, size).O().setMatrix(0, 0, i0);
+      dd.setMatrix(1, 1, dd.subMatrix(1, 1, size - 1, size - 1) + d0);
+      ii.setMatrix(1, 1, ii.subMatrix(1, 1, size - 1, size - 1) + i0);
+      dd.row(0) *= T(2);
+      ii.row(0) *= T(2);
+      dd.row(dd.rows() - 1) *= T(2);
+      ii.row(dd.rows() - 1) *= T(2);
+      dd /= T(2);
+      ii /= T(2);
+    } else {
+      dd = SimpleMatrix<T>(size, size).O();
+      ii = SimpleMatrix<T>(size, size).O();
+    }
+    dd += diff<T>(  size);
+    ii += diff<T>(- size);
+    if(2 < size) {
+      dd /= T(size);
+      ii /= T(size);
+    }
+    ofstream ocache(file.c_str());
+    ocache << dd;
+    ocache << ii;
+    ocache.close();
+    cerr << "." << flush;
+  }
+  return size0 < 0 ? ii : dd;
+}
+
 template <typename T> static inline SimpleVector<T> taylor(const int& size, const T& step) {
   const int  step00(max(int(0), min(size - 1, int(floor(step)))));
   const auto residue0(step - T(step00));
@@ -3231,7 +3281,7 @@ template <typename T> static inline SimpleVector<T> taylor(const int& size, cons
 
 template <typename T> static inline SimpleVector<T> linearInvariant(const SimpleMatrix<T>& in) {
   vector<pair<T, int> > sute;
-  return in.QR().innerFix(in, sute);
+  return in.QR().zeroFix(in, sute);
 }
 
 // N.B. please refer bitsofcotton/randtools.
@@ -3342,6 +3392,35 @@ private:
   feeder f;
 };
 
+template <typename T, typename pred> class shrinkMatrix {
+public:
+  inline shrinkMatrix() { ; }
+  inline shrinkMatrix(pred&& p, const int& len) {
+    d.resize(len);
+    m.resize(len);
+    this->p = p;
+  }
+  inline ~shrinkMatrix() { ; }
+  inline T next(const T& in) {
+    T res(0);
+    for(int i = 1; i < d.size(); i ++) d[i - 1] = move(d[i]);
+    d[d.size() - 1] = in;
+    if(t ++ < d.size()) return res;
+    auto D(d[0]);
+    for(int i = 1; i < d.size(); i ++) D += d[i] * T(i + 1);
+    for(int i = 1; i < m.size(); i ++) m[i - 1] = move(m[i]);
+    m[m.size() - 1] = p.next(D /= T(d.size()));
+    if(t <= d.size() + m.size()) return res;
+    for(int i = 0; i < m.size(); i ++)
+      res += m[i] * T(i + 1);
+    return res /= T(m.size());
+  }
+private:
+  int t;
+  vector<T> d;
+  vector<T> m;
+  pred p;
+};
 
 template <typename T> const T& sgn(const T& x) {
   static const T zero(0);
