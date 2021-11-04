@@ -2242,13 +2242,13 @@ public:
   inline       SimpleMatrix<T>& setMatrix(const int& y, const int& x, const SimpleMatrix<T>& d);
   inline       SimpleMatrix<T>& O(const T& r = T(int(0)));
   inline       SimpleMatrix<T>& I(const T& r = T(int(1)));
-  inline       T                determinant() const;
+  inline       T                determinant(const bool& nonzero = false) const;
   inline       SimpleMatrix<T>  inverse() const;
   inline       SimpleVector<T>  solve(SimpleVector<T> other) const;
   inline       SimpleVector<T>  projectionPt(const SimpleVector<T>& other) const;
   inline       SimpleMatrix<T>& fillP(const vector<int>& idx);
   inline       SimpleMatrix<T>  QR() const;
-  inline       SimpleMatrix<T>  SVD() const;
+  inline       SimpleMatrix<T>  SVD(const int& cut = - 1) const;
   inline       pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > SVD(const SimpleMatrix<T>& src) const;
   inline       SimpleVector<T>  zeroFix(const SimpleMatrix<T>& A, vector<pair<T, int> > fidx);
   inline       SimpleVector<T>  inner(const SimpleVector<T>& bl, const SimpleVector<T>& bu) const;
@@ -2579,7 +2579,7 @@ template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::I(const T& r) {
   return *this;
 }
 
-template <typename T> inline T SimpleMatrix<T>::determinant() const {
+template <typename T> inline T SimpleMatrix<T>::determinant(const bool& nonzero) const {
   assert(0 <= erows && 0 <= ecols && erows == ecols);
   T det(1);
   auto work(*this);
@@ -2591,7 +2591,8 @@ template <typename T> inline T SimpleMatrix<T>::determinant() const {
     swap(work.entity[i], work.entity[xchg]);
     const auto& ei(work.entity[i]);
     const auto& eii(ei[i]);
-    det *= eii;
+    if(! nonzero || ! i || pow(abs(det), T(int(1)) / T(int(i))) * epsilon <= abs(eii))
+      det *= eii;
     if(epsilon * ei.dot(ei) < eii * eii) {
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
@@ -2712,37 +2713,51 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::QR() const {
   return Q.fillP(residue);
 }
 
-template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD() const {
+template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD(const int& cut) const {
   T norm2(int(0));
   for(int i = 0; i < rows(); i ++)
     norm2 = max(norm2, row(i).dot(row(i)));
   if(! isfinite(norm2)) return *this;
-  // N.B. S S^t == L Q Q^t L^t == L L^t.
+  // N.B. S S^t == L Q Q^t L^t == L L^t ~ Q^t L Q Q^t L^t Q.
   //      singular value on L is same on S, S is symmetric.
   const auto S(*this * transpose());
   const auto R(S.QR() * S);
-        auto Ut(SimpleMatrix<T>(S.rows(), S.cols()).O());
-  vector<int> fill;
-  fill.reserve(Ut.rows());
-  // XXX: we can boost this function with
-  //   S = counterI L counterI L compilicated form,
-  // in such case, we should repalce rows by reverse order first,
-  // then, some transpose is needed.
-  //  after all we get (L - lambda I) x == 0 whole.
-  for(int i = 0; i < Ut.rows(); i ++) {
-    // R(i, i) is singular value on S.
-    auto SS(S);
-    SS = S - SS.I(R(i, i));
-    const auto work(SimpleMatrix<T>(Ut.cols() - 1, Ut.cols() - 1).O().setMatrix(0, 0, SS.subMatrix(0, 0, i, i)).setMatrix(i, 0, SS.subMatrix(i + 1, 0, SS.rows() - i - 1, i)).setMatrix(0, i, SS.subMatrix(0, i + 1, i, SS.cols() - i - 1)).setMatrix(i, i, SS.subMatrix(i + 1, i + 1, SS.rows() - i - 1, SS.cols() - i - 1)).solve(- SimpleVector<T>(Ut.cols() - 1).O().setVector(0, SS.col(i).subVector(0, i)).setVector(i, SS.col(i).subVector(i + 1, SS.rows() - i - 1))));
-    Ut.row(i).setVector(0, work.subVector(0, i)).setVector(i + 1, work.subVector(i, work.size() - i));
-    Ut(i, i) = (SS.row(i).dot(Ut.row(i)) - R(i, i)) / (SS(i, i) - R(i, i));
-    const auto n2(Ut.row(i).dot(Ut.row(i)));
-    if(n2 <= epsilon * norm2)
-      fill.emplace_back(i);
-    else
-      Ut.row(i) /= sqrt(n2);
+  const auto Qt(SimpleMatrix<T>(S.rows(), S.cols()).O().setMatrix(0, 0, *this).QR());
+  // N.B. A = QR, (S - lambda I)x = 0 <=> R^t Q^t U = R^-1 Q^t U Lambda
+  //          <=> R^t Q^t U Lambda' = R^-1 Q^t U Lambda'^(- 1)
+  //      A := R^t, B := Q^t U, C := Lambda'
+  //          (A + A^-t)*B*(C + C^-1) - A^-t B C - A B C^- 1 = 2 A B C
+  //          <=> (A + A^-t) * B * (C + C^-1) = (2I + A^-2t + A^2) * ABC
+  //        <=> B = (A + A^-t)^-1 * (2I + A^-2t + A^2) * B * C * (C + C^-1)^- 1
+  const auto A((Qt * SimpleMatrix<T>(Qt.rows(), Qt.cols()).O().setMatrix(0, 0, *this)).transpose());
+  SimpleMatrix<T> C(R.rows(), R.cols());
+  C.O();
+  for(int i = 0; i < C.rows(); i ++)
+    C(i, i) = sqrt(abs(R(i, i)));
+  auto Left((A + A.transpose().inverse()).inverse() * (SimpleMatrix<T>(A.rows(), A.cols()).I(T(int(2))) + A.transpose().inverse() * A.transpose().inverse() + A * A));
+  auto Right(C.inverse() * (C + C.inverse()).inverse());
+  auto before(Left * Right);
+  for(int i = 0; cut < 0 || i < cut; i ++) {
+    Left  = Left  * Left;
+    Right = Right * Right;
+    T r(Left.row(0).dot(Left.row(0)));
+    for(int i = 1; i < Left.rows(); i ++)
+      r = max(r, Left.row(i).dot(Left.row(i)));
+    for(int i = 0; i < Right.rows(); i ++)
+      r = max(r, Right.row(i).dot(Right.row(i)));
+    before /= r * r;
+    Left   /= r;
+    Right  /= r;
+          auto next(Left * Right);
+    const auto err(next - before);
+          T    er(err.row(0).dot(err.row(0)));
+    for(int i = 1; i < err.rows(); i ++)
+      er = max(er, err.row(i).dot(err.row(i)));
+    if(er < epsilon || ! isfinite(er))
+      break;
+    before = move(next);
   }
-  return Ut.fillP(fill);
+  return Qt.transpose() * before.QR().transpose();
 }
 
 template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > SimpleMatrix<T>::SVD(const SimpleMatrix<T>& src) const {
@@ -3094,7 +3109,7 @@ template <typename T> std::istream& operator >> (std::istream& is, SimpleMatrix<
   return is;
 }
 
-template <typename T> static inline SimpleMatrix<T> log(const SimpleMatrix<T>& m, const int& cut = 20) {
+template <typename T> static inline SimpleMatrix<T> log(const SimpleMatrix<T>& m, const int& cut = 2000) {
   T norm2(int(0));
   for(int i = 0; i < m.rows(); i ++)
     norm2 = max(norm2, m.row(i).dot(m.row(i)));
