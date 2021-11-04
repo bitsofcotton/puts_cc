@@ -2692,6 +2692,10 @@ template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::fillP(const vecto
 
 template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::QR() const {
   assert(0 < this->cols() && this->cols() <= this->rows());
+  T norm2(int(0));
+  for(int i = 0; i < rows(); i ++)
+    norm2 = max(norm2, row(i).dot(row(i)));
+  if(! isfinite(norm2)) return *this;
   SimpleMatrix<T> Q(this->cols(), this->rows());
   Q.O();
   vector<int> residue;
@@ -2700,18 +2704,21 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::QR() const {
     const auto Atrowi(this->col(i));
     const auto work(Atrowi - Q.projectionPt(Atrowi));
     const auto n2(work.dot(work));
-    if(n2 <= epsilon) {
+    if(n2 <= epsilon * norm2)
       residue.emplace_back(i);
-      continue;
-    }
-    Q.row(i) = work / sqrt(n2);
+    else
+      Q.row(i) = work / sqrt(n2);
   }
   return Q.fillP(residue);
 }
 
 template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD() const {
+  T norm2(int(0));
+  for(int i = 0; i < rows(); i ++)
+    norm2 = max(norm2, row(i).dot(row(i)));
+  if(! isfinite(norm2)) return *this;
   // N.B. S S^t == L Q Q^t L^t == L L^t.
-  //      eigen value on L is same on S, S is symmetric.
+  //      singular value on L is same on S, S is symmetric.
   const auto S(*this * transpose());
   const auto R(S.QR() * S);
         auto Ut(SimpleMatrix<T>(S.rows(), S.cols()).O());
@@ -2723,13 +2730,14 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD() const {
   // then, some transpose is needed.
   //  after all we get (L - lambda I) x == 0 whole.
   for(int i = 0; i < Ut.rows(); i ++) {
-    // singular index is same as vanish index.
+    // R(i, i) is singular value on S.
     auto SS(S);
     SS = S - SS.I(R(i, i));
-    const auto work(SimpleMatrix<T>(Ut.cols() - 1, Ut.cols() - 1).O().setMatrix(0, 0, SS.subMatrix(0, 0, i, i)).setMatrix(i, 0, SS.subMatrix(i + 1, 0, SS.rows() - i - 1, i)).setMatrix(0, i, SS.subMatrix(0, i + 1, i, SS.cols() - i - 1)).setMatrix(i, i, SS.subMatrix(i + 1, i + 1, SS.rows() - i - 1, SS.cols() - i - 1)).solve(SimpleVector<T>(Ut.cols() - 1).O().setVector(0, SS.col(i).subVector(0, i)).setVector(i, SS.col(i).subVector(i + 1, SS.rows() - i - 1))));
+    const auto work(SimpleMatrix<T>(Ut.cols() - 1, Ut.cols() - 1).O().setMatrix(0, 0, SS.subMatrix(0, 0, i, i)).setMatrix(i, 0, SS.subMatrix(i + 1, 0, SS.rows() - i - 1, i)).setMatrix(0, i, SS.subMatrix(0, i + 1, i, SS.cols() - i - 1)).setMatrix(i, i, SS.subMatrix(i + 1, i + 1, SS.rows() - i - 1, SS.cols() - i - 1)).solve(- SimpleVector<T>(Ut.cols() - 1).O().setVector(0, SS.col(i).subVector(0, i)).setVector(i, SS.col(i).subVector(i + 1, SS.rows() - i - 1))));
     Ut.row(i).setVector(0, work.subVector(0, i)).setVector(i + 1, work.subVector(i, work.size() - i));
+    Ut(i, i) = (SS.row(i).dot(Ut.row(i)) - R(i, i)) / (SS(i, i) - R(i, i));
     const auto n2(Ut.row(i).dot(Ut.row(i)));
-    if(n2 <= epsilon)
+    if(n2 <= epsilon * norm2)
       fill.emplace_back(i);
     else
       Ut.row(i) /= sqrt(n2);
@@ -2738,6 +2746,12 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD() const {
 }
 
 template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > SimpleMatrix<T>::SVD(const SimpleMatrix<T>& src) const {
+  T norm2(int(0));
+  for(int i = 0; i < rows(); i ++)
+    norm2 = max(norm2, row(i).dot(row(i)));
+  for(int i = 0; i < src.rows(); i ++)
+    norm2 = max(norm2, src.row(i).dot(src.row(i)));
+  if(! isfinite(norm2)) return *this;
   // refered from : https://en.wikipedia.org/wiki/Generalized_singular_value_decomposition .
   assert(this->cols() == src.cols());
   SimpleMatrix<T> C(this->rows() + src.rows(), this->cols());
@@ -2750,8 +2764,7 @@ template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, Simpl
   fill.reserve(d.size());
   for(int i = 0; i < d.size(); i ++) {
     d[i] = Qt.row(i).dot(Qt.row(i));
-    // XXX ratio:
-    if(d[i] <= epsilon) {
+    if(d[i] <= epsilon * norm2) {
       fill.emplace_back(i);
       d[i] = sqrt(d[i]);
     } else
@@ -2920,11 +2933,27 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::inner(const Simple
     } else if(bu[i] == bl[i])
       fidx.emplace_back(make_pair(- T(int(bu[i] == T(0) ? 0 : 1)), i));
     assert(bL[i] <= bU[i] && abs(bL[i]) <= abs(bU[i]));
-    A.row(i) /= T(2) * bU[i] - bL[i];
+    A.row(i) /= (T(2) * bU[i] - bL[i]) / T(2);
     assert(isfinite(A.row(i).dot(A.row(i))));
   }
   // N.B. in zeroFix, we get linear Invariant s.t. |Ax| <= 1 possible enough.
-  return A.QR().zeroFix(A, fidx);
+        auto res(A.QR().zeroFix(A, fidx));
+  const auto z(*this * res * T(int(8)));
+        T    t(int(1));
+  for(int i = 0; i < z.size(); i ++) {
+    if(bl[i] * z[i] < T(int(0))) {
+      if(bu[i] * z[i] < T(int(0))) // N.B.: infeasible.
+        continue;
+      else if(z[i] != T(int(0)))
+        t = min(t, bu[i] / z[i]);
+    } else if(z[i] != T(int(0))) {
+      if(bu[i] * z[i] < T(int(0)))
+        t = min(t, bl[i] / z[i]);
+      else
+        t = min(t, min(bu[i] / z[i], bl[i] / z[i]));
+    }
+  }
+  return res *= t;
 }
 
 template <typename T> std::ostream& operator << (std::ostream& os, const SimpleMatrix<T>& v) {
@@ -3066,8 +3095,11 @@ template <typename T> std::istream& operator >> (std::istream& is, SimpleMatrix<
 }
 
 template <typename T> static inline SimpleMatrix<T> log(const SimpleMatrix<T>& m, const int& cut = 20) {
+  T norm2(int(0));
+  for(int i = 0; i < m.rows(); i ++)
+    norm2 = max(norm2, m.row(i).dot(m.row(i)));
   SimpleMatrix<T> res(m.rows(), m.cols());
-  const auto c(abs(m.determinant() * T(20)));
+  const auto c(max(norm2, abs(m.determinant()) * T(8)));
   const auto residue(SimpleMatrix<T>(m.rows(), m.cols()).I() - m / c);
         auto buf(residue);
   res.I(c);
@@ -3160,7 +3192,7 @@ template <typename T> SimpleMatrix<T> diff(const int& size0) {
     cache >> ii;
     cache.close();
   } else {
-    // XXX: if we return recursive each size diff,
+    // N.B. if we return recursive each size diff,
     //      taylor series should be broken.
     auto DD(dft<T>(size));
     auto II(dft<T>(size));
@@ -3177,73 +3209,20 @@ template <typename T> SimpleMatrix<T> diff(const int& size0) {
       II.row(i) /= - complex<T>(T(int(0)), - T(int(2)) * Pi * T(i) / T(DD.rows()));
     // N.B. if we apply DD onto 1 / (1 / f(x)) graph, it's reverse order.
     //      if we average them, it's the only 0 vector.
-    // XXX: there exists also completely correct differential matrix,
+    // N.B. there exists also completely correct differential matrix,
     //      but it's also be only 0 vector.
     //      (because it's a imaginary part on originals.)
     // N.B. in continuous function, we don't divide dd by &pi;.
     //      (d/dx sum exp(2 Pi i x theta / N) exp(- 2 Pi i y theta / N) f(y)).
-    // XXX: from some numerical test, sign on DD, II is reverse side.
-    // XXX: In discrete function, we had be chosen ||dd|| := 1, and not now.
+    // N.B. from some numerical test, sign on DD, II is reverse side.
+    // N.B. In discrete function, we had be chosen ||dd|| := 1, and not now.
     //      (because the (left or right) differential itself cannot be
     //       larger than |x_{k+1}-x_k| < ||x|| in discrete,
     //       sum_0^1 - 2 Pi i (theta/n)^2/2 -&gt; Pi)
-    // XXX: if we make plain differential with no error on cosine curve,
+    // N.B. if we make plain differential with no error on cosine curve,
     //      it causes constant 0 vector.
     dd = (dft<T>(- size) * DD).template real<T>();
     ii = (dft<T>(- size) * II).template real<T>();
-    ofstream ocache(file.c_str());
-    ocache << dd;
-    ocache << ii;
-    ocache.close();
-    cerr << "." << flush;
-  }
-  return size0 < 0 ? ii : dd;
-}
-
-template <typename T> SimpleMatrix<T> diffRecur(const int& size0) {
-  const auto size(abs(size0));
-  if(! size) {
-    static const SimpleMatrix<T> m0;
-    return m0;
-  }
-  SimpleMatrix<T> dd;
-  SimpleMatrix<T> ii;
-  const auto file(std::string("./.cache/lieonn/diff-recur-") + std::to_string(size) +
-#if defined(_FLOAT_BITS_)
-    std::string("-") + std::to_string(_FLOAT_BITS_)
-#else
-    std::string("-ld")
-#endif
-  );
-  ifstream cache(file.c_str());
-  if(cache.is_open()) {
-    cache >> dd;
-    cache >> ii;
-    cache.close();
-  } else {
-    if(2 < size) {
-      const auto d0(diffRecur<T>(   size - 1 ) * T(size - 1));
-      const auto i0(diffRecur<T>(- (size - 1)) * T(size - 1));
-      dd = SimpleMatrix<T>(size, size).O().setMatrix(0, 0, d0);
-      ii = SimpleMatrix<T>(size, size).O().setMatrix(0, 0, i0);
-      dd.setMatrix(1, 1, dd.subMatrix(1, 1, size - 1, size - 1) + d0);
-      ii.setMatrix(1, 1, ii.subMatrix(1, 1, size - 1, size - 1) + i0);
-      dd.row(0) *= T(2);
-      ii.row(0) *= T(2);
-      dd.row(dd.rows() - 1) *= T(2);
-      ii.row(dd.rows() - 1) *= T(2);
-      dd /= T(2);
-      ii /= T(2);
-    } else {
-      dd = SimpleMatrix<T>(size, size).O();
-      ii = SimpleMatrix<T>(size, size).O();
-    }
-    dd += diff<T>(  size);
-    ii += diff<T>(- size);
-    if(2 < size) {
-      dd /= T(size);
-      ii /= T(size);
-    }
     ofstream ocache(file.c_str());
     ocache << dd;
     ocache << ii;
@@ -3286,12 +3265,11 @@ template <typename T> static inline SimpleVector<T> linearInvariant(const Simple
 
 // N.B. please refer bitsofcotton/randtools.
 template <typename T> static inline pair<SimpleVector<T>, T> makeProgramInvariant(const SimpleVector<T>& in, const T& index = - T(int(1))) {
-  SimpleVector<T> res(in.size() + (T(int(0)) <= index ? 3 : 2));
+  SimpleVector<T> res(in.size() + (T(int(0)) <= index ? 2 : 1));
   res.setVector(0, in);
   res[in.size()] = T(int(1));
   if(T(int(0)) <= index)
     res[in.size() + 1] = T(index);
-  res[res.size() - 1] = T(int(0));
   T   lsum(0);
   for(int i = 0; i < res.size() - 1; i ++) {
     assert(- T(int(1)) <= res[i] && res[i] <= T(int(1)));
@@ -3302,7 +3280,6 @@ template <typename T> static inline pair<SimpleVector<T>, T> makeProgramInvarian
   // N.B. x_1 ... x_n == 1.
   // <=> x_1 / (x_1 ... x_n)^(1/n) ... == 1.
   if(lsum != T(int(0))) res /= ratio = exp(lsum / T(res.size() - 1));
-  res[res.size() - 1] = T(int(1));
   return make_pair(res, ratio);
 }
 
@@ -3352,14 +3329,23 @@ private:
   feeder f;
 };
 
-template <typename T, typename feeder> class linearFeeder {
+template <typename T, typename feeder> class deltaFeeder {
 public:
-  inline linearFeeder() { full = false; }
-  inline linearFeeder(const int& size) { f = feeder(size); full = false; }
-  inline ~linearFeeder() { ; }
+  inline deltaFeeder() { full = false; }
+  inline deltaFeeder(const int& size) {
+    f = feeder(size);
+    res.resize(size);
+    res.O();
+    full = false;
+  }
+  inline ~deltaFeeder() { ; }
   inline const SimpleVector<T>& next(const T& in) {
-    res  = f.next(in);
+    const auto& buf(f.next(in));
+    assert(buf.size() == res.size());
     full = f.full;
+    res[0] = T(int(0));
+    for(int i = 1; i < res.size(); i ++)
+      res[i] = buf[i] - buf[i - 1];
     return res;
   }
   SimpleVector<T> res;
@@ -3396,8 +3382,8 @@ template <typename T, typename pred> class shrinkMatrix {
 public:
   inline shrinkMatrix() { ; }
   inline shrinkMatrix(pred&& p, const int& len) {
-    d.resize(len);
-    m.resize(len);
+    d.resize(abs(len));
+    m.resize(abs(len));
     this->p = p;
   }
   inline ~shrinkMatrix() { ; }
@@ -3407,12 +3393,12 @@ public:
     d[d.size() - 1] = in;
     if(t ++ < d.size()) return res;
     auto D(d[0]);
-    for(int i = 1; i < d.size(); i ++) D += d[i] * T(i + 1);
+    for(int i = 1; i < d.size(); i ++) D += d[i];
     for(int i = 1; i < m.size(); i ++) m[i - 1] = move(m[i]);
-    m[m.size() - 1] = p.next(D /= T(d.size()));
+    m[m.size() - 1] = p.next(D) - (D - d[0]);
     if(t <= d.size() + m.size()) return res;
     for(int i = 0; i < m.size(); i ++)
-      res += m[i] * T(i + 1);
+      res += m[i];
     return res /= T(m.size());
   }
 private:
