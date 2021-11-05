@@ -2248,7 +2248,7 @@ public:
   inline       SimpleVector<T>  projectionPt(const SimpleVector<T>& other) const;
   inline       SimpleMatrix<T>& fillP(const vector<int>& idx);
   inline       SimpleMatrix<T>  QR() const;
-  inline       SimpleMatrix<T>  SVD(const int& cut = - 1) const;
+  inline       SimpleMatrix<T>  SVD(const int& cut = 200) const;
   inline       pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > SVD(const SimpleMatrix<T>& src) const;
   inline       SimpleVector<T>  zeroFix(const SimpleMatrix<T>& A, vector<pair<T, int> > fidx);
   inline       SimpleVector<T>  inner(const SimpleVector<T>& bl, const SimpleVector<T>& bu) const;
@@ -2692,12 +2692,11 @@ template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::fillP(const vecto
 }
 
 template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::QR() const {
-  assert(0 < this->cols() && this->cols() <= this->rows());
   T norm2(int(0));
   for(int i = 0; i < rows(); i ++)
     norm2 = max(norm2, row(i).dot(row(i)));
   if(! isfinite(norm2)) return *this;
-  SimpleMatrix<T> Q(this->cols(), this->rows());
+  SimpleMatrix<T> Q(min(this->rows(), this->cols()), this->rows());
   Q.O();
   vector<int> residue;
   residue.reserve(Q.rows());
@@ -2714,50 +2713,60 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::QR() const {
 }
 
 template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD(const int& cut) const {
-  T norm2(int(0));
-  for(int i = 0; i < rows(); i ++)
-    norm2 = max(norm2, row(i).dot(row(i)));
-  if(! isfinite(norm2)) return *this;
-  // N.B. S S^t == L Q Q^t L^t == L L^t ~ Q^t L Q Q^t L^t Q.
-  //      singular value on L is same on S, S is symmetric.
-  const auto S(*this * transpose());
-  const auto R(S.QR() * S);
-  const auto Qt(SimpleMatrix<T>(S.rows(), S.cols()).O().setMatrix(0, 0, *this).QR());
+  if(cols() < rows()) {
+    auto work(transpose().SVD() * transpose());
+    T    Mnorm2(int(0));
+    SimpleVector<T> norm2(work.rows());
+    for(int i = 0; i < work.rows(); i ++)
+      Mnorm2 = max(Mnorm2, norm2[i] = work.row(i).dot(work.row(i)));
+    for(int i = 0; i < work.rows(); i ++) {
+      if(epsilon * Mnorm2 < norm2[i])
+        work.row(i) /= sqrt(norm2[i]);
+    }
+    return move(work);
+  }
   // N.B. A = QR, (S - lambda I)x = 0 <=> R^t Q^t U = R^-1 Q^t U Lambda
-  //          <=> R^t Q^t U Lambda' = R^-1 Q^t U Lambda'^(- 1)
+  //        <=> R^t Q^t U Lambda' = R^-1 Q^t U Lambda'^(- 1)
   //      A := R^t, B := Q^t U, C := Lambda'
-  //          (A + A^-t)*B*(C + C^-1) - A^-t B C - A B C^- 1 = 2 A B C
-  //          <=> (A + A^-t) * B * (C + C^-1) = (2I + A^-2t + A^2) * ABC
-  //        <=> B = (A + A^-t)^-1 * (2I + A^-2t + A^2) * B * C * (C + C^-1)^- 1
-  const auto A((Qt * SimpleMatrix<T>(Qt.rows(), Qt.cols()).O().setMatrix(0, 0, *this)).transpose());
-  SimpleMatrix<T> C(R.rows(), R.cols());
-  C.O();
-  for(int i = 0; i < C.rows(); i ++)
-    C(i, i) = sqrt(abs(R(i, i)));
-  auto Left((A + A.transpose().inverse()).inverse() * (SimpleMatrix<T>(A.rows(), A.cols()).I(T(int(2))) + A.transpose().inverse() * A.transpose().inverse() + A * A));
-  auto Right(C.inverse() * (C + C.inverse()).inverse());
+  //          (A + A^-t)*B*(C + C^-1) - A^-t B C - A B C^-1 = 2 A B C
+  //        <=> (A + A^-t) * B * (C + C^-1) = (2I + A^-tA^-1 + A^(1+t)) * ABC
+  //        <=> B = A^-1 (2I + A^-(t+1) + A^(1+t))^-1 (A + A^-t) * B *
+  //                (C + C^-1) * C^-1
+  // N.B. singular value on QRR^tQ^t is same as singular value on R.
+  const auto S(*this * transpose());
+  const auto SS(S * S);
+  const auto R(SS.QR() * SS);
+  const auto Qt(S.QR());
+  const auto A((Qt * S).transpose());
+  const auto A1t(A * A.transpose());
+        auto Left(A.inverse() * (SimpleMatrix<T>(A.rows(), A.cols()).I(T(int(2))) + A1t.inverse() + A1t).inverse() * (A + A.transpose().inverse()));
+        auto Right(SimpleMatrix<T>(Left.rows(), Left.cols()).O());
+  for(int i = 0; i < Right.rows(); i ++)
+    Right(i, i) = abs(R(i, i)) + T(int(1));
+  // N.B. now we have B = Left * B * Right.
   auto before(Left * Right);
   for(int i = 0; cut < 0 || i < cut; i ++) {
     Left  = Left  * Left;
     Right = Right * Right;
-    T r(Left.row(0).dot(Left.row(0)));
+    auto rl(Left.row(0).dot(Left.row(0)));
+    auto rr(Right.row(0).dot(Right.row(0)));
     for(int i = 1; i < Left.rows(); i ++)
-      r = max(r, Left.row(i).dot(Left.row(i)));
-    for(int i = 0; i < Right.rows(); i ++)
-      r = max(r, Right.row(i).dot(Right.row(i)));
-    before /= r * r;
-    Left   /= r;
-    Right  /= r;
+      rl = max(rl, Left.row(i).dot(Left.row(i)));
+    for(int i = 1; i < Right.rows(); i ++)
+      rr = max(rr, Right.row(i).dot(Right.row(i)));
+    Left   /= (rl = sqrt(rl));
+    Right  /= (rr = sqrt(rr));
+    before /= rl * rr;
           auto next(Left * Right);
     const auto err(next - before);
-          T    er(err.row(0).dot(err.row(0)));
+          auto er(err.row(0).dot(err.row(0)));
     for(int i = 1; i < err.rows(); i ++)
       er = max(er, err.row(i).dot(err.row(i)));
     if(er < epsilon || ! isfinite(er))
       break;
     before = move(next);
   }
-  return Qt.transpose() * before.QR().transpose();
+  return before.QR() * Qt;
 }
 
 template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > SimpleMatrix<T>::SVD(const SimpleMatrix<T>& src) const {
