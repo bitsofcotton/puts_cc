@@ -117,10 +117,12 @@ public:
   inline                operator T    () const;
   inline                operator DUInt<T,bits> () const;
 
-  // friend std::ostream&  operator << (std::ostream& os, DUInt<T,bits>  v);
-  // friend std::istream&  operator >> (std::istream& is, DUInt<T,bits>& v);
-
   T e[2];
+/*
+friend:
+  std::ostream&  operator << (std::ostream& os, DUInt<T,bits>  v);
+  std::istream&  operator >> (std::istream& is, DUInt<T,bits>& v);
+*/
 };
 
 template <typename T, int bits> inline DUInt<T,bits>::DUInt() {
@@ -430,24 +432,23 @@ template <typename T, int bits> inline           DUInt<T,bits>::operator DUInt<T
 }
 
 template <typename T, int bits> std::ostream&  operator << (std::ostream& os, DUInt<T,bits> v) {
-  const static DUInt<T,bits> ten(10);
+  static const char table[0x10] = {'0', '1', '2', '3', '4', '5', '6', '7', '8',
+    '9', 'a', 'b', 'c', 'd', 'e', 'f'};
   vector<char> buf;
   while(v) {
-    const auto div(v / ten);
-    buf.emplace_back(int(v - div * ten));
-    v = div;
+    buf.emplace_back(table[int(v) & 0x0f]);
+    v >>= 4;
   }
   if(buf.size()) {
     for(int i = 0; 0 <= i && i < buf.size(); i ++)
-      os << int(buf[buf.size() - 1 - i]);
+      os << char(buf[buf.size() - 1 - i]);
     return os;
   }
   return os << '0';
 }
 
 template <typename T, int bits> std::istream&  operator >> (std::istream& is, DUInt<T,bits>& v) {
-  const static DUInt<T,bits> ten(10);
-  v = DUInt<T,bits>(0);
+  v ^= v;
   // skip white spaces.
   while(! is.eof()) {
     const auto buf(is.get());
@@ -459,8 +460,11 @@ template <typename T, int bits> std::istream&  operator >> (std::istream& is, DU
   while(! is.eof() ) {
     const auto buf(is.get());
     if('0' <= buf && buf <= '9') {
-      v *= ten;
-      v += DUInt<T,bits>(int(buf - '0'));
+      v <<= 4;
+      v |= DUInt<T,bits>(int(buf - '0'));
+    } else if('a' <= buf && buf <= 'f') {
+      v <<= 4;
+      v |= DUInt<T,bits>(int(buf - 'a' + 10));
     } else {
       is.unget();
       break;
@@ -481,7 +485,10 @@ public:
   inline bool operator <= (const Signed<T,bits>& src) const;
   inline bool operator >  (const Signed<T,bits>& src) const;
   inline bool operator >= (const Signed<T,bits>& src) const;
-  // friend std::ostream&  operator << (std::ostream& os, Signed<T,bits> v);
+/*
+friend:
+  std::ostream&  operator << (std::ostream& os, Signed<T,bits> v);
+*/
 };
 
 template <typename T, int bits> inline Signed<T,bits>::Signed() {
@@ -581,9 +588,6 @@ public:
          SimpleFloat<T,W,bits,U>  atan() const;
   inline SimpleFloat<T,W,bits,U>  sqrt() const;
   
-  // friend std::ostream&    operator << (std::ostream& os, const SimpleFloat<T,W,bits,U>& v);
-  // friend std::istream&    operator >> (std::istream& is, SimpleFloat<T,W,bits,U>& v);
-  
   unsigned char s;
   typedef enum {
     INF = 0,
@@ -611,6 +615,11 @@ private:
   // XXX: these are NOT threadsafe on first call.
   const vector<SimpleFloat<T,W,bits,U> >& exparray()    const;
   const vector<SimpleFloat<T,W,bits,U> >& invexparray() const;
+/*
+friend:
+  std::ostream&    operator << (std::ostream& os, const SimpleFloat<T,W,bits,U>& v);
+  std::istream&    operator >> (std::istream& is, SimpleFloat<T,W,bits,U>& v);
+*/
 };
 
 template <typename T, typename W, int bits, typename U> inline SimpleFloat<T,W,bits,U>::SimpleFloat() {
@@ -1118,6 +1127,8 @@ template <typename T, typename W, int bits, typename U> SimpleFloat<T,W,bits,U> 
       return s & (1 << SIGN) ? - halfpi() : halfpi();
     return *this;
   }
+  if(s & (1 << SIGN))
+    return - (- *this).atan();
   static const auto half(one() >> U(1));
   static const auto four(one() << U(2));
   static const auto five((one() << U(2)) + one());
@@ -1149,8 +1160,6 @@ template <typename T, typename W, int bits, typename U> SimpleFloat<T,W,bits,U> 
   //       (v = x - .5 and 0 <= 2y - 1)
   if(- two() <= *this && *this <= two()) {
     static const auto atanhalf(half.atan());
-    if(s & (1 << SIGN))
-      return - (- *this).atan();
     const auto v(five * *this / (four + (*this << U(1))) - half);
     assert(v < *this);
     return atanhalf + v.atan();
@@ -1158,14 +1167,15 @@ template <typename T, typename W, int bits, typename U> SimpleFloat<T,W,bits,U> 
   // N.B.
   //    in u = v case,
   //  2 atan(u) = atan(2 * u / (1 - u * u))
-  //    in u := x + 1 case,
-  //  2 atan(1 + x) = atan(2 * (1 + x) / (x + x * x))
-  //                = atan(2 / x)
-  //    in Y := 2 / x case,
-  //  atan(Y) = 2 atan(1 + 2 / Y)
-  const auto y(one() + two() / (*this));
-  assert(- two() <= y && y <= two());
-  return y.atan() << U(1);
+  //  2 atan(u) = atan(2 * u / (1 - u) / (1 + u))
+  //            = atan(2 / (1 / u - u))
+  //    in 2Y := 1 / u - u case,
+  //            = atan(1 / Y),
+  //  u^2 + 2Yu - 1 == 0, u = - Y \pm sqrt(Y^2 + 1)
+  const auto Y(one() / (*this));
+  const auto u((Y * Y + one()).sqrt() - Y);
+  assert(- *this < u && u < *this);
+  return u.atan() << U(1);
 }
 
 template <typename T, typename W, int bits, typename U> const vector<SimpleFloat<T,W,bits,U> >& SimpleFloat<T,W,bits,U>::exparray() const {
@@ -1261,16 +1271,16 @@ template <typename T, typename W, int bits, typename U> inline SimpleFloat<T,W,b
 }
 
 template <typename T, typename W, int bits, typename U> std::ostream& operator << (std::ostream& os, const SimpleFloat<T,W,bits,U>& v) {
+  static const U uzero(int(0));
   if(isnan(v))
     return os << "NaN ";
   if(isinf(v))
     return os << (const char*)(v.s & (1 << v.SIGN) ? "-" : "") << "Inf ";
-  return os << (const char*)(v.s & (1 << v.SIGN) ? "-" : "") << T(v.m) << "*2^" << v.e << " ";
+  return os << (const char*)(v.s & (1 << v.SIGN) ? "-" : "") << std::hex << T(v.m) << "*2^" << (const char*)(v.e < uzero ? "-" : "") << (v.e < uzero ? U(- v.e) : v.e) << " " << std::dec;
 }
 
 template <typename T, typename W, int bits, typename U> std::istream& operator >> (std::istream& is, SimpleFloat<T,W,bits,U>& v) {
   const static SimpleFloat<T,W,bits,U> two(2);
-  const static SimpleFloat<T,W,bits,U> ten(10);
                SimpleFloat<T,W,bits,U> e(0);
   bool mode(false);
   bool sign(false);
@@ -1318,11 +1328,21 @@ template <typename T, typename W, int bits, typename U> std::istream& operator >
     case '0': case '1': case '2': case '3': case '4':
     case '5': case '6': case '7': case '8': case '9':
       if(mode) {
-        e *= ten;
-        e += SimpleFloat<T,W,bits,U>(int(buf - '0'));
+        e <<= U(int(4));
+        e  += SimpleFloat<T,W,bits,U>(int(buf - '0'));
       } else {
-        v *= ten;
-        v += SimpleFloat<T,W,bits,U>(int(buf - '0'));
+        v <<= U(int(4));
+        v  += SimpleFloat<T,W,bits,U>(int(buf - '0'));
+      }
+      fsign = true;
+      break;
+    case 'a': case'b': case 'c': case 'd': case 'e': case 'f':
+      if(mode) {
+        e <<= U(int(4));
+        e  += SimpleFloat<T,W,bits,U>(int(buf - 'a' + 10));
+      } else {
+        v <<= U(int(4));
+        v  += SimpleFloat<T,W,bits,U>(int(buf - 'a' + 10));
       }
       fsign = true;
       break;
@@ -1787,32 +1807,32 @@ template <typename T> using complex = Complex<T>;
 # if _FLOAT_BITS_ == 8
   typedef uint8_t myuint;
   typedef int8_t  myint;
-  typedef SimpleFloat<myuint, uint16_t, 8, int64_t> myfloat;
+  typedef SimpleFloat<myuint, uint16_t, 8, myint> myfloat;
 # elif _FLOAT_BITS_ == 16
   typedef uint16_t myuint;
   typedef int16_t  myint;
-  typedef SimpleFloat<myuint, uint32_t, 16, int64_t> myfloat;
+  typedef SimpleFloat<myuint, uint32_t, 16, myint> myfloat;
 # elif _FLOAT_BITS_ == 32
   typedef uint32_t myuint;
   typedef int32_t  myint;
-  typedef SimpleFloat<myuint, uint64_t, 32, int64_t> myfloat;
+  typedef SimpleFloat<myuint, uint64_t, 32, myint> myfloat;
 # elif _FLOAT_BITS_ == 64
   typedef uint64_t myuint;
   typedef int64_t  myint;
-  typedef SimpleFloat<myuint, DUInt<myuint, 64>, 64, int64_t> myfloat;
+  typedef SimpleFloat<myuint, unsigned __int128, 64, myint> myfloat;
 # elif _FLOAT_BITS_ == 128
   typedef DUInt<uint64_t, 64> uint128_t;
   typedef Signed<uint128_t, 128> int128_t;
   typedef uint128_t myuint;
   typedef int128_t  myint;
-  typedef SimpleFloat<myuint, DUInt<myuint, 128>, 128, int64_t> myfloat;
+  typedef SimpleFloat<myuint, DUInt<myuint, 128>, 128, myint> myfloat;
 # elif _FLOAT_BITS_ == 256
   typedef DUInt<uint64_t, 64> uint128_t;
   typedef DUInt<uint128_t, 128> uint256_t;
   typedef Signed<uint256_t, 256> int256_t;
   typedef uint256_t myuint;
   typedef int256_t  myint;
-  typedef SimpleFloat<myuint, DUInt<myuint, 256>, 256, int64_t> myfloat;
+  typedef SimpleFloat<myuint, DUInt<myuint, 256>, 256, myint> myfloat;
 # elif _FLOAT_BITS_ == 512
   typedef DUInt<uint64_t, 64> uint128_t;
   typedef DUInt<uint128_t, 128> uint256_t;
@@ -1820,7 +1840,7 @@ template <typename T> using complex = Complex<T>;
   typedef Signed<uint512_t, 512> int512_t;
   typedef uint512_t myuint;
   typedef int512_t  myint;
-  typedef SimpleFloat<myuint, DUInt<myuint, 512>, 512, int64_t> myfloat;
+  typedef SimpleFloat<myuint, DUInt<myuint, 512>, 512, myint> myfloat;
 # elif _FLOAT_BITS_ == 1024
   typedef DUInt<uint64_t, 64> uint128_t;
   typedef DUInt<uint128_t, 128> uint256_t;
@@ -1829,7 +1849,7 @@ template <typename T> using complex = Complex<T>;
   typedef Signed<uint1024_t, 1024> int1024_t;
   typedef uint1024_t myuint;
   typedef int1024_t  myint;
-  typedef SimpleFloat<myuint, DUInt<myuint, 1024>, 1024, int64_t> myfloat;
+  typedef SimpleFloat<myuint, DUInt<myuint, 1024>, 1024, myint> myfloat;
 # else
 #   error cannot handle float
 # endif
@@ -2202,7 +2222,7 @@ public:
   inline       SimpleVector<T>  projectionPt(const SimpleVector<T>& other) const;
   inline       SimpleMatrix<T>& fillP(const vector<int>& idx);
   inline       SimpleMatrix<T>  QR() const;
-  inline       SimpleMatrix<T>  SVD(const int& cut = 20000) const;
+  inline       SimpleMatrix<T>  SVD() const;
   inline       pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > SVD(const SimpleMatrix<T>& src) const;
   inline       SimpleVector<T>  zeroFix(const SimpleMatrix<T>& A, vector<pair<T, int> > fidx);
   inline       SimpleVector<T>  inner(const SimpleVector<T>& bl, const SimpleVector<T>& bu) const;
@@ -2212,7 +2232,7 @@ public:
   inline const int rows() const;
   inline const int cols() const;
   inline       void resize(const int& rows, const int& cols);
-  myfloat      epsilon;
+  myfloat      epsilon() const;
 
   // friend std::ostream& operator << (std::ostream& os, const SimpleVector<T>& v);
   // friend std::istream& operator >> (std::istream& os, SimpleVector<T>& v);
@@ -2224,12 +2244,7 @@ private:
 };
 
 template <typename T> inline SimpleMatrix<T>::SimpleMatrix() {
-  ecols  = 0;
-#if defined(_FLOAT_BITS_)
-  epsilon = myfloat(int(1)) >> int64_t(_FLOAT_BITS_ - 1);
-#else
-  epsilon = std::numeric_limits<myfloat>::epsilon();
-#endif
+  ecols = 0;
   return;
 }
 
@@ -2242,30 +2257,28 @@ template <typename T> inline SimpleMatrix<T>::SimpleMatrix(const int& rows, cons
   for(int i = 0; i < entity.size(); i ++)
     entity[i].resize(cols);
   ecols = cols;
-#if defined(_FLOAT_BITS_)
-  epsilon = myfloat(int(1)) >> int64_t(_FLOAT_BITS_ - 1);
-#else
-  epsilon = std::numeric_limits<myfloat>::epsilon();
-#endif
   return; 
 }
 
 template <typename T> inline SimpleMatrix<T>::SimpleMatrix(const SimpleMatrix<T>& other) {
-  ecols   = other.ecols;
-  entity  = other.entity;
-  epsilon = other.epsilon;
-  return;
+  *this = other;
 }
 
 template <typename T> inline SimpleMatrix<T>::SimpleMatrix(SimpleMatrix<T>&& other) {
-  ecols   = move(other.ecols);
-  entity  = move(other.entity);
-  epsilon = move(other.epsilon);
-  return;
+  *this = other;
 }
 
 template <typename T> inline SimpleMatrix<T>::~SimpleMatrix() {
   ;
+}
+
+template <typename T> myfloat SimpleMatrix<T>::epsilon() const {
+#if defined(_FLOAT_BITS_)
+  static const auto eps(myfloat(int(1)) >> myint(_FLOAT_BITS_ - 1));
+#else
+  static const auto eps(std::numeric_limits<myfloat>::epsilon());
+#endif
+  return eps;
 }
   
 template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::operator - () const {
@@ -2363,16 +2376,14 @@ template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::operator /= (cons
 }
 
 template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::operator = (const SimpleMatrix<T>& other) {
-  ecols   = other.ecols;
-  entity  = other.entity;
-  epsilon = other.epsilon;
+  ecols  = other.ecols;
+  entity = other.entity;
   return *this;
 }
 
 template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::operator = (SimpleMatrix<T>&& other) {
-  ecols   = move(other.ecols);
-  entity  = move(other.entity);
-  epsilon = move(other.epsilon);
+  ecols  = move(other.ecols);
+  entity = move(other.entity);
   return *this;
 }
 
@@ -2499,9 +2510,9 @@ template <typename T> inline T SimpleMatrix<T>::determinant(const bool& nonzero)
     swap(work.entity[i], work.entity[xchg]);
     const auto& ei(work.entity[i]);
     const auto& eii(ei[i]);
-    if(! nonzero || ! i || pow(abs(det), T(int(1)) / T(int(i))) * epsilon <= abs(eii))
+    if(! nonzero || ! i || pow(abs(det), T(int(1)) / T(int(i))) * epsilon() <= abs(eii))
       det *= eii;
-    if(epsilon * ei.dot(ei) < eii * eii) {
+    if(ei.dot(ei) * epsilon() < eii * eii) {
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -2535,7 +2546,7 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solve(SimpleVector
     swap(other[i], other[xchg]);
     const auto& ei(work.entity[i]);
     const auto& eii(ei[i]);
-    if(epsilon * ei.dot(ei) < eii * eii) {
+    if(ei.dot(ei) * epsilon() < eii * eii) {
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -2591,7 +2602,7 @@ template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::fillP(const vecto
     ek.ek(j);
     ek -= this->projectionPt(ek);
     const auto n2(ek.dot(ek));
-    if(n2 <= epsilon) continue;
+    if(n2 <= epsilon()) continue;
     assert(0 <= idx[ii] && idx[ii] < this->rows());
     this->row(idx[ii ++]) = ek / sqrt(n2);
   }
@@ -2600,9 +2611,7 @@ template <typename T> inline SimpleMatrix<T>& SimpleMatrix<T>::fillP(const vecto
 }
 
 template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::QR() const {
-  T norm2(int(0));
-  for(int i = 0; i < rows(); i ++)
-    norm2 = max(norm2, row(i).dot(row(i)));
+  const auto norm2(norm2M(*this));
   if(! isfinite(norm2)) return *this;
   SimpleMatrix<T> Q(min(this->rows(), this->cols()), this->rows());
   Q.O();
@@ -2612,7 +2621,7 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::QR() const {
     const auto Atrowi(this->col(i));
     const auto work(Atrowi - Q.projectionPt(Atrowi));
     const auto n2(work.dot(work));
-    if(n2 <= epsilon * norm2)
+    if(n2 <= norm2 * epsilon())
       residue.emplace_back(i);
     else
       Q.row(i) = work / sqrt(n2);
@@ -2620,7 +2629,7 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::QR() const {
   return Q.fillP(residue);
 }
 
-template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD(const int& cut) const {
+template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD() const {
   // N.B. A = QR, (S - lambda I)x = 0 <=> R^t Q^t U = R^-1 Q^t U Lambda
   //        <=> R^t Q^t U Lambda' = R^-1 Q^t U Lambda'^(- 1)
   //      A := R^t, B := Q^t U, C := Lambda'
@@ -2640,34 +2649,12 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD(const int& cut
   for(int i = 0; i < Right.rows(); i ++)
     Right(i, i) = abs(R(i, i)) + T(int(1));
   // N.B. now we have B = Left * B * Right.
-  auto before(Left * Right);
-  for(int i = 0; cut < 0 || i < cut; i ++) {
-    Left  = Left  * Left;
-    Right = Right * Right;
-    auto rl(Left.row(0).dot(Left.row(0)));
-    auto rr(Right.row(0).dot(Right.row(0)));
-    for(int i = 1; i < Left.rows(); i ++)
-      rl = max(rl, Left.row(i).dot(Left.row(i)));
-    for(int i = 1; i < Right.rows(); i ++)
-      rr = max(rr, Right.row(i).dot(Right.row(i)));
-          auto next((Left /= (rl = sqrt(rl))) * (Right /= (rr = sqrt(rr))));
-    const auto err(next - (before /= rl * rr));
-          auto er(err.row(0).dot(err.row(0)));
-    for(int i = 1; i < err.rows(); i ++)
-      er = max(er, err.row(i).dot(err.row(i)));
-    if(er < epsilon || ! isfinite(er))
-      break;
-    before = move(next);
-  }
-  return before.QR() * Qt;
+  static const T p(int(exp(sqrt(- log(epsilon())))));
+  return (pow(Left / dnorm2M(Left), p) * pow(Right / dnorm2M(Right), p)).QR() * Qt;
 }
 
 template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > SimpleMatrix<T>::SVD(const SimpleMatrix<T>& src) const {
-  T norm2(int(0));
-  for(int i = 0; i < rows(); i ++)
-    norm2 = max(norm2, row(i).dot(row(i)));
-  for(int i = 0; i < src.rows(); i ++)
-    norm2 = max(norm2, src.row(i).dot(src.row(i)));
+  const auto norm2(max(norm2M(*this), norm2M(src)));
   if(! isfinite(norm2)) return *this;
   // refered from : https://en.wikipedia.org/wiki/Generalized_singular_value_decomposition .
   assert(this->cols() == src.cols());
@@ -2681,7 +2668,7 @@ template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, Simpl
   fill.reserve(d.size());
   for(int i = 0; i < d.size(); i ++) {
     d[i] = Qt.row(i).dot(Qt.row(i));
-    if(d[i] <= epsilon * norm2) {
+    if(d[i] <= norm2 * epsilon()) {
       fill.emplace_back(i);
       d[i] = sqrt(d[i]);
     } else
@@ -2707,7 +2694,7 @@ template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, Simpl
   fill.reserve(Wt.rows());
   for(int i = 0; i < Wt.rows(); i ++) {
     const auto n2(Wt.row(i).dot(Wt.row(i)));
-    if(n2 <= epsilon)
+    if(n2 <= epsilon())
       fill.emplace_back(i);
     else
       Wt.row(i) /= sqrt(n2);
@@ -2718,7 +2705,7 @@ template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, Simpl
   fill.reserve(U2.rows());
   for(int i = 0; i < U2.rows(); i ++) {
     const auto n2(U2.row(i).dot(U2.row(i)));
-    if(n2 <= epsilon)
+    if(n2 <= epsilon())
       fill.emplace_back(i);
     else
       U2.row(i) /= sqrt(n2);
@@ -2808,7 +2795,7 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::zeroFix(const Simp
     const auto& iidx(fidx[idx].second);
     const auto  orth(this->col(iidx));
     const auto  n2(orth.dot(orth));
-    if(n2 <= epsilon)
+    if(n2 <= epsilon())
       continue;
     // N.B. O(mn) can be writed into O(lg m + lg n) in many core cond.
 #if defined(_OPENMP)
@@ -2816,6 +2803,15 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::zeroFix(const Simp
 #endif
     for(int j = 0; j < this->cols(); j ++)
       this->setCol(j, this->col(j) - orth * this->col(j).dot(orth) / n2);
+    if(T(int(0)) < fidx[idx].first) {
+      const auto rfidxsz(fidx.size());
+      fidx.resize(0);
+      fidx.reserve(this->cols());
+      const auto on(projectionPt(one));
+      for(int j = 0; j < this->cols(); j ++)
+        fidx.emplace_back(make_pair(abs(on[j]), i));
+      i -= rfidxsz - fidx.size();
+    }
     i ++;
   }
   // N.B. now we have fix indexes that to be P R [x 1] * t == 0.
@@ -2993,19 +2989,31 @@ template <typename T> std::istream& operator >> (std::istream& is, SimpleMatrix<
   return is;
 }
 
-template <typename T> static inline SimpleMatrix<T> log(const SimpleMatrix<T>& m, const int& cut = 2000) {
-  T norm2(int(0));
-  for(int i = 0; i < m.rows(); i ++)
+template <typename T> static inline T norm2M(const SimpleMatrix<T>& m) {
+  auto norm2(m.row(0).dot(m.row(0)));
+  for(int i = 1; i < m.rows(); i ++)
     norm2 = max(norm2, m.row(i).dot(m.row(i)));
+  return norm2;
+}
+template <typename T> static inline T dnorm2M(const SimpleMatrix<T>& m) {
+  static const T one(int(1));
+  auto norm2(one);
+  for(int i = 0; i < m.rows(); i ++) {
+    const auto n2(m.row(i).dot(m.row(i)));
+    if(one < n2) norm2 *= sqrt(n2);
+  }
+  return norm2;
+}
+
+template <typename T> static inline SimpleMatrix<T> log(const SimpleMatrix<T>& m) {
+  static const int cut(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) * T(int(2)) );
   SimpleMatrix<T> res(m.rows(), m.cols());
-  const auto c(max(sqrt(norm2), abs(m.determinant()) * T(8)));
+  const auto c(dnorm2M(m) * T(2));
   const auto residue(SimpleMatrix<T>(m.rows(), m.cols()).I() - m / c);
         auto buf(residue);
   res.I(c);
   for(int i = 1; 0 < i && i < cut; i ++) {
-    const auto before(res);
     res -= buf / T(i);
-    if(before == res) break;
     buf *= residue;
   }
   return res;
@@ -3015,8 +3023,8 @@ template <typename T> static inline SimpleMatrix<T> exp(const SimpleMatrix<T>& m
   SimpleMatrix<T> res(m.rows(), m.cols());
   auto buf(m);
   res.I();
-  for(int i = 1; 0 < i ; i ++) {
-    const auto before(res);
+  for(int i = 1; 0 < i; i ++) {
+    auto before(res);
     res += buf;
     if(before == res) break;
     buf *= m / T(i + 1);
@@ -3281,34 +3289,30 @@ private:
   feeder f;
 };
 
-template <typename T, typename pred> class shrinkMatrix {
+template <typename T, typename P> class shrinkMatrix {
 public:
   inline shrinkMatrix() { ; }
-  inline shrinkMatrix(pred&& p, const int& len) {
-    d.resize(abs(len));
-    m.resize(abs(len));
+  inline shrinkMatrix(P&& p, const int& len = 0) {
+    d.resize(abs(len), T(t ^= t));
+    m.resize(d.size(), T(t));
     this->p = p;
   }
   inline ~shrinkMatrix() { ; }
   inline T next(const T& in) {
-    T res(0);
-    for(int i = 1; i < d.size(); i ++) d[i - 1] = move(d[i]);
-    d[d.size() - 1] = in;
-    if(t ++ < d.size()) return res;
+    d[(t ++) % d.size()] = in;
+    const T dsize(min(t, int(d.size())));
     auto D(d[0]);
     for(int i = 1; i < d.size(); i ++) D += d[i];
-    for(int i = 1; i < m.size(); i ++) m[i - 1] = move(m[i]);
-    m[m.size() - 1] = p.next(D) - (D - d[0]);
-    if(t <= d.size() + m.size()) return res;
-    for(int i = 0; i < m.size(); i ++)
-      res += m[i];
-    return res /= T(m.size());
+    m[t % m.size()] = p.next(D / dsize);
+    auto res(m[0]);
+    for(int i = 1; i < m.size(); i ++) res += m[i];
+    return res /= T(int(m.size()));
   }
 private:
+  P p;
   int t;
   vector<T> d;
   vector<T> m;
-  pred p;
 };
 
 template <typename T> const T& sgn(const T& x) {
