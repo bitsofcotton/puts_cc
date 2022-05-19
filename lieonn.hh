@@ -2637,7 +2637,8 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD() const {
   //        <=> (A + A^-t) * B * (C + C^-1) = (2I + A^-tA^-1 + A^(1+t)) * ABC
   //        <=> B = A^-1 (2I + A^-(t+1) + A^(1+t))^-1 (A + A^-t) * B *
   //                (C + C^-1) * C^-1
-  // N.B. singular value on QRR^tQ^t is same as singular value on R.
+  // N.B. since S is symmetric, singular value on SS^t = QRR^tQ^t is
+  //      same square root as singular value on R.
   const auto S(*this * transpose());
   const auto SS(S * S);
   const auto R(SS.QR() * SS);
@@ -2649,8 +2650,8 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD() const {
   for(int i = 0; i < Right.rows(); i ++)
     Right(i, i) = abs(R(i, i)) + T(int(1));
   // N.B. now we have B = Left * B * Right.
-  static const T p(int(exp(sqrt(- log(epsilon())))));
-  return (pow(Left / dnorm2M(Left), p) * pow(Right / dnorm2M(Right), p)).QR() * Qt;
+  static const T p(int(exp(sqrt(sqrt(- log(epsilon()))))));
+  return (pow(Left / norm2M(Left), p) * pow(Right / norm2M(Right), p)).QR() * Qt;
 }
 
 template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > SimpleMatrix<T>::SVD(const SimpleMatrix<T>& src) const {
@@ -3019,15 +3020,29 @@ template <typename T> static inline SimpleMatrix<T> log(const SimpleMatrix<T>& m
   return res;
 }
 
-template <typename T> static inline SimpleMatrix<T> exp(const SimpleMatrix<T>& m) {
+template <typename T> static inline SimpleMatrix<T> exp01(const SimpleMatrix<T>& m) {
   SimpleMatrix<T> res(m.rows(), m.cols());
+  static const int cut(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) * T(int(2)) );
   auto buf(m);
   res.I();
-  for(int i = 1; 0 < i; i ++) {
-    auto before(res);
+  for(int i = 1; 0 < i && i < cut; i ++) {
     res += buf;
-    if(before == res) break;
     buf *= m / T(i + 1);
+  }
+  return res;
+}
+
+template <typename T> static inline SimpleMatrix<T> exp(const SimpleMatrix<T>& m) {
+  const auto p0(ceil(sqrt(norm2M(m))));
+  if(! isfinite(p0)) throw "matrix exp with non finite value";
+  myuint p(p0);
+  auto mm(exp01(m / T(p)));
+  auto res(m);
+  res.O();
+  for( ; p; ) {
+    if(p & 1) res += mm;
+    if(! (p >>= 1)) break;
+    mm *= mm;
   }
   return res;
 }
