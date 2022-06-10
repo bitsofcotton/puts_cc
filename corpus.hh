@@ -45,23 +45,23 @@ using std::log;
 using std::move;
 using std::replace;
 
-template <typename T> bool equalStrClip(const T& a, const T& b) {
+template <typename T> static inline bool equalStrClip(const T& a, const T& b) {
   int cmp(0), jidx(0);
   for( ; !cmp && jidx < min(a.size(), b.size()); jidx ++)
     cmp = a[jidx] ^ b[jidx];
   return !cmp && min(a.size(), b.size()) <= jidx;
 }
 
-template <typename T> bool lessEqualStrClip(const T& a, const T& b) {
+template <typename T> static inline bool lessEqualStrClip(const T& a, const T& b) {
   return a < b ||  equalStrClip<T>(a, b);
 }
 
-template <typename T> bool lessNotEqualStrClip(const T& a, const T& b) {
+template <typename T> static inline bool lessNotEqualStrClip(const T& a, const T& b) {
   return a < b && !equalStrClip<T>(a, b);
 }
 
 template <typename T> class gram_t;
-template <typename T> bool lessCount(const gram_t<T>& dst, const gram_t<T>& src) {
+template <typename T> static inline bool lessCount(const gram_t<T>& dst, const gram_t<T>& src) {
   return (dst.rptr.size() < src.rptr.size()) ||
     (dst.rptr.size() == src.rptr.size() && dst.str < src.str);
 }
@@ -70,43 +70,39 @@ template <typename T> class gram_t {
 public:
   T           str;
   vector<int> rptr;
-  gram_t() {
+  inline gram_t() {
     this->str  = T();
     this->rptr = vector<int>();
   }
-  ~gram_t() {
-    ;
-  }
-  gram_t(const gram_t<T>& x) {
-    *this = x;
-  }
-  gram_t& operator = (const gram_t<T>& x) {
+  inline ~gram_t() { ; }
+  inline gram_t(const gram_t<T>& x) { *this = x; }
+  inline gram_t& operator = (const gram_t<T>& x) {
     str  = x.str;
     rptr = x.rptr;
     return *this;
   }
-  bool operator == (const gram_t<T>& x) const {
+  inline bool operator == (const gram_t<T>& x) const {
     return ! (*this != x);
   }
-  bool operator != (const gram_t<T>& x) const {
+  inline bool operator != (const gram_t<T>& x) const {
     return str != x.str || rptr != x.rptr;
   }
-  bool operator < (const gram_t<T>& x1) const {
+  inline bool operator < (const gram_t<T>& x1) const {
     return str < x1.str;
   }
 };
 
 template <typename T, typename U> class lword {
 public:
-  lword(const int& loop) {
+  inline lword(const int& loop) {
     this->dicts.resize(loop, vector<gram_t<U> >());
   }
-  ~lword() { ; }
+  inline ~lword() { ; }
   
   vector<gram_t<U> > compute(const U& input);
 
 private:
-  bool       isin(const U& key) {
+  inline bool       isin(const U& key) {
     assert(key.size() < dicts.size());
     const vector<gram_t<U> >& dict(dicts[key.size()]);
     gram_t<U> key0;
@@ -115,7 +111,7 @@ private:
     return dict.begin() <= p && p < dict.end() && p->str == key;
   }
 
-  gram_t<U>& find(const U& key) {
+  inline gram_t<U>& find(const U& key) {
     static gram_t<U> dummy;
     assert(key.size() < dicts.size());
     vector<gram_t<U> >& dict(dicts[key.size()]);
@@ -129,7 +125,7 @@ private:
     return *p;
   }
 
-  void       assign(const gram_t<U>& val) {
+  inline void       assign(const gram_t<U>& val) {
     assert(val.str.size() < dicts.size());
     vector<gram_t<U> >& dict(dicts[val.str.size()]);
     auto p(lower_bound(dict.begin(), dict.end(), val));
@@ -263,12 +259,12 @@ public:
   
   corpus(const U& input, const vector<U>& delimiter);
   
-  corpus() { ; }
-  corpus(const corpus<T, U>& other) { *this = other; }
-  corpus(corpus<T, U>&& other) { *this = other; }
-  ~corpus() { ; }
+  inline corpus() { ; }
+  inline corpus(const corpus<T, U>& other) { *this = other; }
+  inline corpus(corpus<T, U>&& other) { *this = other; }
+  inline ~corpus() { ; }
   
-  U getAttributed(const vector<U>& highlight) const {
+  inline U getAttributed(const vector<U>& highlight) const {
     U   result;
     int i;
     for(i = 0; i < orig.size(); ) {
@@ -283,7 +279,7 @@ public:
     }
     return result;
   }
-  pair<vector<U>, U> reverseLink() const {
+  inline pair<vector<U>, U> reverseLink() const {
     pair<vector<U>, U> res;
     const auto idx(countIdx(T(0)));
     res.first.reserve(idx.size());
@@ -292,62 +288,62 @@ public:
     res.second = getAttributed(res.first);
     return res;
   }
-  corpus<T, U>& operator += (const corpus<T, U>& other) {
+  inline corpus<T, U>& operator += (const corpus<T, U>& other) {
     orig    += U("+") + other.orig;
     corpust += other.corpust;
     return *this;
   }
-  corpus<T, U>& operator -= (const corpus<T, U>& other) {
+  inline corpus<T, U>& operator -= (const corpus<T, U>& other) {
     orig    += U("-") + other.orig;
     corpust -= other.corpust;
     return *this;
   }
-  corpus<T, U>& operator *= (const T& t) {
+  inline corpus<T, U>& operator *= (const T& t) {
     orig    += U("*") + U(to_string(t));
     corpust *= t;
     return *this;
   }
-  corpus<T, U>& operator /= (const T& t) {
+  inline corpus<T, U>& operator /= (const T& t) {
     orig    += U("/") + U(to_string(t));
     corpust /= t;
     return *this;
   }
-  corpus<T, U>  operator +  (const corpus<T, U>& other) const {
+  inline corpus<T, U>  operator +  (const corpus<T, U>& other) const {
     auto result(*this);
     return result += other;
   }
-  corpus<T, U>  operator -  () const {
+  inline corpus<T, U>  operator -  () const {
     auto result(*this);
     result.orig    = U("-") + result.orig;
     result.corpust = - result.corpust;
     return result;
   }
-  corpus<T, U>  operator -  (const corpus<T, U>& other) const {
+  inline corpus<T, U>  operator -  (const corpus<T, U>& other) const {
     auto result(*this);
     return result -= other;
   }
-  corpus<T, U>  operator *  (const T& t)                  const {
+  inline corpus<T, U>  operator *  (const T& t)                  const {
     auto result(*this);
     return result *= t;
   }
-  corpus<T, U>  operator /  (const T& t)                  const {
+  inline corpus<T, U>  operator /  (const T& t)                  const {
     auto result(*this);
     return result /= t;
   }
-  corpus<T, U>& operator =  (const corpus<T, U>& other) {
+  inline corpus<T, U>& operator =  (const corpus<T, U>& other) {
     corpust = other.corpust;
     orig    = other.orig;
     return *this;
   }
-  corpus<T, U>& operator =  (corpus<T, U>&& other) {
+  inline corpus<T, U>& operator =  (corpus<T, U>&& other) {
     corpust = move(other.corpust);
     orig    = move(other.orig);
     return *this;
   }
-  bool          operator == (const corpus<T, U>& other) const {
+  inline bool          operator == (const corpus<T, U>& other) const {
     return ! (*this != other);
   }
-  bool          operator != (const corpus<T, U>& other) const {
+  inline bool          operator != (const corpus<T, U>& other) const {
     return corpust != other.corpust;
   }
   T             cdot(const corpus<T, U>& other) const {
@@ -411,7 +407,7 @@ public:
     }
     return result;
   }
-  SimpleVector<T> singularValues(const SimpleMatrix<T>& m) const {
+  inline SimpleVector<T> singularValues(const SimpleMatrix<T>& m) const {
     const auto SV(m.SVD() * m);
     SimpleVector<T> w(SV.rows());
     for(int i = 0; i < w.size(); i ++)
@@ -894,13 +890,13 @@ template <typename T, typename U> void corpus<T,U>::merge5(Tensor& d, const int&
 }
 
 
-template <typename T, typename U> U getCut(const U& input, const int& idx, const int& szwindow) {
+template <typename T, typename U> static inline U getCut(const U& input, const int& idx, const int& szwindow) {
   if(input.size() < idx * szwindow / 2)
     return "XXX: getCut";
   return input.substr(idx * szwindow / 2, szwindow);
 }
 
-template <typename T, typename U> std::ostream& outTagged(std::ostream& os, const U& name, const corpus<T, U>& cstat, const int& idx, const T& score, const U& input, const int& szwindow) {
+template <typename T, typename U> static inline std::ostream& outTagged(std::ostream& os, const U& name, const corpus<T, U>& cstat, const int& idx, const T& score, const U& input, const int& szwindow) {
   os << "<span id=\"" << name << idx << "\">";
   os << "score: " << score << " : ";
   os << getCut<T, U>(input, idx, szwindow);
@@ -911,14 +907,14 @@ template <typename T, typename U> std::ostream& outTagged(std::ostream& os, cons
   return os;
 }
 
-template <typename T, typename U> void getAbbreved(corpus<T, U>& cstat, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter) {
+template <typename T, typename U> static inline void getAbbreved(corpus<T, U>& cstat, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter) {
   assert(detailtitle.size() == detail.size());
   for(int i = 0; i < detail.size(); i ++)
     cstat = cstat.abbrev(detailtitle[i], corpus<T, U>(detail[i], delimiter));
   return;
 }
 
-template <typename T, typename U> bool getDetailed(corpus<T, U>& cstat, const U& input, const int& idx, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const T& thresh) {
+template <typename T, typename U> static inline bool getDetailed(corpus<T, U>& cstat, const U& input, const int& idx, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const T& thresh) {
   assert(detailtitle.size() == detail.size());
   if(! (0 <= idx && idx < input.size() / szwindow * 2 + 1))
     return false;
@@ -1109,7 +1105,7 @@ template <typename T, typename U> std::ostream& diff(std::ostream& os, const U& 
   return os << endl;
 }
 
-template <typename T> vector<T> cutText(const T& input, const vector<T>& eliminate, const vector<T>& delimiter, const bool& f_sort = false) {
+template <typename T> static inline vector<T> cutText(const T& input, const vector<T>& eliminate, const vector<T>& delimiter, const bool& f_sort = false) {
   vector<T> result;
   T         workbuf;
   for(int i = 0; i < input.size(); i ++) {
@@ -1138,7 +1134,7 @@ template <typename T> vector<T> cutText(const T& input, const vector<T>& elimina
   return result;
 }
 
-template <typename T, typename U> SimpleVector<T> countWords(const U& orig, const vector<U>& words) {
+template <typename T, typename U> static inline SimpleVector<T> countWords(const U& orig, const vector<U>& words) {
   SimpleVector<T> result(words.size());
   for(int i = 0; i < result.size(); i ++)
     result[i] = T(0);

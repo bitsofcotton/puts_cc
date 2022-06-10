@@ -2060,10 +2060,10 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solve(SimpleVector
     if(work.entity[i][i] == T(int(0))) continue;
     const auto buf(other[i] / work.entity[i][i]);
     if(!isfinite(buf) || isnan(buf)) {
-    //  assert(!isfinite(work.entity[i][i] / other[i]) || isnan(work.entity[i][i] / other[i]));
+      // assert(!isfinite(work.entity[i][i] / other[i]) || isnan(work.entity[i][i] / other[i]));
       continue;
     }
-    other[i]    = buf;
+    other[i] = buf;
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -2150,7 +2150,15 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD() const {
     Right(i, i) = abs(R(i, i)) + T(int(1));
   // N.B. now we have B = Left * B * Right.
   static const T p(int(exp(sqrt(- log(epsilon())) / T(int(2)))));
-  return (pow(Left, p) * pow(Right, p)).QR() * Qt;
+  try {
+    return (pow(Left /= sqrt(norm2M(Left)), p) * pow(Right /= sqrt(norm2M(Right)), p)).QR() * Qt;
+  } catch(const char* e) {
+    /* might be Left or Right are sparse. */
+    /* in this case, we should separate them by LDLt S matrix. */
+    /* no code in here. */
+    ;
+  }
+  return Left.O();
 }
 
 template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, SimpleMatrix<T> > SimpleMatrix<T>::SVD(const SimpleMatrix<T>& src) const {
@@ -2228,6 +2236,7 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::zeroFix(const Simp
     fidx[i].first = - T(int(1));
   }
   // we now have: Q [R [x t] ] <= {0, 1}^m cond.
+  auto Pb(*this);
   const auto on(projectionPt(one));
   fidx.reserve(fidx.size() + this->cols());
   for(int i = 0; i < this->cols(); i ++)
@@ -2236,6 +2245,11 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::zeroFix(const Simp
   // sort by: |<Q^t(1), q_k>|, we subject to minimize each, to do this,
   //   maximize minimum q_k orthogonality.
   for(int i = 0, idx = 0; i < this->rows() - 1 && idx < fidx.size(); idx ++) {
+    if(T(int(0)) < fidx[idx].first &&
+       fidx[idx].first < sqrt(one.dot(one)) * epsilon()) {
+      *this = Pb;
+      break;
+    }
     const auto& iidx(fidx[idx].second);
     const auto  orth(this->col(iidx));
     const auto  n2(orth.dot(orth));
@@ -2254,6 +2268,7 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::zeroFix(const Simp
       const auto on(projectionPt(one));
       for(int j = 0; j < this->cols(); j ++)
         fidx.emplace_back(make_pair(abs(on[j]), i));
+      sort(fidx.begin(), fidx.end());
       i -= rfidxsz - fidx.size();
     }
     i ++;
@@ -2467,11 +2482,10 @@ template <typename T> static inline SimpleMatrix<T> exp01(const SimpleMatrix<T>&
 }
 
 template <typename T> static inline SimpleMatrix<T> exp(const SimpleMatrix<T>& m) {
-  const auto p00(ceil(sqrt(norm2M(m))));
-  const auto p0(p00 * p00);
-  if(! isfinite(p0)) throw "matrix exp with non finite value";
+  const auto p0(ceil(sqrt(norm2M(m))));
   myuint p(p0);
-  auto mm(exp01(m / T(p00)));
+  if(T(int(1)) < abs(p0 - T(p))) throw "too large abs num in exp matrix";
+  auto mm(exp01(m / T(p)));
   auto res(m);
   res.I();
   for( ; p; ) {
@@ -2628,7 +2642,7 @@ template <typename T> static inline pair<SimpleVector<T>, T> makeProgramInvarian
   if(T(int(0)) <= index)
     res[in.size() + 1] = T(index);
   T   lsum(0);
-  for(int i = 0; i < res.size() - 1; i ++) {
+  for(int i = 0; i < res.size(); i ++) {
     assert(- T(int(1)) <= res[i] && res[i] <= T(int(1)));
     res[i] += T(int(1));
     if(res[i] != T(int(0))) lsum += log(res[i]);
@@ -2743,24 +2757,26 @@ template <typename T, typename P> class shrinkMatrix {
 public:
   inline shrinkMatrix() { ; }
   inline shrinkMatrix(P&& p, const int& len = 0) {
-    d.resize(abs(len), T(t ^= t));
+    d.resize(abs(len), T(nzt = (t ^= t)));
     m.resize(d.size(), T(t));
     this->p = p;
   }
   inline ~shrinkMatrix() { ; }
   inline T next(const T& in) {
+    static const T zero(int(0));
     d[(t ++) % d.size()] = in;
     const T dsize(min(t, int(d.size())));
     auto D(d[0]);
     for(int i = 1; i < d.size(); i ++) D += d[i];
-    m[t % m.size()] = p.next(D / dsize);
+    if((m[t % m.size()] = p.next(D / dsize)) != zero && !nzt) nzt = t;
     auto res(m[0]);
     for(int i = 1; i < m.size(); i ++) res += m[i];
-    return res /= T(int(m.size()));
+    return ! nzt || (t < m.size() + nzt) ? res = in : res /= T(int(m.size()));
   }
 private:
   P p;
   int t;
+  int nzt;
   vector<T> d;
   vector<T> m;
 };
