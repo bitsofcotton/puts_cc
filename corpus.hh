@@ -174,7 +174,6 @@ template <typename T, typename U> vector<gram_t<U> > lword<T, U>::compute(const 
   int i;
   for(i = 2; i < dicts.size() - 1; i ++) {
     map<U, vector<int> > amap;
-    map<U, vector<int> > dmap;
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -191,16 +190,12 @@ template <typename T, typename U> vector<gram_t<U> > lword<T, U>::compute(const 
         const gram_t<U>& idxkey2(find(key2));
         U workkey(idxkey.str);
         workkey += *itr2;
-        vector<int> idxwork[3];
-        for(int j = 0; j < 3; j ++)
-          idxwork[j] = vector<int>();
+        vector<int> idxwork;
         int tt = 0;
         int ss = 0;
         while(tt < idxkey2.rptr.size() && ss < idxkey.rptr.size()) {
           if(idxkey2.rptr[tt] == idxkey.rptr[ss] + 1) {
-            idxwork[0].emplace_back(idxkey.rptr[ss]);
-            idxwork[1].emplace_back(ss);
-            idxwork[2].emplace_back(tt);
+            idxwork.emplace_back(idxkey.rptr[ss]);
             ss ++;
             tt ++;
           } else if(idxkey2.rptr[tt] >= idxkey.rptr[ss])
@@ -208,28 +203,15 @@ template <typename T, typename U> vector<gram_t<U> > lword<T, U>::compute(const 
           else
             tt ++;
         }
-        assert(idxwork[0].size() <= min(idxkey.rptr.size(), idxkey2.rptr.size()));
-        if(idxwork[0].size() < 2) continue;
+        assert(idxwork.size() <= min(idxkey.rptr.size(), idxkey2.rptr.size()));
+        if(idxwork.size() < 2) continue;
 #if defined(_OPENMP)
 #pragma omp critical
 #endif
         {
-          amap[workkey].insert(amap[workkey].end(), idxwork[0].begin(), idxwork[0].end());
-          dmap[idxkey.str].insert(dmap[idxkey.str].end(), idxwork[1].begin(), idxwork[1].end());
-          dmap[key2].insert(dmap[key2].end(), idxwork[2].begin(), idxwork[2].end());
+          amap[workkey].insert(amap[workkey].end(), idxwork.begin(), idxwork.end());
         }
       }
-    }
-    // delete this stage garbage.
-    for(auto itr = dmap.begin(); itr != dmap.end(); ++ itr) {
-      sort(itr->second.begin(), itr->second.end());
-      const gram_t<U>& before(find(itr->first));
-            gram_t<U>  after(before);
-      after.rptr = vector<int>();
-      for(int j = 0; j < before.rptr.size(); j ++)
-        if(!binary_search(itr->second.begin(), itr->second.end(), before.rptr[j]))
-          after.rptr.emplace_back(before.rptr[j]);
-      assign(after);
     }
     // construct next stage.
     for(auto itr = amap.begin(); itr != amap.end(); ++ itr) {
