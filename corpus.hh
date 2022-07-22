@@ -227,7 +227,7 @@ template <typename T, typename U> vector<gram_t<U> > lword<T, U>::compute(const 
             gram_t<U>  after(before);
       after.rptr = vector<int>();
       for(int j = 0; j < before.rptr.size(); j ++)
-        if(!binary_search(itr->second.begin(), itr->second.end(), j))
+        if(!binary_search(itr->second.begin(), itr->second.end(), before.rptr[j]))
           after.rptr.emplace_back(before.rptr[j]);
       assign(after);
     }
@@ -247,7 +247,36 @@ template <typename T, typename U> vector<gram_t<U> > lword<T, U>::compute(const 
   dict0 = vector<T>();
   dicts = vector<vector<gram_t<U> > >();
   sort(words.begin(), words.end(), lessCount<U>);
-  return words;
+  vector<gram_t<U> > result;
+  result.reserve(words.size());
+  for(int i = 0; i < words.size() - 1; i ++) {
+    const auto mw(min(words[i].str.size(), words[i + 1].str.size()));
+    if(! (words[i].str.substr(0, mw) == words[i + 1].str.substr(0, mw) &&
+          words[i].rptr == words[i + 1].rptr) ) {
+      if(words[i].str.size() < words[i + 1].str.size() &&
+         words[i].str.substr(1, mw) == words[i + 1].str.substr(0, mw) &&
+         words[i].rptr.size() == words[i + 1].rptr.size()) {
+        int j;
+        for(j = 0; j < words[i].rptr.size(); j ++)
+          if(words[i].rptr[j] != words[i + 1].rptr[j] + 1)
+            break;
+        if(j != words[i].rptr.size())
+          result.emplace_back(move(words[i]));
+      } else if(words[i].str.size() > words[i + 1].str.size() &&
+         words[i].str.substr(0, mw) == words[i + 1].str.substr(1, mw) &&
+         words[i].rptr.size() == words[i + 1].rptr.size()) {
+        int j;
+        for(j = 0; j < words[i].rptr.size(); j ++)
+          if(words[i].rptr[j] + 1 != words[i + 1].rptr[j])
+            break;
+        if(j != words[i].rptr.size())
+          result.emplace_back(move(words[i]));
+      } else
+        result.emplace_back(move(words[i]));
+   }
+  }
+  result.emplace_back(move(words[words.size() - 1]));
+  return result;
 }
 
 
