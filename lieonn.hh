@@ -567,7 +567,7 @@ public:
       if(e == src.e) return s_is_minus ? src.m < m : m < src.m;
       return s_is_minus;
     }
-    return !m ? (bool(src.m) && ! s_is_minus) : s_is_minus;
+    return !m ? (! src.m ? true : ! (src.s & (1 << SIGN))) : s_is_minus;
   }
   inline bool             operator <= (const SimpleFloat<T,W,bits,U>& src) const {
     return *this < src || *this == src;
