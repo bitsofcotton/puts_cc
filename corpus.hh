@@ -228,7 +228,7 @@ template <typename T, typename U> vector<gram_t<U> > lword<T, U>::compute(const 
     words.insert(words.end(), dicts[i].begin(), dicts[i].end());
   dict0 = vector<T>();
   dicts = vector<vector<gram_t<U> > >();
-  sort(words.begin(), words.end(), lessCount<U>);
+  sort(words.begin(), words.end());
   vector<gram_t<U> > result;
   result.reserve(words.size());
   for(int i = 0; i < words.size() - 1; i ++) {

@@ -106,7 +106,7 @@ int main(int argc, const char* argv[]) {
     for(auto itr = lwords.begin(); itr != lwords.end(); ++ itr) {
       if(itr->rptr.size() < 2 && itr->str.size() < 3)
         continue;
-      const auto lb(std::lower_bound(found.begin(), found.end(), *itr, lessCount<std::string>));
+      const auto lb(std::lower_bound(found.begin(), found.end(), *itr));
       if(found.begin() <= lb && lb < found.end() && lb->str == itr->str)
         lb->rptr.insert(lb->rptr.end(), itr->rptr.begin(), itr->rptr.end());
       else
