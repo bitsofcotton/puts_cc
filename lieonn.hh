@@ -2,7 +2,7 @@
 /*
 BSD 3-Clause License
 
-Copyright (c) 2013-2021, bitsofcotton (kazunobu watatsu)
+Copyright (c) 2013-2023, bitsofcotton (kazunobu watatsu)
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -44,8 +44,9 @@ using std::binary_search;
 using std::pair;
 using std::make_pair;
 using std::map;
-using std::vector;
+
 using std::stringstream;
+using std::istringstream;
 using std::ifstream;
 using std::ofstream;
 
@@ -53,10 +54,7 @@ using std::string;
 using std::cerr;
 using std::endl;
 using std::flush;
-
-using std::string;
 using std::getline;
-using std::istringstream;
 
 #if !defined(_FLOAT_BITS_)
   #include <complex>
@@ -2820,6 +2818,57 @@ private:
   feeder f;
 };
 
+template <typename T, typename feeder> class cbrtFeeder {
+public:
+  inline cbrtFeeder() { full = false; }
+  inline cbrtFeeder(const int& size) {
+    res.resize(size);
+    for(int i = 0; i < res.size(); i ++)
+      res[i] = T(int(0));
+    f = feeder(1 + int(ceil(T(size - 1) / (pow(T(size + 1), T(int(2)) / T(int(3)) ) - pow(T(size), T(int(2)) / T(int(3)) ) )) ) );
+    full = false;
+  }
+  inline ~cbrtFeeder() { ; }
+  inline const SimpleVector<T>& next(const T& in) {
+    const auto& g(f.next(in));
+    if(! (full = f.full) ) return res;
+    for(int i = 0; i < res.size(); i ++)
+      res[i] = g[int(ceil(T(i) / (pow(T(res.size() + 1), T(int(2)) / T(int(3)) ) - pow(T(res.size()), T(int(2)) / T(int(3)) ) )) )];
+    full = false;
+    return res;
+  }
+  SimpleVector<T> res;
+  bool full;
+private:
+  feeder f;
+};
+
+template <typename T, typename feeder> class invFeeder {
+public:
+  inline invFeeder() { full = false; }
+  inline invFeeder(const int& size) {
+    res.resize(size);
+    for(int i = 0; i < res.size(); i ++)
+      res[i] = T(int(0));
+    f = feeder(size);
+    full = false;
+  }
+  inline ~invFeeder() { ; }
+  inline const SimpleVector<T>& next(const T& in) {
+    static const T zero(int(0));
+    static const T one(int(1));
+    const auto& buf(f.next(in));
+    if(! (full = f.full) ) return res;
+    for(int i = 0; i < buf.size(); i ++)
+      res[i] = buf[i] == zero ? buf[i] : one / buf[i];
+    return res;
+  }
+  SimpleVector<T> res;
+  bool full;
+private:
+  feeder f;
+};
+
 template <typename T> const T& sgn(const T& x) {
   static const T zero(0);
   static const T one(1);
@@ -3181,33 +3230,32 @@ template <typename T> static inline vector<pair<vector<SimpleVector<T> >, vector
   return crushWithOrder<T>(v, cs, max(int(2), int(sqrt(T(v.size())))));
 }
 
-template <typename T, typename feeder> class P012L {
+template <typename T> class P012L {
 public:
   typedef SimpleVector<T> Vec;
   typedef SimpleMatrix<T> Mat;
   inline P012L() { varlen = 0; }
-  inline P012L(const int& stat, const int& var, const int& step = 1) {
-    assert(0 < stat && 1 < var && 0 < step);
-    f = feeder(stat + (this->step = step) - 1 + (varlen = var) - 1);
+  inline P012L(const int& var, const int& step = 1) {
+    assert(1 < var && 0 < step);
+    varlen = var;
+    this->step = step;
   }
   inline ~P012L() { ; }
-  T next(const T& in);
-  feeder f;
+  T next(const SimpleVector<T>& in);
 private:
   int varlen;
   int step;
 };
 
-template <typename T, typename feeder> inline T P012L<T,feeder>::next(const T& in) {
+template <typename T> inline T P012L<T>::next(const SimpleVector<T>& d) {
   static const T zero(int(0));
-  const auto& d(f.next(in));
-        auto  M(zero);
+         auto    M(zero);
   for(int i = 0; i < d.size(); i ++) {
     if(! isfinite(d[i])) return zero;
     M = max(M, abs(d[i]));
   }
   M *= T(int(2));
-  if(! f.full || M <= zero) return zero;
+  if(M <= zero) return zero;
   vector<SimpleVector<T> > cache;
   cache.reserve(d.size() - varlen + 2);
   for(int i = 0; i < d.size() - varlen - step + 2; i ++) {
@@ -3254,45 +3302,7 @@ template <typename T, typename feeder> inline T P012L<T,feeder>::next(const T& i
 
 
 template <typename T> SimpleVector<T> pnext(const int& size, const int& step = 1, const int& r = 1) {
-  SimpleVector<T> p;
-  if(size * r <= 1) {
-    p.resize(1);
-    p[0] = T(1);
-  } else if(size * r <= 2) {
-    p.resize(2);
-    p[0] = T(1) / T(2) + T(step * r < 0 ? 1 : 0);
-    p[1] = T(1) / T(2) + T(step * r < 0 ? 0 : 1);
-    p   /= T(2);
-  } else {
-    const auto file(std::string("./.cache/lieonn/next-") +
-      std::to_string(size) + std::string("-") + std::to_string(step) +
-      std::string("-") + std::to_string(r) +
-#if defined(_FLOAT_BITS_)
-      std::string("-") + std::to_string(_FLOAT_BITS_)
-#else
-      std::string("-ld")
-#endif
-    );
-    ifstream cache(file.c_str());
-    if(cache.is_open()) {
-      cache >> p;
-      cache.close();
-    } else {
-      p = taylor(size * r, T(step * r < 0 ? step * r : (size + step) * r - 1));
-      cerr << "." << flush;
-      if(abs(step) <= int(exp(sqrt(log(T(size * 2)))))) {
-        const auto pp(pnext<T>(size - 1, step, r));
-        for(int j = 0; j < pp.size(); j ++)
-          p[step < 0 ? j : j - pp.size() + p.size()] += pp[j] * T(size - 1);
-        p /= T(size);
-        ofstream ocache(file.c_str());
-        ocache << p << endl;
-        ocache.close();
-      }
-    }
-  }
-  assert(p.size() == size * r);
-  return p;
+  return taylor(size * r, T(step * r < 0 ? step * r : (size + step) * r - 1));
 }
 
 template <typename T> SimpleVector<T> minsq(const int& size) {
@@ -3341,11 +3351,9 @@ template <typename T> const SimpleMatrix<complex<T> >& dftcache(const int& size)
   return cidft[abs(size)] = dft<T>(size);
 }
 
-template <typename T, typename feeder, int r = 2> class P0 {
+template <typename T, int r = 2> class P0 {
 public:
-  inline P0() { ; }
-  inline P0(const int& size, const int& step = 1) {
-    f = feeder(size);
+  inline P0(const int& step = 1) {
     this->step = step;
   }
   inline ~P0() { ; };
@@ -3353,7 +3361,6 @@ public:
     return pnextcacher<T>(in.size(), step, r).dot(in);
   }
   int step;
-  feeder f;
 };
 
 template <typename T, typename P> class P0inv {
@@ -3470,11 +3477,6 @@ public:
 template <typename T> class P0maxRank0 {
 public:
   inline P0maxRank0() { ; }
-  inline P0maxRank0(const int& status, const int& var) {
-    assert(0 < status && 0 < var);
-    p = p0_0t(status);
-    q = p0_i0t(p0_0t(status));
-  }
   inline ~P0maxRank0() { ; }
   inline T next(const SimpleVector<T>& in) {
     return (p.next(in) + q.next(in)) / T(int(2));
@@ -3488,7 +3490,7 @@ public:
   //      so we should use sectional measurement for them.
   // N.B. the sectional measurament is done by following Ppad class.
   //      So this is only the raw prediction.
-  typedef P0<T, idFeeder<T> > p0_0t;
+  typedef sumChain<T, P0<T>, true> p0_0t;
   typedef P0inv<T, p0_0t> p0_i0t;
   p0_0t p;
   p0_i0t q;
@@ -3497,15 +3499,9 @@ public:
 template <typename T> class P0maxRank {
 public:
   inline P0maxRank() { ; }
-  inline P0maxRank(const int& status, int var = - 1) {
-    if(var < 0) var = max(int(1), min(status / 3, int(exp(sqrt(log(T(status)))))));
-    p = p0_t(p0_5t(p0_4t(p0_3t(p0_2t(p0_1t(p0_0t(status, var) )) )) ));
-    buf = idFeeder<T>(status);
-  }
   inline ~P0maxRank() { ; }
-  inline T next(const T& in) {
-    buf.next(in);
-    return buf.full ? p.next(buf.res) : T(int(0));
+  inline T next(const SimpleVector<T>& in) {
+    return p.next(in);
   }
 /*
   // N.B. make information-rich not to associative/commutative.
@@ -3534,34 +3530,32 @@ public:
   typedef sumChain<T, p0_4t>  p0_5t;
   typedef sumChain<T, p0_5t, true> p0_t;
   p0_t p;
-  idFeeder<T> buf;
 };
 
 // Get invariant structure that
 // \[- &alpha, &alpha;\[ register computer with deterministic calculation.
 // cf. bitsofcotton/randtools .
-template <typename T, typename feeder> class P1I {
+template <typename T> class P1I {
 public:
   typedef SimpleVector<T> Vec;
   typedef SimpleMatrix<T> Mat;
   inline P1I() { varlen = 0; }
-  inline P1I(const int& stat, const int& var, const int& step = 1) {
-    assert(0 < stat && 0 < var && 0 < step);
-    f = feeder(stat + (this->step = step) - 1 + (varlen = var) - 1);
+  inline P1I(const int& var, const int& step = 1) {
+    assert(0 < var && 0 < step);
+    this->varlen = var;
+    this->step = step;
   }
   inline ~P1I() { ; }
-  inline T next(const T& in) {
+  inline T next(const SimpleVector<T>& in) {
     static const T zero(0);
-    const auto& buf(f.next(in));
-    if(! f.full) return T(0);
     // N.B. please use catgp to compete with over learning.
     // XXX: division accuracy glitch.
-    const auto nin(sqrt(buf.dot(buf)) * T(int(2)));
+    const auto nin(sqrt(in.dot(in)) * T(int(2)));
     if(! isfinite(nin) || nin == zero) return zero;
-    SimpleMatrix<T> toeplitz(buf.size() - varlen - step + 2, varlen + 2);
+    SimpleMatrix<T> toeplitz(in.size() - varlen - step + 2, varlen + 2);
     for(int i = 0; i < toeplitz.rows(); i ++) {
-      auto work(buf.subVector(i, varlen) / nin);
-      work[work.size() - 1] = buf[i + varlen + step - 2] / nin;
+      auto work(in.subVector(i, varlen) / nin);
+      work[work.size() - 1] = in[i + varlen + step - 2] / nin;
       auto mp(makeProgramInvariant<T>(move(work),
                 T(i + 1) / T(toeplitz.rows() + 1)));
       toeplitz.row(i)  = move(mp.first);
@@ -3571,7 +3565,7 @@ public:
     if(invariant[varlen - 1] == zero) return zero;
     SimpleVector<T> work(varlen);
     for(int i = 1; i < work.size(); i ++)
-      work[i - 1] = buf[i - work.size() + buf.size()] / nin;
+      work[i - 1] = in[i - work.size() + in.size()] / nin;
     work[work.size() - 1] = zero;
     const auto work2(makeProgramInvariant<T>(work, T(1)));
     return revertProgramInvariant<T>(make_pair(
@@ -3579,132 +3573,75 @@ public:
                     invariant[varlen - 1] * work2.first[varlen - 1]) /
                invariant[varlen - 1], work2.second)) * nin;
   }
-  feeder f;
 private:
   int varlen;
   int step;
 };
 
 // N.B. persistent raw prediction.
-template <typename T> class Prange {
+template <typename T, typename feed0, typename feed1> class Prange {
 public:
   inline Prange() { ; }
   inline Prange(const int& status) {
     assert(0 < status);
-    p0 = P0maxRank<T>(status);
-    p1 = P1I<T, idFeeder<T> >(status, int(max(T(int(2)), sqrt(T(status)) )) );
-    p2 = P012L<T, idFeeder<T> >(status, int(max(T(int(2)), pow(T(status), T(int(1)) / T(int(3)) ))) );
-    M  = T(int(1));
+    p1 = P1I<T>(int(max(T(int(2)), sqrt(T(status)) )) );
+    p2 = P012L<T>(int(max(T(int(2)), pow(T(status), T(int(1)) / T(int(3)) ))) );
+    this->status = status;
   }
   inline ~Prange() { ; }
-  inline T next(T d) {
-    M = max(abs(d), M);
+  inline T next(const SimpleVector<T>& in) {
+    feed0 f0(status);
+    feed1 f1(status);
+    for(int i = 0; i < in.size(); i ++) {
+      f0.next(in[i]);
+      f1.next(in[i]);
+    }
+    T M(int(1));
+    for(int i = 0; i < f0.res.size(); i ++) M = max(M, abs(f0.res[i]));
     return max(- M, min(M, (
-      max(- M, min(M, p0.next(d))) +
-      max(- M, min(M, p1.next(d))) +
-      max(- M, min(M, p2.next(d))) ) / T(int(3)) * T(int(2)) ));
+      max(- M, min(M, p0.next(f1.res))) +
+      max(- M, min(M, p1.next(f1.res))) +
+      max(- M, min(M, p2.next(f1.res))) ) / T(int(3)) * T(int(2)) ));
   }
   P0maxRank<T> p0;
-  P1I<T, idFeeder<T> > p1;
-  P012L<T, idFeeder<T> > p2;
+  P1I<T> p1;
+  P012L<T> p2;
+  int status;
+};
+
+template <typename T, typename P, typename feed0, typename feed1> class PBond {
+public:
+  inline PBond() { ; }
+  inline PBond(P&& p, const int& status) {
+    assert(0 < status);
+    this->p = p;
+    f0 = feed0(status);
+    f1 = feed1(status);
+    M  = T(int(1));
+  }
+  inline ~PBond() { ; }
+  inline T next(const T& in) {
+    M = max(M, abs(in));
+    const auto& g0(f0.next(in));
+    const auto& g1(f1.next(in));
+    if(! (f0.full && f1.full)) return T(int(0));
+    const auto  pg0(p.next(g0));
+          auto  pg1(p.next(g1));
+    pg1 = pg1 == - g1[g1.size() - 1] ? pg0 : T(int(1)) / (pg1 + g1[g1.size() - 1]) - g0[g0.size() - 1];
+    return (max(- M, min(M, pg0)) + max(- M, min(M, (isfinite(pg1) ? pg1 : pg0)) )) / T(int(2));
+  }
+  feed0 f0;
+  feed1 f1;
+  P p;
   T M;
 };
 
-// In laurent series, we treat a_-1 as both side a_1 and a_-1 arithmetric avg.
-template <typename T, typename P> class PWalkBoth {
-public:
-  inline PWalkBoth() { ; }
-  inline PWalkBoth(P&& p) { S = T(int(0)); this->p = q = p; }
-  inline ~PWalkBoth() { ; }
-  inline T next(const T& d) {
-    static const T zero(int(0));
-    static const T one(int(1));
-    static const T two(int(2));
-    const auto bS(S);
-    if((S += d) != zero && bS != zero) {
-      const auto dd(one / S - one / bS);
-      const auto pd(p.next(d));
-            auto qd(q.next(dd));
-      qd = qd == zero ? pd : one / (one / S + one / qd) - S;
-      return (pd + (isfinite(qd) ? qd : pd)) / two;
-    }
-    return p.next(d);
-  }
-  T S;
-  P p;
-  P q;
-};
-
-// N.B. x -> x^(2/3) replacement. This causes (cbrt(x))^2 series or rich of
-//                   information on sparse input matrix.
-//      This also causes sectional measurament on certain range.
-template <typename T, typename P> class Ppad {
-public:
-  inline Ppad() { ; }
-  inline Ppad(P&& p, const int& pad = 1, const int& absent = - 1) {
-    this->p = p0 = p;
-    nxt = int(pow(T(this->pad = pad0 = pad), T(int(2)) / T(int(3))));
-    assert(0 < pad);
-    d = res = T(tt = t ^= t);
-    tt ++;
-    this->absent = absent < 0 ? pad : absent;
-  }
-  inline ~Ppad() { ; }
-  inline const T& next(const T& in) {
-    d += in;
-    if(t ++ < nxt) return res;
-    const auto nxt2(pow(T(pad += pad0), T(int(2)) / T(int(3))));
-    if(nxt2 < T(nxt + 1) + T(int(1)) / T(int(4))) {
-      nxt = int(pow(T(pad = pad0), T(int(2)) / T(int(3))));
-      p   = p0;
-      return res = d = T(tt = t ^= t);
-    }
-    nxt = int(nxt2);
-    res = p.next(d);
-    d   = T(int(0));
-    return tt ++ < absent ? res = T(int(0)) : res;
-  }
-  int t;
-  int tt;
-  int absent;
-  int pad0;
-  int pad;
-  int nxt;
-  P p0;
-  P p;
-  T d;
-  T res;
-};
-
-// N.B. auto retry Ppad, we need this because x -> large, delta x^(2/3) -> 0.
-template <typename T, typename P> class Ppretry {
-public:
-  inline Ppretry() { ; }
-  inline Ppretry(P&& p) { p0 = p; flag = true; }
-  inline ~Ppretry() { ; }
-  inline T next(const T& in) {
-    if(flag) {
-      if(! p.size() || p[0].p.tt)
-        p.emplace_back(p0);
-      else if(p.size()) flag = ! flag;
-    }
-    T res(int(0));
-    for(int i = 0; i < p.size(); i ++)
-      res += p[i].next(in);
-    return res;
-  }
-  P p0;
-  vector<P> p;
-  bool flag;
-};
-
 template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv(const vector<SimpleVector<T> >& in) {
-  vector<PWalkBoth<T, Prange<T> > > p0;
+  vector<PBond<T, Prange<T, deltaFeeder<T, idFeeder<T> >, deltaFeeder<T, idFeeder<T> > >, sumFeeder<T, idFeeder<T> >, invFeeder<T, sumFeeder<T, idFeeder<T> > > > > p0;
   for(int ext = 0; ext < in.size() / 2; ext ++) {
-    const int status(in.size() / (ext + 1) - 2);
-    const int var0(max(T(int(1)), T(min(status / 3, int(exp(sqrt(log(T(status)))))) - 2) ) );
-    if(status < 8) break;
-    p0.emplace_back(PWalkBoth<T, Prange<T> >(status));
+    const int status(in.size() / (ext + 1) - 1);
+    if(status < 5) break;
+    p0.emplace_back(PBond<T, Prange<T, deltaFeeder<T, idFeeder<T> >, deltaFeeder<T, idFeeder<T> > >, sumFeeder<T, idFeeder<T> >, invFeeder<T, sumFeeder<T, idFeeder<T> > > >(Prange<T, deltaFeeder<T, idFeeder<T> >, deltaFeeder<T, idFeeder<T> > >(status), status));
     auto pp(p0[ext]);
     for(int i = 0; i < status * 2 + 4; i ++)
       pp.next(T(i + 1) / T(status * 2 + 5) - T(int(1)) / T(int(2)));
@@ -3736,45 +3673,20 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
     for(int j = 0; j < p[i].size(); j ++) {
       auto pf(p0[i]);
       auto pb(p0[i]);
-      T    qmax(int(0));
-      T    pmax(int(0));
-      for(int k = 0; k < invariant.size() / (i + 1); k ++)
-        qmax += invariant[(invariant.size() / (i + 1) - (k + 1)) * (i + 1)][j] *
-          invariant[(invariant.size() / (i + 1) - (k + 1)) * (i + 1)][j];
-      for(int k = 0; k < invariant.size() / (i + 1); k ++)
-        pmax += invariant[invariant.size() - 1 -
-            (invariant.size() / (i + 1) - (k + 1)) * (i + 1)][j] *
-                invariant[invariant.size() - 1 -
-            (invariant.size() / (i + 1) - (k + 1)) * (i + 1)][j];
-      qmax = sqrt(qmax * T(int(2)));
-      pmax = sqrt(pmax * T(int(2)));
       try {
-        for(int k = 0; k < invariant.size() / (i + 1); k ++) {
-          assert(0 <= (invariant.size() / (i + 1) - (k + 1)) * (i + 1));
-          assert((invariant.size() / (i + 1) - (k + 1)) * (i + 1) < invariant.size());
-          assert(- T(int(1)) <= invariant[(invariant.size() / (i + 1) - (k + 1)) * (i + 1)][j] / qmax);
-          assert(invariant[(invariant.size() / (i + 1) - (k + 1)) * (i + 1)][j] / qmax <= T(int(1)));
-          q[i][j] = pb.next(invariant[(invariant.size() / (i + 1) - (k + 1)) * (i + 1)][j] / qmax);
-        }
+        for(int k = 0; k < invariant.size() / (i + 1); k ++)
+          q[i][j] = pb.next(invariant[(invariant.size() / (i + 1) -
+            (k + 1)) * (i + 1)][j]);
       } catch(const char* e) {
         q[i][j] = T(int(0));
       }
       try {
-        for(int k = 0; k < invariant.size() / (i + 1); k ++) {
-          assert(0 <= (invariant.size() / (i + 1) - (k + 1)) * (i + 1));
-          assert((invariant.size() / (i + 1) - (k + 1)) * (i + 1) < invariant.size());
-          assert(- T(int(1)) <= invariant[invariant.size() - 1 -
-            (invariant.size() / (i + 1) - (k + 1)) * (i + 1)][j] / pmax);
-          assert(invariant[invariant.size() - 1 -
-            (invariant.size() / (i + 1) - (k + 1)) * (i + 1)][j] / pmax <= T(int(1)));
+        for(int k = 0; k < invariant.size() / (i + 1); k ++)
           p[i][j] = pf.next(invariant[invariant.size() - 1 -
-              (invariant.size() / (i + 1) - (k + 1)) * (i + 1)][j] / pmax);
-        }
+              (invariant.size() / (i + 1) - (k + 1)) * (i + 1)][j]);
       } catch(const char* e) {
         p[i][j] = T(int(0));
       }
-      q[i][j] *= qmax;
-      p[i][j] *= pmax;
     }
   }
   return make_pair(move(p), move(q));
