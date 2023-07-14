@@ -1,16 +1,14 @@
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
-#include <cmath>
-#include <string>
-#include <iterator>
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <locale>
-#include <algorithm>
 #include <vector>
 #include <map>
-#include <utility>
+#include <algorithm>
+#include <cctype>
+#include <random>
 #include <assert.h>
 
 #define int int64_t
@@ -29,7 +27,7 @@ const int    szwindow(1500);
 const int    Mbalance(40);
 const double scorethresh(sqrt(.5));
 const double dscorethresh(0.);
-const double threshin(0.);
+const double threshin(0.05);
 const double redig(1.1);
 std::vector<std::string> delimiter;
 std::vector<std::string> csvelim;
@@ -224,6 +222,20 @@ int main(int argc, const char* argv[]) {
     std::cout << "<body>";
     optimizeTOC<double, std::string>(std::cout, input, rdetails, rdetailwords, delimiter, szwindow, - scorethresh, threshin, redig, std::strcmp(argv[1], "findroot") == 0);
     std::cout << "<hr/>" << std::endl << "</body></html>" << std::endl;
+  } else if(std::strcmp(argv[1], "pred") == 0) {
+    std::vector<std::string> details;
+    std::vector<std::string> detailwords;
+    for(int iidx = 3; iidx < argc; iidx ++) {
+      const auto work(loadbuf(argv[iidx]));
+      details.push_back(work.second);
+      detailwords.push_back(work.first);
+    }
+    words.insert(words.end(), detailwords.begin(), detailwords.end());
+    std::sort(words.begin(), words.end());
+    words.erase(std::unique(words.begin(), words.end()), words.end());
+    std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
+    std::cout << "<body>";
+    predTOC<num_t, std::string>(std::cout, input, detailwords, details, delimiter, szwindow, - scorethresh, threshin, redig);
   } else if(std::strcmp(argv[1], "prep") == 0) {
     std::vector<std::string> buf;
     for(int i = 0; i < input.size() / szwindow + 1; i ++) {

@@ -454,13 +454,13 @@ public:
   corpus<T, U>  abbrev(const U& word, const corpus<T, U>& work, const T& thresh = T(0)) const;
   pair<T, T>    compareStructure(const corpus<T, U>& src, const T& thresh = T(1e-4), const T& thresh2 = T(.125)) const;
 
+  Tensor corpust;
 private:
   SimpleVector<T> singularValues() const;
   U     serializeSub(const vector<int>& idxs) const;
   void  merge5(Tensor& d, const int& i, const int& ki, const int& kk, const int& kj, const int& j, const T& intensity) const;
   
   U      orig;
-  Tensor corpust;
 };
 
 template <typename T, typename U> corpus<T,U>::corpus(const U& input, const vector<U>& delimiter) {
@@ -1187,6 +1187,63 @@ template <typename T, typename U> vector<int> pseudoWordsBalance(const vector<U>
   }
   cerr << endl;
   return vres;
+}
+
+template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const T& depth, const T& threshin, const T& redig = T(1) ) {
+  assert(detailtitle.size() == detail.size());
+  os << "predTOC: " << flush;
+  vector<corpus<T, U> > istats;
+  istats.emplace_back(corpus<T, U>());
+  for(int j = 0; getDetailed<T, U>(istats[istats.size() - 1], input, j, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
+    istats[j].reDig(redig);
+    istats[j] /= sqrt(istats[j].cdot(istats[j]));
+    istats.emplace_back(corpus<T, U>());
+  }
+  vector<corpus<T, U> > pstats;
+  {
+    vector<int> idx;
+    for(int j = 0; j < istats.size() - 1; j ++) {
+      auto lidx(istats[j].countIdx(threshin));
+      idx.insert(idx.end(), lidx.begin(), lidx.end());
+    }
+    sort(idx.begin(), idx.end());
+    idx.erase(std::unique(idx.begin(), idx.end()), idx.end());
+    vector<SimpleVector<T> > pp;
+    pp.reserve(2 * (istats.size() - 1) - 1);
+    for(int j = 0; j < istats.size() - 1; j ++) {
+      pp.emplace_back(SimpleVector<T>(idx.size() * idx.size() * idx.size()));
+      if(j) pp.emplace_back(SimpleVector<T>(idx.size() * idx.size() * idx.size()));
+      for(int ii = 0; ii < idx.size(); ii ++)
+        for(int jj = 0; jj < idx.size(); jj ++)
+          for(int kk = 0; kk < idx.size(); kk ++)
+            pp[pp.size() - 1][ii * idx.size() * idx.size() + jj * idx.size() + kk] = const_cast<const SimpleSparseTensor<T>&>(istats[j].corpust)[idx[ii]][idx[jj]][idx[kk]];
+      if(j) pp[pp.size() - 2] = (pp[pp.size() - 3] + pp[pp.size() - 1]) / T(int(2));
+    }
+    auto qp(predv<T>(pp));
+    qp.first.insert(qp.first.end(), qp.second.begin(), qp.second.end());
+    for(int j = 0; j < qp.first.size(); j ++) {
+      pstats.emplace_back(corpus<T, U>());
+      for(int ii = 0; ii < idx.size(); ii ++)
+        for(int jj = 0; jj < idx.size(); jj ++)
+          for(int kk = 0; kk < idx.size(); kk ++)
+            pstats[j].corpust[idx[ii]][idx[jj]][idx[kk]] = qp.first[j][ii * idx.size() * idx.size() + jj * idx.size() + kk];
+    }
+  }
+  for(int i = 0; i < pstats.size(); i ++) {
+    int idx(0);
+    T   score(0);
+    for(int j = 0; j < istats.size() - 1; j ++) {
+      const auto lscore(pstats[i].cdot(istats[j]) / istats[j].cdot(istats[j]));
+      if(isfinite(lscore) && score <= lscore) {
+        idx   = j;
+        score = lscore;
+      }
+    }
+    os << pstats[i].serialize() << " " << idx << " : " << endl;
+    outTagged<T,U>(os, U("prepTOC0_") + to_string(i) + U("_"), istats[idx], idx, score, input, szwindow);
+    os << "<br />" << "<br />" << endl;
+  }
+  return os;
 }
 
 #define _CORPUS_
