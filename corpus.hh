@@ -1189,7 +1189,7 @@ template <typename T, typename U> vector<int> pseudoWordsBalance(const vector<U>
   return vres;
 }
 
-template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const T& depth, const T& threshin, const T& redig = T(1) ) {
+template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const U& input, const U& db, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const T& depth, const T& threshin, const T& redig = T(1) ) {
   assert(detailtitle.size() == detail.size());
   os << "predTOC: " << flush;
   vector<corpus<T, U> > istats;
@@ -1220,27 +1220,33 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
       if(j) pp[pp.size() - 2] = (pp[pp.size() - 3] + pp[pp.size() - 1]) / T(int(2));
     }
     auto qp(predv<T>(pp));
+    if(qp.first.size() & 1) qp.first.erase(qp.first.end() - 1);
     qp.first.insert(qp.first.end(), qp.second.begin(), qp.second.end());
-    for(int j = 0; j < qp.first.size(); j ++) {
+    for(int j = 1; j < qp.first.size(); j += 2) {
       pstats.emplace_back(corpus<T, U>());
       for(int ii = 0; ii < idx.size(); ii ++)
         for(int jj = 0; jj < idx.size(); jj ++)
           for(int kk = 0; kk < idx.size(); kk ++)
-            pstats[j].corpust[idx[ii]][idx[jj]][idx[kk]] = qp.first[j][ii * idx.size() * idx.size() + jj * idx.size() + kk];
+            pstats[j / 2].corpust[idx[ii]][idx[jj]][idx[kk]] = qp.first[j][ii * idx.size() * idx.size() + jj * idx.size() + kk];
     }
   }
   for(int i = 0; i < pstats.size(); i ++) {
     int idx(0);
     T   score(0);
-    for(int j = 0; j < istats.size() - 1; j ++) {
-      const auto lscore(pstats[i].cdot(istats[j]) / istats[j].cdot(istats[j]));
+    corpus<T, U> dbc;
+    corpus<T, U> dbcc;
+    for(int j = 0; getDetailed<T, U>(dbc, db, j, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
+      std::cerr << j << " : " << i << " / " << pstats.size() << endl;
+      dbc.reDig(redig);
+      const auto lscore(pstats[i].cdot(dbc) / sqrt(dbc.cdot(dbc)));
       if(isfinite(lscore) && score <= lscore) {
         idx   = j;
         score = lscore;
+        dbcc  = dbc;
       }
     }
     os << pstats[i].serialize() << " " << idx << " : " << endl;
-    outTagged<T,U>(os, U("prepTOC0_") + to_string(i) + U("_"), istats[idx], idx, score, input, szwindow);
+    outTagged<T,U>(os, U("prepTOC0_") + to_string(i) + U("_"), dbcc, idx, score, db, szwindow);
     os << "<br />" << "<br />" << endl;
   }
   return os;

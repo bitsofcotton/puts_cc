@@ -20,6 +20,7 @@ This program uses large amount of region on the memory. And, very slow because o
     ./tools diff wordlist.txt -dict ... -dict2 ... < data.txt
     ./tools same wordlist.txt -dict ... -dict2 ... < data.txt
     ./tools prep wordlist.txt < data.txt
+    ./tools pred wordlist.txt (-|db.txt) dict1 ... < data.txt
 
 # Memory Fragments
 There exists better efficient memory management programs like jemalloc.
@@ -75,4 +76,5 @@ If we use NOT word with accurate handle, we can roughly (but deeply differed to 
 This repository is archived, so without bug report, will no change.
 2023/03/13 integrate some files into lieonn.hh.
 2023/03/24 code clean.
+2023/07/15 add fix predTOC.
 
