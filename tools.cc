@@ -27,7 +27,7 @@ const int    szwindow(1500);
 const int    Mbalance(40);
 const double scorethresh(sqrt(.5));
 const double dscorethresh(0.);
-const double threshin(0.05);
+const double threshin(0.015);
 const double redig(1.1);
 std::vector<std::string> delimiter;
 std::vector<std::string> csvelim;
@@ -236,6 +236,7 @@ int main(int argc, const char* argv[]) {
     std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
     std::cout << "<body>";
     predTOC<num_t, std::string>(std::cout, input, argv[3][0] == '-' ? input : loadbuf(argv[3]).second, detailwords, details, delimiter, szwindow, - scorethresh, threshin, redig);
+    std::cout << "<hr/>" << std::endl << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "prep") == 0) {
     std::vector<std::string> buf;
     for(int i = 0; i < input.size() / szwindow + 1; i ++) {
