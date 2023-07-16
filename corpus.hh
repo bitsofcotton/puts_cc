@@ -1245,9 +1245,10 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
         dbcc  = dbc;
       }
     }
+    dbcc.corpust = pstats[i].corpust;
     os << pstats[i].serialize() << " " << idx << " : " << endl;
     outTagged<T,U>(os, U("prepTOC0_") + to_string(i) + U("_"), dbcc, idx, score, db, szwindow);
-    os << "<br />" << "<br />" << endl;
+    os << "<br /><br />" << endl;
   }
   return os;
 }

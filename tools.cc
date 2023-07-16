@@ -27,7 +27,7 @@ const int    szwindow(1500);
 const int    Mbalance(40);
 const double scorethresh(sqrt(.5));
 const double dscorethresh(0.);
-const double threshin(0.015);
+const double threshin(0.05);
 const double redig(1.1);
 std::vector<std::string> delimiter;
 std::vector<std::string> csvelim;
