@@ -4013,14 +4013,15 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
   p0 /= 2;
   vector<SimpleVector<T> > invariant;
   invariant.resize(in.size());
-  T norm(int(0));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < in.size(); i ++) {
     invariant[i] = makeProgramInvariant<T>(in[i]).first;
-    norm += invariant[i].dot(invariant[i]);
   }
+  T norm(int(0));
+  for(int i = 0; i < in.size(); i ++)
+    norm += invariant[i].dot(invariant[i]);
   norm = sqrt(norm / T(int(in.size())));
   vector<SimpleVector<T> > p;
   if(p0 < 1) return make_pair(p, p);
