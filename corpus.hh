@@ -1193,60 +1193,42 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
   assert(detailtitle.size() == detail.size());
   os << "predTOC: " << flush;
   vector<corpus<T, U> > istats;
+  vector<SimpleSparseTensor<T> > in;
   istats.emplace_back(corpus<T, U>());
   for(int j = 0; getDetailed<T, U>(istats[istats.size() - 1], input, j, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
     istats[j].reDig(redig);
     istats[j] /= sqrt(istats[j].cdot(istats[j]));
     istats.emplace_back(corpus<T, U>());
+    in.emplace_back(const_cast<const SimpleSparseTensor<T>&>(istats[j].corpust) );
   }
-  vector<corpus<T, U> > pstats;
-  {
-    vector<int> idx;
-    for(int j = 0; j < istats.size() - 1; j ++) {
-      auto lidx(istats[j].countIdx(threshin));
-      idx.insert(idx.end(), lidx.begin(), lidx.end());
-    }
-    sort(idx.begin(), idx.end());
-    idx.erase(std::unique(idx.begin(), idx.end()), idx.end());
-    vector<SimpleVector<T> > pp;
-    pp.reserve(2 * (istats.size() - 1) - 1);
-    for(int j = 0; j < istats.size() - 1; j ++) {
-      pp.emplace_back(SimpleVector<T>(idx.size() * idx.size() * idx.size()));
-      if(j) pp.emplace_back(SimpleVector<T>(idx.size() * idx.size() * idx.size()));
-      for(int ii = 0; ii < idx.size(); ii ++)
-        for(int jj = 0; jj < idx.size(); jj ++)
-          for(int kk = 0; kk < idx.size(); kk ++)
-            pp[pp.size() - 1][ii * idx.size() * idx.size() + jj * idx.size() + kk] = const_cast<const SimpleSparseTensor<T>&>(istats[j].corpust)[idx[ii]][idx[jj]][idx[kk]];
-      if(j) pp[pp.size() - 2] = (pp[pp.size() - 3] + pp[pp.size() - 1]) / T(int(2));
-    }
-    auto qp(predv<T>(pp));
-    if(qp.first.size() & 1) qp.first.erase(qp.first.end() - 1);
-    qp.first.insert(qp.first.end(), qp.second.begin(), qp.second.end());
-    for(int j = 1; j < qp.first.size(); j += 2) {
-      pstats.emplace_back(corpus<T, U>());
-      for(int ii = 0; ii < idx.size(); ii ++)
-        for(int jj = 0; jj < idx.size(); jj ++)
-          for(int kk = 0; kk < idx.size(); kk ++)
-            pstats[j / 2].corpust[idx[ii]][idx[jj]][idx[kk]] = qp.first[j][ii * idx.size() * idx.size() + jj * idx.size() + kk];
-    }
+  vector<int> idx;
+  for(int j = 0; j < istats.size() - 1; j ++) {
+    auto lidx(istats[j].countIdx(threshin));
+    idx.insert(idx.end(), lidx.begin(), lidx.end());
   }
-  for(int i = 0; i < pstats.size(); i ++) {
+  sort(idx.begin(), idx.end());
+  idx.erase(std::unique(idx.begin(), idx.end()), idx.end());
+  auto p(predvResizeSTen<T>(in, idx));
+  p.first.insert(p.first.end(), p.second.begin(), p.second.end());
+  for(int i = 0; i < p.first.size(); i ++) {
+    corpus<T, U> pstats;
+    pstats.corpust = p.first[i];
     int idx(0);
     T   score(0);
     corpus<T, U> dbc;
     corpus<T, U> dbcc;
     for(int j = 0; getDetailed<T, U>(dbc, db, j, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
-      std::cerr << j << " : " << i << " / " << pstats.size() << endl;
+      std::cerr << j << " : " << i << " / " << p.first.size() << endl;
       dbc.reDig(redig);
-      const auto lscore(pstats[i].cdot(dbc) / sqrt(dbc.cdot(dbc)));
+      const auto lscore(pstats.cdot(dbc) / sqrt(dbc.cdot(dbc)));
       if(isfinite(lscore) && score <= lscore) {
         idx   = j;
         score = lscore;
         dbcc  = dbc;
       }
     }
-    dbcc.corpust = pstats[i].corpust;
-    os << pstats[i].serialize() << " " << idx << " : " << endl;
+    dbcc.corpust = pstats.corpust;
+    os << pstats.serialize() << " " << idx << " : " << endl;
     outTagged<T,U>(os, U("prepTOC0_") + to_string(i) + U("_"), dbcc, idx, score, db, szwindow);
     os << "<br /><br />" << endl;
   }
