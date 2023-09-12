@@ -23,7 +23,8 @@ void usage() {
 }
 
 //const int    szwindow(120);
-const int    szwindow(1500);
+const int    szwindow(200);
+//const int    szwindow(1500);
 const int    Mbalance(40);
 const double scorethresh(sqrt(.5));
 const double dscorethresh(0.);

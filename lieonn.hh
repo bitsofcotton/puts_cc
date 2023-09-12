@@ -4077,17 +4077,17 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
     int ok_cnt(0);
     for(int j = 0; j < in0.size(); j ++) {
       const auto ga(revertProgramInvariant<T>(make_pair(makeProgramInvariant<T>(in[j * 2]).second, T(int(1)) )) );
-      M = max(abs(ga), M);
-      if(abs(ga) <= M * sqrt(SimpleMatrix<T>().epsilon())) ok_cnt ++;
+      M = max(M, abs(ga));
+      if(abs(ga) <= M * sqrt(SimpleMatrix<T>().epsilon()) ) ok_cnt ++;
       else cerr << "Geometric average " << ga << " is still large." << endl;
       for(int k = 0; k < in[j * 2].size(); k ++) in[j * 2][k] -= ga;
       if(j) in[j * 2 - 1] = (in[j * 2] + in[j * 2 - 2]) / T(int(2));
     }
-    cerr << "loop # " << i << endl;
-    auto q(predv<T>(in, msz));
-    for(int i = 0; i < q.first.size();  i ++) res.first[i]  += q.first[i];
-    for(int i = 0; i < q.second.size(); i ++) res.second[i] += q.second[i];
     if(in0.size() <= ok_cnt) break;
+    cerr << "loop # " << i << endl;
+    auto q(predv0<T>(in, msz));
+    for(int j = 0; j < q.first.size();  j ++) res.first[j]  += q.first[j];
+    for(int j = 0; j < q.second.size(); j ++) res.second[j] += q.second[j];
   }
   return res;
 }
@@ -4171,6 +4171,7 @@ template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTe
   const int  rsize(pow(T(int(in0.size() * 2 - 1) ), T(int(1)) / T(int(3)) ) );
   const auto resize((dft<T>(- rsize).subMatrix(0, 0, rsize, min(rsize, int(idx.size()))) * dft<T>(int(idx.size())).subMatrix(0, 0, min(rsize, int(idx.size())), int(idx.size())) ).template real<T>() * T(rsize) / T(int(idx.size())) );
   const auto reverse((dft<T>(- int(idx.size()) ).subMatrix(0, 0, int(idx.size()), min(rsize, int(idx.size())) ) * dft<T>(rsize).subMatrix(0, 0, min(rsize, int(idx.size())), rsize) ).template real<T>() * T(int(idx.size())) / T(rsize) );
+  cerr << "Resize into " << rsize << endl;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
