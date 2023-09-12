@@ -4119,7 +4119,7 @@ template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<Simp
       res.first[i / 2][j] = reverse * p.first[i].subVector(j * rsize, rsize);
     res.second[i / 2].resize(in0[i / 2].size());
     for(int j = 0; j < res.second[i / 2].size(); j ++)
-      res.first[i / 2][j] = reverse * p.second[i].subVector(j * rsize, rsize);
+      res.second[i / 2][j] = reverse * p.second[i].subVector(j * rsize, rsize);
   }
   return res;
 }
