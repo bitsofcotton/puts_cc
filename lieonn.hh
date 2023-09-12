@@ -4209,8 +4209,8 @@ template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTe
         SimpleVector<T> workf(rsize);
         SimpleVector<T> workb(rsize);
         for(int j = 0; j < rsize; j ++) {
-          workf[j] = p.first[ i / 2][k * rsize * m * rsize + j];
-          workb[j] = p.second[i / 2][k * rsize * m * rsize + j];
+          workf[j] = p.first[ i][k * rsize * rsize + m * rsize + j];
+          workb[j] = p.second[i][k * rsize * rsize + m * rsize + j];
         }
         workf = reverse * workf;
         workb = reverse * workb;
