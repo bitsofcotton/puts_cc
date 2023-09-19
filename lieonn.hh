@@ -4003,6 +4003,35 @@ template <typename T> static inline SimpleVector<T> autoLevel(const SimpleVector
   return autoLevel<T>(b, count)[0].row(0);
 }
 
+template <typename T> static inline vector<SimpleMatrix<T> > autoGamma(const vector<SimpleMatrix<T> >& data, const T& ratio = T(int(1)) / T(int(2)) ) {
+  T r(int(0));
+  for(int k = 0; k < data.size(); k ++)
+    for(int i = 0; i < data[k].rows(); i ++)
+      for(int j = 0; j < data[k].cols(); j ++) {
+        assert(T(int(0)) <= data[k](i, j) && data[k](i, j) <= T(int(1)) );
+        r += log(data[k](i, j) + T(int(1)) / T(int(65536)) );
+      }
+  r /= T(int(data.size() * data[0].rows() * data[0].cols()));
+  r  = log(ratio) / r;
+  auto result(data);
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
+  for(int k = 0; k < data.size(); k ++)
+    for(int i = 0; i < data[k].rows(); i ++)
+      for(int j = 0; j < data[k].cols(); j ++)
+        result[k](i, j) = max(T(int(0)), min(T(int(1)), pow(data[k](i, j) + T(int(1)) / T(int(65536)), r) ));
+  return result;
+}
+
+template <typename T> static inline SimpleVector<T> autoGamma(const SimpleVector<T>& data, const T& r = T(int(1)) / T(int(2)) ) {
+  vector<SimpleMatrix<T> > b;
+  b.resize(1);
+  b[0].resize(1, data.size());
+  b[0].row(0) = data;
+  return autoGamma<T>(b, r)[0].row(0);
+}
+
 template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv0(const vector<SimpleVector<T> >& in, int msz = - 1) {
   int p0(0);
   if(msz < 0) msz = in.size();
@@ -4093,7 +4122,8 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
 }
 
 template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predvResizeVec(const vector<vector<SimpleVector<T> > >& in0, int msz = - 1) {
-  const int  rsize(T(int(in0.size() * 2 - 1)) / T(int(in0[0].size())) );
+  // N.B. we need /= 2 align with predv0.
+  const int  rsize(T(int(in0.size() * 2 - 1)) / T(int(in0[0].size())) / T(int(2)) );
   const auto resize((dft<T>(- rsize).subMatrix(0, 0, rsize, min(rsize, in0[0][0].size())) * dft<T>(in0[0][0].size()).subMatrix(0, 0, min(rsize, in0[0][0].size()), in0[0][0].size()) ).template real<T>() * T(rsize) / T(int(in0[0][0].size())) );
   const auto reverse((dft<T>(- in0[0][0].size()).subMatrix(0, 0, in0[0][0].size(), min(rsize, in0[0][0].size())) * dft<T>(rsize).subMatrix(0, 0, min(rsize, in0[0][0].size()), rsize) ).template real<T>() * T(int(in0[0][0].size())) / T(rsize) );
   cerr << "Resize into " << rsize << endl;
@@ -4125,13 +4155,16 @@ template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<Simp
 }
 
 template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predvResizeMat(const vector<vector<SimpleMatrix<T> > >& in0, int msz = - 1) {
-  const auto pixels(T(int(in0.size() * 2 - 1)) / T(int(in0[0].size())) );
-  const int  ry(pixels * T(int(in0[0][0].rows())) * sqrt(T(int(in0[0][0].rows() * in0[0][0].rows() + in0[0][0].cols() * in0[0][0].cols() ))) / T(int(in0[0][0].rows() * in0[0][0].cols() )) );
-  const int  rx(pixels * T(int(in0[0][0].cols())) * sqrt(T(int(in0[0][0].rows() * in0[0][0].rows() + in0[0][0].cols() * in0[0][0].cols() ))) / T(int(in0[0][0].rows() * in0[0][0].cols() )) );
+  // N.B. we need this actually. (Whole graphics orthogonality information).
+  // const auto pixels(sqrt(T(int(in0.size() * 2 - 1)) / T(int(in0[0].size())) / T(int(in0[0][0].rows() * in0[0][0].cols() )) ));
+  // N.B. however, we use this because of its tiny output size.
+  //      (Each line orthogonality information.)
+  // N.B. we need /= 2 because of alighment on predv0.
+  const auto pixels(T(int(in0.size() * 2 - 1)) / T(int(in0[0].size())) / sqrt(T(int(in0[0][0].rows() * in0[0][0].cols() )) ) / T(int(2)));
+  const int  ry(pixels * T(int(in0[0][0].rows()) ) );
+  const int  rx(pixels * T(int(in0[0][0].cols()) ) );
   const auto resizeL((dft<T>(- ry).subMatrix(0, 0, ry, min(ry, in0[0][0].rows())) * dft<T>(in0[0][0].rows()).subMatrix(0, 0, min(ry, in0[0][0].rows()), in0[0][0].rows()) ).template real<T>() * T(ry) / T(int(in0[0][0].rows())) );
   const auto resizeR((dft<T>(- rx).subMatrix(0, 0, rx, min(rx, in0[0][0].cols())) * dft<T>(in0[0][0].cols()).subMatrix(0, 0, min(rx, in0[0][0].cols()), in0[0][0].cols()) ).template real<T>().transpose() * T(rx) / T(int(in0[0][0].cols())) );
-  const auto reverseL((dft<T>(- in0[0][0].rows()).subMatrix(0, 0, in0[0][0].rows(), min(ry, in0[0][0].rows())) * dft<T>(ry).subMatrix(0, 0, min(ry, in0[0][0].rows()), ry) ).template real<T>() * T(int(in0[0][0].rows())) / T(ry) );
-  const auto reverseR((dft<T>(- in0[0][0].cols()).subMatrix(0, 0, in0[0][0].cols(), min(rx, in0[0][0].cols())) * dft<T>(rx).subMatrix(0, 0, min(rx, in0[0][0].cols()), rx) ).template real<T>().transpose() * T(int(in0[0][0].cols())) / T(rx) );
   cerr << "Resize into (" << ry << ", " << rx << ")" << endl;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4151,24 +4184,25 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
   for(int i = 1; i < p.first.size(); i += 2) {
     res.first[i / 2].resize(in0[i / 2].size());
     for(int j = 0; j < res.first[i / 2].size(); j ++) {
-      SimpleMatrix<T> work(ry, rx);
-      for(int k = 0; k < work.rows(); k ++)
-        work.row(k) = p.first[i].subVector(j * ry * rx + k * rx, rx);
-      res.first[i / 2][j] = reverseL * work * reverseR;
+      res.first[i / 2][j].resize(ry, rx);
+      for(int k = 0; k < ry; k ++)
+        res.first[i / 2][j].row(k) =
+          p.first[i].subVector(j * ry * rx + k * rx, rx);
     }
     res.second[i / 2].resize(in0[i / 2].size());
     for(int j = 0; j < res.second[i / 2].size(); j ++) {
-      SimpleMatrix<T> work(ry, rx);
-      for(int k = 0; k < work.rows(); k ++)
-        work.row(k) = p.second[i].subVector(j * ry * rx + k * rx, rx);
-      res.second[i / 2][j] = reverseL * work * reverseR;
+      res.second[i / 2][j].resize(ry, rx);
+      for(int k = 0; k < ry; k ++)
+        res.second[i / 2][j].row(k) =
+          p.second[i].subVector(j * ry * rx + k * rx, rx);
     }
   }
   return res;
 }
 
 template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predvResizeSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx, int msz = - 1) {
-  const int  rsize(pow(T(int(in0.size() * 2 - 1) ), T(int(1)) / T(int(3)) ) );
+  // N.B. we need /=2 aligh with predv0.
+  const int  rsize(pow(T(int(in0.size() * 2 - 1) ) / T(int(2)), T(int(1)) / T(int(3)) ) );
   const auto resize((dft<T>(- rsize).subMatrix(0, 0, rsize, min(rsize, int(idx.size()))) * dft<T>(int(idx.size())).subMatrix(0, 0, min(rsize, int(idx.size())), int(idx.size())) ).template real<T>() * T(rsize) / T(int(idx.size())) );
   const auto reverse((dft<T>(- int(idx.size()) ).subMatrix(0, 0, int(idx.size()), min(rsize, int(idx.size())) ) * dft<T>(rsize).subMatrix(0, 0, min(rsize, int(idx.size())), rsize) ).template real<T>() * T(int(idx.size())) / T(rsize) );
   cerr << "Resize into " << rsize << endl;
