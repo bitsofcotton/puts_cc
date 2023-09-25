@@ -4209,8 +4209,8 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
   return res;
 }
 
-template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predvResizeSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
-  const int skip(pow(T(int(in0.size() * 2 - 1) ) / T(int(2)), T(int(1)) / T(int(3)) ) );
+template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
+  const int skip(ceil(T(int(idx.size() * idx.size() * idx.size() )) / T(int(in0.size())) ) );
   cerr << "Skip: " << skip << endl;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());

@@ -1209,7 +1209,7 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
   sort(idx.begin(), idx.end());
   idx.erase(std::unique(idx.begin(), idx.end()), idx.end());
   cerr << "total " << idx.size() << " words." << endl;
-  auto p(predvResizeSTen<T>(in, idx));
+  auto p(predSTen<T>(in, idx));
   p.first.insert(p.first.end(), p.second.begin(), p.second.end());
   for(int i = 0; i < p.first.size(); i ++) {
     corpus<T, U> pstats;
