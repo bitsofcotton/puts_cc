@@ -1995,7 +1995,9 @@ public:
   }
   myfloat      epsilon() const {
 #if defined(_FLOAT_BITS_)
-    static const auto eps(myfloat(int(1)) >> myint(_FLOAT_BITS_ - 1));
+    // N.B. conservative.
+    static const auto eps(sqrt(myfloat(int(1)) >> myint(_FLOAT_BITS_ - 1)));
+    // static const auto eps(myfloat(int(1)) >> myint(_FLOAT_BITS_ - 1));
 #else
     // N.B. conservative.
     static const auto eps(sqrt(std::numeric_limits<myfloat>::epsilon()));
@@ -4032,12 +4034,15 @@ template <typename T> static inline SimpleVector<T> autoGamma(const SimpleVector
   return autoGamma<T>(b, r)[0].row(0);
 }
 
-template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv0(const vector<SimpleVector<T> >& in, int msz = - 1) {
+template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv0(const vector<SimpleVector<T> >& in, int skip = 2) {
+/*
   int p0(0);
-  if(msz < 0) msz = in.size();
-  for( ; p0 < min(int(in.size()), msz); p0 ++)
+  for( ; p0 < int(in.size()); p0 ++)
     if(in.size() - 4 - p0 - 1 + 2 < 4 + 2) break;
   p0 /= 4;
+*/
+  assert(0 < skip);
+  auto p0(int(in.size() - 4 - 1 + 2 - 4 - 2) / 4 / skip);
   vector<SimpleVector<T> > invariant;
   invariant.resize(in.size());
 #if defined(_OPENMP)
@@ -4072,8 +4077,8 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
       pf.next(invariant[k][j]);
     }
     for(int i = 0; i < p0; i ++) {
-      q[i][j] = P1I<T>(4, i + 1).next(pb.res);
-      p[i][j] = P1I<T>(4, i + 1).next(pf.res);
+      q[i][j] = P1I<T>(4, (i + 1) * skip).next(pb.res);
+      p[i][j] = P1I<T>(4, (i + 1) * skip).next(pf.res);
     }
   }
   for(int i = 0; i < p.size(); i ++) {
@@ -4093,175 +4098,145 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
   return make_pair(move(p), move(q));
 }
 
-template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv(const vector<SimpleVector<T> >& in0, int msz = - 1) {
+template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv(const vector<SimpleVector<T> >& in0, int skip = 2) {
+  assert(0 < skip);
   vector<SimpleVector<T> > in;
-  in.reserve(in0.size() * 2 - 1);
+  in.reserve(in0.size() * skip - skip + 1);
   for(int i = 0; i < in0.size(); i ++)  {
-    if(i) in.emplace_back((in0[i - 1] + in0[i]) / T(int(2)));
+    if(i)
+      for(int j = 0; j < skip - 1; j ++)
+        in.emplace_back((in0[i - 1] * T(int(skip - 1 - j)) +
+                         in0[i]     * T(int(j + 1)) ) / T(skip) );
     in.emplace_back(in0[i]);
   }
-  auto res(predv0<T>(in, msz));
+  auto res(predv0<T>(in, skip));
   T M(int(0));
   for(int i = 0; i < in.size(); i ++) {
     int ok_cnt(0);
-    for(int j = 0; j < in0.size(); j ++) {
-      const auto ga(revertProgramInvariant<T>(make_pair(makeProgramInvariant<T>(in[j * 2]).second, T(int(1)) )) );
+    for(int j = 0; j < in.size(); j += skip) {
+      const auto ga(revertProgramInvariant<T>(make_pair(makeProgramInvariant<T>(in[j]).second, T(int(1)) )) );
       M = max(M, abs(ga));
       if(abs(ga) <= M * sqrt(SimpleMatrix<T>().epsilon()) ) ok_cnt ++;
       else cerr << "Geometric average " << ga << " is still large." << endl;
-      for(int k = 0; k < in[j * 2].size(); k ++) in[j * 2][k] -= ga;
-      if(j) in[j * 2 - 1] = (in[j * 2] + in[j * 2 - 2]) / T(int(2));
+      for(int k = 0; k < in[j].size(); k ++) in[j][k] -= ga;
+      if(j)
+        for(int k = 0; k < skip - 1; k ++)
+          in[j - skip + k + 1] =
+            (in[j - skip] * T(int(skip - 1 - k)) +
+             in[j]        * T(int(k + 1)) ) / T(skip);
     }
     if(in0.size() <= ok_cnt) break;
     cerr << "loop # " << i << endl;
-    auto q(predv0<T>(in, msz));
+    auto q(predv0<T>(in, skip));
     for(int j = 0; j < q.first.size();  j ++) res.first[j]  += q.first[j];
     for(int j = 0; j < q.second.size(); j ++) res.second[j] += q.second[j];
   }
   return res;
 }
 
-template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predvResizeVec(const vector<vector<SimpleVector<T> > >& in0, int msz = - 1) {
-  // N.B. we need /= 2 align with predv0.
-  const int  rsize(T(int(in0.size() * 2 - 1)) / T(int(in0[0].size())) / T(int(2)) );
-  const auto resize((dft<T>(- rsize).subMatrix(0, 0, rsize, min(rsize, in0[0][0].size())) * dft<T>(in0[0][0].size()).subMatrix(0, 0, min(rsize, in0[0][0].size()), in0[0][0].size()) ).template real<T>() * T(rsize) / T(int(in0[0][0].size())) );
-  const auto reverse((dft<T>(- in0[0][0].size()).subMatrix(0, 0, in0[0][0].size(), min(rsize, in0[0][0].size())) * dft<T>(rsize).subMatrix(0, 0, min(rsize, in0[0][0].size()), rsize) ).template real<T>() * T(int(in0[0][0].size())) / T(rsize) );
-  cerr << "Resize into " << rsize << endl;
+template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
+  assert(in0.size() && in0[0].size() && in0[0][0].size());
+  const int skip(ceil(T(int(in0[0].size() * in0[0][0].size())) / T(int(in0.size())) ));
+  cerr << "Skip: " << skip << endl;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
     assert(in0[i].size() == in0[0].size() &&
            in0[i][0].size() == in0[0][0].size());
-    in[i].resize(rsize * in0[i].size());
+    in[i].resize(in0[i].size() * in0[i][0].size());
     for(int j = 0; j < in0[i].size(); j ++) {
-      assert(in0[i][j].size() == in0[i][0].size());
-      const auto work(resize * in0[i][j]);
-      in[i].setVector(j * work.size(), work);
+      assert(in0[i][0].size() == in0[i][j].size());
+      in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
-  const auto p(predv<T>(in, msz));
+  const auto p(predv<T>(in, skip));
   pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > res;
-  res.first.resize( p.first.size()  / 2);
-  res.second.resize(p.second.size() / 2);
-  for(int i = 1; i < p.first.size(); i += 2) {
-    res.first[i / 2].resize(in0[i / 2].size());
-    for(int j = 0; j < res.first[i / 2].size(); j ++)
-      res.first[i / 2][j] = reverse * p.first[i].subVector(j * rsize, rsize);
-    res.second[i / 2].resize(in0[i / 2].size());
-    for(int j = 0; j < res.second[i / 2].size(); j ++)
-      res.second[i / 2][j] = reverse * p.second[i].subVector(j * rsize, rsize);
+  res.first.resize( p.first.size() );
+  res.second.resize(p.second.size());
+  for(int i = 0; i < p.first.size(); i ++) {
+    res.first[i].resize(in0[0].size());
+    for(int j = 0; j < res.first[i].size(); j ++)
+      res.first[i][j]  = p.first[i].subVector( j * in0[0][0].size(), in0[0][0].size());
+    res.second[i].resize(in0[0].size());
+    for(int j = 0; j < res.second[i].size(); j ++)
+      res.second[i][j] = p.second[i].subVector(j * in0[0][0].size(), in0[0][0].size());
   }
   return res;
 }
 
-template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predvResizeMat(const vector<vector<SimpleMatrix<T> > >& in0, int msz = - 1) {
-  // N.B. we need this actually. (Whole graphics orthogonality information).
-  // const auto pixels(sqrt(T(int(in0.size() * 2 - 1)) / T(int(in0[0].size())) / T(int(in0[0][0].rows() * in0[0][0].cols() )) ));
-  // N.B. however, we use this because of its tiny output size.
-  //      (Each line orthogonality information.)
-  // N.B. we need /= 2 because of alighment on predv0.
-  const auto pixels(T(int(in0.size() * 2 - 1)) / T(int(in0[0].size())) / sqrt(T(int(in0[0][0].rows() * in0[0][0].cols() )) ) / T(int(2)));
-  const int  ry(pixels * T(int(in0[0][0].rows()) ) );
-  const int  rx(pixels * T(int(in0[0][0].cols()) ) );
-  const auto resizeL((dft<T>(- ry).subMatrix(0, 0, ry, min(ry, in0[0][0].rows())) * dft<T>(in0[0][0].rows()).subMatrix(0, 0, min(ry, in0[0][0].rows()), in0[0][0].rows()) ).template real<T>() * T(ry) / T(int(in0[0][0].rows())) );
-  const auto resizeR((dft<T>(- rx).subMatrix(0, 0, rx, min(rx, in0[0][0].cols())) * dft<T>(in0[0][0].cols()).subMatrix(0, 0, min(rx, in0[0][0].cols()), in0[0][0].cols()) ).template real<T>().transpose() * T(rx) / T(int(in0[0][0].cols())) );
-  cerr << "Resize into (" << ry << ", " << rx << ")" << endl;
+template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
+  assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
+  // N.B. In fact, we need to sqrt input total pixels, but we don't.
+  //      this is because of each line condition and
+  //      sqrt causes square output and they are huge input arrays.
+  const int skip(ceil(T(int(in0[0].size() * in0[0][0].rows() * in0[0][0].cols())) / T(int(in0.size())) ));
+  cerr << "Skip: " << skip << endl;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
     assert(in0[i].size() == in0[0].size());
-    in[i].resize(ry * rx * in0[i].size());
+    in[i].resize(in0[i].size());
     for(int j = 0; j < in0[i].size(); j ++) {
-      const auto work(resizeL * in0[i][j] * resizeR);
-      for(int k = 0; k < work.rows(); k ++)
-        in[i].setVector(j * ry * rx + k * rx, work.row(k));
+      assert(in0[i][j].rows() == in0[0][0].rows() &&
+             in0[i][j].cols() == in0[0][0].cols());
+      for(int k = 0; k < in0[i][j].rows(); k ++)
+        in[i].setVector(j * in0[i][0].rows() * in0[i][0].cols() +
+                        k * in0[i][0].cols(), in0[i][j].row(k));
     }
   }
-  const auto p(predv<T>(in, msz));
+  const auto p(predv<T>(in, skip));
   pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > res;
-  res.first.resize( p.first.size()  / 2);
-  res.second.resize(p.second.size() / 2);
-  for(int i = 1; i < p.first.size(); i += 2) {
-    res.first[i / 2].resize(in0[i / 2].size());
-    for(int j = 0; j < res.first[i / 2].size(); j ++) {
-      res.first[i / 2][j].resize(ry, rx);
-      for(int k = 0; k < ry; k ++)
-        res.first[i / 2][j].row(k) =
-          p.first[i].subVector(j * ry * rx + k * rx, rx);
+  res.first.resize( p.first.size() );
+  res.second.resize(p.second.size());
+  for(int i = 0; i < p.first.size(); i ++) {
+    res.first[i].resize(in0[i].size());
+    for(int j = 0; j < res.first[i].size(); j ++) {
+      res.first[i][j].resize(in0[0][0].rows(), in0[0][0].cols());
+      for(int k = 0; k < in0[0][0].rows(); k ++)
+        res.first[i][j].row(k) =
+          p.first[i].subVector(j * in0[0][0].rows() * in0[0][0].cols() +
+                               k * in0[0][0].cols(), in0[0][0].cols());
     }
-    res.second[i / 2].resize(in0[i / 2].size());
-    for(int j = 0; j < res.second[i / 2].size(); j ++) {
-      res.second[i / 2][j].resize(ry, rx);
-      for(int k = 0; k < ry; k ++)
-        res.second[i / 2][j].row(k) =
-          p.second[i].subVector(j * ry * rx + k * rx, rx);
+    res.second[i].resize(in0[i].size());
+    for(int j = 0; j < res.second[i].size(); j ++) {
+      res.second[i][j].resize(in0[0][0].rows(), in0[0][0].cols());
+      for(int k = 0; k < in0[0][0].rows(); k ++)
+        res.second[i][j].row(k) =
+          p.second[i].subVector(j * in0[0][0].rows() * in0[0][0].cols() +
+                                k * in0[0][0].cols(), in0[0][0].cols());
     }
   }
   return res;
 }
 
-template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predvResizeSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx, int msz = - 1) {
-  // N.B. we need /=2 aligh with predv0.
-  const int  rsize(pow(T(int(in0.size() * 2 - 1) ) / T(int(2)), T(int(1)) / T(int(3)) ) );
-  const auto resize((dft<T>(- rsize).subMatrix(0, 0, rsize, min(rsize, int(idx.size()))) * dft<T>(int(idx.size())).subMatrix(0, 0, min(rsize, int(idx.size())), int(idx.size())) ).template real<T>() * T(rsize) / T(int(idx.size())) );
-  const auto reverse((dft<T>(- int(idx.size()) ).subMatrix(0, 0, int(idx.size()), min(rsize, int(idx.size())) ) * dft<T>(rsize).subMatrix(0, 0, min(rsize, int(idx.size())), rsize) ).template real<T>() * T(int(idx.size())) / T(rsize) );
-  cerr << "Resize into " << rsize << endl;
+template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predvResizeSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
+  const int skip(pow(T(int(in0.size() * 2 - 1) ) / T(int(2)), T(int(1)) / T(int(3)) ) );
+  cerr << "Skip: " << skip << endl;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
-    in[i].resize(rsize * rsize * rsize);
+    in[i].resize(idx.size() * idx.size() * idx.size());
     vector<SimpleMatrix<T> > tensor;
     tensor.reserve(idx.size());
-    for(int j = 0; j < idx.size(); j ++) {
-      SimpleMatrix<T> work(idx.size(), idx.size());
+    for(int j = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
         for(int m = 0; m < idx.size(); m ++)
-          work(k, m) = in0[i][idx[j]][idx[k]][idx[m]];
-      tensor.emplace_back(resize * work * resize.transpose());
-    }
-    for(int k = 0; k < rsize; k ++)
-      for(int m = 0; m < rsize; m ++) {
-        SimpleVector<T> work(idx.size());
-        for(int j = 0; j < idx.size(); j ++)
-          work[j] = tensor[j](k, m);
-        work = resize * work;
-        for(int j = 0; j < rsize; j ++)
-          in[i][k * rsize * rsize + m * rsize + j] = work[j];
-      }
+          in[i][j * idx.size() * idx.size() + k * idx.size() + m] =
+            in0[i][idx[j]][idx[k]][idx[m]];
   }
-  const auto p(predv<T>(in, msz));
+  const auto p(predv<T>(in, skip));
   pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > res;
-  res.first.resize( p.first.size()  / 2);
-  res.second.resize(p.second.size() / 2);
-  for(int i = 1; i < p.first.size(); i += 2) {
-    vector<SimpleMatrix<T> > tf;
-    vector<SimpleMatrix<T> > tb;
-    tf.resize(idx.size(), SimpleMatrix<T>(rsize, rsize));
-    tb.resize(idx.size(), SimpleMatrix<T>(rsize, rsize));
-    for(int k = 0; k < rsize; k ++)
-      for(int m = 0; m < rsize; m ++) {
-        SimpleVector<T> workf(rsize);
-        SimpleVector<T> workb(rsize);
-        for(int j = 0; j < rsize; j ++) {
-          workf[j] = p.first[ i][k * rsize * rsize + m * rsize + j];
-          workb[j] = p.second[i][k * rsize * rsize + m * rsize + j];
-        }
-        workf = reverse * workf;
-        workb = reverse * workb;
-        for(int j = 0; j < idx.size(); j ++) {
-          tf[j](k, m) = workf[j];
-          tb[j](k, m) = workb[j];
-        }
-      }
-    for(int j = 0; j < idx.size(); j ++) {
-      const auto workf(reverse * (tf[j]) * reverse.transpose());
-      const auto workb(reverse * (tb[j]) * reverse.transpose());
+  res.first.resize( p.first.size() );
+  res.second.resize(p.second.size());
+  for(int i = 0; i < p.first.size(); i ++) {
+    for(int j = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
         for(int m = 0; m < idx.size(); m ++) {
-          res.first[i / 2][idx[j]][idx[k]][idx[m]]  = workf(k, m);
-          res.second[i / 2][idx[j]][idx[k]][idx[m]] = workb(k, m);
+          res.first[i][ idx[j]][idx[k]][idx[m]] =
+            p.first[i][ j * idx.size() * idx.size() + k * idx.size() + m];
+          res.second[i][idx[j]][idx[k]][idx[m]] =
+            p.second[i][j * idx.size() * idx.size() + k * idx.size() + m];
         }
-    }
   }
   return res;
 }
