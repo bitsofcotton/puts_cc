@@ -4166,16 +4166,16 @@ template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<Simp
 
 template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
-  // N.B. In fact, we need to sqrt input total pixels, but we don't.
+  // N.B. In fact, we need not to sqrt input total pixels, but we don't.
   //      this is because of each line condition and
-  //      sqrt causes square output and they are huge input arrays.
-  const int skip(ceil(T(int(in0[0].size() * in0[0][0].rows() * in0[0][0].cols())) / T(int(in0.size())) ));
+  //      they causes square output to be huge input arrays.
+  const int skip(sqrt(ceil(T(int(in0[0].size() * in0[0][0].rows() * in0[0][0].cols())) / T(int(in0.size())) )) );
   cerr << "Skip: " << skip << endl;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
     assert(in0[i].size() == in0[0].size());
-    in[i].resize(in0[i].size());
+    in[i].resize(in0[i].size() * in0[i][0].rows() * in0[i][0].cols());
     for(int j = 0; j < in0[i].size(); j ++) {
       assert(in0[i][j].rows() == in0[0][0].rows() &&
              in0[i][j].cols() == in0[0][0].cols());
@@ -4210,7 +4210,8 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
 }
 
 template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
-  const int skip(ceil(T(int(idx.size() * idx.size() * idx.size() )) / T(int(in0.size())) ) );
+  // N.B. we need not to do cbrt, however, same reason with predMat, we don't.
+  const int skip(pow(ceil(T(int(idx.size() * idx.size() * idx.size() )) / T(int(in0.size())) ), T(int(1)) / T(int(3)) ) );
   cerr << "Skip: " << skip << endl;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
