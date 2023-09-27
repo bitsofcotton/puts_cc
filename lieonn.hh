@@ -4169,7 +4169,8 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
   // N.B. In fact, we need not to sqrt input total pixels, but we don't.
   //      this is because of each line condition and
   //      they causes square output to be huge input arrays.
-  const int skip(sqrt(ceil(T(int(in0[0].size() * in0[0][0].rows() * in0[0][0].cols())) / T(int(in0.size())) )) );
+  // const int skip(ceil(T(int(in0[0].size() * in0[0][0].rows() * in0[0][0].cols())) / T(int(in0.size())) ) );
+  const int skip(ceil(sqrt(T(int(in0[0].size() * in0[0][0].rows() * in0[0][0].cols())) ) / T(int(in0.size())) ) );
   cerr << "Skip: " << skip << endl;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4211,7 +4212,8 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
 
 template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
   // N.B. we need not to do cbrt, however, same reason with predMat, we don't.
-  const int skip(pow(ceil(T(int(idx.size() * idx.size() * idx.size() )) / T(int(in0.size())) ), T(int(1)) / T(int(3)) ) );
+  // const int skip(ceil(T(int(idx.size() * idx.size() * idx.size() )) / T(int(in0.size() )) ) );
+  const int skip(ceil(T(int(idx.size() )) / T(int(in0.size())) ) );
   cerr << "Skip: " << skip << endl;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
