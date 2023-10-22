@@ -80,4 +80,5 @@ This repository is archived, so without bug report, will no change.
 2023/09/12 add and fix predvResizeSTens.
 2023/09/19 merge latest lieonn causes predv correction.
 2023/09/25 change prediction strategy, prefer to use complement.
+2023/10/22 we select the speed instead of accuracy on prediction, so we should to shrink the output tensor.
 

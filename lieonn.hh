@@ -4034,15 +4034,14 @@ template <typename T> static inline SimpleVector<T> autoGamma(const SimpleVector
   return autoGamma<T>(b, r)[0].row(0);
 }
 
-template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv0(const vector<SimpleVector<T> >& in, int skip = 2) {
+template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv0(const vector<SimpleVector<T> >& in, int skip = 1) {
 /*
   int p0(0);
   for( ; p0 < int(in.size()); p0 ++)
     if(in.size() - 4 - p0 - 1 + 2 < 4 + 2) break;
-  p0 /= 4;
 */
   assert(0 < skip);
-  auto p0(int(in.size() - 4 - 1 + 2 - 4 - 2) / 4 / skip);
+  auto p0(int(in.size() - 4 - 1 + 2 - 4 - 2) / skip);
   vector<SimpleVector<T> > invariant;
   invariant.resize(in.size());
 #if defined(_OPENMP)
@@ -4098,7 +4097,7 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
   return make_pair(move(p), move(q));
 }
 
-template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv(const vector<SimpleVector<T> >& in0, int skip = 2) {
+template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv(const vector<SimpleVector<T> >& in0, int skip = 1) {
   assert(0 < skip);
   vector<SimpleVector<T> > in;
   in.reserve(in0.size() * skip - skip + 1);
@@ -4109,6 +4108,8 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
                          in0[i]     * T(int(j + 1)) ) / T(skip) );
     in.emplace_back(in0[i]);
   }
+  return predv0<T>(in, skip);
+/*
   auto res(predv0<T>(in, skip));
   T M(int(0));
   for(int i = 0; i < in.size(); i ++) {
@@ -4132,12 +4133,12 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
     for(int j = 0; j < q.second.size(); j ++) res.second[j] += q.second[j];
   }
   return res;
+*/
 }
 
 template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
-  const int skip(ceil(T(int(in0[0].size() * in0[0][0].size())) / T(int(in0.size())) ));
-  cerr << "Skip: " << skip << endl;
+  cerr << "ratio: " << T(int(in0[0].size() * in0[0][0].size())) / T(int(in0.size())) << endl;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
@@ -4149,7 +4150,7 @@ template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<Simp
       in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
-  const auto p(predv<T>(in, skip));
+  const auto p(predv<T>(in));
   pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > res;
   res.first.resize( p.first.size() );
   res.second.resize(p.second.size());
@@ -4166,12 +4167,7 @@ template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<Simp
 
 template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
-  // N.B. In fact, we need not to sqrt input total pixels, but we don't.
-  //      this is because of each line condition and
-  //      they causes square output to be huge input arrays.
-  // const int skip(ceil(T(int(in0[0].size() * in0[0][0].rows() * in0[0][0].cols())) / T(int(in0.size())) ) );
-  const int skip(ceil(sqrt(T(int(in0[0].size() * in0[0][0].rows() * in0[0][0].cols())) ) / T(int(in0.size())) ) );
-  cerr << "Skip: " << skip << endl;
+  cerr << "ratio: " << sqrt(T(int(in0[0].size() * in0[0][0].rows() * in0[0][0].cols())) ) / T(int(in0.size())) << endl;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
@@ -4185,7 +4181,7 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
                         k * in0[i][0].cols(), in0[i][j].row(k));
     }
   }
-  const auto p(predv<T>(in, skip));
+  const auto p(predv<T>(in));
   pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > res;
   res.first.resize( p.first.size() );
   res.second.resize(p.second.size());
@@ -4211,10 +4207,7 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
 }
 
 template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
-  // N.B. we need not to do cbrt, however, same reason with predMat, we don't.
-  // const int skip(ceil(T(int(idx.size() * idx.size() * idx.size() )) / T(int(in0.size() )) ) );
-  const int skip(ceil(T(int(idx.size() )) / T(int(in0.size())) ) );
-  cerr << "Skip: " << skip << endl;
+  cerr << "ratio: " << T(int(idx.size() * idx.size() * idx.size() )) / T(int(in0.size() )) << endl;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
@@ -4227,7 +4220,7 @@ template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTe
           in[i][j * idx.size() * idx.size() + k * idx.size() + m] =
             in0[i][idx[j]][idx[k]][idx[m]];
   }
-  const auto p(predv<T>(in, skip));
+  const auto p(predv<T>(in));
   pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > res;
   res.first.resize( p.first.size() );
   res.second.resize(p.second.size());
