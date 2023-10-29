@@ -685,6 +685,7 @@ template <typename T, typename U> U corpus<T, U>::serializeSub(const vector<int>
           if(const_cast<const Tensor&>(corpust)[idxs[i]][idxs[j]][idxs[k]] != T(0))
             lscore ++;
       }
+    // XXX: middle data ignored.
     score.emplace_back(make_pair(lscore, idxs[i]));
   }
   sort(score.begin(), score.end());
@@ -692,16 +693,12 @@ template <typename T, typename U> U corpus<T, U>::serializeSub(const vector<int>
   left.reserve(idxs.size());
   right.reserve(idxs.size());
   int i(0);
-  for( ; i < score.size() && score[i].first < 0; i ++)
+  // N.B.: we only focus orders itself.
+  for( ; i < score.size() / 2; i ++)
     left.emplace_back(score[i].second);
   for( ; i < score.size(); i ++)
     right.emplace_back(score[i].second);
-  if(left.size() && right.size())
-    return serializeSub(left) + serializeSub(right);
-  U result;
-  for(int i = 0; i < idxs.size(); i ++)
-    result += words[idxs[i]];
-  return result;
+  return serializeSub(left) + serializeSub(right);
 }
 
 template <typename T, typename U> pair<T, T> corpus<T, U>::compareStructure(const corpus<T, U>& src, const T& thresh, const T& thresh2) const {
@@ -1189,7 +1186,7 @@ template <typename T, typename U> vector<int> pseudoWordsBalance(const vector<U>
   return vres;
 }
 
-template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const U& input, const U& db, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const T& depth, const T& threshin, const T& redig = T(1) ) {
+template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const T& threshin, const T& redig = T(1) ) {
   assert(detailtitle.size() == detail.size());
   os << "predTOC: " << flush;
   vector<corpus<T, U> > istats;
@@ -1214,24 +1211,9 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
   for(int i = 0; i < p.first.size(); i ++) {
     corpus<T, U> pstats;
     pstats.corpust = p.first[i];
-    int idx(0);
-    T   score(0);
-    corpus<T, U> dbc;
-    corpus<T, U> dbcc;
-    for(int j = 0; getDetailed<T, U>(dbc, db, j, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
-      std::cerr << j << " : " << i << " / " << p.first.size() << endl;
-      dbc.reDig(redig);
-      const auto lscore(pstats.cdot(dbc) / sqrt(dbc.cdot(dbc)));
-      if(isfinite(lscore) && score <= lscore) {
-        idx   = j;
-        score = lscore;
-        dbcc  = dbc;
-      }
-    }
-    dbcc.corpust = pstats.corpust;
-    os << pstats.serialize() << " " << idx << " : " << endl;
-    outTagged<T,U>(os, U("prepTOC0_") + to_string(i) + U("_"), dbcc, idx, score, db, szwindow);
-    os << "<br /><br />" << endl;
+    getAbbreved<T>(pstats, detailtitle, detail, delimiter);
+    os << pstats.simpleThresh(threshin).serialize() << "<br /><br />" << endl;
+    if(i == p.first.size() / 2 - 1) os << "<hr />" << endl;
   }
   return os;
 }

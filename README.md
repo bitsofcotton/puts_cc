@@ -20,7 +20,7 @@ This program uses large amount of region on the memory. And, very slow because o
     ./tools diff wordlist.txt -dict ... -dict2 ... < data.txt
     ./tools same wordlist.txt -dict ... -dict2 ... < data.txt
     ./tools prep wordlist.txt < data.txt
-    ./tools pred wordlist.txt (-|db.txt) dict1 ... < data.txt
+    ./tools pred wordlist.txt dictionaries ... < data.txt
 
 # Memory Fragments
 There exists better efficient memory management programs like jemalloc.
@@ -81,4 +81,5 @@ This repository is archived, so without bug report, will no change.
 2023/09/19 merge latest lieonn causes predv correction.
 2023/09/25 change prediction strategy, prefer to use complement.
 2023/10/22 we select the speed instead of accuracy on prediction, so we should to shrink the output tensor.
+2023/10/29 pred output fix, also have serializeSub function additional large effect fix. Either we have prediction noise glitch which will be reduced sqrt scale tensor but we don't implement them because of huge memory usage.
 

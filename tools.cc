@@ -23,8 +23,8 @@ void usage() {
 }
 
 //const int    szwindow(120);
-const int    szwindow(200);
-//const int    szwindow(1500);
+//const int    szwindow(200);
+const int    szwindow(1500);
 const int    Mbalance(40);
 const double scorethresh(sqrt(.5));
 const double dscorethresh(0.);
@@ -226,7 +226,7 @@ int main(int argc, const char* argv[]) {
   } else if(std::strcmp(argv[1], "pred") == 0) {
     std::vector<std::string> details;
     std::vector<std::string> detailwords;
-    for(int iidx = 4; iidx < argc; iidx ++) {
+    for(int iidx = 3; iidx < argc; iidx ++) {
       const auto work(loadbuf(argv[iidx]));
       details.push_back(work.second);
       detailwords.push_back(work.first);
@@ -236,7 +236,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
     std::cout << "<body>";
-    predTOC<num_t, std::string>(std::cout, input, argv[3][0] == '-' ? input : loadbuf(argv[3]).second, detailwords, details, delimiter, szwindow, - scorethresh, threshin, redig);
+    predTOC<num_t, std::string>(std::cout, input, detailwords, details, delimiter, szwindow, threshin, redig);
     std::cout << "<hr/>" << std::endl << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "prep") == 0) {
     std::vector<std::string> buf;
