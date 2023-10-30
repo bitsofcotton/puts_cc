@@ -67,7 +67,7 @@ using std::getline;
   typedef int64_t  myint;
   // XXX:
   // typedef long double myfloat;
-  typedef float myfloat;
+  typedef double myfloat;
 #else
 
 // Double int to new int class.
@@ -2716,36 +2716,27 @@ template <typename T> static inline pair<SimpleVector<T>, T> makeProgramInvarian
     res[in.size() + 1] = T(index);
   T ratio(0);
   for(int i = 0; i < res.size(); i ++) {
-    res[i]  = atan(res[i]) / atan(T(int(1))) / T(int(2));
+    res[i]  = atan(- res[i]) / atan(T(int(1))) / T(int(2));
     res[i] += T(int(1));
     res[i] /= T(int(2));
     assert(T(int(0)) < res[i] && res[i] <= T(int(1)));
-    ratio  += (res[i] = log(res[i]));
+    // ratio  += (res[i] = log(res[i]));
+    ratio  += log(res[i]);
   }
   // N.B. x_1 ... x_n == 1.
   // <=> x_1 / (x_1 ... x_n)^(1/n) ... == 1.
-  res /= ratio /= T(res.size());
+  ratio = exp(ratio / T(res.size()));
+  for(int i = 0; i < res.size(); i ++) res[i] /= ratio;
   return make_pair(res, ratio);
 }
 
 template <typename T> static inline T revertProgramInvariant(const pair<T, T>& in) {
-  return tan(max(- T(int(1)) + sqrt(SimpleMatrix<T>().epsilon()),
-             min(  T(int(1)) - sqrt(SimpleMatrix<T>().epsilon()),
-             exp(- abs(in.first * in.second) ) * T(int(2)) - T(int(1)) ))
-             * atan(T(int(1))) * T(int(2)) );
-}
-
-template <typename T> static inline SimpleVector<T> revertProgramInvariant(const SimpleVector<T>& in) {
-  auto M(abs(in[0]));
-  for(int i = 1; i < in.size(); i ++) M = max(M, abs(in[i]));
-  if(M == T(int(0))) M = T(int(1));
-  auto res(in);
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-  for(int i = 0; i < res.size(); i ++)
-    res[i] = revertProgramInvariant<T>(make_pair(res[i] / M, T(int(1)) ));
-  return res;
+  const auto r0(in.first * in.second);
+  const auto r(T(int(0)) < r0 ? r0 - floor(r0) : ceil(- r0) + r0);
+  return - tan(max(- T(int(1)) + sqrt(SimpleMatrix<T>().epsilon()),
+               min(  T(int(1)) - sqrt(SimpleMatrix<T>().epsilon()),
+               r * T(int(2)) - T(int(1)) ))
+                 * atan(T(int(1))) * T(int(2)) );
 }
 
 template <typename T> class idFeeder {
@@ -4047,15 +4038,18 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
   const int p0(ceil(sqrt(T(int(in.size() - 4 - 1 + 2 - 4 - 2) / skip) )) );
   vector<SimpleVector<T> > invariant;
   invariant.resize(in.size());
+  SimpleVector<T> secondsf(in.size());
+  SimpleVector<T> secondsb(in.size());
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < in.size(); i ++) {
-    invariant[i] = makeProgramInvariant<T>(in[i]).first;
+    auto mpi(makeProgramInvariant<T>(in[i]));
+    invariant[i] = move(mpi.first);
+    secondsf[i]  = move(mpi.second);
   }
-  T norm(int(0));
-  for(int i = 0; i < in.size(); i ++) norm += in[i].dot(in[i]);
-  norm = sqrt(norm / T(int(in.size())));
+  for(int i = 0; i < secondsf.size(); i ++)
+    secondsb[i] = secondsf[secondsf.size() - 1 - i];
   vector<SimpleVector<T> > p;
   if(p0 < 1) return make_pair(p, p);
   p.resize(p0);
@@ -4083,19 +4077,16 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
       p[i][j] = P1I<T>(4, (i + 1) * skip).next(pf.res);
     }
   }
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
   for(int i = 0; i < p.size(); i ++) {
-    p[i][p[i].size() - 1] = T(int(0));
-    p[i] = revertProgramInvariant<T>(p[i]);
-    p[i][p[i].size() - 1] = T(int(0));
-    const auto normp(sqrt(p[i].dot(p[i])));
-    if(normp != T(int(0))) p[i] *= norm / normp;
-  }
-  for(int i = 0; i < q.size(); i ++) {
-    q[i][q[i].size() - 1] = T(int(0));
-    q[i] = revertProgramInvariant<T>(q[i]);
-    q[i][q[i].size() - 1] = T(int(0));
-    const auto normq(sqrt(q[i].dot(q[i])));
-    if(normq != T(int(0))) q[i] *= norm / normq;
+    const auto qsec(P1I<T>(4, (i + 1) * skip).next(secondsb));
+    const auto psec(P1I<T>(4, (i + 1) * skip).next(secondsf));
+    for(int j = 0; j < p[i].size(); j ++)
+      p[i][j] = revertProgramInvariant<T>(make_pair(p[i][j], psec));
+    for(int j = 0; j < q[i].size(); j ++)
+      q[i][j] = revertProgramInvariant<T>(make_pair(q[i][j], qsec));
   }
   return make_pair(move(p), move(q));
 }
@@ -4113,31 +4104,6 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
     in.emplace_back(in0[i]);
   }
   return predv0<T>(in, skip);
-/*
-  auto res(predv0<T>(in, skip));
-  T M(int(0));
-  for(int i = 0; i < in.size(); i ++) {
-    int ok_cnt(0);
-    for(int j = 0; j < in.size(); j += skip) {
-      const auto ga(revertProgramInvariant<T>(make_pair(makeProgramInvariant<T>(in[j]).second, T(int(1)) )) );
-      M = max(M, abs(ga));
-      if(abs(ga) <= M * sqrt(SimpleMatrix<T>().epsilon()) ) ok_cnt ++;
-      else cerr << "Geometric average " << ga << " is still large." << endl;
-      for(int k = 0; k < in[j].size(); k ++) in[j][k] -= ga;
-      if(j)
-        for(int k = 0; k < skip - 1; k ++)
-          in[j - skip + k + 1] =
-            (in[j - skip] * T(int(skip - 1 - k)) +
-             in[j]        * T(int(k + 1)) ) / T(skip);
-    }
-    if(in0.size() <= ok_cnt) break;
-    cerr << "loop # " << i << endl;
-    auto q(predv0<T>(in, skip));
-    for(int j = 0; j < q.first.size();  j ++) res.first[j]  += q.first[j];
-    for(int j = 0; j < q.second.size(); j ++) res.second[j] += q.second[j];
-  }
-  return res;
-*/
 }
 
 template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
