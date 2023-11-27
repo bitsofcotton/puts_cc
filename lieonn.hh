@@ -4188,7 +4188,7 @@ template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTe
       for(int k = 0; k < idx.size(); k ++)
         for(int m = 0; m < idx.size(); m ++)
           in[i][j * idx.size() * idx.size() + k * idx.size() + m] =
-            in0[i][idx[j]][idx[k]][idx[m]];
+            (in0[i][idx[j]][idx[k]][idx[m]] + T(int(1))) / T(int(2));
   }
   const auto p(predv<T>(in));
   pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > res;
@@ -4199,9 +4199,11 @@ template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTe
       for(int k = 0; k < idx.size(); k ++)
         for(int m = 0; m < idx.size(); m ++) {
           res.first[i][ idx[j]][idx[k]][idx[m]] =
-            p.first[i][ j * idx.size() * idx.size() + k * idx.size() + m];
+            p.first[i][ j * idx.size() * idx.size() + k * idx.size() + m] *
+              T(int(2)) - T(int(1));
           res.second[i][idx[j]][idx[k]][idx[m]] =
-            p.second[i][j * idx.size() * idx.size() + k * idx.size() + m];
+            p.second[i][j * idx.size() * idx.size() + k * idx.size() + m] *
+              T(int(2)) - T(int(1));
         }
   }
   return res;
