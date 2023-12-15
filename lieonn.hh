@@ -3432,7 +3432,7 @@ public:
 // Get invariant structure that
 // \[- &alpha, &alpha;\[ register computer with deterministic calculation.
 // cf. bitsofcotton/randtools .
-template <typename T> class P1I {
+template <typename T, bool nonlinear = true> class P1I {
 public:
   inline P1I() { varlen = 0; }
   inline P1I(const int& var, const int& step = 1) {
@@ -3447,12 +3447,13 @@ public:
     // XXX: division accuracy glitch.
     const auto nin(sqrt(in.dot(in)) * T(int(2)));
     if(! isfinite(nin) || nin == zero) return zero;
-    SimpleMatrix<T> toeplitz(in.size() - varlen - step + 2, varlen + 2);
+    SimpleMatrix<T> toeplitz(in.size() - varlen - step + 2,
+                             nonlinear ? varlen + 2 : varlen);
     for(int i = 0; i < toeplitz.rows(); i ++) {
       auto work(in.subVector(i, varlen));
       work[work.size() - 1] = in[i + varlen + step - 2];
-      toeplitz.row(i) = makeProgramInvariant<T>(move(work),
-        T(i + 1) / T(toeplitz.rows() + 1) ).first;
+      toeplitz.row(i) = nonlinear ? makeProgramInvariant<T>(move(work),
+        T(i + 1) / T(toeplitz.rows() + 1) ).first : move(work);
     }
     const auto invariant(linearInvariant<T>(toeplitz));
     if(invariant[varlen - 1] == zero) return zero;
@@ -3460,19 +3461,22 @@ public:
     for(int i = 1; i < work.size(); i ++)
       work[i - 1] = in[i - work.size() + in.size()];
     work[work.size() - 1] = zero;
-    auto last(sqrt(work.dot(work)));
-    for(int ii = 0;
-            ii < 2 * int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) )
-            && sqrt(work.dot(work) * SimpleMatrix<T>().epsilon()) <
-                 abs(work[work.size() - 1] - last); ii ++) {
-      last = work[work.size() - 1];
-      const auto work2(makeProgramInvariant<T>(work, T(1)));
-      work[work.size() - 1] = revertProgramInvariant<T>(make_pair(
-               - (invariant.dot(work2.first) -
-                      invariant[varlen - 1] * work2.first[varlen - 1]) /
-                 invariant[varlen - 1], work2.second));
+    if(nonlinear) {
+      auto last(sqrt(work.dot(work)));
+      for(int ii = 0;
+              ii < 2 * int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) )
+              && sqrt(work.dot(work) * SimpleMatrix<T>().epsilon()) <
+                   abs(work[work.size() - 1] - last); ii ++) {
+        last = work[work.size() - 1];
+        const auto work2(makeProgramInvariant<T>(work, T(1)));
+        work[work.size() - 1] = revertProgramInvariant<T>(make_pair(
+                 - (invariant.dot(work2.first) -
+                        invariant[varlen - 1] * work2.first[varlen - 1]) /
+                   invariant[varlen - 1], work2.second));
+      }
+      return work[work.size() - 1];
     }
-    return work[work.size() - 1];
+    return - invariant.dot(work) / invariant[varlen - 1];
   }
 private:
   int varlen;
@@ -4060,7 +4064,7 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < in.size(); i ++)  {
-    secondsf[i] = makeProgramInvariant<T>(in[i]).second;
+    secondsf[i] = makeProgramInvariant<T>(in[i], - T(int(1)), true).second;
   }
   SimpleVector<T> secondsb(secondsf.size());
   secondsb.O();
@@ -4089,16 +4093,16 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
       pb.next(pf.res[pf.res.size() - 1 - k]);
     assert(pb.full);
     for(int i = 0; i < p0; i ++) {
-      q[i][j] += P1I<T>(4, i + 1).next(pb.res);
-      p[i][j] += P1I<T>(4, i + 1).next(pf.res);
+      q[i][j] += P1I<T, false>(4, i + 1).next(pb.res);
+      p[i][j] += P1I<T, false>(4, i + 1).next(pf.res);
     }
   }
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < p.size(); i ++) {
-    const auto qsec(P1I<T>(4, i + 1).next(secondsb));
-    const auto psec(P1I<T>(4, i + 1).next(secondsf));
+    const auto qsec(P1I<T, false>(4, i + 1).next(secondsb));
+    const auto psec(P1I<T, false>(4, i + 1).next(secondsf));
     for(int j = 0; j < p[i].size(); j ++)
       p[i][j] = revertProgramInvariant<T>(make_pair(p[i][j], psec), true);
     for(int j = 0; j < q[i].size(); j ++)

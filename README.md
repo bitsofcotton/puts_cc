@@ -83,4 +83,5 @@ This repository is archived, so without bug report, will no change.
 2023/10/22 we select the speed instead of accuracy on prediction, so we should to shrink the output tensor.
 2023/10/29 pred output fix, also have serializeSub function additional large effect fix. Either we have prediction noise glitch which will be reduced sqrt scale tensor but we don't implement them because of huge memory usage.
 2023/10/30 copy structure reliably with randtools meaning.
+2023/12/15 merge lieonn.hh causes pred takes invariant only once in the whole.
 
