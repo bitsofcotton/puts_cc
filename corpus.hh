@@ -453,6 +453,7 @@ public:
   corpus<T, U>  withDetail(const U& word, const corpus<T, U>& other, const T& thresh = T(0)) const;
   corpus<T, U>  abbrev(const U& word, const corpus<T, U>& work, const T& thresh = T(0)) const;
   pair<T, T>    compareStructure(const corpus<T, U>& src, const T& thresh = T(1e-4), const T& thresh2 = T(.125)) const;
+  corpus<T, U>& absfy();
 
   Tensor corpust;
 private:
@@ -630,34 +631,27 @@ template <typename T, typename U> corpus<T, U> corpus<T, U>::conflictPart() cons
   return result;
 }
 
-template <typename T, typename U> U corpus<T, U>::serialize() const {
-  cerr << "s" << flush;
-  auto plus(*this), minus(*this);
-  const auto& pi0(plus.corpust.iter());
+template <typename T, typename U> corpus<T, U>& corpus<T, U>::absfy() {
+  const auto& pi0(corpust.iter());
   for(auto itr0(pi0.begin()); itr0 != pi0.end(); ++ itr0) {
     const auto& pi1(itr0->second.iter());
     for(auto itr1(pi1.begin()); itr1 != pi1.end(); ++ itr1) {
       const auto& pi2(itr1->second.iter());
       for(auto itr2(pi2.begin()); itr2 != pi2.end(); ++ itr2)
-        if(itr2->second < T(0))
-          plus.corpust[itr0->first][itr1->first][itr2->first] = T(0);
+        if(itr2->second < T(0)) {
+          // N.B. we estimate minus sign on the tensor as to be reverse order.
+          corpust[itr1->first][itr0->first][itr2->first] -= itr2->second;
+          corpust[itr0->first][itr1->first][itr2->first]  = T(int(0));
+        }
     }
   }
-  const auto& mi0(minus.corpust.iter());
-  for(auto itr0(mi0.begin()); itr0 != mi0.end(); ++ itr0) {
-    const auto& mi1(itr0->second.iter());
-    for(auto itr1(mi1.begin()); itr1 != mi1.end(); ++ itr1) {
-      const auto& mi2(itr1->second.iter());
-      for(auto itr2(mi2.begin()); itr2 != mi2.end(); ++ itr2)
-        if(itr2->second > T(0))
-          minus.corpust[itr0->first][itr1->first][itr2->first] = T(0);
-        else
-          minus.corpust[itr0->first][itr1->first][itr2->first] = - itr2->second;
-    }
-  }
-  const auto entire(countIdx(T(0)));
-  return plus.serializeSub(entire)  + U(".&nbsp;&nbsp;&nbsp;-&nbsp;&nbsp;&nbsp;") +
-         minus.serializeSub(entire) + U(".");
+  return *this = simpleThresh(T(int(0)));
+}
+
+template <typename T, typename U> U corpus<T, U>::serialize() const {
+  cerr << "s" << flush;
+  auto plus(*this);
+  return plus.absfy().serializeSub(plus.countIdx(T(int(0))));
 }
 
 template <typename T, typename U> U corpus<T, U>::serializeSub(const vector<int>& idxs) const {
@@ -942,6 +936,7 @@ template <typename T, typename U> std::ostream& preparedTOC(std::ostream& os, co
   istats.emplace_back(corpus<T, U>());
   for(int j = 0; getDetailed<T, U>(istats[istats.size() - 1], input, j, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
     istats[j].reDig(redig);
+    istats[j].absfy();
     istats.emplace_back(corpus<T, U>());
   }
   for(int i = 0; i < topics.size(); i ++) {
@@ -950,6 +945,7 @@ template <typename T, typename U> std::ostream& preparedTOC(std::ostream& os, co
     stats.emplace_back(corpus<T, U>());
     for(int j = 0; getDetailed<T, U>(stats[stats.size() - 1], topics[i], j, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
       stats[j].reDig(redig);
+      stats[j].absfy();
       stats.emplace_back(corpus<T, U>());
     }
     for(int j = 0; j < istats.size() - 1; j ++) {
@@ -991,6 +987,7 @@ template <typename T, typename U> std::ostream& optimizeTOC(std::ostream& os, co
   stats.emplace_back(corpus<T, U>());
   for(int i = 0; getDetailed<T, U>(stats[stats.size() - 1], input, i, detailtitle, detail, delimiter, szwindow, threshin); i ++) {
     stats[i].reDig(redig);
+    stats[i].absfy();
     stats.emplace_back(corpus<T, U>());
   }
   for(int i = 0; i < stats.size() - 1; i ++)
@@ -1194,6 +1191,7 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
   istats.emplace_back(corpus<T, U>());
   for(int j = 0; getDetailed<T, U>(istats[istats.size() - 1], input, j, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
     istats[j].reDig(redig);
+    istats[j].absfy();
     istats[j] /= sqrt(istats[j].cdot(istats[j]));
     istats.emplace_back(corpus<T, U>());
     in.emplace_back(const_cast<const SimpleSparseTensor<T>&>(istats[j].corpust) );
