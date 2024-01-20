@@ -1556,7 +1556,7 @@ public:
       if(entity[i] != other.entity[i]) return true;
     return false;
   }
-  inline       T                dot         (const SimpleVector<T>& other) const {
+  template <typename U> inline T dot(const SimpleVector<U>& other) const {
     assert(entity.size() == other.entity.size());
     SimpleVector<T> work(other.size());
 #if defined(_OPENMP)
@@ -2263,7 +2263,7 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::zeroFix(const Simp
       continue;
     if(T(int(0)) < fidx[idx].first &&
        fidx[idx].first < sqrt(one.dot(one)) * epsilon()) {
-      assert(i && "linearInvariant: P matrix is orthogonal to 1 vector.");
+      cerr << "linearInvariant: P matrix is orthogonal to 1 vector." << endl;
       *this = Pb;
       break;
     }
@@ -4184,6 +4184,9 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
 template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
   assert(idx.size() && in0.size());
   cerr << "ratio: " << ceil(T(int(idx.size() * idx.size() * idx.size())) / T(int(in0.size())) / T(int(2))) << endl;
+  // N.B. the data we target is especially string stream corpus.
+  //      they are incontinuous one, so complementing with continuous stream
+  //      shouldn't improve outputs.
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
@@ -4194,22 +4197,22 @@ template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTe
           in[i][j * idx.size() * idx.size() + k * idx.size() + m] =
             (in0[i][idx[j]][idx[k]][idx[m]] + T(int(1))) / T(int(2));
   }
-  const auto p(predv<T>(in));
+  auto p(predv<T>(in));
+  in.resize(0);
   pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > res;
   res.first.resize( p.first.size() );
   res.second.resize(p.second.size());
-  for(int i = 0; i < p.first.size(); i ++) {
+  for(int i = 0; i < p.first.size(); i ++)
     for(int j = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
         for(int m = 0; m < idx.size(); m ++) {
           res.first[i][ idx[j]][idx[k]][idx[m]] =
-            p.first[i][ j * idx.size() * idx.size() + k * idx.size() + m] *
-              T(int(2)) - T(int(1));
+            p.first[i][j * idx.size() * idx.size() + k * idx.size() + m]
+              * T(int(2)) - T(int(1));
           res.second[i][idx[j]][idx[k]][idx[m]] =
-            p.second[i][j * idx.size() * idx.size() + k * idx.size() + m] *
-              T(int(2)) - T(int(1));
+            p.second[i][j * idx.size() * idx.size() + k * idx.size() + m]
+              * T(int(2)) - T(int(1));
         }
-  }
   return res;
 }
 

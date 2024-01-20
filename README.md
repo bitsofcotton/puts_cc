@@ -85,4 +85,5 @@ This repository is archived, so without bug report, will no change.
 2023/10/30 copy structure reliably with randtools meaning.
 2023/12/15 merge lieonn.hh causes pred takes invariant only once in the whole.
 2023/12/17 serializeSub minus tensor to be reverse order of abs(minus tensor).
+2023/01/20 Auto configure szwindow with sqrt input size.
 

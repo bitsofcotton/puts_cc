@@ -15,24 +15,19 @@
 #include "lieonn.hh"
 typedef myfloat num_t;
 #include "corpus.hh"
-
 std::vector<std::string> words;
+
+const double scorethresh(sqrt(.5));
+const double threshin(0.05);
+const double redig(1.1);
+
+std::vector<std::string> delimiter;
+std::vector<std::string> csvelim;
+std::vector<std::string> csvdelim;
 
 void usage() {
   std::cout << "tools (lword|lbalance|toc|lack|redig|stat|findroot|diff|same|prep|pred)" << std::endl;
 }
-
-//const int    szwindow(120);
-//const int    szwindow(200);
-const int    szwindow(1500);
-const int    Mbalance(40);
-const double scorethresh(sqrt(.5));
-const double dscorethresh(0.);
-const double threshin(0.05);
-const double redig(1.1);
-std::vector<std::string> delimiter;
-std::vector<std::string> csvelim;
-std::vector<std::string> csvdelim;
 
 std::pair<std::string, std::string> loadbuf(const char* filename) {
   std::ifstream input;
@@ -95,6 +90,7 @@ int main(int argc, const char* argv[]) {
       if(line[i] == '<' || line[i] == '>' || line[i] == '&') line[i] = '!';
     input += line + std::string("\n");
   }
+  const int szwindow(sqrt(num_t(int(input.size()))));
   if(std::strcmp(argv[1], "lword") == 0) {
     words.insert(words.end(), csvelim.begin(),  csvelim.end());
     words.insert(words.end(), csvdelim.begin(), csvdelim.end());
@@ -132,7 +128,7 @@ int main(int argc, const char* argv[]) {
       std::cout << inputs[i] << ", 1" << std::endl;
   } else if(std::strcmp(argv[1], "lbalance") == 0) {
     const auto cinput(cutText(input, csvelim, delimiter));
-    const auto idxs(pseudoWordsBalance<double, std::string>(cinput, words, Mbalance));
+    const auto idxs(pseudoWordsBalance<double, std::string>(cinput, words, szwindow));
     std::cout << idxs.size() << "sets." << std::endl;
     for(int i = 0; i < idxs.size(); i ++)
       std::cout << cinput[idxs[i]] << std::endl;
@@ -205,7 +201,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
     std::cout << "<body>";
-    diff<double, std::string>(std::cout, input, details, detailwords, details2, detailwords2, delimiter, szwindow, - dscorethresh, threshin, redig, strcmp(argv[1], "same") == 0);
+    diff<double, std::string>(std::cout, input, details, detailwords, details2, detailwords2, delimiter, szwindow, - num_t(int(0)), threshin, redig, strcmp(argv[1], "same") == 0);
     std::cout << "<hr/>" << std::endl << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "stat") == 0 ||
             std::strcmp(argv[1], "findroot") == 0) {
