@@ -17,7 +17,7 @@ typedef myfloat num_t;
 #include "corpus.hh"
 std::vector<std::string> words;
 
-const double scorethresh(sqrt(.5));
+const double scorethresh(.25);
 const double threshin(0.05);
 const double redig(1.1);
 
