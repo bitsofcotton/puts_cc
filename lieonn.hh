@@ -4053,7 +4053,59 @@ template <typename T> static inline SimpleVector<T> autoGamma(const SimpleVector
   return autoGamma<T>(b, r)[0].row(0);
 }
 
-template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv(const vector<SimpleVector<T> >& in) {
+template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predvc(const vector<SimpleVector<T> >& in) {
+  // N.B. we need stable next vectors.
+  int p0(1);
+  for( ; p0 < in.size(); p0 ++) {
+    const auto pp(pnextcacher<T>(in.size(), p0, 4));
+    if(T(int(in.size())) < sqrt(pp.dot(pp))) break;
+  }
+  vector<SimpleVector<T> > p;
+  if(-- p0 < 1) return make_pair(p, p);
+  SimpleVector<T> sec(in.size());
+  for(int i = 0; i < sec.size(); i ++)
+    sec[i] = makeProgramInvariant<T>(in[i], - T(int(1)), true).second;
+  auto secb(sec);
+  for(int i = 0; i < sec.size(); i ++)
+    secb[i] = sec[sec.size() - i - 1];
+  p.resize(p0);
+  auto q(p);
+  for(int i = 0; i < p0; i ++) {
+    p[i].resize(in[0].size());
+    q[i].resize(in[0].size());
+    p[i].O();
+    q[i].O();
+  }
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
+  for(int j = 0; j < in[0].size(); j ++) {
+    cerr << j << " / " << in[0].size() << endl;
+    idFeeder<T> pb(sec.size());
+    idFeeder<T> pf(sec.size());
+    for(int i = 0; i < in.size(); i ++)
+      pf.next(makeProgramInvariantPartial<T>(in[i][j], sec[i], true));
+    assert(pf.full);
+    for(int k = 0; k < pf.res.size(); k ++)
+      pb.next(pf.res[pf.res.size() - 1 - k]);
+    assert(pb.full);
+    for(int i = 0; i < p0; i ++) {
+      q[i][j] += P0maxRank0<T>(i + 1).next(pb.res);
+      p[i][j] += P0maxRank0<T>(i + 1).next(pf.res);
+    }
+  }
+  for(int i = 0; i < p.size(); i ++) {
+    const auto qsec(P0maxRank0<T>(i + 1).next(secb));
+    const auto psec(P0maxRank0<T>(i + 1).next(sec));
+    for(int j = 0; j < p[i].size(); j ++)
+      p[i][j] = revertProgramInvariant<T>(make_pair(p[i][j], psec), true);
+    for(int j = 0; j < q[i].size(); j ++)
+      q[i][j] = revertProgramInvariant<T>(make_pair(q[i][j], qsec), true);
+  }
+  return make_pair(move(p), move(q));
+}
+
+template <typename T, bool continuous = false> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv(const vector<SimpleVector<T> >& in) {
   // N.B. we need rich internal status.
   const int p0(ceil(sqrt(T(int(in.size() - 4 - 1 + 2 - 4 - 2)) )) );
   vector<SimpleVector<T> > p;
@@ -4078,7 +4130,6 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
     p[i].O();
     q[i].O();
   }
-  const auto one65536(T(int(1)) / T(int(65536)));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -4111,7 +4162,7 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
   return make_pair(move(p), move(q));
 }
 
-template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
+template <typename T, bool continuous = false> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   cerr << "ratio: " << ceil(T(int(in0[0].size() * in0[0][0].size())) / T(int(in0.size())) / T(int(2))) << endl;
   vector<SimpleVector<T> > in;
@@ -4125,7 +4176,7 @@ template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<Simp
       in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
-  const auto p(predv<T>(in));
+  const auto p(continuous ? predvc<T>(in) : predv<T>(in));
   pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > res;
   res.first.resize( p.first.size() );
   res.second.resize(p.second.size());
@@ -4140,7 +4191,7 @@ template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<Simp
   return res;
 }
 
-template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
+template <typename T, bool continuous = false> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   cerr << "ratio: " << ceil(T(int(in0[0].size() * in0[0][0].rows() * in0[0][0].cols())) / T(int(in0.size())) / T(int(2)) ) << endl;
   vector<SimpleVector<T> > in;
@@ -4156,7 +4207,7 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
                         k * in0[i][0].cols(), in0[i][j].row(k));
     }
   }
-  const auto p(predv<T>(in));
+  const auto p(continuous ? predvc<T>(in) : predv<T>(in));
   pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > res;
   res.first.resize( p.first.size() );
   res.second.resize(p.second.size());
@@ -4181,7 +4232,7 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
   return res;
 }
 
-template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
+template <typename T, bool continuous = false> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
   assert(idx.size() && in0.size());
   cerr << "ratio: " << ceil(T(int(idx.size() * idx.size() * idx.size())) / T(int(in0.size())) / T(int(2))) << endl;
   // N.B. the data we target is especially string stream corpus.
@@ -4197,7 +4248,7 @@ template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTe
           in[i][j * idx.size() * idx.size() + k * idx.size() + m] =
             (in0[i][idx[j]][idx[k]][idx[m]] + T(int(1))) / T(int(2));
   }
-  auto p(predv<T>(in));
+  auto p(continuous ? predvc<T>(in) : predv<T>(in));
   in.resize(0);
   pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > res;
   res.first.resize( p.first.size() );
