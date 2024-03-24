@@ -3483,6 +3483,65 @@ private:
   int step;
 };
 
+template <typename T, bool nonlinear = true> class P01 {
+public:
+  inline P01() { varlen = 0; }
+  inline P01(const int& var, const int& step = 1) {
+    assert(0 < var && 0 < step);
+    this->varlen = var;
+    this->step = step;
+  }
+  inline ~P01() { ; }
+  inline T next(const SimpleVector<T>& in) {
+    static const T zero(0);
+    // N.B. please use catgp to compete with over learning.
+    // XXX: division accuracy glitch.
+    const auto nin(sqrt(in.dot(in)) * T(int(2)));
+    if(! isfinite(nin) || nin == zero) return zero;
+    SimpleMatrix<T> invariants(3, nonlinear ? varlen + 2 : varlen);
+    invariants.O();
+    for(int i0 = 0; i0 < invariants.rows(); i0 ++) {
+      SimpleMatrix<T> toeplitz(in.size() - varlen - step + 2
+                               - invariants.rows(), invariants.cols());
+      for(int i = i0; i < toeplitz.rows() + i0; i ++) {
+        auto work(in.subVector(i, varlen));
+        work[work.size() - 1] = in[i + varlen + step - 2];
+        toeplitz.row(i - i0) = nonlinear ? makeProgramInvariant<T>(move(work),
+          T(i + 1) / T(toeplitz.rows() + 1) ).first : move(work);
+      }
+      invariants.row(i0) = linearInvariant<T>(toeplitz);
+    }
+    SimpleVector<T> invariant(invariants.cols());
+    invariant.O();
+    for(int i = 0; i < invariants.cols(); i ++)
+      invariant[i] = P0maxRank0<T>(1).next(invariants.col(i));
+    if(invariant[varlen - 1] == zero) return zero;
+    SimpleVector<T> work(varlen);
+    for(int i = 1; i < work.size(); i ++)
+      work[i - 1] = in[i - work.size() + in.size()];
+    work[work.size() - 1] = zero;
+    if(nonlinear) {
+      auto last(sqrt(work.dot(work)));
+      for(int ii = 0;
+              ii < 2 * int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) )
+              && sqrt(work.dot(work) * SimpleMatrix<T>().epsilon()) <
+                   abs(work[work.size() - 1] - last); ii ++) {
+        last = work[work.size() - 1];
+        const auto work2(makeProgramInvariant<T>(work, T(1)));
+        work[work.size() - 1] = revertProgramInvariant<T>(make_pair(
+                 - (invariant.dot(work2.first) -
+                        invariant[varlen - 1] * work2.first[varlen - 1]) /
+                   invariant[varlen - 1], work2.second));
+      }
+      return work[work.size() - 1];
+    }
+    return - invariant.dot(work) / invariant[varlen - 1];
+  }
+private:
+  int varlen;
+  int step;
+};
+
 // N.B. we omit high frequency part (1/f(x) input) to be treated better in P.
 template <typename T, typename P> class PBond {
 public:
@@ -4105,9 +4164,14 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
   return make_pair(move(p), move(q));
 }
 
-template <typename T, bool continuous = false> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv(const vector<SimpleVector<T> >& in) {
+template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv(const vector<SimpleVector<T> >& in) {
+  // N.B. we need to initialize p0 vector.
+  SimpleVector<T> init(3);
+  for(int i = 0; i < init.size(); i ++)
+    init[i] = T(int(i));
+  cerr << "P0 initialize: " << P0maxRank0<T>(1).next(init) << endl;
   // N.B. we need rich internal status.
-  const int p0(ceil(sqrt(T(int(in.size() - 4 - 1 + 2 - 4 - 2)) )) );
+  const int p0(ceil(sqrt(T(int(in.size() - 4 - 1 + 2 - 4 - 2 - 3)) )) );
   vector<SimpleVector<T> > p;
   if(p0 < 1) return make_pair(p, p);
   SimpleVector<T> secondsf(in.size());
@@ -4144,16 +4208,16 @@ template <typename T, bool continuous = false> pair<vector<SimpleVector<T> >, ve
       pb.next(pf.res[pf.res.size() - 1 - k]);
     assert(pb.full);
     for(int i = 0; i < p0; i ++) {
-      q[i][j] += P1I<T, false>(4, i + 1).next(pb.res);
-      p[i][j] += P1I<T, false>(4, i + 1).next(pf.res);
+      q[i][j] += P01<T, false>(4, i + 1).next(pb.res);
+      p[i][j] += P01<T, false>(4, i + 1).next(pf.res);
     }
   }
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < p.size(); i ++) {
-    const auto qsec(P1I<T, false>(4, i + 1).next(secondsb));
-    const auto psec(P1I<T, false>(4, i + 1).next(secondsf));
+    const auto qsec(P01<T, false>(4, i + 1).next(secondsb));
+    const auto psec(P01<T, false>(4, i + 1).next(secondsf));
     for(int j = 0; j < p[i].size(); j ++)
       p[i][j] = revertProgramInvariant<T>(make_pair(p[i][j], psec), true);
     for(int j = 0; j < q[i].size(); j ++)
