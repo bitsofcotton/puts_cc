@@ -3502,7 +3502,7 @@ public:
     invariants.O();
     for(int i0 = 0; i0 < invariants.rows(); i0 ++) {
       SimpleMatrix<T> toeplitz(in.size() - varlen - step + 2
-                               - invariants.rows(), invariants.cols());
+                               - invariants.rows() + 1, invariants.cols());
       for(int i = i0; i < toeplitz.rows() + i0; i ++) {
         auto work(in.subVector(i, varlen));
         work[work.size() - 1] = in[i + varlen + step - 2];
