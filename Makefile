@@ -18,9 +18,9 @@ LDFLAGS+=	-lc++ -L/usr/local/lib
 #CXXFLAGS+=	-D_FLOAT_BITS_=256
 #CXXFLAGS+=	-D_FLOAT_BITS_=512
 
-CLEANFILES= *.o puts putsmp putsc putscmp
+CLEANFILES= *.o puts putsmp
 
-all:	puts putsmp putsc putscmp
+all:	puts putsmp
 
 clean:
 	@rm -rf ${CLEANFILES}
@@ -29,8 +29,4 @@ puts:
 	${CXX} ${CXXFLAGS} -static -o puts tools.cc
 putsmp:
 	${CXX} ${CXXFLAGS} ${MPFLAGS} -o putsmp tools.cc
-putsc:
-	${CXX} ${CXXFLAGS} -D_CONTINUOUS_ -static -o putsc tools.cc
-putscmp:
-	${CXX} ${CXXFLAGS} ${MPFLAGS} -D_CONTINUOUS_ -o putscmp tools.cc
 
