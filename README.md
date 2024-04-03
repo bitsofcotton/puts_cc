@@ -87,5 +87,6 @@ This repository is archived, so without bug report, will no change.
 2023/12/17 serializeSub minus tensor to be reverse order of abs(minus tensor).
 2023/01/20 Auto configure szwindow with sqrt input size.
 2023/01/21 Reconfigure default scorethresh.
-2023/04/02 P01 fix.
+2024/04/02 P01 fix.
+2024/04/04 only use large accuracy on calculating pnextcache, but this is broken with cache naming.
 

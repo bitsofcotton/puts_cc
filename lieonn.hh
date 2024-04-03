@@ -59,16 +59,6 @@ using std::endl;
 using std::flush;
 using std::getline;
 
-#if !defined(_FLOAT_BITS_)
-  #include <complex>
-  #include <cmath>
-  using namespace std;
-  typedef uint64_t myuint;
-  typedef int64_t  myint;
-  // XXX:
-  // typedef long double myfloat;
-  typedef double myfloat;
-#else
 
 // Double int to new int class.
 template <typename T, int bits> class DUInt {
@@ -1422,36 +1412,44 @@ template <typename T> static inline T ccot(const T& s) {
 
 template <typename T> using complex = Complex<T>;
 
-# if _FLOAT_BITS_ == 8
+#if !defined(_FLOAT_BITS_)
+  #include <cmath>
+  using namespace std;
+  typedef uint64_t myuint;
+  typedef int64_t  myint;
+  // XXX:
+  // typedef long double myfloat;
+  typedef double myfloat;
+#elif _FLOAT_BITS_ == 8
   typedef uint8_t myuint;
   typedef int8_t  myint;
   typedef SimpleFloat<myuint, uint16_t, 8, myint> myfloat;
-# elif _FLOAT_BITS_ == 16
+#elif _FLOAT_BITS_ == 16
   typedef uint16_t myuint;
   typedef int16_t  myint;
   typedef SimpleFloat<myuint, uint32_t, 16, myint> myfloat;
-# elif _FLOAT_BITS_ == 32
+#elif _FLOAT_BITS_ == 32
   typedef uint32_t myuint;
   typedef int32_t  myint;
   typedef SimpleFloat<myuint, uint64_t, 32, myint> myfloat;
-# elif _FLOAT_BITS_ == 64
+#elif _FLOAT_BITS_ == 64
   typedef uint64_t myuint;
   typedef int64_t  myint;
   typedef SimpleFloat<myuint, unsigned __int128, 64, myint> myfloat;
-# elif _FLOAT_BITS_ == 128
+#elif _FLOAT_BITS_ == 128
   typedef DUInt<uint64_t, 64> uint128_t;
   typedef Signed<uint128_t, 128> int128_t;
   typedef uint128_t myuint;
   typedef int128_t  myint;
   typedef SimpleFloat<myuint, DUInt<myuint, 128>, 128, myint> myfloat;
-# elif _FLOAT_BITS_ == 256
+#elif _FLOAT_BITS_ == 256
   typedef DUInt<uint64_t, 64> uint128_t;
   typedef DUInt<uint128_t, 128> uint256_t;
   typedef Signed<uint256_t, 256> int256_t;
   typedef uint256_t myuint;
   typedef int256_t  myint;
   typedef SimpleFloat<myuint, DUInt<myuint, 256>, 256, myint> myfloat;
-# elif _FLOAT_BITS_ == 512
+#elif _FLOAT_BITS_ == 512
   typedef DUInt<uint64_t, 64> uint128_t;
   typedef DUInt<uint128_t, 128> uint256_t;
   typedef DUInt<uint256_t, 256> uint512_t;
@@ -1459,7 +1457,7 @@ template <typename T> using complex = Complex<T>;
   typedef uint512_t myuint;
   typedef int512_t  myint;
   typedef SimpleFloat<myuint, DUInt<myuint, 512>, 512, myint> myfloat;
-# elif _FLOAT_BITS_ == 1024
+#elif _FLOAT_BITS_ == 1024
   typedef DUInt<uint64_t, 64> uint128_t;
   typedef DUInt<uint128_t, 128> uint256_t;
   typedef DUInt<uint256_t, 256> uint512_t;
@@ -1468,9 +1466,8 @@ template <typename T> using complex = Complex<T>;
   typedef uint1024_t myuint;
   typedef int1024_t  myint;
   typedef SimpleFloat<myuint, DUInt<myuint, 1024>, 1024, myint> myfloat;
-# else
-#   error cannot handle float
-# endif
+#else
+# error cannot handle float
 #endif
 
 
@@ -3182,10 +3179,36 @@ template <typename T> inline T P012L<T>::next(const SimpleVector<T>& d) {
 
 
 template <typename T> SimpleVector<T> pnext(const int& size, const int& step = 1, const int& r = 1) {
+#if defined(_ADVANCE_PNEXT_BITS_)
+  typedef DUInt<uint64_t, 64>          pnext_uint128_t;
+  typedef DUInt<pnext_uint128_t, 128>  pnext_uint256_t;
+  typedef DUInt<pnext_uint256_t, 256>  pnext_uint512_t;
+  typedef Signed<pnext_uint512_t, 512> pnext_int512_t;
+  typedef pnext_uint512_t pnext_uint;
+  typedef pnext_int512_t  pnext_int;
+  typedef SimpleFloat<pnext_uint, DUInt<pnext_uint, 512>, 512, pnext_int> pnext_float;
+  auto work(taylor<pnext_float>(size * r, pnext_float(step * r < 0 ? step * r : (size + step) * r - 1)));
+  for(int i = 1; i < r; i ++)
+    work += taylor<pnext_float>(size * r, pnext_float(step * r < 0 ? step * r + i : (size + step) * r - 1 - i));
+  const auto pn((dft<pnext_float>(- size * r).subMatrix(0, 0, size * r, size) * dft<pnext_float>(size)).template real<pnext_float>().transpose() * work);
+  SimpleVector<T> res(pn.size());
+  for(int i = 0; i < res.size(); i ++) {
+    auto abspni(abs(pn[i]));
+    res[i] = T(abspni.operator int());
+    for(int j = 0; j < 512 / 16; j ++) {
+      abspni -= floor(abspni);
+      abspni *= pnext_float(int(65536));
+      res[i] += T(abspni.operator int()) / T(int(65536));
+    }
+    if(pn[i] < pnext_float(int(0))) res[i] = - res[i];
+  }
+  return res;
+#else
   auto work(taylor(size * r, T(step * r < 0 ? step * r : (size + step) * r - 1)));
   for(int i = 1; i < r; i ++)
     work += taylor(size * r, T(step * r < 0 ? step * r + i : (size + step) * r - 1 - i));
   return (dft<T>(- size * r).subMatrix(0, 0, size * r, size) * dft<T>(size)).template real<T>().transpose() * work;
+#endif
 }
 
 template <typename T> SimpleVector<T> minsq(const int& size) {
