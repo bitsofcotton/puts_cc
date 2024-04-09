@@ -2709,6 +2709,7 @@ template <typename T> static inline SimpleVector<T> linearInvariant(const Simple
 template <typename T> static inline T makeProgramInvariantPartial(const T& in, const T& ratio, const bool& on01 = false) {
   auto res(on01 ? in :
     ((atan(- in) / atan(T(int(1))) / T(int(2))) + T(int(1))) / T(int(2)) );
+  if(res == T(int(0)) ) res = T(int(1));
   assert(T(int(0)) < res && res <= T(int(1)));
   return res /= ratio;
 }
@@ -3997,35 +3998,44 @@ template <typename T> bool savep2or3(const char* filename, const vector<SimpleMa
   return true;
 }
 
-template <typename T> static inline vector<SimpleMatrix<T> > normalize(const vector<SimpleMatrix<T> >& data, const T& upper = T(1)) {
+template <typename T> static inline vector<vector<SimpleMatrix<T> > > normalize(const vector<vector<SimpleMatrix<T> > >& data, const T& upper = T(1)) {
   T MM(0), mm(0);
   bool fixed(false);
-  for(int k = 0; k < data.size(); k ++)
-    for(int i = 0; i < data[k].rows(); i ++)
-      for(int j = 0; j < data[k].cols(); j ++)
-        if(! fixed || (isfinite(data[k](i, j)) && ! isinf(data[k](i, j)) && ! isnan(data[k](i, j)))) {
-          if(! fixed)
-            MM = mm = data[k](i, j);
-          else {
-            MM = max(MM, data[k](i, j));
-            mm = min(mm, data[k](i, j));
+  for(int kk = 0; kk < data.size(); kk ++)
+    for(int k = 0; k < data[kk].size(); k ++)
+      for(int i = 0; i < data[kk][k].rows(); i ++)
+        for(int j = 0; j < data[kk][k].cols(); j ++)
+          if(! fixed || (isfinite(data[kk][k](i, j)) &&
+               ! isinf(data[kk][k](i, j)) && ! isnan(data[kk][k](i, j)))) {
+            if(! fixed)
+              MM = mm = data[kk][k](i, j);
+            else {
+              MM = max(MM, data[kk][k](i, j));
+              mm = min(mm, data[kk][k](i, j));
+            }
+            fixed = true;
           }
-          fixed = true;
-        }
   if(MM == mm || ! fixed)
     return data;
   auto result(data);
-  for(int k = 0; k < data.size(); k ++)
-    for(int i = 0; i < data[k].rows(); i ++)
-      for(int j = 0; j < data[k].cols(); j ++) {
-        if(isfinite(result[k](i, j)) && ! isinf(data[k](i, j)) && ! isnan(result[k](i, j)))
-          result[k](i, j) -= mm;
-        else
-          result[k](i, j)  = T(0);
-        assert(T(0) <= result[k](i, j) && result[k](i, j) <= MM - mm);
-        result[k](i, j) *= upper / (MM - mm);
-      }
+  for(int kk = 0; kk < data.size(); kk ++)
+    for(int k = 0; k < data[kk].size(); k ++)
+      for(int i = 0; i < data[kk][k].rows(); i ++)
+        for(int j = 0; j < data[kk][k].cols(); j ++) {
+          if(isfinite(result[kk][k](i, j)) && ! isinf(data[kk][k](i, j)) && ! isnan(result[kk][k](i, j)))
+            result[kk][k](i, j) -= mm;
+          else
+            result[kk][k](i, j)  = T(0);
+          assert(T(0) <= result[kk][k](i, j) && result[kk][k](i, j) <= MM - mm);
+          result[kk][k](i, j) *= upper / (MM - mm);
+        }
   return result;
+}
+
+template <typename T> static inline vector<SimpleMatrix<T> > normalize(const vector<SimpleMatrix<T> >& data, const T& upper = T(1)) {
+  vector<vector<SimpleMatrix<T> > > w;
+  w.emplace_back(data);
+  return normalize<T>(w, upper)[0];
 }
 
 template <typename T> static inline vector<SimpleMatrix<T> > autoLevel(const vector<SimpleMatrix<T> >& data, const int& count = 0) {
@@ -4257,6 +4267,59 @@ template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTe
               * T(int(2)) - T(int(1));
         }
   return res;
+}
+
+template <typename T> static inline vector<SimpleMatrix<T> > rgb2xyz(const vector<SimpleMatrix<T> >& rgb) {
+  // CIE 1931 XYZ from wikipedia.org
+  SimpleMatrix<T> mRGB2XYZ(3, 3);
+  mRGB2XYZ(0, 0) = T(49000);
+  mRGB2XYZ(0, 1) = T(31000);
+  mRGB2XYZ(0, 2) = T(20000);
+  mRGB2XYZ(1, 0) = T(17697);
+  mRGB2XYZ(1, 1) = T(81240);
+  mRGB2XYZ(1, 2) = T( 1063);
+  mRGB2XYZ(2, 0) = T(0);
+  mRGB2XYZ(2, 1) = T( 1000);
+  mRGB2XYZ(2, 2) = T(99000);
+  mRGB2XYZ /= T(17697);
+  assert(rgb.size() == 3);
+  assert(rgb[0].rows() == rgb[1].rows() && rgb[1].rows() == rgb[2].rows());
+  assert(rgb[0].cols() == rgb[1].cols() && rgb[1].cols() == rgb[2].cols());
+  auto xyz(rgb);
+  xyz[0] = rgb[0] * mRGB2XYZ(0, 0) + rgb[1] * mRGB2XYZ(0, 1) + rgb[2] * mRGB2XYZ(0, 2);
+  xyz[1] = rgb[0] * mRGB2XYZ(1, 0) + rgb[1] * mRGB2XYZ(1, 1) + rgb[2] * mRGB2XYZ(1, 2);
+  xyz[2] = rgb[0] * mRGB2XYZ(2, 0) + rgb[1] * mRGB2XYZ(2, 1) + rgb[2] * mRGB2XYZ(2, 2);
+  assert(xyz.size() == 3);
+  assert(xyz[0].rows() == xyz[1].rows() && xyz[1].rows() == xyz[2].rows());
+  assert(xyz[0].cols() == xyz[1].cols() && xyz[1].cols() == xyz[2].cols());
+  return xyz;
+}
+
+template <typename T> static inline vector<SimpleMatrix<T> > xyz2rgb(const vector<SimpleMatrix<T> >& xyz) {
+  // CIE 1931 XYZ from wikipedia.org
+  SimpleMatrix<T> mRGB2XYZ(3, 3);
+  mRGB2XYZ(0, 0) = T(49000);
+  mRGB2XYZ(0, 1) = T(31000);
+  mRGB2XYZ(0, 2) = T(20000);
+  mRGB2XYZ(1, 0) = T(17697);
+  mRGB2XYZ(1, 1) = T(81240);
+  mRGB2XYZ(1, 2) = T( 1063);
+  mRGB2XYZ(2, 0) = T(0);
+  mRGB2XYZ(2, 1) = T( 1000);
+  mRGB2XYZ(2, 2) = T(99000);
+  mRGB2XYZ /= T(17697);
+  const auto mXYZ2RGB(mRGB2XYZ.inverse());
+  assert(xyz.size() == 3);
+  assert(xyz[0].rows() == xyz[1].rows() && xyz[1].rows() == xyz[2].rows());
+  assert(xyz[0].cols() == xyz[1].cols() && xyz[1].cols() == xyz[2].cols());
+  auto rgb(xyz);
+  rgb[0] = xyz[0] * mXYZ2RGB(0, 0) + xyz[1] * mXYZ2RGB(0, 1) + xyz[2] * mXYZ2RGB(0, 2);
+  rgb[1] = xyz[0] * mXYZ2RGB(1, 0) + xyz[1] * mXYZ2RGB(1, 1) + xyz[2] * mXYZ2RGB(1, 2);
+  rgb[2] = xyz[0] * mXYZ2RGB(2, 0) + xyz[1] * mXYZ2RGB(2, 1) + xyz[2] * mXYZ2RGB(2, 2);
+  assert(rgb.size() == 3);
+  assert(rgb[0].rows() == rgb[1].rows() && rgb[1].rows() == rgb[2].rows());
+  assert(rgb[0].cols() == rgb[1].cols() && rgb[1].cols() == rgb[2].cols());
+  return rgb;
 }
 
 #define _SIMPLELIN_
