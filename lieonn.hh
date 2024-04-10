@@ -3199,7 +3199,7 @@ template <typename T> SimpleVector<T> pnext(const int& size, const int& step = 1
     for(int j = 0; j < 512 / 16; j ++) {
       abspni -= floor(abspni);
       abspni *= pnext_float(int(65536));
-      res[i] += T(abspni.operator int()) / T(int(65536));
+      res[i] += T(abspni.operator int()) / pow(T(int(65536)), T(int(j + 1)) );
     }
     if(pn[i] < pnext_float(int(0))) res[i] = - res[i];
   }
@@ -4166,7 +4166,8 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
 
 template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
-  cerr << "ratio: " << ceil(T(int(in0[0].size() * in0[0][0].size())) / T(int(in0.size())) / T(int(2))) << endl;
+  if(19683 < in0[0].size() * in0[0][0].size())
+    cerr << "predVec : elements larger than 19683, exceeds function entropy." << endl;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
@@ -4195,7 +4196,8 @@ template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<Simp
 
 template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
-  cerr << "ratio: " << ceil(T(int(in0[0].size() * in0[0][0].rows() * in0[0][0].cols())) / T(int(in0.size())) / T(int(2)) ) << endl;
+  if(19683 < in0[0].size() * in0[0][0].rows() * in0[0][0].cols())
+    cerr << "predMat : elements larger than 19683, exceeds function entropy." << endl;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
@@ -4236,7 +4238,8 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
 
 template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
   assert(idx.size() && in0.size());
-  cerr << "ratio: " << ceil(T(int(idx.size() * idx.size() * idx.size())) / T(int(in0.size())) / T(int(2))) << endl;
+  if(19683 < idx.size() * idx.size() * idx.size())
+    cerr << "predSTen : elements larger than 19683, exceeds function entropy." << endl;
   // N.B. the data we target is especially string stream corpus.
   //      they are incontinuous one, so complementing with continuous stream
   //      shouldn't improve outputs.
