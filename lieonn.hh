@@ -3465,8 +3465,9 @@ public:
     this->step = step;
   }
   inline ~P01() { ; }
-  inline T next(const SimpleVector<T>& in) {
+  inline T next(const SimpleVector<T>& in0, const int& skip = 1) {
     static const T zero(0);
+    const auto in(in0.subVector(in0.size() % skip, in0.size() / skip * skip));
     // N.B. please use catgp to compete with over learning.
     // XXX: division accuracy glitch.
     const auto nin(sqrt(in.dot(in)) * T(int(2)));
@@ -3474,11 +3475,11 @@ public:
     SimpleMatrix<T> invariants(3, nonlinear ? varlen + 2 : varlen);
     invariants.O();
     for(int i0 = 0; i0 < invariants.rows(); i0 ++) {
-      SimpleMatrix<T> toeplitz(in.size() - varlen - step + 2
+      SimpleMatrix<T> toeplitz((in.size() - varlen - step + 2) / skip
                                - invariants.rows() + 1, invariants.cols());
       for(int i = i0; i < toeplitz.rows() + i0; i ++) {
-        auto work(in.subVector(i, varlen));
-        work[work.size() - 1] = in[i + varlen + step - 2];
+        auto work(in.subVector(i * skip, varlen));
+        work[work.size() - 1] = in[i * skip + varlen + step - 2];
         toeplitz.row(i - i0) = nonlinear ? makeProgramInvariant<T>(move(work),
           T(i + 1) / T(toeplitz.rows() + 1) ).first : move(work);
       }
@@ -4103,13 +4104,14 @@ template <typename T> static inline T getImgPt(const T& y, const T& h) {
   return yy % h;
 }
 
-template <typename T> pair<pair<vector<SimpleVector<T> >, vector<T> >, pair<vector<SimpleVector<T> >, vector<T> > > predv(const vector<SimpleVector<T> >& in) {
+template <typename T> pair<pair<vector<SimpleVector<T> >, vector<T> >, pair<vector<SimpleVector<T> >, vector<T> > > predv(const vector<SimpleVector<T> >& in, const int& skip = 1) {
+  assert(0 < skip);
   // N.B. we need to initialize p0 vector.
   SimpleVector<T> init(3);
   for(int i = 0; i < init.size(); i ++)
     init[i] = T(int(i));
   // N.B. we need rich internal status.
-  int p0(ceil(sqrt(T(int(in.size() - 4 - 1 + 2 - 4 - 2 - 3)) )) );
+  int p0(floor(sqrt(T(int(in.size() - 4 - 1 + 2 - 4 - 2 - 3)) ) / T(skip) ));
   // N.B. we need large accuracy to continue much more.
   for(int i = 0; i < p0; i ++) {
     const auto pp(pnextcacher<T>(3, i + 1, 4));
@@ -4176,8 +4178,8 @@ template <typename T> pair<pair<vector<SimpleVector<T> >, vector<T> >, pair<vect
                    make_pair(move(q), move(qsec)));
 }
 
-template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predVec(const vector<vector<SimpleVector<T> > >& in0, const int& cj = 11) {
-  assert(in0.size() && in0[0].size() && in0[0][0].size() && 0 < cj);
+template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predVec(const vector<vector<SimpleVector<T> > >& in0, const int& skip = 1, const int& cj = 11) {
+  assert(0 < skip && in0.size() / skip && in0[0].size() && in0[0][0].size() && 0 < cj);
   if(19683 * cj < in0[0].size() * in0[0][0].size())
     cerr << "predVec : elements larger than 19683, exceeds function entropy." << endl;
   vector<SimpleVector<T> > in;
@@ -4191,7 +4193,7 @@ template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<Simp
       in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
-  const auto p(predv<T>(in));
+  const auto p(predv<T>(in, skip));
   pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > res;
   res.first.resize( p.first.first.size() );
   res.second.resize(p.second.first.size());
@@ -4224,8 +4226,8 @@ template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<Simp
   return res;
 }
 
-template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predMat(const vector<vector<SimpleMatrix<T> > >& in0, const int& cj = 11) {
-  assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
+template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predMat(const vector<vector<SimpleMatrix<T> > >& in0, const int& skip = 1, const int& cj = 11) {
+  assert(0 < skip && in0.size() / skip && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   const int ccj(ceil(sqrt(T(cj))));
   assert(0 < ccj);
   if(ccj * ccj * 19683 < in0[0].size() * in0[0][0].rows() * in0[0][0].cols())
@@ -4243,7 +4245,7 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
                         k * in0[i][0].cols(), in0[i][j].row(k));
     }
   }
-  const auto p(predv<T>(in));
+  const auto p(predv<T>(in, skip));
   pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > res;
   res.first.resize( p.first.first.size() );
   res.second.resize(p.second.first.size());
@@ -4287,8 +4289,8 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
   return res;
 }
 
-template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx, const int& cj = 11) {
-  assert(idx.size() && in0.size());
+template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx, const int& skip = 1, const int& cj = 11) {
+  assert(idx.size() && 0 < skip && in0.size() / skip);
   // N.B.: we don't do input scaling.
   // const int ccj(ceil(pow(T(cj), T(int(1)) / T(int(3)) )) );
   const int ccj(1);
@@ -4308,7 +4310,7 @@ template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTe
           in[i][j * idx.size() * idx.size() + k * idx.size() + m] =
             (in0[i][idx[j]][idx[k]][idx[m]] + T(int(1))) / T(int(2));
   }
-  auto p(predv<T>(in));
+  auto p(predv<T>(in, skip));
   in.resize(0);
   pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > res;
   res.first.resize( p.first.first.size() );
