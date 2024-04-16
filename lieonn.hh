@@ -4161,16 +4161,16 @@ template <typename T> pair<pair<vector<SimpleVector<T> >, vector<T> >, pair<vect
       pb.next(pf.res[pf.res.size() - 1 - k]);
     assert(pb.full);
     for(int i = 0; i < p0; i ++) {
-      q[i][j] += P01<T, false>(4, i + 1).next(pb.res);
-      p[i][j] += P01<T, false>(4, i + 1).next(pf.res);
+      q[i][j] += P01<T, false>(4, i + 1).next(pb.res, skip);
+      p[i][j] += P01<T, false>(4, i + 1).next(pf.res, skip);
     }
   }
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < p.size(); i ++) {
-    qsec[i] = P01<T, false>(4, i + 1).next(secondsb);
-    psec[i] = P01<T, false>(4, i + 1).next(secondsf);
+    qsec[i] = P01<T, false>(4, i + 1).next(secondsb, skip);
+    psec[i] = P01<T, false>(4, i + 1).next(secondsf, skip);
     // p[i][j] = revertProgramInvariant<T>(make_pair(rres[5], psec), true);
     // q[i][j] = revertProgramInvariant<T>(make_pair(rres[5], qsec), true);
   }
