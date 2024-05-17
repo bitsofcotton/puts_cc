@@ -3188,20 +3188,33 @@ template <typename T> SimpleVector<T> pnext(const int& size, const int& step = 1
   typedef pnext_uint512_t pnext_uint;
   typedef pnext_int512_t  pnext_int;
   typedef SimpleFloat<pnext_uint, DUInt<pnext_uint, 512>, 512, pnext_int> pnext_float;
-  auto work(taylor<pnext_float>(size * r, pnext_float(step * r < 0 ? step * r : (size + step) * r - 1)));
-  for(int i = 1; i < r; i ++)
-    work += taylor<pnext_float>(size * r, pnext_float(step * r < 0 ? step * r + i : (size + step) * r - 1 - i));
-  const auto pn((dft<pnext_float>(- size * r).subMatrix(0, 0, size * r, size) * dft<pnext_float>(size)).template real<pnext_float>().transpose() * work);
-  SimpleVector<T> res(pn.size());
-  for(int i = 0; i < res.size(); i ++) {
-    auto abspni(abs(pn[i]));
-    res[i] = T(abspni.operator int());
-    for(int j = 0; j < 512 / 16; j ++) {
-      abspni -= floor(abspni);
-      abspni *= pnext_float(int(65536));
-      res[i] += T(abspni.operator int()) / pow(T(int(65536)), T(int(j + 1)) );
+  SimpleVector<T> res;
+  const auto file(string("./.cache/lieonn/pnextadv-") + to_string(size) +
+    string("-") + to_string(step) + string("-") + to_string(r));
+  ifstream cache(file.c_str());
+  if(cache.is_open()) {
+    cache >> res;
+    cache.close();
+  } else {
+    cerr << "." << flush;
+    auto work(taylor<pnext_float>(size * r, pnext_float(step * r < 0 ? step * r : (size + step) * r - 1)));
+    for(int i = 1; i < r; i ++)
+      work += taylor<pnext_float>(size * r, pnext_float(step * r < 0 ? step * r + i : (size + step) * r - 1 - i));
+    const auto pn((dft<pnext_float>(- size * r).subMatrix(0, 0, size * r, size) * dft<pnext_float>(size)).template real<pnext_float>().transpose() * work);
+    res.resize(pn.size());
+    for(int i = 0; i < res.size(); i ++) {
+      auto abspni(abs(pn[i]));
+      res[i] = T(abspni.operator int());
+      for(int j = 0; j < 512 / 16; j ++) {
+        abspni -= floor(abspni);
+        abspni *= pnext_float(int(65536));
+        res[i] += T(abspni.operator int()) / pow(T(int(65536)), T(int(j + 1)) );
+      }
+      if(pn[i] < pnext_float(int(0))) res[i] = - res[i];
     }
-    if(pn[i] < pnext_float(int(0))) res[i] = - res[i];
+    ofstream ocache(file.c_str());
+    ocache << res;
+    ocache.close();
   }
   return res;
 #else
@@ -3488,7 +3501,7 @@ public:
     SimpleVector<T> invariant(invariants.cols());
     invariant.O();
     for(int i = 0; i < invariants.cols(); i ++)
-      invariant[i] = P0maxRank0<T>(step).next(invariants.col(i));
+      invariant[i] = P0maxRank0<T>().next(invariants.col(i));
     if(invariant[varlen - 1] == zero) return zero;
     SimpleVector<T> work(varlen);
     for(int i = 1; i < work.size(); i ++)
@@ -4110,17 +4123,9 @@ template <typename T> pair<pair<vector<SimpleVector<T> >, vector<T> >, pair<vect
   SimpleVector<T> init(3);
   for(int i = 0; i < init.size(); i ++)
     init[i] = T(int(i));
+  cerr << "P0 initialize: " << P0maxRank0<T>(1).next(init) << endl;
   // N.B. we need rich internal status.
   int p0(floor(sqrt(T(int(in.size() - 4 - 1 + 2 - 4 - 2 - 3)) ) / T(skip) ));
-  // N.B. we need large accuracy to continue much more.
-  for(int i = 0; i < p0; i ++) {
-    const auto pp(pnextcacher<T>(3, i + 1, 4));
-    if(T(int(in.size())) < sqrt(pp.dot(pp))) {
-      p0 = i + 1;
-      break;
-    }
-    cerr << "P0 initialize: " << P0maxRank0<T>(i + 1).next(init) << endl;
-  }
   vector<SimpleVector<T> > p;
   vector<T> psec;
   if(p0 < 1) return make_pair(make_pair(p, psec), make_pair(p, psec));

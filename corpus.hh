@@ -1206,11 +1206,17 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
   cerr << "total " << idx.size() << " words." << endl;
   auto p(predSTen<T>(in, idx));
   p.first.insert(p.first.end(), p.second.begin(), p.second.end());
+  vector<string> hist;
+  hist.reserve(p.first.size());
   for(int i = 0; i < p.first.size(); i ++) {
     corpus<T, U> pstats;
     pstats.corpust = p.first[i];
     getAbbreved<T>(pstats, detailtitle, detail, delimiter);
-    os << pstats.simpleThresh(threshin).serialize() << "<br /><br />" << endl;
+    auto serial(pstats.simpleThresh(threshin).serialize());
+    if(binary_search(hist.begin(), hist.end(), serial)) continue;
+    os << serial << "<br /><br />" << endl;
+    hist.emplace_back(move(serial));
+    sort(hist.begin(), hist.end());
     if(i == p.first.size() / 2 - 1) os << "<hr />" << endl;
   }
   return os;

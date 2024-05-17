@@ -26,7 +26,7 @@ clean:
 	@rm -rf ${CLEANFILES}
 
 puts:
-	${CXX} ${CXXFLAGS} -static -D_ADVANCE_PNEXT_BITS_ -o puts tools.cc
+	${CXX} ${CXXFLAGS} -static -o puts tools.cc
 putsmp:
-	${CXX} ${CXXFLAGS} ${MPFLAGS} -D_ADVANCE_PNEXT_BITS_ -o putsmp tools.cc
+	${CXX} ${CXXFLAGS} ${MPFLAGS} -o putsmp tools.cc
 
