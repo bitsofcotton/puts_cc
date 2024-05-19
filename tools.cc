@@ -17,16 +17,12 @@ typedef myfloat num_t;
 #include "corpus.hh"
 std::vector<std::string> words;
 
-const double scorethresh(.25);
-const double threshin(0.05);
-const double redig(1.1);
-
 std::vector<std::string> delimiter;
 std::vector<std::string> csvelim;
 std::vector<std::string> csvdelim;
 
 void usage() {
-  std::cout << "tools (lword|lbalance|toc|lack|redig|stat|findroot|diff|same|prep|pred)" << std::endl;
+  std::cout << "tools (lword|lbalance|toc|lack|redig|stat|findroot|diff|same|prep|pred|prednoword)" << std::endl;
 }
 
 std::pair<std::string, std::string> loadbuf(const char* filename) {
@@ -56,6 +52,48 @@ std::pair<std::string, std::string> loadbuf(const char* filename) {
   return std::make_pair(name, inbuf);
 }
 
+void makelword(vector<string>& words, const std::string& input, const bool& show = false) {
+  words.insert(words.end(), csvelim.begin(),  csvelim.end());
+  words.insert(words.end(), csvdelim.begin(), csvdelim.end());
+  std::sort(words.begin(), words.end());
+  words.erase(std::unique(words.begin(), words.end()), words.end());
+  std::vector<gram_t<std::string> > found;
+  const auto lwords(lword<char, std::string>(int(log(num_t(int(input.size() ))) / log(num_t(int(2)) ) )).compute(input));
+  for(auto itr = lwords.begin(); itr != lwords.end(); ++ itr) {
+    if(itr->rptr.size() < 2 && itr->str.size() < 3)
+      continue;
+    const auto lb(std::lower_bound(found.begin(), found.end(), *itr));
+    if(found.begin() <= lb && lb < found.end() && lb->str == itr->str)
+      lb->rptr.insert(lb->rptr.end(), itr->rptr.begin(), itr->rptr.end());
+    else
+      found.emplace_back(*itr);
+  }
+  for(auto itr = found.begin(); itr != found.end(); ++ itr) {   
+    std::sort(itr->rptr.begin(), itr->rptr.end());
+    itr->rptr.erase(std::unique(itr->rptr.begin(), itr->rptr.end()), itr->rptr.end());
+  }
+  std::sort(found.begin(), found.end(), lessCount<std::string>);
+  found.erase(std::unique(found.begin(), found.end()), found.end());
+  words.reserve(words.size() + found.size());
+  for(auto itr(found.begin()); itr < found.end(); ++ itr) {
+    const auto& tob(itr->str);
+    words.emplace_back(tob);
+    if(show) std::cout << tob << ", " << itr->rptr.size() << std::endl;
+  }
+  std::sort(words.begin(), words.end());
+  words.erase(std::unique(words.begin(), words.end()), words.end());
+  auto inputs(cutText(input, words, delimiter));
+  std::sort(inputs.begin(), inputs.end());
+  inputs.erase(std::unique(inputs.begin(), inputs.end()), inputs.end());
+  words.insert(words.end(), inputs.begin(), inputs.end());
+  std::sort(words.begin(), words.end());
+  words.erase(std::unique(words.begin(), words.end()), words.end());
+  if(show)
+    for(int i = 0; i < inputs.size(); i ++)
+      std::cout << inputs[i] << ", 1" << std::endl;
+  return;
+}
+
 #undef int
 int main(int argc, const char* argv[]) {
 #define int int64_t
@@ -81,52 +119,30 @@ int main(int argc, const char* argv[]) {
   std::sort(delimiter.begin(), delimiter.end());
   std::sort(csvelim.begin(), csvelim.end());
   std::sort(csvdelim.begin(), csvdelim.end());
-  words = cutText(loadbuf(argv[2]).second, csvelim, csvdelim, true);
-  std::sort(words.begin(), words.end());
-  words.erase(std::unique(words.begin(), words.end()), words.end());
   std::string input, line;
   while(std::getline(std::cin, line)) {
     for(int i = 0; i < line.size(); i ++)
       if(line[i] == '<' || line[i] == '>' || line[i] == '&') line[i] = '!';
     input += line + std::string("\n");
   }
+  if(strcmp(argv[1], "lword") != 0) {
+    if(2 < argc) {
+      words = cutText(loadbuf(argv[2]).second, csvelim, csvdelim, true);
+      if(! words.size()) makelword(words, input);
+    } else
+      makelword(words, input);
+  } else if(2 < argc)
+    words = cutText(loadbuf(argv[2]).second, csvelim, csvdelim, true);
+  std::sort(words.begin(), words.end());
+  words.erase(std::unique(words.begin(), words.end()), words.end());
+  // setup as default parameters.
   const int szwindow(sqrt(num_t(int(input.size()))));
-  if(std::strcmp(argv[1], "lword") == 0) {
-    words.insert(words.end(), csvelim.begin(),  csvelim.end());
-    words.insert(words.end(), csvdelim.begin(), csvdelim.end());
-    std::sort(words.begin(), words.end());
-    words.erase(std::unique(words.begin(), words.end()), words.end());
-    std::vector<gram_t<std::string> > found;
-    const auto lwords(lword<char, std::string>(80).compute(input));
-    for(auto itr = lwords.begin(); itr != lwords.end(); ++ itr) {
-      if(itr->rptr.size() < 2 && itr->str.size() < 3)
-        continue;
-      const auto lb(std::lower_bound(found.begin(), found.end(), *itr));
-      if(found.begin() <= lb && lb < found.end() && lb->str == itr->str)
-        lb->rptr.insert(lb->rptr.end(), itr->rptr.begin(), itr->rptr.end());
-      else
-        found.emplace_back(*itr);
-    }
-    for(auto itr = found.begin(); itr != found.end(); ++ itr) {   
-      std::sort(itr->rptr.begin(), itr->rptr.end());
-      itr->rptr.erase(std::unique(itr->rptr.begin(), itr->rptr.end()), itr->rptr.end());
-    }
-    std::sort(found.begin(), found.end(), lessCount<std::string>);
-    found.erase(std::unique(found.begin(), found.end()), found.end());
-    words.reserve(words.size() + found.size());
-    for(auto itr(found.begin()); itr < found.end(); ++ itr) {
-      const auto& tob(itr->str);
-      words.emplace_back(tob);
-      std::cout << tob << ", " << itr->rptr.size() << std::endl;
-    }
-    std::sort(words.begin(), words.end());
-    words.erase(std::unique(words.begin(), words.end()), words.end());
-    auto inputs(cutText(input, words, delimiter));
-    std::sort(inputs.begin(), inputs.end());
-    inputs.erase(std::unique(inputs.begin(), inputs.end()), inputs.end());
-    for(int i = 0; i < inputs.size(); i ++)
-      std::cout << inputs[i] << ", 1" << std::endl;
-  } else if(std::strcmp(argv[1], "lbalance") == 0) {
+  const int nrwords(pow(num_t(int(19683)), num_t(int(1)) / num_t(int(3)) ));
+  const int outblock(sqrt(sqrt(num_t(int(input.size() )) )) );
+  const num_t redig(int(1));
+  if(std::strcmp(argv[1], "lword") == 0)
+    makelword(words, input, true);
+  else if(std::strcmp(argv[1], "lbalance") == 0) {
     const auto cinput(cutText(input, csvelim, delimiter));
     const auto idxs(pseudoWordsBalance<double, std::string>(cinput, words, szwindow));
     std::cout << idxs.size() << "sets." << std::endl;
@@ -159,7 +175,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
     std::cout << "<body>";
-    preparedTOC<double, std::string>(std::cout, input, detailwords, details, tocwords, tocs, delimiter, szwindow, - scorethresh, threshin, redig, std::strcmp(argv[1], "lack") == 0);
+    preparedTOC<double, std::string>(std::cout, input, detailwords, details, tocwords, tocs, delimiter, szwindow, outblock, nrwords, redig, std::strcmp(argv[1], "lack") == 0);
     std::cout << std::endl << "<br/></body></html>";
   } else if(std::strcmp(argv[1], "reconstruct") == 0)
     std::cout << corpus<double, std::string>(input, delimiter).serialize() << std::endl;
@@ -201,7 +217,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
     std::cout << "<body>";
-    diff<double, std::string>(std::cout, input, details, detailwords, details2, detailwords2, delimiter, szwindow, - num_t(int(0)), threshin, redig, strcmp(argv[1], "same") == 0);
+    diff<double, std::string>(std::cout, input, details, detailwords, details2, detailwords2, delimiter, szwindow, - num_t(int(0)), nrwords, redig, strcmp(argv[1], "same") == 0);
     std::cout << "<hr/>" << std::endl << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "stat") == 0 ||
             std::strcmp(argv[1], "findroot") == 0) {
@@ -217,22 +233,51 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
     std::cout << "<body>";
-    optimizeTOC<double, std::string>(std::cout, input, rdetails, rdetailwords, delimiter, szwindow, - scorethresh, threshin, redig, std::strcmp(argv[1], "findroot") == 0);
+    optimizeTOC<double, std::string>(std::cout, input, rdetails, rdetailwords, delimiter, szwindow, outblock, nrwords, redig, std::strcmp(argv[1], "findroot") == 0);
     std::cout << "<hr/>" << std::endl << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "pred") == 0) {
     std::vector<std::string> details;
     std::vector<std::string> detailwords;
-    for(int iidx = 3; iidx < argc; iidx ++) {
-      const auto work(loadbuf(argv[iidx]));
-      details.push_back(work.second);
-      detailwords.push_back(work.first);
+    if(std::strcmp(argv[1], "prednoword") == 0) {
+      words.insert(words.end(), csvelim.begin(),  csvelim.end());
+      words.insert(words.end(), csvdelim.begin(), csvdelim.end());
+      std::sort(words.begin(), words.end());
+      words.erase(std::unique(words.begin(), words.end()), words.end());
+      std::vector<gram_t<std::string> > found;
+      const auto lwords(lword<char, std::string>(80).compute(input));
+      for(auto itr = lwords.begin(); itr != lwords.end(); ++ itr) {
+        if(itr->rptr.size() < 2 && itr->str.size() < 3)
+          continue;
+        const auto lb(std::lower_bound(found.begin(), found.end(), *itr));
+        if(found.begin() <= lb && lb < found.end() && lb->str == itr->str)
+          lb->rptr.insert(lb->rptr.end(), itr->rptr.begin(), itr->rptr.end());
+        else
+          found.emplace_back(*itr);
+      }
+      for(auto itr = found.begin(); itr != found.end(); ++ itr) {   
+        std::sort(itr->rptr.begin(), itr->rptr.end());
+        itr->rptr.erase(std::unique(itr->rptr.begin(), itr->rptr.end()), itr->rptr.end());
+      }
+      std::sort(found.begin(), found.end(), lessCount<std::string>);
+      found.erase(std::unique(found.begin(), found.end()), found.end());
+      words.reserve(words.size() + found.size());
+      for(auto itr(found.begin()); itr < found.end(); ++ itr)
+        words.emplace_back(itr->str);
+      std::sort(words.begin(), words.end());
+      words.erase(std::unique(words.begin(), words.end()), words.end());
+    } else {
+      for(int iidx = 3; iidx < argc; iidx ++) {
+        const auto work(loadbuf(argv[iidx]));
+        details.push_back(work.second);
+        detailwords.push_back(work.first);
+      }
+      words.insert(words.end(), detailwords.begin(), detailwords.end());
+      std::sort(words.begin(), words.end());
+      words.erase(std::unique(words.begin(), words.end()), words.end());
     }
-    words.insert(words.end(), detailwords.begin(), detailwords.end());
-    std::sort(words.begin(), words.end());
-    words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
     std::cout << "<body>";
-    predTOC<num_t, std::string>(std::cout, input, detailwords, details, delimiter, szwindow, threshin, redig);
+    predTOC<num_t, std::string>(std::cout, input, detailwords, details, delimiter, szwindow, nrwords, redig);
     std::cout << "<hr/>" << std::endl << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "prep") == 0) {
     std::vector<std::string> buf;

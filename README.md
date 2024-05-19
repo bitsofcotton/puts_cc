@@ -9,18 +9,17 @@ This program uses large amount of region on the memory. And, very slow because o
 
 # Usage
     make tools
-    ./tools lword < data.txt
-    ./tools lword prepared_word_list.txt < data.txt
-    ./tools lbalance wordlist.txt < data.txt
+    ./tools lword prepared_word_list.txt? < data.txt
+    ./tools lbalance wordlist.txt? < data.txt
     ./tools toc  wordlist.txt dictionaries ... -toc topics ... < data.txt
     ./tools lack wordlist.txt dictionaries ... -toc topics ... < data.txt
-    ./tools redig wordlist.txt < data.txt
-    ./tools stat wordlist.txt dictionaries ... < data.txt
-    ./tools findroot wordlist.txt dictionaries ... < data.txt
+    ./tools redig wordlist.txt? < data.txt
+    ./tools stat (wordlist.txt (dictionaries ...)?)? < data.txt
+    ./tools findroot (wordlist.txt (dictionaries ...)?)? < data.txt
     ./tools diff wordlist.txt -dict ... -dict2 ... < data.txt
     ./tools same wordlist.txt -dict ... -dict2 ... < data.txt
-    ./tools prep wordlist.txt < data.txt
-    ./tools pred wordlist.txt dictionaries ... < data.txt
+    ./tools prep wordlist.txt? < data.txt
+    ./tools pred (wordlist.txt (dictionaries ...)?)? < data.txt
 
 # Memory Fragments
 There exists better efficient memory management programs like jemalloc.
@@ -92,4 +91,5 @@ This repository is archived, so without bug report, will no change.
 2024/04/09 merge latest lieonn from ddpmopt.
 2024/04/14 merge latest lieonn, no logic change.
 2024/05/17 omit prediction output.
+2024/05/19 add prednoword command.
 

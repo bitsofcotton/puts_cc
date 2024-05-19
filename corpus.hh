@@ -926,18 +926,26 @@ template <typename T, typename U> static inline bool getDetailed(corpus<T, U>& c
   return true;
 }
 
-template <typename T, typename U> std::ostream& preparedTOC(std::ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& topictitle, const vector<U>& topics, const vector<U>& delimiter, const int& szwindow, const T& depth, const T& threshin, const T& redig = T(1), const bool& reverse = false) {
+template <typename T, typename U> std::ostream& preparedTOC(std::ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& topictitle, const vector<U>& topics, const vector<U>& delimiter, const int& szwindow, const int& outblock, const int& nrwords, const T& redig = T(1), const bool& reverse = false) {
   assert(detailtitle.size() == detail.size());
   assert(topictitle.size()  == topics.size());
   os << "prepTOC: " << flush;
   if(!topics.size())
     return os << "zero input. <br />";
   vector<corpus<T, U> > istats;
-  istats.emplace_back(corpus<T, U>());
-  for(int j = 0; getDetailed<T, U>(istats[istats.size() - 1], input, j, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
-    istats[j].reDig(redig);
-    istats[j].absfy();
+  T    threshin(int(0));
+  for(int i = 1; i <= int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) ); i ++) {
+    int inscore(0);
+    T   tthresh(threshin + pow(T(int(2)), - T(int(i))) );
+    istats.resize(0);
     istats.emplace_back(corpus<T, U>());
+    for(int j = 0; getDetailed<T, U>(istats[istats.size() - 1], input, j, detailtitle, detail, delimiter, szwindow, tthresh); j ++) {
+      istats[j].reDig(redig);
+      istats[j].absfy();
+      istats.emplace_back(corpus<T, U>());
+      inscore = max(inscore, int(istats[j].countIdx().size()));
+    }
+    if(inscore < nrwords) threshin = tthresh;
   }
   for(int i = 0; i < topics.size(); i ++) {
     vector<pair<T, pair<int, int> > > topicidx;
@@ -965,7 +973,7 @@ template <typename T, typename U> std::ostream& preparedTOC(std::ostream& os, co
     for(int j = 0; j < topicidx.size(); j ++) {
       const auto& stat0(istats[topicidx[j].second.first]);
       const auto& stat1(stats[topicidx[j].second.second]);
-      if(depth < topicidx[j].first)
+      if(outblock < j)
         break;
       os << topictitle[i] << " ";
       outTagged<T,U>(os, U("prepTOC0_") + to_string(i) + U("_"), stat0, topicidx[j].second.first, topicidx[j].first, input, szwindow);
@@ -978,17 +986,25 @@ template <typename T, typename U> std::ostream& preparedTOC(std::ostream& os, co
   return os;
 }
 
-template <typename T, typename U> std::ostream& optimizeTOC(std::ostream& os, const U& input, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const int& szwindow, const T& depth, const T& threshin, const T& redig = T(1), const bool& countnum = false, const U& notcheck = U("")) {
+template <typename T, typename U> std::ostream& optimizeTOC(std::ostream& os, const U& input, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const int& szwindow, const int& outblock, const int& nrwords, const T& redig = T(1), const bool& countnum = false, const U& notcheck = U("")) {
   assert(notcheck == U(""));
   os << "optTOC: " << flush;
   SimpleSparseMatrix<T> scores;
   int Midx(0);
   vector<corpus<T, U> > stats;
-  stats.emplace_back(corpus<T, U>());
-  for(int i = 0; getDetailed<T, U>(stats[stats.size() - 1], input, i, detailtitle, detail, delimiter, szwindow, threshin); i ++) {
-    stats[i].reDig(redig);
-    stats[i].absfy();
+  T    threshin(int(0));
+  for(int i = 1; i <= int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) ); i ++) {
+    int inscore(0);
+    T   tthresh(threshin + pow(T(int(2)), - T(int(i))) );
+    stats.resize(0);
     stats.emplace_back(corpus<T, U>());
+    for(int j = 0; getDetailed<T, U>(stats[stats.size() - 1], input, j, detailtitle, detail, delimiter, szwindow, tthresh); j ++) {
+      stats[j].reDig(redig);
+      stats[j].absfy();
+      stats.emplace_back(corpus<T, U>());
+      inscore = max(inscore, int(stats[j].countIdx().size()));
+    }
+    if(inscore < nrwords) threshin = tthresh;
   }
   for(int i = 0; i < stats.size() - 1; i ++)
     for(int j = i + 1; j < stats.size() - 1; j ++) {
@@ -1008,7 +1024,7 @@ template <typename T, typename U> std::ostream& optimizeTOC(std::ostream& os, co
         vector<pair<T, pair<int, int> > > llscore;
         for(int j = 0; j < Midx; j ++)
           if(!binary_search(phrases.begin(), phrases.end(), j) &&
-             scores[min(i, j)][max(i, j)] <= depth)
+             llscore.size() <= outblock)
             llscore.emplace_back(make_pair(scores[min(i, j)][max(i, j)], make_pair(i, j)));
         sort(llscore.begin(), llscore.end());
         lscore.emplace_back(llscore);
@@ -1070,10 +1086,27 @@ template <typename T, typename U> std::ostream& optimizeTOC(std::ostream& os, co
   return os << endl;
 }
 
-template <typename T, typename U> std::ostream& diff(std::ostream& os, const U& input, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const T& depth, const T& threshin, const T& redig = T(1), const bool& same = false) {
+template <typename T, typename U> std::ostream& diff(std::ostream& os, const U& input, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const int& outblock, const int& nrwords, const T& redig = T(1), const bool& same = false) {
   assert(detail0.size() == detailtitle0.size() &&
          detail1.size() == detailtitle1.size());
   os << "diff:" << flush;
+  T    threshin(int(0));
+  for(int i = 1; i <= int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) ); i ++) {
+    int inscore(0);
+    T   tthresh(threshin + pow(T(int(2)), - T(int(i))) );
+    corpus<T, U> stat;
+    for(int j = 0; getDetailed<T, U>(stat, input, j, detailtitle0, detail0, delimiter, szwindow, tthresh); j ++) {
+      stat.reDig(redig);
+      stat.absfy();
+      inscore = max(inscore, int(stat.countIdx().size()));
+    }
+    for(int j = 0; getDetailed<T, U>(stat, input, j, detailtitle1, detail1, delimiter, szwindow, tthresh); j ++) {
+      stat.reDig(redig);
+      stat.absfy();
+      inscore = max(inscore, int(stat.countIdx().size()));
+    }
+    if(inscore < nrwords) threshin = tthresh;
+  }
   corpus<T, U> cstat, dstat;
   vector<pair<T, int> > scores;
   for(int i = 0; ; i ++) {
@@ -1090,7 +1123,7 @@ template <typename T, typename U> std::ostream& diff(std::ostream& os, const U& 
       scores.emplace_back(make_pair(same ? - score : score, i));
   }
   sort(scores.begin(), scores.end());
-  for(int ii = 0; ii < scores.size() && scores[ii].first < depth; ii ++) {
+  for(int ii = 0; ii < scores.size() && ii <= outblock; ii ++) {
     const T&   score(scores[ii].first);
     const int& i(scores[ii].second);
     if(!getDetailed<T, U>(cstat, input, i, detailtitle0, detail0, delimiter, szwindow, threshin) ||
@@ -1183,12 +1216,26 @@ template <typename T, typename U> vector<int> pseudoWordsBalance(const vector<U>
   return vres;
 }
 
-template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const T& threshin, const T& redig = T(1) ) {
+template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const int& nrwords, const T& redig = T(1) ) {
   assert(detailtitle.size() == detail.size());
   os << "predTOC: " << flush;
   vector<corpus<T, U> > istats;
   vector<SimpleSparseTensor<T> > in;
   istats.emplace_back(corpus<T, U>());
+  T    threshin(int(0));
+  for(int i = 1; i <= int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) ); i ++) {
+    int inscore(0);
+    T   tthresh(threshin + pow(T(int(2)), - T(int(i))) );
+    istats.resize(0);
+    istats.emplace_back(corpus<T, U>());
+    for(int j = 0; getDetailed<T, U>(istats[istats.size() - 1], input, j, detailtitle, detail, delimiter, szwindow, tthresh); j ++) {
+      istats[j].reDig(redig);
+      istats[j].absfy();
+      istats.emplace_back(corpus<T, U>());
+      inscore = max(inscore, int(istats[j].countIdx().size()));
+    }
+    if(inscore < nrwords) threshin = tthresh;
+  }
   for(int j = 0; getDetailed<T, U>(istats[istats.size() - 1], input, j, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
     istats[j].reDig(redig);
     istats[j].absfy();
