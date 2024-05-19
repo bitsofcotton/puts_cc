@@ -138,7 +138,7 @@ int main(int argc, const char* argv[]) {
   // setup as default parameters.
   const int szwindow(sqrt(num_t(int(input.size()))));
   // N.B. cbrt is too small, raw is too large.
-  const int nrwords(pow(num_t(int(19683)), num_t(int(2)) / num_t(int(3)) ));
+  const int nrwords(sqrt(num_t(int(19683)) ));
   const int outblock(sqrt(sqrt(num_t(int(input.size() )) )) );
   const num_t redig(int(1));
   if(std::strcmp(argv[1], "lword") == 0)
