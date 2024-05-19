@@ -517,7 +517,8 @@ template <typename T, typename U> corpus<T,U>::corpus(const U& input, const vect
     }
     if(i == orig.size() - 1)
       break;
-    i   -= work.size() - 1;
+    // XXX:
+    // i   -= work.size() - 1;
     i0   = i;
     work = U();
   }

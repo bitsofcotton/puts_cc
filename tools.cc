@@ -52,13 +52,22 @@ std::pair<std::string, std::string> loadbuf(const char* filename) {
   return std::make_pair(name, inbuf);
 }
 
-void makelword(vector<string>& words, const std::string& input, const bool& show = false) {
+inline std::string utf8align(const std::string& tob) {
+  int head = 0;
+  while(head < tob.size() && (tob[head] & 0xc0) == 0x80) head ++;
+  int tail = head;
+  for(int j = head; j < tob.size(); j ++) if((tob[j] & 0xc0) != 0x80) tail = j;
+  if(-- tail <= head) return tob.substr(0, 0);
+  return tob.substr(head, tail - head + 1);
+}
+
+inline void makelword(vector<string>& words, const std::string& input, const bool& show = false, const bool& utf8 = true) {
   words.insert(words.end(), csvelim.begin(),  csvelim.end());
   words.insert(words.end(), csvdelim.begin(), csvdelim.end());
   std::sort(words.begin(), words.end());
   words.erase(std::unique(words.begin(), words.end()), words.end());
   std::vector<gram_t<std::string> > found;
-  const auto lwords(lword<char, std::string>(int(log(num_t(int(input.size() ))) / log(num_t(int(2)) ) )).compute(input));
+  auto lwords(lword<char, std::string>(int(log(num_t(int(input.size() ))) / log(num_t(int(2)) ) )).compute(input));
   for(auto itr = lwords.begin(); itr != lwords.end(); ++ itr) {
     if(itr->rptr.size() < 2 && itr->str.size() < 3)
       continue;
@@ -76,7 +85,8 @@ void makelword(vector<string>& words, const std::string& input, const bool& show
   found.erase(std::unique(found.begin(), found.end()), found.end());
   words.reserve(words.size() + found.size());
   for(auto itr(found.begin()); itr < found.end(); ++ itr) {
-    const auto& tob(itr->str);
+    const auto tob(utf8 ? utf8align(itr->str) : itr->str);
+    if(! tob.size()) continue;
     words.emplace_back(tob);
     if(show) std::cout << tob << ", " << itr->rptr.size() << std::endl;
   }
@@ -85,12 +95,18 @@ void makelword(vector<string>& words, const std::string& input, const bool& show
   auto inputs(cutText(input, words, delimiter));
   std::sort(inputs.begin(), inputs.end());
   inputs.erase(std::unique(inputs.begin(), inputs.end()), inputs.end());
-  words.insert(words.end(), inputs.begin(), inputs.end());
+  if(utf8)
+    for(int i = 0; i < inputs.size(); i ++) {
+      inputs[i] = utf8align(inputs[i]);
+      if(inputs[i].size()) words.emplace_back(inputs[i]);
+    }
+  else
+    words.insert(words.end(), inputs.begin(), inputs.end());
   std::sort(words.begin(), words.end());
   words.erase(std::unique(words.begin(), words.end()), words.end());
   if(show)
     for(int i = 0; i < inputs.size(); i ++)
-      std::cout << inputs[i] << ", 1" << std::endl;
+      if(inputs[i].size()) std::cout << inputs[i] << ", 1" << std::endl;
   return;
 }
 
@@ -137,9 +153,8 @@ int main(int argc, const char* argv[]) {
   words.erase(std::unique(words.begin(), words.end()), words.end());
   // setup as default parameters.
   const int szwindow(sqrt(num_t(int(input.size()))));
-  // N.B. cbrt is too small however optimal, we have memory size constraint.
-  //      So we need slow growth memory.
-  const int nrwords(sqrt(num_t(int(19683)) / num_t(szwindow) ));
+  // N.B. cbrt is too small however optimal, raw is too large.
+  const int nrwords(sqrt(num_t(int(19683)) ));
   const int outblock(sqrt(sqrt(num_t(int(input.size() )) )) );
   const num_t redig(int(1));
   if(std::strcmp(argv[1], "lword") == 0)
