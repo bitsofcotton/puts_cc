@@ -935,17 +935,20 @@ template <typename T, typename U> std::ostream& preparedTOC(std::ostream& os, co
   vector<corpus<T, U> > istats;
   T    threshin(int(0));
   for(int i = 1; i <= int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) ); i ++) {
-    int inscore(0);
     T   tthresh(threshin + pow(T(int(2)), - T(int(i))) );
+    vector<int> idx;
     istats.resize(0);
     istats.emplace_back(corpus<T, U>());
     for(int j = 0; getDetailed<T, U>(istats[istats.size() - 1], input, j, detailtitle, detail, delimiter, szwindow, tthresh); j ++) {
       istats[j].reDig(redig);
       istats[j].absfy();
       istats.emplace_back(corpus<T, U>());
-      inscore = max(inscore, int(istats[j].countIdx().size()));
+      auto lidx(istats[j].countIdx());
+      idx.insert(idx.end(), lidx.begin(), lidx.end());
     }
-    if(inscore < nrwords) threshin = tthresh;
+    sort(idx.begin(), idx.end());
+    idx.erase(std::unique(idx.begin(), idx.end()), idx.end());
+    if(idx.size() < nrwords) threshin = tthresh;
   }
   for(int i = 0; i < topics.size(); i ++) {
     vector<pair<T, pair<int, int> > > topicidx;
@@ -994,17 +997,20 @@ template <typename T, typename U> std::ostream& optimizeTOC(std::ostream& os, co
   vector<corpus<T, U> > stats;
   T    threshin(int(0));
   for(int i = 1; i <= int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) ); i ++) {
-    int inscore(0);
     T   tthresh(threshin + pow(T(int(2)), - T(int(i))) );
+    vector<int> idx;
     stats.resize(0);
     stats.emplace_back(corpus<T, U>());
     for(int j = 0; getDetailed<T, U>(stats[stats.size() - 1], input, j, detailtitle, detail, delimiter, szwindow, tthresh); j ++) {
       stats[j].reDig(redig);
       stats[j].absfy();
       stats.emplace_back(corpus<T, U>());
-      inscore = max(inscore, int(stats[j].countIdx().size()));
+      auto lidx(stats[j].countIdx());
+      idx.insert(idx.end(), lidx.begin(), lidx.end());
     }
-    if(inscore < nrwords) threshin = tthresh;
+    sort(idx.begin(), idx.end());
+    idx.erase(std::unique(idx.begin(), idx.end()), idx.end());
+    if(idx.size() < nrwords) threshin = tthresh;
   }
   for(int i = 0; i < stats.size() - 1; i ++)
     for(int j = i + 1; j < stats.size() - 1; j ++) {
@@ -1092,20 +1098,24 @@ template <typename T, typename U> std::ostream& diff(std::ostream& os, const U& 
   os << "diff:" << flush;
   T    threshin(int(0));
   for(int i = 1; i <= int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) ); i ++) {
-    int inscore(0);
     T   tthresh(threshin + pow(T(int(2)), - T(int(i))) );
     corpus<T, U> stat;
+    vector<int> idx;
     for(int j = 0; getDetailed<T, U>(stat, input, j, detailtitle0, detail0, delimiter, szwindow, tthresh); j ++) {
       stat.reDig(redig);
       stat.absfy();
-      inscore = max(inscore, int(stat.countIdx().size()));
+      auto lidx(stat.countIdx());
+      idx.insert(idx.end(), lidx.begin(), lidx.end());
     }
     for(int j = 0; getDetailed<T, U>(stat, input, j, detailtitle1, detail1, delimiter, szwindow, tthresh); j ++) {
       stat.reDig(redig);
       stat.absfy();
-      inscore = max(inscore, int(stat.countIdx().size()));
+      auto lidx(stat.countIdx());
+      idx.insert(idx.end(), lidx.begin(), lidx.end());
     }
-    if(inscore < nrwords) threshin = tthresh;
+    sort(idx.begin(), idx.end());
+    idx.erase(std::unique(idx.begin(), idx.end()), idx.end());
+    if(idx.size() < nrwords) threshin = tthresh;
   }
   corpus<T, U> cstat, dstat;
   vector<pair<T, int> > scores;
@@ -1224,17 +1234,20 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
   istats.emplace_back(corpus<T, U>());
   T    threshin(int(0));
   for(int i = 1; i <= int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) ); i ++) {
-    int inscore(0);
     T   tthresh(threshin + pow(T(int(2)), - T(int(i))) );
     istats.resize(0);
     istats.emplace_back(corpus<T, U>());
+    vector<int> idx;
     for(int j = 0; getDetailed<T, U>(istats[istats.size() - 1], input, j, detailtitle, detail, delimiter, szwindow, tthresh); j ++) {
       istats[j].reDig(redig);
       istats[j].absfy();
       istats.emplace_back(corpus<T, U>());
-      inscore = max(inscore, int(istats[j].countIdx().size()));
+      auto lidx(istats[j].countIdx());
+      idx.insert(idx.end(), lidx.begin(), lidx.end());
     }
-    if(inscore < nrwords) threshin = tthresh;
+    sort(idx.begin(), idx.end());
+    idx.erase(std::unique(idx.begin(), idx.end()), idx.end());
+    if(idx.size() < nrwords) threshin = tthresh;
   }
   for(int j = 0; getDetailed<T, U>(istats[istats.size() - 1], input, j, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
     istats[j].reDig(redig);

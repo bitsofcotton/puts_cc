@@ -137,12 +137,8 @@ int main(int argc, const char* argv[]) {
   words.erase(std::unique(words.begin(), words.end()), words.end());
   // setup as default parameters.
   const int szwindow(sqrt(num_t(int(input.size()))));
-  // N.B. function entropy limit is too large for each line word count.
-  //      instead of them, we use them divided by line numbers * avg word len.
-  //      this is weired condition but we use this with makelword result
-  //      because of duplicates.
-  const int nrwords(pow(num_t(int(19683 / szwindow)) / log(num_t(int(szwindow))),
-      num_t(int(1)) / num_t(int(3)) ));
+  // N.B. cbrt is too small, raw is too large.
+  const int nrwords(pow(num_t(int(19683)), num_t(int(2)) / num_t(int(3)) ));
   const int outblock(sqrt(sqrt(num_t(int(input.size() )) )) );
   const num_t redig(int(1));
   if(std::strcmp(argv[1], "lword") == 0)
@@ -222,7 +218,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
     std::cout << "<body>";
-    diff<double, std::string>(std::cout, input, details, detailwords, details2, detailwords2, delimiter, szwindow, - num_t(int(0)), nrwords, redig, strcmp(argv[1], "same") == 0);
+    diff<double, std::string>(std::cout, input, details, detailwords, details2, detailwords2, delimiter, szwindow, outblock, nrwords, redig, strcmp(argv[1], "same") == 0);
     std::cout << "<hr/>" << std::endl << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "stat") == 0 ||
             std::strcmp(argv[1], "findroot") == 0) {
