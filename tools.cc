@@ -22,7 +22,7 @@ std::vector<std::string> csvelim;
 std::vector<std::string> csvdelim;
 
 void usage() {
-  std::cout << "tools (lword|lbalance|toc|lack|redig|stat|findroot|diff|same|prep|pred|prednoword)" << std::endl;
+  std::cout << "tools (lword|lbalance|toc|lack|redig|stat|findroot|diff|same|prep|pred)" << std::endl;
 }
 
 std::pair<std::string, std::string> loadbuf(const char* filename) {
@@ -137,8 +137,12 @@ int main(int argc, const char* argv[]) {
   words.erase(std::unique(words.begin(), words.end()), words.end());
   // setup as default parameters.
   const int szwindow(sqrt(num_t(int(input.size()))));
-  const int nrwords(pow(num_t(int(19683) / szwindow),
-    num_t(int(1)) / num_t(int(3)) ));
+  // N.B. function entropy limit is too large for each line word count.
+  //      instead of them, we use them divided by line numbers * avg word len.
+  //      this is weired condition but we use this with makelword result
+  //      because of duplicates.
+  const int nrwords(pow(num_t(int(19683 / szwindow)) / log(num_t(int(szwindow))),
+      num_t(int(1)) / num_t(int(3)) ));
   const int outblock(sqrt(sqrt(num_t(int(input.size() )) )) );
   const num_t redig(int(1));
   if(std::strcmp(argv[1], "lword") == 0)
@@ -239,43 +243,14 @@ int main(int argc, const char* argv[]) {
   } else if(std::strcmp(argv[1], "pred") == 0) {
     std::vector<std::string> details;
     std::vector<std::string> detailwords;
-    if(std::strcmp(argv[1], "prednoword") == 0) {
-      words.insert(words.end(), csvelim.begin(),  csvelim.end());
-      words.insert(words.end(), csvdelim.begin(), csvdelim.end());
-      std::sort(words.begin(), words.end());
-      words.erase(std::unique(words.begin(), words.end()), words.end());
-      std::vector<gram_t<std::string> > found;
-      const auto lwords(lword<char, std::string>(80).compute(input));
-      for(auto itr = lwords.begin(); itr != lwords.end(); ++ itr) {
-        if(itr->rptr.size() < 2 && itr->str.size() < 3)
-          continue;
-        const auto lb(std::lower_bound(found.begin(), found.end(), *itr));
-        if(found.begin() <= lb && lb < found.end() && lb->str == itr->str)
-          lb->rptr.insert(lb->rptr.end(), itr->rptr.begin(), itr->rptr.end());
-        else
-          found.emplace_back(*itr);
-      }
-      for(auto itr = found.begin(); itr != found.end(); ++ itr) {   
-        std::sort(itr->rptr.begin(), itr->rptr.end());
-        itr->rptr.erase(std::unique(itr->rptr.begin(), itr->rptr.end()), itr->rptr.end());
-      }
-      std::sort(found.begin(), found.end(), lessCount<std::string>);
-      found.erase(std::unique(found.begin(), found.end()), found.end());
-      words.reserve(words.size() + found.size());
-      for(auto itr(found.begin()); itr < found.end(); ++ itr)
-        words.emplace_back(itr->str);
-      std::sort(words.begin(), words.end());
-      words.erase(std::unique(words.begin(), words.end()), words.end());
-    } else {
-      for(int iidx = 3; iidx < argc; iidx ++) {
-        const auto work(loadbuf(argv[iidx]));
-        details.push_back(work.second);
-        detailwords.push_back(work.first);
-      }
-      words.insert(words.end(), detailwords.begin(), detailwords.end());
-      std::sort(words.begin(), words.end());
-      words.erase(std::unique(words.begin(), words.end()), words.end());
+    for(int iidx = 3; iidx < argc; iidx ++) {
+      const auto work(loadbuf(argv[iidx]));
+      details.push_back(work.second);
+      detailwords.push_back(work.first);
     }
+    words.insert(words.end(), detailwords.begin(), detailwords.end());
+    std::sort(words.begin(), words.end());
+    words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
     std::cout << "<body>";
     predTOC<num_t, std::string>(std::cout, input, detailwords, details, delimiter, szwindow, nrwords, redig);
