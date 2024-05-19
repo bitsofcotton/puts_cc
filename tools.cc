@@ -137,7 +137,8 @@ int main(int argc, const char* argv[]) {
   words.erase(std::unique(words.begin(), words.end()), words.end());
   // setup as default parameters.
   const int szwindow(sqrt(num_t(int(input.size()))));
-  const int nrwords(pow(num_t(int(19683)), num_t(int(1)) / num_t(int(3)) ));
+  const int nrwords(pow(num_t(int(19683) / szwindow),
+    num_t(int(1)) / num_t(int(3)) ));
   const int outblock(sqrt(sqrt(num_t(int(input.size() )) )) );
   const num_t redig(int(1));
   if(std::strcmp(argv[1], "lword") == 0)
