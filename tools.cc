@@ -207,8 +207,8 @@ int main(int argc, const char* argv[]) {
     emph.push_back(1.);
     emph.push_back(.25);
     for(int ei = 0; ei < emph.size(); ei ++) {
-      for(int i = 0; i < input.size() / szwindow + 1; i ++)
-        std::cout << corpus<double, std::string>(input.substr(i * szwindow, std::min(szwindow, int(input.size()) - i * szwindow)), delimiter).reDig(emph[ei]).serialize() << std::endl;
+      for(int i = 0; i < input.size() / szwindow; i ++)
+        std::cout << corpus<double, std::string>(input.substr(i * szwindow, szwindow), delimiter).reDig(emph[ei]).serialize() << std::endl;
       std::cout << std::endl << std::endl;
     }
   } else if(std::strcmp(argv[1], "diff") == 0 ||
