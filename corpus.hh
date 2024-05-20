@@ -934,10 +934,9 @@ template <typename T, typename U> std::ostream& preparedTOC(std::ostream& os, co
     return os << "zero input. <br />";
   vector<corpus<T, U> > istats;
   T threshin(int(0));
-  for(int i = 1;
-          i < abs(int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) ));
-          i ++) {
-    threshin = pow(T(int(2)), - T(abs(i)));
+  for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
+          i <= 0; i ++) {
+    threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
     vector<int> idx;
     istats = vector<corpus<T, U> >();
     istats.emplace_back(corpus<T, U>());
@@ -950,6 +949,7 @@ template <typename T, typename U> std::ostream& preparedTOC(std::ostream& os, co
     }
     sort(idx.begin(), idx.end());
     idx.erase(std::unique(idx.begin(), idx.end()), idx.end());
+    cerr << threshin << " : " << idx.size() << endl;
     if(nrwords <= idx.size()) break;
   }
   for(int i = 0; i < topics.size(); i ++) {
@@ -998,11 +998,9 @@ template <typename T, typename U> std::ostream& optimizeTOC(std::ostream& os, co
   int Midx(0);
   vector<corpus<T, U> > stats;
   T   threshin(int(0));
-  for(int i = 1;
-          i < abs(int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) ));
-          i ++) {
-    threshin = pow(T(int(2)), - T(abs(i)));
-    cerr << threshin << endl;
+  for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
+          i <= 0; i ++) {
+    threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
     vector<int> idx;
     stats = vector<corpus<T, U> >();
     stats.emplace_back(corpus<T, U>());
@@ -1015,6 +1013,7 @@ template <typename T, typename U> std::ostream& optimizeTOC(std::ostream& os, co
     }
     sort(idx.begin(), idx.end());
     idx.erase(std::unique(idx.begin(), idx.end()), idx.end());
+    cerr << threshin << " : " << idx.size() << endl;
     if(nrwords <= idx.size()) break;
   }
   for(int i = 0; i < stats.size() - 1; i ++)
@@ -1102,10 +1101,9 @@ template <typename T, typename U> std::ostream& diff(std::ostream& os, const U& 
          detail1.size() == detailtitle1.size());
   os << "diff:" << flush;
   T threshin(int(0));
-  for(int i = 1;
-          i < abs(int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) ));
-          i ++) {
-    threshin = pow(T(int(2)), - T(abs(i)));
+  for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
+          i <= 0; i ++) {
+    threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
     corpus<T, U> stat;
     vector<int> idx;
     for(int j = 0; getDetailed<T, U>(stat, input, j, detailtitle0, detail0, delimiter, szwindow, threshin); j ++) {
@@ -1122,6 +1120,7 @@ template <typename T, typename U> std::ostream& diff(std::ostream& os, const U& 
     }
     sort(idx.begin(), idx.end());
     idx.erase(std::unique(idx.begin(), idx.end()), idx.end());
+    cerr << threshin << " : " << idx.size() << endl;
     if(nrwords <= idx.size()) break;
   }
   corpus<T, U> cstat, dstat;
@@ -1240,10 +1239,9 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
   vector<SimpleSparseTensor<T> > in;
   istats.emplace_back(corpus<T, U>());
   T threshin(int(0));
-  for(int i = 1;
-          i < abs(int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) ));
-          i ++) {
-    threshin = pow(T(int(2)), - T(abs(i)));
+  for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
+          i <= 0; i ++) {
+    threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
     istats = vector<corpus<T, U> >();
     istats.emplace_back(corpus<T, U>());
     vector<int> idx;
@@ -1256,6 +1254,7 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
     }
     sort(idx.begin(), idx.end());
     idx.erase(std::unique(idx.begin(), idx.end()), idx.end());
+    cerr << threshin << " : " << idx.size() << endl;
     if(nrwords <= idx.size()) break;
   }
   for(int j = 0; getDetailed<T, U>(istats[istats.size() - 1], input, j, detailtitle, detail, delimiter, szwindow, threshin); j ++) {
