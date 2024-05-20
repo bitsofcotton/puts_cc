@@ -69,7 +69,7 @@ inline void makelword(vector<string>& words, const std::string& input, const boo
   std::sort(words.begin(), words.end());
   words.erase(std::unique(words.begin(), words.end()), words.end());
   std::vector<gram_t<std::string> > found;
-  auto lwords(lword<char, std::string>(int(log(num_t(int(input.size() ))) / log(num_t(int(2)) ) )).compute(input));
+  const auto lwords(lword<char, std::string>(int(log(num_t(int(input.size() ))) / log(num_t(int(2)) ) )).compute(input));
   for(auto itr = lwords.begin(); itr != lwords.end(); ++ itr) {
     if(itr->rptr.size() < 2 && itr->str.size() < 3)
       continue;
@@ -118,7 +118,7 @@ inline void makelword(vector<string>& words, const std::string& input, const boo
 #undef int
 int main(int argc, const char* argv[]) {
 #define int int64_t
-  if(argc < 3) {
+  if(argc < 2) {
     usage();
     return - 2;
   }
@@ -160,8 +160,8 @@ int main(int argc, const char* argv[]) {
   const int szwindow(sqrt(num_t(int(input.size()))));
   const int outblock(sqrt(sqrt(num_t(int(input.size() )) )) );
   const num_t redig(int(1));
-  // N.B. cbrt is too small however optimal, raw is too large.
-  const int nrwords(sqrt(num_t(int(19683)) ));
+  // N.B. this is optimal but we need huge memory.
+  const int nrwords(pow(num_t(int(19683)), num_t(int(1)) / num_t(int(3)) ));
   if(std::strcmp(argv[1], "lword") == 0)
     makelword(words, input, true);
   else if(std::strcmp(argv[1], "lbalance") == 0) {

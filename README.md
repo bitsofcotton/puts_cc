@@ -93,4 +93,5 @@ This repository is archived, so without bug report, will no change.
 2024/05/17 omit prediction output.
 2024/05/19 add prednoword command.
 2024/05/20 reconfigure param nrwords, it's still large.
+2024/05/21 fix opt direction. they doesn't need such large mem. code cleaning.
 
