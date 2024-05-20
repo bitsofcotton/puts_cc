@@ -58,7 +58,9 @@ inline std::string utf8align(const std::string& tob) {
   int tail = head;
   for(int j = head; j < tob.size(); j ++) if((tob[j] & 0xc0) != 0x80) tail = j;
   if(-- tail <= head) return tob.substr(0, 0);
-  return tob.substr(head, tail - head + 1);
+  int cnt(0);
+  for(int j = head; j <= tail; j ++) if((tob[j] & 0xc0) != 0x80) cnt ++;
+  return cnt <= 1 ? tob.substr(0, 0) : tob.substr(head, tail - head + 1);
 }
 
 inline void makelword(vector<string>& words, const std::string& input, const bool& show = false, const bool& utf8 = true) {
@@ -92,7 +94,10 @@ inline void makelword(vector<string>& words, const std::string& input, const boo
   }
   std::sort(words.begin(), words.end());
   words.erase(std::unique(words.begin(), words.end()), words.end());
-  auto inputs(cutText(input, words, delimiter));
+  auto mydelim(delimiter);
+  mydelim.insert(mydelim.end(), words.begin(), words.end());
+  sort(mydelim.begin(), mydelim.end());
+  auto inputs(cutText(input, words, mydelim));
   std::sort(inputs.begin(), inputs.end());
   inputs.erase(std::unique(inputs.begin(), inputs.end()), inputs.end());
   if(utf8)
@@ -153,10 +158,10 @@ int main(int argc, const char* argv[]) {
   words.erase(std::unique(words.begin(), words.end()), words.end());
   // setup as default parameters.
   const int szwindow(sqrt(num_t(int(input.size()))));
-  // N.B. cbrt is too small however optimal, raw is too large.
-  const int nrwords(sqrt(num_t(int(19683)) ));
   const int outblock(sqrt(sqrt(num_t(int(input.size() )) )) );
   const num_t redig(int(1));
+  // N.B. cbrt is too small however optimal, raw is too large.
+  const int nrwords(sqrt(num_t(int(19683)) ));
   if(std::strcmp(argv[1], "lword") == 0)
     makelword(words, input, true);
   else if(std::strcmp(argv[1], "lbalance") == 0) {
