@@ -921,6 +921,7 @@ template <typename T, typename U> static inline bool getDetailed(corpus<T, U>& c
   if(! (0 <= idx && idx < input.size() / szwindow * 2 + 1))
     return false;
   cstat = corpus<T, U>(getCut<T>(input, idx, szwindow), delimiter);
+  if(! detail.size()) cstat = cstat.simpleThresh(thresh);
   for(int i = 0; i < detail.size(); i ++)
     cstat = cstat.withDetail(detailtitle[i], corpus<T, U>(detail[i], delimiter), thresh).simpleThresh(thresh);
   return true;
@@ -936,7 +937,7 @@ template <typename T, typename U> std::ostream& preparedTOC(std::ostream& os, co
   T threshin(int(0));
   for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
           i <= 0; i ++) {
-    threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
+    threshin = pow(T(int(2)), - T(abs(i)));
     vector<int> idx;
     istats = vector<corpus<T, U> >();
     istats.emplace_back(corpus<T, U>());
@@ -1000,7 +1001,7 @@ template <typename T, typename U> std::ostream& optimizeTOC(std::ostream& os, co
   T   threshin(int(0));
   for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
           i <= 0; i ++) {
-    threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
+    threshin = pow(T(int(2)), - T(abs(i)));
     vector<int> idx;
     stats = vector<corpus<T, U> >();
     stats.emplace_back(corpus<T, U>());
@@ -1103,7 +1104,7 @@ template <typename T, typename U> std::ostream& diff(std::ostream& os, const U& 
   T threshin(int(0));
   for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
           i <= 0; i ++) {
-    threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
+    threshin = pow(T(int(2)), - T(abs(i)));
     corpus<T, U> stat;
     vector<int> idx;
     for(int j = 0; getDetailed<T, U>(stat, input, j, detailtitle0, detail0, delimiter, szwindow, threshin); j ++) {
@@ -1241,7 +1242,7 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
   T threshin(int(0));
   for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
           i <= 0; i ++) {
-    threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
+    threshin = pow(T(int(2)), - T(abs(i)));
     istats = vector<corpus<T, U> >();
     istats.emplace_back(corpus<T, U>());
     vector<int> idx;
