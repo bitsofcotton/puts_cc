@@ -935,8 +935,9 @@ template <typename T, typename U> std::ostream& preparedTOC(std::ostream& os, co
     return os << "zero input. <br />";
   vector<corpus<T, U> > istats;
   T threshin(int(0));
-  for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
-          i <= 0; i ++) {
+  for(int i = 1;
+          i <= int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
+          i ++) {
     threshin = pow(T(int(2)), - T(abs(i)));
     vector<int> idx;
     istats = vector<corpus<T, U> >();
@@ -999,8 +1000,9 @@ template <typename T, typename U> std::ostream& optimizeTOC(std::ostream& os, co
   int Midx(0);
   vector<corpus<T, U> > stats;
   T   threshin(int(0));
-  for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
-          i <= 0; i ++) {
+  for(int i = 1;
+          i <= int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
+          i ++) {
     threshin = pow(T(int(2)), - T(abs(i)));
     vector<int> idx;
     stats = vector<corpus<T, U> >();
@@ -1102,8 +1104,9 @@ template <typename T, typename U> std::ostream& diff(std::ostream& os, const U& 
          detail1.size() == detailtitle1.size());
   os << "diff:" << flush;
   T threshin(int(0));
-  for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
-          i <= 0; i ++) {
+  for(int i = 1;
+          i <= int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
+          i ++) {
     threshin = pow(T(int(2)), - T(abs(i)));
     corpus<T, U> stat;
     vector<int> idx;
@@ -1240,8 +1243,9 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
   vector<SimpleSparseTensor<T> > in;
   istats.emplace_back(corpus<T, U>());
   T threshin(int(0));
-  for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
-          i <= 0; i ++) {
+  for(int i = 1;
+          i <= int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
+          i ++) {
     threshin = pow(T(int(2)), - T(abs(i)));
     istats = vector<corpus<T, U> >();
     istats.emplace_back(corpus<T, U>());
