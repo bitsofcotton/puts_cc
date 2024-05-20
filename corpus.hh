@@ -514,14 +514,11 @@ template <typename T, typename U> corpus<T,U>::corpus(const U& input, const vect
       Midx = matchidxs[j];
       matchwidx = vector<int>();
       matchidxs = vector<int>();
-    }
+      i0   = (-- i);
+    } else
+      i0   = (i -= work.size() - 1);
     if(i == orig.size() - 1)
       break;
-    // XXX:
-    if(match)
-      i0 = i;
-    else
-      i -= work.size() - 1;
     work = U();
   }
   pdelim.emplace_back(Midx + 2);
