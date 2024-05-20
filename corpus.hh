@@ -518,8 +518,10 @@ template <typename T, typename U> corpus<T,U>::corpus(const U& input, const vect
     if(i == orig.size() - 1)
       break;
     // XXX:
-    // i   -= work.size() - 1;
-    i0   = i;
+    if(match)
+      i0 = i;
+    else
+      i -= work.size() - 1;
     work = U();
   }
   pdelim.emplace_back(Midx + 2);
