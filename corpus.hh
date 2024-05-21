@@ -1247,6 +1247,7 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
   for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
           i <= 0; i ++) {
     threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
+    idx.resize(0);
     istats.resize(0);
     istats.resize(input.size() / (szwindow / 2));
     for(int j = 0; j < istats.size(); j ++) {
