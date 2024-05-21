@@ -4294,63 +4294,58 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
   return res;
 }
 
-template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx, const int& skip = 1, const int& cj = 11) {
+template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx, const int& skip = 1) {
   assert(idx.size() && 0 < skip && in0.size() / skip);
   // N.B.: we don't do input scaling.
-  // const int ccj(ceil(pow(T(cj), T(int(1)) / T(int(3)) )) );
-  const int ccj(1);
-  assert(0 < ccj);
-  if(ccj * ccj * ccj * 19683 < idx.size() * idx.size() * idx.size())
+  if(19683 < idx.size() * idx.size() * idx.size())
     cerr << "predSTen : elements larger than 19683, exceeds function entropy." << endl;
   // N.B. the data we target is especially string stream corpus.
   //      they are incontinuous one, so complementing with continuous stream
   //      shouldn't improve outputs.
   vector<SimpleVector<T> > in;
+  vector<pair<int, pair<int, int> > > absent;
   in.resize(in0.size());
-  for(int i = 0; i < in0.size(); i ++) {
-    in[i].resize(idx.size() * idx.size() * idx.size());
+  absent.reserve(idx.size() * idx.size() * idx.size());
+  for(int i = 0; i < idx.size(); i ++)
     for(int j = 0; j < idx.size(); j ++)
+      for(int k = 0; k < idx.size(); k ++) {
+        for(int ii = 0; ii < in0.size(); ii ++)
+          if(in0[ii][idx[i]][idx[j]][idx[k]] != T(int(0)))
+            goto next;
+        absent.emplace_back(make_pair(i, make_pair(j, k)));
+       next:
+      }
+  sort(absent.begin(), absent.end());
+  for(int i = 0; i < in0.size(); i ++) {
+    in[i].resize(idx.size() * idx.size() * idx.size() - absent.size());
+    for(int j = 0, cnt = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
         for(int m = 0; m < idx.size(); m ++)
-          in[i][j * idx.size() * idx.size() + k * idx.size() + m] =
-            (in0[i][idx[j]][idx[k]][idx[m]] + T(int(1))) / T(int(2));
+          if(! binary_search(absent.begin(), absent.end(),
+            make_pair(j, make_pair(k, m))))
+            in[i][cnt ++] =
+              (in0[i][idx[j]][idx[k]][idx[m]] + T(int(1))) / T(int(2));
   }
   auto p(predv<T>(in, skip));
   in.resize(0);
   pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > res;
   res.first.resize( p.first.first.size() );
   res.second.resize(p.second.first.size());
-  vector<T> rres(ccj * ccj * ccj);
   for(int i = 0; i < p.first.first.size(); i ++)
-    for(int j = 0; j < idx.size(); j ++)
+    for(int j = 0, cnt = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
         for(int m = 0; m < idx.size(); m ++) {
-          for(int jj = 0; jj < ccj; jj ++)
-            for(int kk = 0; kk < ccj; kk ++)
-              for(int mm = 0; mm < ccj; mm ++)
-                rres[jj * ccj * ccj + kk * ccj + mm] =
-                  p.first.first[i][getImgPt<int>(j + jj - ccj / 2, idx.size()) *
-                      idx.size() * idx.size() +
-                    getImgPt<int>(k + kk - ccj / 2, idx.size()) * idx.size() +
-                    getImgPt<int>(m + mm - ccj / 2, idx.size())] * T(int(2)) -
-                      T(int(1));
-          sort(rres.begin(), rres.end());
-          res.first[i][ idx[j]][idx[k]][idx[m]] =
+          if(binary_search(absent.begin(), absent.end(),
+               make_pair(j, make_pair(k, m))))
+            continue;
+          res.first[i][idx[j]][idx[k]][idx[m]] =
             revertProgramInvariant<T>(make_pair(
-              rres[rres.size() / 2], p.first.second[i]), true);
-          for(int jj = 0; jj < ccj; jj ++)
-            for(int kk = 0; kk < ccj; kk ++)
-              for(int mm = 0; mm < ccj; mm ++)
-                rres[jj * ccj * ccj + kk * ccj + mm] =
-                  p.second.first[i][getImgPt<int>(j + jj - ccj / 2, idx.size()) *
-                      idx.size() * idx.size() +
-                    getImgPt<int>(k + kk - ccj / 2, idx.size()) * idx.size() +
-                    getImgPt<int>(m + mm - ccj / 2, idx.size())] * T(int(2)) -
-                      T(int(1));
-          sort(rres.begin(), rres.end());
-          res.second[i][ idx[j]][idx[k]][idx[m]] =
+              p.first.first[i][cnt] * T(int(2)) - T(int(1)),
+                p.first.second[i]), true);
+          res.second[i][idx[j]][idx[k]][idx[m]] =
             revertProgramInvariant<T>(make_pair(
-              rres[rres.size() / 2], p.second.second[i]), true);
+              p.second.first[i][cnt ++] * T(int(2)) - T(int(1)),
+                p.second.second[i]), true);
         }
   return res;
 }

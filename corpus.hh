@@ -1272,6 +1272,7 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
   vector<string> hist;
   hist.reserve(p.first.size());
   for(int i = 0; i < p.first.size(); i ++) {
+    if(i == p.first.size() / 2) os << "<hr />" << endl;
     corpus<T, U> pstats;
     pstats.corpust = p.first[i];
     getAbbreved<T>(pstats, detailtitle, detail, delimiter);
@@ -1280,7 +1281,6 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
     os << serial << "<br /><br />" << endl;
     hist.emplace_back(move(serial));
     sort(hist.begin(), hist.end());
-    if(i == p.first.size() / 2 - 1) os << "<hr />" << endl;
   }
   return os;
 }

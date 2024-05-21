@@ -160,8 +160,7 @@ int main(int argc, const char* argv[]) {
   const int szwindow(sqrt(num_t(int(input.size()))));
   const int outblock(sqrt(sqrt(num_t(int(input.size() )) )) );
   const num_t redig(int(1));
-  // N.B. cbrt is optimal but we use square except with predTOC.
-  // const int nrwords(pow(num_t(int(19683)), num_t(int(1)) / num_t(int(3)) ));
+  // N.B. cbrt is optimal but we use square except for predTOC.
   const int nrwords(pow(num_t(int(19683)), num_t(int(2)) / num_t(int(3)) ));
   if(std::strcmp(argv[1], "lword") == 0)
     makelword(words, input, true);
