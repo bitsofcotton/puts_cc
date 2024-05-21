@@ -484,7 +484,7 @@ template <typename T, typename U> corpus<T,U>::corpus(const U& input, const vect
       workd[i] += U(" ");
   }
   orig = U(input);
-  int i(0), i0(0), Midx(0);
+  int i(0), i0(0), Midx(0), lastlen(0);
   for( ; i < orig.size(); i ++) {
     work += orig[i];
     for(int ii = 0; ii < workd.size(); ii ++) {
@@ -502,6 +502,7 @@ template <typename T, typename U> corpus<T,U>::corpus(const U& input, const vect
         if(work.size() == itr->size()) {
           matchwidx.emplace_back(distance(words.begin(), itr));
           matchidxs.emplace_back(i0);
+          lastlen = max(lastlen, int(work.size()));
         } else if(work.size() < itr->size())
           match = true;
       }
@@ -514,8 +515,10 @@ template <typename T, typename U> corpus<T,U>::corpus(const U& input, const vect
       Midx = matchidxs[j];
       matchwidx.resize(0);
       matchidxs.resize(0);
-    }
-    i0 = (i -= work.size() - 1) + 1;
+      i0 = (i -= work.size() - lastlen - 1) + 1;
+      lastlen = 0;
+    } else
+      i0 = (i -= work.size() - 1) + 1;
     if(i == orig.size() - 1)
       break;
     work = U();
@@ -1013,7 +1016,6 @@ template <typename T, typename U> std::ostream& optimizeTOC(std::ostream& os, co
     }
     sort(idx.begin(), idx.end());
     idx.erase(std::unique(idx.begin(), idx.end()), idx.end());
-    // XXX: not shown.
     cerr << threshin << " : " << idx.size() << endl;
     if(nrwords <= idx.size()) break;
   }
@@ -1242,7 +1244,7 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
   vector<SimpleSparseTensor<T> > in;
   T threshin(int(0));
   vector<int> idx;
-  for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) ) * 2;
+  for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
           i <= 0; i ++) {
     vector<corpus<T, U> > istats;
     threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
