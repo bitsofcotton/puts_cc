@@ -512,11 +512,10 @@ template <typename T, typename U> corpus<T,U>::corpus(const U& input, const vect
       ptrs[matchwidx[j]].emplace_back(matchidxs[j]);
       uptrs.emplace_back(matchwidx[j]);
       Midx = matchidxs[j];
-      matchwidx = vector<int>();
-      matchidxs = vector<int>();
-      i0   = (-- i);
-    } else
-      i0   = (i -= work.size() - 1);
+      matchwidx.resize(0);
+      matchidxs.resize(0);
+    }
+    i0 = (i -= work.size() - 1) + 1;
     if(i == orig.size() - 1)
       break;
     work = U();
@@ -918,7 +917,6 @@ template <typename T, typename U> static inline void getAbbreved(corpus<T, U>& c
 
 template <typename T, typename U> static inline bool getDetailed(corpus<T, U>& cstat, const U& input, const int& idx, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const T& thresh) {
   assert(detailtitle.size() == detail.size());
-  cerr << idx * szwindow / 2 << "/" << input.size() << endl;
   if(idx < 0 || input.size() <= idx * szwindow / 2)
     return false;
   assert(0 <= idx && idx * szwindow / 2 < input.size());
@@ -941,7 +939,7 @@ template <typename T, typename U> std::ostream& preparedTOC(std::ostream& os, co
     threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
     vector<int> idx;
     istats.resize(0);
-    istats.resize(input.size() / (szwindow / 2) - 1);
+    istats.resize(input.size() / (szwindow / 2));
     for(int j = 0; j < istats.size(); j ++) {
       getDetailed<T, U>(istats[j], input, j, detailtitle, detail, delimiter, szwindow, threshin);
       istats[j].reDig(redig);
@@ -1005,7 +1003,7 @@ template <typename T, typename U> std::ostream& optimizeTOC(std::ostream& os, co
     threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
     vector<int> idx;
     stats.resize(0);
-    stats.resize(input.size() / (szwindow / 2) - 1);
+    stats.resize(input.size() / (szwindow / 2));
     for(int j = 0; j < stats.size(); j ++) {
       getDetailed<T, U>(stats[j], input, j, detailtitle, detail, delimiter, szwindow, threshin);
       stats[j].reDig(redig);
@@ -1110,14 +1108,14 @@ template <typename T, typename U> std::ostream& diff(std::ostream& os, const U& 
     threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
     corpus<T, U> stat;
     vector<int> idx;
-    for(int j = 0; j < input.size() / (szwindow / 2) - 1; j ++) {
+    for(int j = 0; j < input.size() / (szwindow / 2); j ++) {
       getDetailed<T, U>(stat, input, j, detailtitle0, detail0, delimiter, szwindow, threshin);
       stat.reDig(redig);
       stat.absfy();
       auto lidx(stat.countIdx());
       idx.insert(idx.end(), lidx.begin(), lidx.end());
     }
-    for(int j = 0; j < input.size() / (szwindow / 2) - 1; j ++) {
+    for(int j = 0; j < input.size() / (szwindow / 2); j ++) {
       getDetailed<T, U>(stat, input, j, detailtitle1, detail1, delimiter, szwindow, threshin);
       stat.reDig(redig);
       stat.absfy();
@@ -1250,7 +1248,7 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
     threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
     vector<int> idx;
     istats.resize(0);
-    istats.resize(input.size() / (szwindow / 2) - 1);
+    istats.resize(input.size() / (szwindow / 2));
     for(int j = 0; j < istats.size(); j ++) {
       getDetailed<T, U>(istats[j], input, j, detailtitle, detail, delimiter, szwindow, threshin);
       istats[j].reDig(redig);
