@@ -1236,19 +1236,18 @@ template <typename T, typename U> vector<int> pseudoWordsBalance(const vector<U>
   return vres;
 }
 
-template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const int& nrwords, const T& redig = T(1) ) {
+template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const int& nrwords0, const T& redig = T(1) ) {
   assert(detailtitle.size() == detail.size());
+  const int nrwords(sqrt(T(nrwords0)));
   os << "predTOC: " << flush;
-  vector<corpus<T, U> > istats;
   vector<SimpleSparseTensor<T> > in;
-  istats.emplace_back(corpus<T, U>());
   T threshin(int(0));
   vector<int> idx;
-  for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
+  for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) ) * 2;
           i <= 0; i ++) {
+    vector<corpus<T, U> > istats;
     threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
     idx.resize(0);
-    istats.resize(0);
     istats.resize(input.size() / (szwindow / 2));
     for(int j = 0; j < istats.size(); j ++) {
       getDetailed<T, U>(istats[j], input, j, detailtitle, detail, delimiter, szwindow, threshin);
@@ -1260,10 +1259,13 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
     sort(idx.begin(), idx.end());
     idx.erase(std::unique(idx.begin(), idx.end()), idx.end());
     cerr << threshin << " : " << idx.size() << endl;
-    if(nrwords <= idx.size()) break;
+    if(nrwords <= idx.size()) {
+      in.resize(istats.size());
+      for(int j = 0; j < istats.size(); j ++)
+        in[j] = move(istats[j].corpust);
+      break;
+    }
   }
-  for(int j = 0; j < istats.size(); j ++)
-    in.emplace_back(const_cast<const SimpleSparseTensor<T>&>(istats[j].corpust) );
   auto p(predSTen<T>(in, idx));
   p.first.insert(p.first.end(), p.second.begin(), p.second.end());
   vector<string> hist;
