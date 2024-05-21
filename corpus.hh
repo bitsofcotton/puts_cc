@@ -398,7 +398,7 @@ public:
     return *this;
   }
   corpus<T, U> simpleThresh(const T& ratio) const {
-    assert(0 <= ratio);
+    assert(T(int(0)) <= ratio);
     const auto thisabsmax(absmax());
     const auto okidx(countIdx(ratio * thisabsmax));
     corpus<T, U> result;
@@ -574,7 +574,7 @@ template <typename T, typename U> corpus<T,U>::corpus(const U& input, const vect
           // const T buf1(abs(*itr + .5 - ptrs[j][ctrv]));
           const T work(T(1) / (buf0 * buf0 + buf1 * buf1));
           if(isfinite(work))
-            corpust[i][j][k] += sqrt(work) / Midx;
+            corpust[i][j][k] += sqrt(work) / T(int(Midx));
         }
       }
     }

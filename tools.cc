@@ -198,7 +198,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
     std::cout << "<body>";
-    preparedTOC<double, std::string>(std::cout, input, detailwords, details, tocwords, tocs, delimiter, szwindow, outblock, nrwords, redig, std::strcmp(argv[1], "lack") == 0);
+    preparedTOC<num_t, std::string>(std::cout, input, detailwords, details, tocwords, tocs, delimiter, szwindow, outblock, nrwords, redig, std::strcmp(argv[1], "lack") == 0);
     std::cout << std::endl << "<br/></body></html>";
   } else if(std::strcmp(argv[1], "reconstruct") == 0)
     std::cout << corpus<double, std::string>(input, delimiter).serialize() << std::endl;
@@ -240,7 +240,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
     std::cout << "<body>";
-    diff<double, std::string>(std::cout, input, details, detailwords, details2, detailwords2, delimiter, szwindow, outblock, nrwords, redig, strcmp(argv[1], "same") == 0);
+    diff<num_t, std::string>(std::cout, input, details, detailwords, details2, detailwords2, delimiter, szwindow, outblock, nrwords, redig, strcmp(argv[1], "same") == 0);
     std::cout << "<hr/>" << std::endl << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "stat") == 0 ||
             std::strcmp(argv[1], "findroot") == 0) {
@@ -256,7 +256,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
     std::cout << "<body>";
-    optimizeTOC<double, std::string>(std::cout, input, rdetails, rdetailwords, delimiter, szwindow, outblock, nrwords, redig, std::strcmp(argv[1], "findroot") == 0);
+    optimizeTOC<num_t, std::string>(std::cout, input, rdetails, rdetailwords, delimiter, szwindow, outblock, nrwords, redig, std::strcmp(argv[1], "findroot") == 0);
     std::cout << "<hr/>" << std::endl << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "pred") == 0) {
     std::vector<std::string> details;
