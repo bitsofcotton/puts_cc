@@ -160,9 +160,9 @@ int main(int argc, const char* argv[]) {
   const int szwindow(sqrt(num_t(int(input.size()))));
   const int outblock(sqrt(sqrt(num_t(int(input.size() )) )) );
   const num_t redig(int(1));
-  // N.B. cbrt is optimal but we use their square.
+  // N.B. cbrt is optimal but we use sqrt.
   // const int nrwords(pow(num_t(int(19683)), num_t(int(1)) / num_t(int(3)) ));
-  const int nrwords(pow(num_t(int(19683)), num_t(int(2)) / num_t(int(3)) ));
+  const int nrwords(sqrt(num_t(int(19683)) ));
   if(std::strcmp(argv[1], "lword") == 0)
     makelword(words, input, true);
   else if(std::strcmp(argv[1], "lbalance") == 0) {

@@ -1243,10 +1243,10 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
   vector<SimpleSparseTensor<T> > in;
   istats.emplace_back(corpus<T, U>());
   T threshin(int(0));
+  vector<int> idx;
   for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
           i <= 0; i ++) {
     threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
-    vector<int> idx;
     istats.resize(0);
     istats.resize(input.size() / (szwindow / 2));
     for(int j = 0; j < istats.size(); j ++) {
@@ -1262,15 +1262,7 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
     if(nrwords <= idx.size()) break;
   }
   for(int j = 0; j < istats.size(); j ++)
-    in.emplace_back(const_cast<const SimpleSparseTensor<T>&&>(istats[j].corpust) );
-  vector<int> idx;
-  for(int j = 0; j < istats.size() - 1; j ++) {
-    auto lidx(istats[j].countIdx(threshin));
-    idx.insert(idx.end(), lidx.begin(), lidx.end());
-  }
-  sort(idx.begin(), idx.end());
-  idx.erase(std::unique(idx.begin(), idx.end()), idx.end());
-  cerr << "total " << idx.size() << " words." << endl;
+    in.emplace_back(const_cast<const SimpleSparseTensor<T>&>(istats[j].corpust) );
   auto p(predSTen<T>(in, idx));
   p.first.insert(p.first.end(), p.second.begin(), p.second.end());
   vector<string> hist;
