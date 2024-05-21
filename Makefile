@@ -30,7 +30,7 @@ puts:
 putsmp:
 	${CXX} ${CXXFLAGS} ${MPFLAGS} -o putsmp tools.cc
 puts32:
-	${CXX} ${CXXFLAGS} -D_FLOAT_BITS_=32 -static -o puts tools.cc
+	${CXX} ${CXXFLAGS} -D_FLOAT_BITS_=32 -static -o puts32 tools.cc
 puts32mp:
-	${CXX} ${CXXFLAGS} -D_FLOAT_BITS_=32 ${MPFLAGS} -o putsmp tools.cc
+	${CXX} ${CXXFLAGS} -D_FLOAT_BITS_=32 ${MPFLAGS} -o puts32mp tools.cc
 
