@@ -941,7 +941,7 @@ template <typename T, typename U> std::ostream& preparedTOC(std::ostream& os, co
     threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
     vector<int> idx;
     istats.resize(0);
-    istats.resize(input.size() / (szwindow / 2));
+    istats.resize(input.size() / (szwindow / 2) - 1);
     for(int j = 0; j < istats.size(); j ++) {
       getDetailed<T, U>(istats[j], input, j, detailtitle, detail, delimiter, szwindow, threshin);
       istats[j].reDig(redig);
@@ -1005,7 +1005,7 @@ template <typename T, typename U> std::ostream& optimizeTOC(std::ostream& os, co
     threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
     vector<int> idx;
     stats.resize(0);
-    stats.resize(input.size() / (szwindow / 2));
+    stats.resize(input.size() / (szwindow / 2) - 1);
     for(int j = 0; j < stats.size(); j ++) {
       getDetailed<T, U>(stats[j], input, j, detailtitle, detail, delimiter, szwindow, threshin);
       stats[j].reDig(redig);
@@ -1110,14 +1110,14 @@ template <typename T, typename U> std::ostream& diff(std::ostream& os, const U& 
     threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
     corpus<T, U> stat;
     vector<int> idx;
-    for(int j = 0; j < input.size() / (szwindow / 2); j ++) {
+    for(int j = 0; j < input.size() / (szwindow / 2) - 1; j ++) {
       getDetailed<T, U>(stat, input, j, detailtitle0, detail0, delimiter, szwindow, threshin);
       stat.reDig(redig);
       stat.absfy();
       auto lidx(stat.countIdx());
       idx.insert(idx.end(), lidx.begin(), lidx.end());
     }
-    for(int j = 0; j < input.size() / (szwindow / 2); j ++) {
+    for(int j = 0; j < input.size() / (szwindow / 2) - 1; j ++) {
       getDetailed<T, U>(stat, input, j, detailtitle1, detail1, delimiter, szwindow, threshin);
       stat.reDig(redig);
       stat.absfy();
@@ -1250,7 +1250,7 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
     threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
     vector<int> idx;
     istats.resize(0);
-    istats.resize(input.size() / (szwindow / 2));
+    istats.resize(input.size() / (szwindow / 2) - 1);
     for(int j = 0; j < istats.size(); j ++) {
       getDetailed<T, U>(istats[j], input, j, detailtitle, detail, delimiter, szwindow, threshin);
       istats[j].reDig(redig);
