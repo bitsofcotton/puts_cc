@@ -1010,11 +1010,10 @@ template <typename T, typename U> std::ostream& optimizeTOC(std::ostream& os, co
       stats[j].absfy();
       auto lidx(stats[j].countIdx());
       idx.insert(idx.end(), lidx.begin(), lidx.end());
-      // XXX: ordinary C compiler freezes here with exhaust of memory, then,
-      //      abort trap exit.
     }
     sort(idx.begin(), idx.end());
     idx.erase(std::unique(idx.begin(), idx.end()), idx.end());
+    // XXX: not shown.
     cerr << threshin << " : " << idx.size() << endl;
     if(nrwords <= idx.size()) break;
   }
