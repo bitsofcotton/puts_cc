@@ -4296,9 +4296,7 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
 
 template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx, const int& skip = 1) {
   assert(idx.size() && 0 < skip && in0.size() / skip);
-  // N.B.: we don't do input scaling.
-  if(19683 < idx.size() * idx.size() * idx.size())
-    cerr << "predSTen : elements larger than 19683, exceeds function entropy." << endl;
+  // N.B. we don't do input scaling.
   // N.B. the data we target is especially string stream corpus.
   //      they are incontinuous one, so complementing with continuous stream
   //      shouldn't improve outputs.
@@ -4316,6 +4314,8 @@ template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTe
        next:
       }
   sort(absent.begin(), absent.end());
+  if(19683 < idx.size() * idx.size() * idx.size() - absent.size())
+    cerr << "predSTen : elements larger than 19683, exceeds function entropy." << endl;
   for(int i = 0; i < in0.size(); i ++) {
     in[i].resize(idx.size() * idx.size() * idx.size() - absent.size());
     for(int j = 0, cnt = 0; j < idx.size(); j ++)
