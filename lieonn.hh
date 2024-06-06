@@ -3161,7 +3161,7 @@ template <typename T> inline T P012L<T>::next(const SimpleVector<T>& d) {
             ii < 2 * int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) )
             && sqrt(work.dot(work) * SimpleMatrix<T>().epsilon()) <
                  abs(work[work.size() - 1] - last); ii ++) {
-      last = work[work.size() - 1];
+      last  = work[work.size() - 1];
       const auto vdp(makeProgramInvariant<T>(work));
       avg  = avg0 * sqrt(vdp.first.dot(vdp.first) / avg0.dot(avg0));
       work[work.size() - 1] =
@@ -3488,7 +3488,7 @@ public:
     SimpleMatrix<T> invariants(3, nonlinear ? varlen + 2 : varlen);
     invariants.O();
     for(int i0 = 0; i0 < invariants.rows(); i0 ++) {
-      SimpleMatrix<T> toeplitz((in.size() - varlen - step + 2) / skip
+      SimpleMatrix<T> toeplitz((in.size() - varlen - step + 2 - 1) / skip
                                - invariants.rows() + 1, invariants.cols());
       for(int i = i0; i < toeplitz.rows() + i0; i ++) {
         auto work(in.subVector(i * skip, varlen));
@@ -4125,7 +4125,7 @@ template <typename T> pair<pair<vector<SimpleVector<T> >, vector<T> >, pair<vect
     init[i] = T(int(i));
   cerr << "P0 initialize: " << P0maxRank0<T>(1).next(init) << endl;
   // N.B. we need rich internal status.
-  int p0(floor(sqrt(T(int(in.size() - 4 - 1 + 2 - 4 - 2 - 3)) ) / T(skip) ));
+  auto p0(min(int(floor(sqrt(T(int(in.size() - 4 - 1 + 2 - 4 - 2 - 3)) ) / T(skip) )), int(in.size() - 2) / skip / 26));
   vector<SimpleVector<T> > p;
   vector<T> psec;
   if(p0 < 1) return make_pair(make_pair(p, psec), make_pair(p, psec));
@@ -4166,8 +4166,8 @@ template <typename T> pair<pair<vector<SimpleVector<T> >, vector<T> >, pair<vect
       pb.next(pf.res[pf.res.size() - 1 - k]);
     assert(pb.full);
     for(int i = 0; i < p0; i ++) {
-      q[i][j] += P01<T, false>(4, i + 1).next(pb.res, skip);
-      p[i][j] += P01<T, false>(4, i + 1).next(pf.res, skip);
+      q[i][j] = P01<T, false>(4, i + 1).next(pb.res, skip);
+      p[i][j] = P01<T, false>(4, i + 1).next(pf.res, skip);
     }
   }
 #if defined(_OPENMP)
@@ -4215,16 +4215,18 @@ template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<Simp
           rres[m] = p.first.first[i][j * in0[0][0].size() +
             getImgPt<int>(k + m - rres.size() / 2, in0[0][0].size())];
         sort(rres.begin(), rres.end());
-        res.first[i][j][k] = revertProgramInvariant<T>(make_pair(
-          rres[rres.size() / 2], p.first.second[i]), true);
+        res.first[i][j][k] =
+          revertProgramInvariant<T>(make_pair(
+            rres[rres.size() / 2], p.first.second[i]), true);
       }
       for(int k = 0; k < in0[0][0].size(); k ++) {
         for(int m = 0; m < rres.size(); m ++)
           rres[m] = p.second.first[i][j * in0[0][0].size() +
             getImgPt<int>(k + m - rres.size() / 2, in0[0][0].size())];
         sort(rres.begin(), rres.end());
-        res.second[i][j][k] = revertProgramInvariant<T>(make_pair(
-          rres[rres.size() / 2], p.second.second[i]), true);
+        res.second[i][j][k] =
+          revertProgramInvariant<T>(make_pair(
+            rres[rres.size() / 2], p.second.second[i]), true);
       }
     }
   }
@@ -4273,8 +4275,9 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
                   in0[0][0].cols() +
                 getImgPt<int>(m + mm - ccj / 2, in0[0][0].cols())];
           sort(rres.begin(), rres.end());
-          res.first[i][j](k, m) = revertProgramInvariant<T>(make_pair(
-            rres[rres.size() / 2], p.first.second[i]), true);
+          res.first[i][j](k, m) =
+            revertProgramInvariant<T>(make_pair(
+              rres[rres.size() / 2], p.first.second[i]), true);
         }
       for(int k = 0; k < in0[0][0].rows(); k ++)
         for(int m = 0; m < in0[0][0].cols(); m ++) {
@@ -4286,8 +4289,9 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
                   in0[0][0].cols() +
                 getImgPt<int>(m + mm - ccj / 2, in0[0][0].cols())];
           sort(rres.begin(), rres.end());
-          res.second[i][j](k, m) = revertProgramInvariant<T>(make_pair(
-            rres[rres.size() / 2], p.second.second[i]), true);
+          res.second[i][j](k, m) =
+            revertProgramInvariant<T>(make_pair(
+              rres[rres.size() / 2], p.second.second[i]), true);
         }
     }
   }
