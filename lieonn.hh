@@ -1648,6 +1648,15 @@ public:
       (*this)[ii] = ii == i ? r : zero;
     return *this;
   }
+  inline       SimpleVector<T>  reverse() {
+    SimpleVector<T> res(entity.size());
+#if defined(_OPENMP)
+#pragma omp simd
+#endif
+    for(int i = 0; i < res.size(); i ++)
+      res[i] = entity[entity.size() - 1 - i];
+    return res;
+  }
   
   vector<T> entity;
 };
@@ -3597,25 +3606,17 @@ public:
     ph[idx][count] = 1;
     return (eh[idx][count] = progression(h, idx, count - 1) - progression(h, idx - 1, count - 1));
   }
-  inline void pnext(const SimpleVector<T>& hh) {
-    for(int i = 0; i < p.size(); i ++)
-      bb[i].next(p[i][t % p[i].size()].next(progression(hh, hh.size() - 1, i)));
-    t ++;
-    return;
-  }
-  inline void clearCache() {
+  inline T next(const T& in) {
+    static const T zero(int(0));
     for(int i = 0; i < ph.size(); i ++)
       for(int j = 0; j < ph[i].size(); j ++)
         ph[i][j] = 0;
-    return;
-  }
-  inline T next(const T& in) {
-    static const T zero(int(0));
-    clearCache();
     const auto& hh(h.next(in));
     auto M(zero);
     if(! h.full) return M;
-    pnext(hh);
+    for(int i = 0; i < p.size(); i ++)
+      bb[i].next(p[i][t % p[i].size()].next(progression(hh, hh.size() - 1, i)));
+    t ++;
     for(int i = 0; i < p.size(); i ++)
       M += bb[i].res[0] + (i && addp ? progression(hh, hh.size() - 2, i - 1) : zero);
     return addp ? M /= T(int(p.size())) : M;
@@ -3627,14 +3628,10 @@ public:
     SimpleVector<T> res(bb.size());
     for(int i = 0; i < res.size(); i ++) {
       res[i] = zero;
-      int cnt(0);
-      for(int j = i; j < res.size(); j ++, cnt ++)
-        if(i < bb[j].res.size())
-          res[i] += bb[j].res[i] +
-            (j ? progression(hh, hh.size() - 2, j - 1) : zero);
-        else
-          break;
-      res[i] /= T(int(cnt ? cnt : 1));
+      for(int j = i; j < res.size(); j ++)
+        res[i] += bb[j].res[i] +
+          (j ? progression(hh, hh.size() - 2, j - 1) : zero);
+      res[i] /= T(int(res.size() - i));
     }
     return res;
   }
@@ -3647,12 +3644,11 @@ public:
   bool addp;
 };
 
-template <typename T, typename P> class PprogressionOnce01 {
+template <typename T, typename P> class PprogressionOnce010n {
 public:
-  inline PprogressionOnce01() { ; }
-  inline PprogressionOnce01(const P& p, const int& sz = 31) {
-    this->sz = sz;
-    const auto loop(sz / 31);
+  inline PprogressionOnce010n() { ; }
+  inline PprogressionOnce010n(const P& p, const int& p0, const int& len) {
+    const auto& loop(p0);
     assert(0 < loop);
     (this->p).resize(loop);
     for(int i = 0; i < (this->p).size(); i ++)
@@ -3669,8 +3665,10 @@ public:
     bb.reserve(loop);
     for(int i = 0; i < loop; i ++)
       bb.emplace_back(idFeeder<T>(i + 1));
+    t ^= t;
+    plen = len;
   }
-  inline ~PprogressionOnce01() { ; }
+  inline ~PprogressionOnce010n() { ; }
   inline const T& progression(const SimpleVector<T>& h, const int& idx, const int& count) {
     assert(0 <= idx && 0 <= count);
     if(! count) return h[idx];
@@ -3678,27 +3676,35 @@ public:
     ph[idx][count] = 1;
     return (eh[idx][count] = progression(h, idx, count - 1) - progression(h, idx - 1, count - 1));
   }
-  inline T next(const T& in) {
-/*
+  inline SimpleVector<T> next(const T& in) {
     static const T zero(int(0));
-    const auto& hh(h.next(in));
-    if(! h.full) return zero;
-    auto M(zero);
-    for(int i = 0; i < p.size(); i ++)
-      M += bb[i].next(p[i][t % p[i].size()].next(progression(hh, hh.size() - 1, i)))[0] + (i ? progression(hh, hh.size() - 2, i - 1) : zero);
     for(int i = 0; i < ph.size(); i ++)
       for(int j = 0; j < ph[i].size(); j ++)
         ph[i][j] = 0;
-    return M /= T(int(p.size()));
-*/
-    return T(int(0));
+    const auto& hh(h.next(in));
+    t ++;
+    if(! h.full) return SimpleVector<T>();
+    for(int i = 0; i < p.size(); i ++)
+      if((p.size() - 1 - t) / plen / (i + 1) <= 1)
+        bb[i].next(p[i][t % p[i].size()].next(progression(hh, hh.size() - 1, i)));
+    SimpleVector<T> res(bb.size());
+    for(int i = 0; i < res.size(); i ++) {
+      res[i] = zero;
+      for(int j = i; j < res.size(); j ++)
+        res[i] += bb[j].res[i] +
+          (j ? progression(hh, hh.size() - 2, j - 1) : zero);
+      res[i] /= T(int(res.size() - i));
+    }
+    return res;
   }
   vector<vector<P> > p;
   idFeeder<T> h;
   vector<vector<int> > ph;
   vector<vector<T> > eh;
   vector<idFeeder<T> > bb;
-  int sz;
+  int plen;
+  int p0;
+  int t;
 };
 
 template <typename T, typename P, typename Q> class PAthenB {
@@ -3720,6 +3726,20 @@ template <typename T> using P10 =
      Pprogression<T, PBond<T, P0maxRank<T> > >  >;
 template <typename T> using P210 =
    PAthenB<T, Pprogression<T, PBond<T, P012L<T> > >, P10<T> >;
+
+template <typename T> SimpleVector<T> P010nOneshot(const SimpleVector<T>& in, const int& p0) {
+  PprogressionOnce010n<T, PBond<T, P01<T> > > p(PBond<T, P01<T> >(P01<T>(4), 5 * 5 - 4 + 2), p0, 5 * 5 - 4 + 2);
+  PprogressionOnce010n<T, PBond<T, P0maxRank<T> > > q(PBond<T, P0maxRank<T> >(P0maxRank<T>(), 3), p0, 3);
+  SimpleVector<T> rp;
+  SimpleVector<T> rq;
+  for(int i = 0; i < in.size(); i ++) {
+    if(rp.size()) rq = q.next(rp[0] * in[i]);
+    rp = p.next(in[i]);
+  }
+  for(int i = 0; i < rq.size(); i ++)
+    rq[i] *= rp[i];
+  return rq;
+}
 
 // N.B. invariant gathers some of the group on the input pattern.
 template <typename T> SimpleMatrix<T> concat(const SimpleMatrix<T>& m0, const SimpleMatrix<T>& m1) {
@@ -4284,7 +4304,7 @@ template <typename T> pair<pair<vector<SimpleVector<T> >, SimpleVector<T> >, pai
   cerr << "P0 initialize: " << P0maxRank0<T>(1).next(init) << endl;
   // N.B. we need p10 because of short internal states length.
   //      in fact, we need p210 for them.
-  const auto p0(int(in.size()) / (5 * 5 - 4 + 2 + 2));
+  const auto p0(int(in.size()) / (5 * 5 - 4 + 2) / 3);
   vector<SimpleVector<T> > p;
   if(p0 < 2) return make_pair(make_pair(p, SimpleVector<T>()),
     make_pair(p, SimpleVector<T>()));
@@ -4309,53 +4329,18 @@ template <typename T> pair<pair<vector<SimpleVector<T> >, SimpleVector<T> >, pai
 #endif
   for(int j = 0; j < in[0].size(); j ++) {
     cerr << j << " / " << in[0].size() << endl;
-    P10<T> pf(Pprogression<T, PBond<T, P01<T> > >(PBond<T, P01<T> >(
-        P01<T>(4), 5 * 5 - 4 + 2), p0),
-      Pprogression<T, PBond<T, P0maxRank<T> > >(PBond<T, P0maxRank<T> >(
-        P0maxRank<T>(), 3), p0) );
-    auto pb(pf);
-    SimpleVector<T> epb0;
-    SimpleVector<T> epf0;
-    for(int i = 0; i < in.size(); i ++) {
-      pb.next(makeProgramInvariantPartial<T>(in[in.size() - 1 - i][j], seconds[seconds.size() - 1 - i], true));
-      pf.next(makeProgramInvariantPartial<T>(in[i][j], seconds[i], true));
-      if(i == in.size() - 2) {
-        epb0 = pb.p.getAll();
-        epf0 = pf.p.getAll();
-      }
-    }
-    auto epb(pb.q.getAll());
-    auto epf(pf.q.getAll());
-    assert(p0 == epb.size() && p0 == epb0.size());
-    for(int i = 0; i < p0; i ++) {
-      q[i][j] = epb[i] * epb0[i];
-      p[i][j] = epf[i] * epf0[i];
+    SimpleVector<T> buf(in.size());
+    for(int i = 0; i < in.size(); i ++)
+      buf[i] = makeProgramInvariantPartial<T>(in[i][j], seconds[i], true);
+    auto pf(P010nOneshot<T>(buf, p0));
+    auto pb(P010nOneshot<T>(buf.reverse(), p0));
+    for(int i = 0; i < p.size(); i ++) {
+      p[i][j] = move(pf[i]);
+      q[i][j] = move(pb[i]);
     }
   }
-  P10<T> pf(Pprogression<T, PBond<T, P01<T> > >(PBond<T, P01<T> >(
-      P01<T>(4), 5 * 5 - 4 + 2), p0),
-    Pprogression<T, PBond<T, P0maxRank<T> > >(PBond<T, P0maxRank<T> >(
-      P0maxRank<T>(), 3), p0) );
-  auto pb(pf);
-  SimpleVector<T> epb;
-  SimpleVector<T> epf;
-  for(int i = 0; i < seconds.size(); i ++) {
-    pb.next(seconds[seconds.size() - 1 - i]);
-    pf.next(seconds[i]);
-    if(i == seconds.size() - 2) {
-      epb = pb.p.getAll();
-      epf = pf.p.getAll();
-    }
-  }
-  const auto epb1(pb.q.getAll());
-  const auto epf1(pf.q.getAll());
-  assert(p0 == epb.size() && p0 == epb1.size());
-  for(int i = 0; i < epb.size(); i ++) {
-    epb[i] *= epb1[i];
-    epf[i] *= epf1[i];
-  }
-  return make_pair(make_pair(move(p), move(epf)),
-                   make_pair(move(q), move(epb)) );
+  return make_pair(make_pair(move(p), P010nOneshot<T>(seconds, p0)),
+                   make_pair(move(q), P010nOneshot<T>(seconds.reverse(), p0)) );
 }
 
 template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predVec(const vector<vector<SimpleVector<T> > >& in0, const int& cj = 11) {
