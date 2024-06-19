@@ -3644,7 +3644,7 @@ public:
   bool addp;
 };
 
-template <typename T, typename P, int avglen = 12> class PprogressionOnce010n {
+template <typename T, typename P> class PprogressionOnce010n {
 public:
   inline PprogressionOnce010n() { ; }
   inline PprogressionOnce010n(const P& p, const int& p0, const int& len) {
@@ -3687,6 +3687,15 @@ public:
     for(int i = 0; i < p.size(); i ++)
       if((p.size() - 1 - t) / plen / (i + 1) <= 1)
         bb[i].next(p[i][t % p[i].size()].next(progression(hh, hh.size() - 1, i)));
+    // N.B. we bet 4 dimension the original bitstream have.
+    //      if there's some regression, this fails however hardly occurs.
+    //      betting 4 dimension is from bitsofcotton/p1 condition.
+    //      so hardly tuned bitwise functions has core 3. ... dimension but
+    //      some of the eigen vectors the stream depend which we cannot get
+    //      them by this function.
+    // N.B. on another perspective, (x,f(x)) has 2 dimension,
+    //      this can also work.
+    static const int avglen(4);
     SimpleVector<T> res(bb.size());
     for(int i = 0; i < res.size(); i ++) {
       const auto rhe(min(int(res.size()), i + avglen));
@@ -4091,7 +4100,7 @@ template <typename T> static inline bool loadstub(ifstream& input, const int& nm
       continue;
     } else if(mode) {
       mode = false;
-      datas[k](j, i) = T(work + 1) / (T(nmax) + T(int(1)));
+      datas[k](j, i) = T(work) / (T(nmax) + T(int(1)));
       work = 0;
       if(++ k >= ncolor) {
         if(++ i >= datas[0].cols()) {
@@ -4177,10 +4186,10 @@ template <typename T> bool savep2or3(const char* filename, const vector<SimpleMa
       for(int i = 0; i < data[0].rows(); i ++)
         for(int j = 0; j < data[0].cols(); j ++)
           if(data.size() == 1)
-            output << max(int(0), int(data[0](i, j) * (T(depth) + T(int(1)))) - int(1)) << "\n";
+            output << min(int(depth), int(data[0](i, j) * (T(depth) + T(int(1)))) - int(1)) << "\n";
           else
             for(int k = 0; k < 3; k ++)
-              output << max(int(0), int(data[k](i, j) * (T(depth) + T(int(1)))) - int(1)) << "\n";
+              output << min(int(depth), int(data[k](i, j) * (T(depth) + T(int(1)))) - int(1)) << "\n";
     } catch (...) {
       cerr << "An error has occured while writing file." << endl;
     }
