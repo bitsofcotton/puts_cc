@@ -3644,7 +3644,7 @@ public:
   bool addp;
 };
 
-template <typename T, typename P> class PprogressionOnce010n {
+template <typename T, typename P, int avglen = 12> class PprogressionOnce010n {
 public:
   inline PprogressionOnce010n() { ; }
   inline PprogressionOnce010n(const P& p, const int& p0, const int& len) {
@@ -3689,11 +3689,12 @@ public:
         bb[i].next(p[i][t % p[i].size()].next(progression(hh, hh.size() - 1, i)));
     SimpleVector<T> res(bb.size());
     for(int i = 0; i < res.size(); i ++) {
+      const auto rhe(min(int(res.size()), i + avglen));
       res[i] = zero;
-      for(int j = i; j < res.size(); j ++)
+      for(int j = i; j < rhe; j ++)
         res[i] += bb[j].res[i] +
           (j ? progression(hh, hh.size() - 2, j - 1) : zero);
-      res[i] /= T(int(res.size() - i));
+      res[i] /= T(int(rhe - i));
     }
     return res;
   }
@@ -4304,7 +4305,7 @@ template <typename T> pair<pair<vector<SimpleVector<T> >, SimpleVector<T> >, pai
   cerr << "P0 initialize: " << P0maxRank0<T>(1).next(init) << endl;
   // N.B. we need p10 because of short internal states length.
   //      in fact, we need p210 for them.
-  const auto p0(int(in.size()) / (5 * 5 - 4 + 2) / 3);
+  const auto p0(in.size() / (5 * 5 - 4 + 2 + 3) + 1);
   vector<SimpleVector<T> > p;
   if(p0 < 2) return make_pair(make_pair(p, SimpleVector<T>()),
     make_pair(p, SimpleVector<T>()));
