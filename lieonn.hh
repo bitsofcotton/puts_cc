@@ -4430,11 +4430,11 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
       for(int k = 0; k < in0[0][0].rows(); k ++) {
         res.first[i][j].row(k) =
           p.first[i].subVector(
-            j * in0[0][0].rows() * in0[0][0].cols() + k * in0[0][0].rows(),
+            j * in0[0][0].rows() * in0[0][0].cols() + k * in0[0][0].cols(),
             in0[0][0].cols());
         res.second[i][j].row(k) =
           p.second[i].subVector(
-            j * in0[0][0].rows() * in0[0][0].cols() + k * in0[0][0].rows(),
+            j * in0[0][0].rows() * in0[0][0].cols() + k * in0[0][0].cols(),
             in0[0][0].cols());
       }
     }
