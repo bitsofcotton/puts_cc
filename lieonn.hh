@@ -4276,18 +4276,12 @@ template <typename T> static inline T getImgPt(const T& y, const T& h) {
   return yy % h;
 }
 
-template <typename T> pair<pair<vector<SimpleVector<T> >, SimpleVector<T> >, pair<vector<SimpleVector<T> >, SimpleVector<T> > > predv(const vector<SimpleVector<T> >& in) {
+template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv(const vector<SimpleVector<T> >& in) {
   // N.B. we need to initialize p0 vector.
   SimpleVector<T> init(3);
   for(int i = 0; i < init.size(); i ++)
     init[i] = T(int(i));
   cerr << "Coherent: P0: " << P0maxRank0<T>().next(init) << endl;
-  // N.B. we need p10 like method because of short internal states length.
-  //      in fact, we need p210 for them.
-  const auto p0((in.size() - (5 * 5 - 4 + 2) * 2) / 2);
-  vector<SimpleVector<T> > p;
-  if(p0 < 2) return make_pair(make_pair(p, SimpleVector<T>()),
-    make_pair(p, SimpleVector<T>()));
   SimpleVector<T> seconds(in.size());
   seconds.O();
 #if defined(_OPENMP)
@@ -4296,6 +4290,10 @@ template <typename T> pair<pair<vector<SimpleVector<T> >, SimpleVector<T> >, pai
   for(int i = 0; i < in.size(); i ++)  {
     seconds[i] = makeProgramInvariant<T>(in[i], - T(int(1)), true).second;
   }
+  // N.B. p210 works even when we're jammed condition, however, we suppose
+  //      there's no jammer on us nor no noise nor no special stream condition.
+  const int p0(sqrt(T((in.size() - (5 * 5 - 4 + 2) * 2) / 2)) + T(int(1)));
+  vector<SimpleVector<T> > p;
   p.resize(p0 + 1, SimpleVector<T>(in[0].size()).O());
   auto q(p);
   auto pfsz(p0);
@@ -4337,38 +4335,45 @@ template <typename T> pair<pair<vector<SimpleVector<T> >, SimpleVector<T> >, pai
   }
   p.resize(pfsz);
   q.resize(pfsz);
-  SimpleVector<T> rp(pfsz);
-  SimpleVector<T> rq(pfsz);
   PprogressionOnce<T> ppf(p0, in.size());
   PprogressionOnce<T> ppb(p0, in.size());
   idFeeder<T> pf((in.size() - p0 * 2) / 2);
   idFeeder<T> pb((in.size() - p0 * 2) / 2);
+  T rp;
+  T rq;
   SimpleVector<T> qf;
   SimpleVector<T> qb;
   for(int i = 0; i < in.size(); i ++) {
     const auto& p0f(pf.next(seconds[i]));
     const auto& q0f(pb.next(seconds[seconds.size() - i - 1]));
-    rp[0] = rq[0] = T(int(0));
+    rp = rq = T(int(0));
     for(int k = 1; k < p0f.size(); k ++) {
-      rp[0] += p0f[k];
-      rq[0] += q0f[k];
+      rp += p0f[k];
+      rq += q0f[k];
     }
-    rp[0] = - rp[0];
-    rq[0] = - rq[0];
+    rp = - rp;
+    rq = - rq;
     qf = ppf.next(seconds[i]);
     qb = ppb.next(seconds[seconds.size() - i - 1]);
   }
-  for(int i = 0; i < qf.size(); i ++) {
-    rp[i + 1] = qf[i];
-    rq[i + 1] = qb[i];
+  for(int i = 0; i < p[0].size(); i ++) {
+    p[0][i] =
+      revertProgramInvariant<T>(make_pair(p[0][i], rp), true);
+    q[0][i] =
+      revertProgramInvariant<T>(make_pair(q[0][i], rq), true);
   }
-  return make_pair(make_pair(move(p), move(rp)), make_pair(move(q), move(rq)));
+  for(int i = 1; i < p.size(); i ++)
+    for(int j = 0; j < p[i].size(); j ++) {
+      p[i][j] =
+        revertProgramInvariant<T>(make_pair(p[i][j], qf[i - 1]), true);
+      q[i][j] =
+        revertProgramInvariant<T>(make_pair(q[i][j], qb[i - 1]), true);
+    }
+  return make_pair(move(p), move(q));
 }
 
-template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predVec(const vector<vector<SimpleVector<T> > >& in0, const int& cj = 11) {
-  assert(in0.size() && in0[0].size() && in0[0][0].size() && 0 < cj);
-  if(19683 * cj < in0[0].size() * in0[0][0].size())
-    cerr << "predVec : elements larger than 19683, exceeds function entropy." << endl;
+template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
+  assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
@@ -4382,45 +4387,23 @@ template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<Simp
   }
   const auto p(predv<T>(in));
   pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > res;
-  res.first.resize( p.first.first.size() );
-  res.second.resize(p.second.first.size());
-  vector<T> rres;
-  rres.resize(cj);
-  for(int i = 0; i < p.first.first.size(); i ++) {
+  res.first.resize( p.first.size() );
+  res.second.resize(p.second.size());
+  for(int i = 0; i < p.first.size(); i ++) {
     res.first[i].resize(in0[0].size());
     res.second[i].resize(in0[0].size());
-    for(int j = 0; j < res.first[i].size(); j ++) {
-      res.first[i][j].resize(in0[0][0].size());
-      res.second[i][j].resize(in0[0][0].size());
-      for(int k = 0; k < in0[0][0].size(); k ++) {
-        for(int m = 0; m < rres.size(); m ++)
-          rres[m] = p.first.first[i][j * in0[0][0].size() +
-            getImgPt<int>(k + m - rres.size() / 2, in0[0][0].size())];
-        sort(rres.begin(), rres.end());
-        res.first[i][j][k] =
-          revertProgramInvariant<T>(make_pair(
-            rres[rres.size() / 2], p.first.second[i]), true);
-      }
-      for(int k = 0; k < in0[0][0].size(); k ++) {
-        for(int m = 0; m < rres.size(); m ++)
-          rres[m] = p.second.first[i][j * in0[0][0].size() +
-            getImgPt<int>(k + m - rres.size() / 2, in0[0][0].size())];
-        sort(rres.begin(), rres.end());
-        res.second[i][j][k] =
-          revertProgramInvariant<T>(make_pair(
-            rres[rres.size() / 2], p.second.second[i]), true);
-      }
+    for(int j = 0; j < in0[0].size(); j ++) {
+      res.first[i][j] =
+        p.first[i].subVector(in0[0][0].size() * j, in0[0][0].size());
+      res.second[i][j] =
+        p.second[i].subVector(in0[0][0].size() * j, in0[0][0].size());
     }
   }
   return res;
 }
 
-template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predMat(const vector<vector<SimpleMatrix<T> > >& in0, const int& cj = 11) {
+template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
-  const auto ccj(int(ceil(sqrt(T(cj)))) | int(1));
-  assert(0 < ccj);
-  if(ccj * ccj * 19683 < in0[0].size() * in0[0][0].rows() * in0[0][0].cols())
-    cerr << "predMat : elements larger than 19683, exceeds function entropy." << endl;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
@@ -4436,44 +4419,24 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
   }
   const auto p(predv<T>(in));
   pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > res;
-  res.first.resize( p.first.first.size() );
-  res.second.resize(p.second.first.size());
-  vector<T> rres;
-  rres.resize(ccj * ccj);
-  for(int i = 0; i < p.first.first.size(); i ++) {
+  res.first.resize( p.first.size() );
+  res.second.resize(p.second.size());
+  for(int i = 0; i < p.first.size(); i ++) {
     res.first[i].resize(in0[i].size());
     res.second[i].resize(in0[i].size());
     for(int j = 0; j < res.first[i].size(); j ++) {
       res.first[i][j].resize(in0[0][0].rows(), in0[0][0].cols());
       res.second[i][j].resize(in0[0][0].rows(), in0[0][0].cols());
-      for(int k = 0; k < in0[0][0].rows(); k ++)
-        for(int m = 0; m < in0[0][0].cols(); m ++) {
-          for(int kk = 0; kk < ccj; kk ++)
-            for(int mm = 0; mm < ccj; mm ++)
-              rres[kk * ccj + mm] = p.first.first[i][
-                j * in0[0][0].rows() * in0[0][0].cols() +
-                getImgPt<int>(k + kk - ccj / 2, in0[0][0].rows()) *
-                  in0[0][0].cols() +
-                getImgPt<int>(m + mm - ccj / 2, in0[0][0].cols())];
-          sort(rres.begin(), rres.end());
-          res.first[i][j](k, m) =
-            revertProgramInvariant<T>(make_pair(
-              rres[rres.size() / 2], p.first.second[i]), true);
-        }
-      for(int k = 0; k < in0[0][0].rows(); k ++)
-        for(int m = 0; m < in0[0][0].cols(); m ++) {
-          for(int kk = 0; kk < ccj; kk ++)
-            for(int mm = 0; mm < ccj; mm ++)
-              rres[kk * ccj + mm] = p.second.first[i][
-                j * in0[0][0].rows() * in0[0][0].cols() +
-                getImgPt<int>(k + kk - ccj / 2, in0[0][0].rows()) *
-                  in0[0][0].cols() +
-                getImgPt<int>(m + mm - ccj / 2, in0[0][0].cols())];
-          sort(rres.begin(), rres.end());
-          res.second[i][j](k, m) =
-            revertProgramInvariant<T>(make_pair(
-              rres[rres.size() / 2], p.second.second[i]), true);
-        }
+      for(int k = 0; k < in0[0][0].rows(); k ++) {
+        res.first[i][j].row(k) =
+          p.first[i].subVector(
+            j * in0[0][0].rows() * in0[0][0].cols() + k * in0[0][0].rows(),
+            in0[0][0].cols());
+        res.second[i][j].row(k) =
+          p.second[i].subVector(
+            j * in0[0][0].rows() * in0[0][0].cols() + k * in0[0][0].rows(),
+            in0[0][0].cols());
+      }
     }
   }
   return res;
@@ -4500,8 +4463,6 @@ template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTe
         ;
       }
   sort(absent.begin(), absent.end());
-  if(19683 < idx.size() * idx.size() * idx.size() - absent.size())
-    cerr << "predSTen : elements larger than 19683, exceeds function entropy." << endl;
   for(int i = 0; i < in0.size(); i ++) {
     in[i].resize(idx.size() * idx.size() * idx.size() - absent.size());
     for(int j = 0, cnt = 0; j < idx.size(); j ++)
@@ -4515,23 +4476,17 @@ template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTe
   auto p(predv<T>(in));
   in.resize(0);
   pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > res;
-  res.first.resize( p.first.first.size() );
-  res.second.resize(p.second.first.size());
-  for(int i = 0; i < p.first.first.size(); i ++)
+  res.first.resize( p.first.size() );
+  res.second.resize(p.second.size());
+  for(int i = 0; i < p.first.size(); i ++)
     for(int j = 0, cnt = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
         for(int m = 0; m < idx.size(); m ++) {
           if(binary_search(absent.begin(), absent.end(),
                make_pair(j, make_pair(k, m))))
             continue;
-          res.first[i][idx[j]][idx[k]][idx[m]] =
-            revertProgramInvariant<T>(make_pair(
-              p.first.first[i][cnt] * T(int(2)) - T(int(1)),
-                p.first.second[i]), true);
-          res.second[i][idx[j]][idx[k]][idx[m]] =
-            revertProgramInvariant<T>(make_pair(
-              p.second.first[i][cnt ++] * T(int(2)) - T(int(1)),
-                p.second.second[i]), true);
+          res.first[i][idx[j]][idx[k]][idx[m]] = p.first[i][cnt] * T(int(2)) - T(int(1));
+          res.second[i][idx[j]][idx[k]][idx[m]] = p.second[i][cnt ++] * T(int(2)) - T(int(1));
         }
   return res;
 }
