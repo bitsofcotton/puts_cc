@@ -1277,25 +1277,15 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
     }
   }
   auto p(predSTen<T>(in, idx));
-  p.first.insert(p.first.end(), p.second.begin(), p.second.end());
   vector<string> hist;
-  hist.reserve(p.first.size());
-  U forward("");
-  U backward("");
-  for(int i = 0; i < p.first.size(); i ++) {
-    if(i == p.first.size() / 2) os << "<hr />" << endl;
-    corpus<T, U> pstats;
-    pstats.corpust = p.first[i];
-    getAbbreved<T>(pstats, detailtitle, detail, delimiter);
-    auto serial(pstats.simpleThresh(threshin).serialize());
-    if(binary_search(hist.begin(), hist.end(), serial)) continue;
-    os << serial << "<br /><br />" << endl;
-    if(i < p.first.size() / 2) forward += serial;
-    else backward = serial + backward;
-    hist.emplace_back(move(serial));
-    sort(hist.begin(), hist.end());
-  }
-  os << "<br /><hr /><br />" << forward << "<br />" << endl << backward << "<br /><br />" << endl;
+  os << "<hr />Forward: " << endl;
+  corpus<T, U> pstats;
+  pstats.corpust = p.first;
+  getAbbreved<T>(pstats, detailtitle, detail, delimiter);
+  os << pstats.simpleThresh(threshin).serialize() << "<br /><hr />Backward: ";
+  pstats.corpust = p.second;
+  getAbbreved<T>(pstats, detailtitle, detail, delimiter);
+  os << pstats.simpleThresh(threshin).serialize() << "<br />";
   return os;
 }
 
