@@ -3986,7 +3986,7 @@ static inline bool whiteline(const string& s) {
   return true;
 }
 
-template <typename T> static inline bool loadstub(ifstream& input, const int& nmax, const int& ncolor, vector<SimpleMatrix<T> >& datas) {
+template <typename T> static inline bool loadstub(istream& input, const int& nmax, const int& ncolor, vector<SimpleMatrix<T> >& datas) {
   int i = 0, j = 0, k = 0;
   char buf;
   int  work = 0;
@@ -4014,54 +4014,60 @@ template <typename T> static inline bool loadstub(ifstream& input, const int& nm
   return true;
 }
 
-template <typename T> bool loadp2or3(vector<SimpleMatrix<T> >& data, const char* filename) {
+template <typename T> bool loadp2or3(vector<SimpleMatrix<T> >& data, istream& input) {
   string line;
   string line2;
   string line3;
+  try {
+    data.resize(3, SimpleMatrix<T>());
+    getline(input, line);
+    while((whiteline(line) || line[0] == '#') && getline(input, line) && !input.eof() && !input.bad()) ;
+    getline(input, line2);
+    while((whiteline(line2) || line2[0] == '#') && getline(input, line2) && !input.eof() && !input.bad()) ;
+    getline(input, line3);
+    while((whiteline(line3) || line3[0] == '#') && getline(input, line3) && !input.eof() && !input.bad()) ;
+    istringstream iline2(line2);
+    int w, h;
+    iline2 >> w;
+    iline2 >> h;
+    if(line.size() < 2 || w <= 0 || h <= 0) {
+      cerr << "unknown size." << endl;
+      return false;
+    }
+    istringstream iline3(line3);
+    int nmax;
+    iline3 >> nmax;
+    if(line[0] == 'P') {
+      if(line[1] == '2') {
+        data.resize(1);
+        data[0] = SimpleMatrix<T>(h,w ).O();
+        loadstub<T>(input, nmax, 1, data);
+      } else if(line[1] == '3') {
+        for(int i = 0; i < 3; i ++)
+          data[i] = SimpleMatrix<T>(h, w).O();
+        loadstub<T>(input, nmax, 3, data);
+      } else {
+        cerr << "unknown file type." << endl;
+        return false;
+      }
+    } else {
+      cerr << "unknown file type." << endl;
+      return false;
+    }
+  } catch (...) {
+    cerr << "Exception while reading." << endl;
+    return false;
+  }
+  return true;
+}
+
+template <typename T> bool loadp2or3(vector<SimpleMatrix<T> >& data, const char* filename) {
   ifstream input;
   input.open(filename);
   if(input.is_open()) {
-    try {
-      data.resize(3, SimpleMatrix<T>());
-      getline(input, line);
-      while((whiteline(line) || line[0] == '#') && getline(input, line) && !input.eof() && !input.bad()) ;
-      getline(input, line2);
-      while((whiteline(line2) || line2[0] == '#') && getline(input, line2) && !input.eof() && !input.bad()) ;
-      getline(input, line3);
-      while((whiteline(line3) || line3[0] == '#') && getline(input, line3) && !input.eof() && !input.bad()) ;
-      istringstream iline2(line2);
-      int w, h;
-      iline2 >> w;
-      iline2 >> h;
-      if(line.size() < 2 || w <= 0 || h <= 0) {
-        cerr << "unknown size." << endl;
-        input.close();
-        return false;
-      }
-      istringstream iline3(line3);
-      int nmax;
-      iline3 >> nmax;
-      if(line[0] == 'P') {
-        if(line[1] == '2') {
-          data.resize(1);
-          data[0] = SimpleMatrix<T>(h,w ).O();
-          loadstub<T>(input, nmax, 1, data);
-        } else if(line[1] == '3') {
-          for(int i = 0; i < 3; i ++)
-            data[i] = SimpleMatrix<T>(h, w).O();
-          loadstub<T>(input, nmax, 3, data);
-        } else {
-          cerr << "unknown file type." << endl;
-          input.close();
-          return false;
-        }
-      } else {
-        cerr << "unknown file type." << endl;
-        input.close();
-        return false;
-      }
-    } catch (...) {
-      cerr << "Exception while reading." << endl;
+    if(! loadp2or3<T>(data, static_cast<istream&>(input))) {
+      input.close();
+      return false;
     }
     input.close();
   } else {
@@ -4221,8 +4227,7 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
   }
   // N.B. p210 works even when we're jammed condition, however, we suppose
   //      there's no jammer on us nor no noise nor no special stream condition.
-  // const int p0(sqrt(T((in.size() - (5 * 5 - 4 + 2) * 2) / 2)) + T(int(1)));
-  const int p0(sqrt(T(in.size() - (5 * 5 - 4 + 2) - 1) ));
+  const int p0(in.size() - (5 * 5 - 4 + 2) - 1);
   vector<SimpleVector<T> > p;
   p.resize(p0 + 1, SimpleVector<T>(in[0].size()).O());
   auto q(p);
@@ -4234,6 +4239,10 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
     cerr << j << " / " << in[0].size() << endl;
     // N.B. our computer is infected, so out of the control could tell us
     //      predict and destroy by this way is correct ones.
+    //      this is from arc4random implant test around p[012] results.
+    //      so without p[0], q[0] as output average, we cannot get better
+    //      from the tests.
+    //      however, the arc4random implant can returns false positive for us.
     //      also we need to implant the input data itself into source code
     //      when not only pipe but also the file io is infected condition.
     idFeeder<T> pf(in.size());
@@ -4283,8 +4292,10 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
       rq = - rq;
     }
     for(int j = 0; j < p[i].size(); j ++) {
-      p[i][j] = revertProgramInvariant<T>(make_pair(p[i][j], rp), true);
-      q[i][j] = revertProgramInvariant<T>(make_pair(q[i][j], rq), true);
+      p[i][j] = p[i][j] == T(int(0)) || rp == T(int(0)) ? T(int(1)) / T(int(2))
+        : revertProgramInvariant<T>(make_pair(p[i][j], rp), true);
+      q[i][j] = q[i][j] == T(int(0)) || rp == T(int(0)) ? T(int(1)) / T(int(2))
+        : revertProgramInvariant<T>(make_pair(q[i][j], rq), true);
     }
   }
   return make_pair(move(p), move(q));
