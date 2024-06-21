@@ -3630,77 +3630,6 @@ public:
   bool addp;
 };
 
-template <typename T> class PprogressionOnce {
-public:
-  inline PprogressionOnce() { ; }
-  inline PprogressionOnce(const int& loop, const int& len) {
-    assert(0 < loop && 0 < len);
-    p.reserve(loop);
-    for(int i = 0; i < loop; i ++)
-      p.emplace_back(PBond<T, P01<T> >(P01<T>(4, i + 1), (len - loop * 2) / 2));
-    h = idFeeder<T>(loop);
-    {
-      vector<int> ph0;
-      ph0.resize(loop, 0);
-      ph.resize(loop, ph0);
-      vector<T> eh0;
-      eh0.resize(loop, T(int(0)));
-      eh.resize(loop, eh0);
-    }
-    bb.reserve(loop);
-    for(int i = 0; i < loop; i ++)
-      bb.emplace_back(idFeeder<T>(i + 1));
-    t ^= t;
-  }
-  inline ~PprogressionOnce() { ; }
-  inline const T& progression(const SimpleVector<T>& h, const int& idx, const int& count) {
-    assert(0 <= idx && 0 <= count);
-    if(! count) return h[idx];
-    if(ph[idx][count]) return eh[idx][count];
-    ph[idx][count] = 1;
-    return (eh[idx][count] = progression(h, idx, count - 1) -
-                             progression(h, idx - 1, count - 1));
-  }
-  inline SimpleVector<T> next(const T& in) {
-    static const T zero(int(0));
-    for(int i = 0; i < ph.size(); i ++)
-      for(int j = 0; j < ph[i].size(); j ++)
-        ph[i][j] = 0;
-    const auto& hh(h.next(in));
-    if(! h.full) return SimpleVector<T>();
-    for(int i = 0; i < p.size(); i ++)
-      if(p.size() - t - i <= 1)
-        bb[i].next(p[i].next(progression(hh, hh.size() - 1, i)));
-    t ++;
-    // N.B. we bet 4 dimension the original bitstream have.
-    //      if there's some regression, this fails however hardly occurs.
-    //      betting 4 dimension is from bitsofcotton/p1 condition.
-    //      so hardly tuned bitwise functions has core 3. ... dimension but
-    //      some of the eigen vectors the stream depend which we cannot get
-    //      them by this function.
-    // N.B. on another perspective, (x,f(x)) has 2 dimension,
-    //      this can also work.
-    static const int avglen(4);
-    // static const int avglen(2);
-    SimpleVector<T> res(max(int(1), int(bb.size()) - avglen));
-    for(int i = 0; i < res.size(); i ++) {
-      const auto rhe(min(int(res.size()), i + avglen));
-      res[i] = zero;
-      for(int j = i; j < rhe; j ++)
-        res[i] += bb[j].res[i] +
-          (j ? progression(hh, hh.size() - 2, j - 1) : zero);
-      res[i] /= T(int(rhe - i));
-    }
-    return res;
-  }
-  vector<PBond<T, P01<T> > > p;
-  idFeeder<T> h;
-  vector<vector<int> > ph;
-  vector<vector<T> > eh;
-  vector<idFeeder<T> > bb;
-  int t;
-};
-
 template <typename T, typename P, typename Q> class PAthenB {
 public:
   inline PAthenB() { ; }
@@ -4292,7 +4221,8 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
   }
   // N.B. p210 works even when we're jammed condition, however, we suppose
   //      there's no jammer on us nor no noise nor no special stream condition.
-  const int p0(sqrt(T((in.size() - (5 * 5 - 4 + 2) * 2) / 2)) + T(int(1)));
+  // const int p0(sqrt(T((in.size() - (5 * 5 - 4 + 2) * 2) / 2)) + T(int(1)));
+  const int p0(sqrt(T(in.size() - (5 * 5 - 4 + 2) - 1) ));
   vector<SimpleVector<T> > p;
   p.resize(p0 + 1, SimpleVector<T>(in[0].size()).O());
   auto q(p);
@@ -4302,73 +4232,61 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
 #endif
   for(int j = 0; j < in[0].size(); j ++) {
     cerr << j << " / " << in[0].size() << endl;
-    PprogressionOnce<T> ppf(p0, in.size());
-    PprogressionOnce<T> ppb(p0, in.size());
     // N.B. our computer is infected, so out of the control could tell us
     //      predict and destroy by this way is correct ones.
     //      also we need to implant the input data itself into source code
     //      when not only pipe but also the file io is infected condition.
-    idFeeder<T> pf((in.size() - p0 * 2) / 2);
-    idFeeder<T> pb((in.size() - p0 * 2) / 2);
-    SimpleVector<T> qf;
-    SimpleVector<T> qb;
+    idFeeder<T> pf(in.size());
+    idFeeder<T> pb(in.size());
     for(int i = 0; i < in.size(); i ++) {
-      const auto fwd(makeProgramInvariantPartial<T>(in[i][j], seconds[i], true));
-      const auto bwd(makeProgramInvariantPartial<T>(in[in.size() - i - 1][j], seconds[seconds.size() - i - 1], true));
-      const auto& p0f(pf.next(fwd));
-      const auto& q0f(pb.next(bwd));
-      p[0][j] = q[0][j] = T(int(0));
-      for(int k = 1; k < p0f.size(); k ++) {
-        p[0][j] += p0f[k];
-        q[0][j] += q0f[k];
+      pf.next(makeProgramInvariantPartial<T>(in[i][j], seconds[i], true));
+      pb.next(makeProgramInvariantPartial<T>(in[in.size() - i - 1][j], seconds[seconds.size() - i - 1], true));
+    }
+    for(int i = 0; i < p.size(); i ++) {
+      if(i) {
+        p[i][j] = P01<T>(4, i).next(pf.res);
+        q[i][j] = P01<T>(4, i).next(pb.res);
+      } else {
+        const auto& p0f(pf.res);
+        const auto& q0f(pb.res);
+        p[0][j] = q[0][j] = T(int(0));
+        for(int k = 1; k < p0f.size(); k ++) {
+          p[0][j] += p0f[k];
+          q[0][j] += q0f[k];
+        }
+        p[0][j] = - p[0][j];
+        q[0][j] = - q[0][j];
       }
-      p[0][j] = - p[0][j];
-      q[0][j] = - q[0][j];
-      qf = ppf.next(fwd);
-      qb = ppb.next(bwd);
     }
-    for(int i = 0; i < qf.size(); i ++) {
-      p[i + 1][j] = move(qf[i]);
-      q[i + 1][j] = move(qb[i]);
-    }
-    pfsz = qf.size() + 1;
   }
-  p.resize(pfsz);
-  q.resize(pfsz);
-  PprogressionOnce<T> ppf(p0, in.size());
-  PprogressionOnce<T> ppb(p0, in.size());
-  idFeeder<T> pf((in.size() - p0 * 2) / 2);
-  idFeeder<T> pb((in.size() - p0 * 2) / 2);
-  T rp;
-  T rq;
-  SimpleVector<T> qf;
-  SimpleVector<T> qb;
+  idFeeder<T> pf(in.size());
+  idFeeder<T> pb(in.size());
   for(int i = 0; i < in.size(); i ++) {
-    const auto& p0f(pf.next(seconds[i]));
-    const auto& q0f(pb.next(seconds[seconds.size() - i - 1]));
-    rp = rq = T(int(0));
-    for(int k = 1; k < p0f.size(); k ++) {
-      rp += p0f[k];
-      rq += q0f[k];
+    pf.next(seconds[i]);
+    pb.next(seconds[seconds.size() - 1 - i]);
+  }
+  for(int i = 0; i < p.size(); i ++) {
+    T rp;
+    T rq;
+    if(i) {
+      rp = P01<T>(4, i).next(pf.res);
+      rq = P01<T>(4, i).next(pb.res);
+    } else {
+      const auto& p0f(pf.res);
+      const auto& q0f(pb.res);
+      rp = rq = T(int(0));
+      for(int k = 1; k < p0f.size(); k ++) {
+        rp += p0f[k];
+        rq += q0f[k];
+      }
+      rp = - rp;
+      rq = - rq;
     }
-    rp = - rp;
-    rq = - rq;
-    qf = ppf.next(seconds[i]);
-    qb = ppb.next(seconds[seconds.size() - i - 1]);
-  }
-  for(int i = 0; i < p[0].size(); i ++) {
-    p[0][i] =
-      revertProgramInvariant<T>(make_pair(p[0][i], rp), true);
-    q[0][i] =
-      revertProgramInvariant<T>(make_pair(q[0][i], rq), true);
-  }
-  for(int i = 1; i < p.size(); i ++)
     for(int j = 0; j < p[i].size(); j ++) {
-      p[i][j] =
-        revertProgramInvariant<T>(make_pair(p[i][j], qf[i - 1]), true);
-      q[i][j] =
-        revertProgramInvariant<T>(make_pair(q[i][j], qb[i - 1]), true);
+      p[i][j] = revertProgramInvariant<T>(make_pair(p[i][j], rp), true);
+      q[i][j] = revertProgramInvariant<T>(make_pair(q[i][j], rq), true);
     }
+  }
   return make_pair(move(p), move(q));
 }
 

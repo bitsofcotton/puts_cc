@@ -537,6 +537,9 @@ template <typename T, typename U> corpus<T,U>::corpus(const U& input, const vect
   
   // corpus each
   corpust = Tensor();
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
   for(auto itr0(uptrs.begin()); itr0 != uptrs.end(); ++ itr0) {
     const int i(*itr0);
     if(!ptrs[i].size()) continue;
@@ -576,8 +579,14 @@ template <typename T, typename U> corpus<T,U>::corpus(const U& input, const vect
           // const T buf0(abs(*itr + .5 - ptrs[i][ctru]));
           // const T buf1(abs(*itr + .5 - ptrs[j][ctrv]));
           const T work(T(1) / (buf0 * buf0 + buf1 * buf1));
-          if(isfinite(work))
-            corpust[i][j][k] += sqrt(work) / T(int(Midx));
+          if(isfinite(work)) {
+#if defined(_OPENMP)
+#pragma omp critical
+#endif
+            {
+              corpust[i][j][k] += sqrt(work) / T(int(Midx));
+            }
+          }
         }
       }
     }

@@ -1,8 +1,8 @@
 CXX=	clang++
 
 # compiler flags.
-#CXXFLAGS+=	-Oz -mtune=native -gfull
-CXXFLAGS+=	-Ofast -mtune=native -gfull
+CXXFLAGS+=	-Oz -mtune=native -gfull
+#CXXFLAGS+=	-Ofast -mtune=native -gfull
 #CXXFLAGS+=	-O2 -mtune=native -g3
 #CXXFLAGS+=	-pg
 CXXFLAGS+=	-std=c++11
