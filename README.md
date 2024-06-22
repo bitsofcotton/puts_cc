@@ -98,5 +98,5 @@ This repository is archived, so without bug report, will no change.
 2024/06/18 merge latest ddpmopt results.
 2024/06/19 merge latest ddpmopt results.
 2024/06/21 merge latest ddpmopt results.
-2024/06/22 p01 fatal fix.
+2024/06/22 p01 fatal fix. make/revert program invariant change friendly to predictors.
 

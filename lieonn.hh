@@ -2720,7 +2720,7 @@ template <typename T> static inline T makeProgramInvariantPartial(const T& in, c
     ((atan(- in) / atan(T(int(1))) / T(int(2))) + T(int(1))) / T(int(2)) );
   if(res == T(int(0)) ) res = T(int(1));
   assert(T(int(0)) < res && res <= T(int(1)));
-  return res /= ratio;
+  return res *= ratio;
 }
 
 template <typename T> static inline pair<SimpleVector<T>, T> makeProgramInvariant(const SimpleVector<T>& in, const T& index = - T(int(1)), const bool& on01 = false) {
@@ -2735,13 +2735,12 @@ template <typename T> static inline pair<SimpleVector<T>, T> makeProgramInvarian
                             T(int(1)), on01));
   // N.B. x_1 ... x_n == 1.
   // <=> x_1 / (x_1 ... x_n)^(1/n) ... == 1.
-  ratio = isfinite(ratio) ? exp(ratio / T(res.size())) : T(int(1));
-  for(int i = 0; i < res.size(); i ++) res[i] /= ratio;
-  return make_pair(res, ratio);
+  ratio = isfinite(ratio) ? exp(- ratio / T(res.size())) : T(int(1));
+  return make_pair(res *= ratio, ratio);
 }
 
 template <typename T> static inline T revertProgramInvariant(const pair<T, T>& in, const bool& on01 = false) {
-  const auto r0(in.first * in.second);
+  const auto r0(in.first / in.second);
   const auto r1(T(int(0)) < r0 ? r0 - floor(r0) : ceil(- r0) + r0);
   const auto r(T(int(0)) == r1 ? T(int(1)) : r1);
   return on01 ? r :
