@@ -63,8 +63,8 @@ using std::getline;
 // Double int to new int class.
 template <typename T, int bits> class DUInt {
 public:
-  inline DUInt() { assert(0 < bits && ! (bits & 3)); }
-  inline DUInt(const int& src) {
+  inline DUInt(const int& src = 0) {
+    assert(0 < bits && ! (bits & 3));
     const auto abssrc(src < 0 ? - src : src);
     e[0]   = T(abssrc);
     e[1]  ^= e[1];
@@ -1173,11 +1173,11 @@ template <typename T, typename W, int bits, typename U> static inline SimpleFloa
 template <typename T> class Complex {
 public:
   inline Complex() { ; }
-  inline Complex(const Complex<T>& s) { *this = s; }
-  inline Complex(Complex<T>&& s) { *this = s; }
   inline Complex(const T& real, const T& imag = T(int(0))) {
     _real = real; _imag = imag;
   }
+  inline Complex(const Complex<T>& s) { *this = s; }
+  inline Complex(Complex<T>&& s) { *this = s; }
   inline Complex(T&& real) {
     const static T zero(0);
     _real = move(real);
@@ -2753,8 +2753,12 @@ template <typename T> static inline T revertProgramInvariant(const pair<T, T>& i
 
 template <typename T> class idFeeder {
 public:
-  inline idFeeder() { full = false; t = 0;}
-  inline idFeeder(const int& size) { res.resize(size); res.O(); full = false; t = 0; }
+  inline idFeeder(const int& size = 1) {
+    res.resize(size);
+    res.O();
+    full = false;
+    t = 0;
+  }
   inline ~idFeeder() { ; }
   inline const SimpleVector<T>& next(const T& in) {
     if(t < res.size())
@@ -3124,8 +3128,7 @@ template <typename T> static inline vector<pair<vector<SimpleVector<T> >, vector
 
 template <typename T> class P012L {
 public:
-  inline P012L() { varlen = 0; }
-  inline P012L(const int& var, const int& step = 1) {
+  inline P012L(const int& var = 4, const int& step = 1) {
     assert(1 < var && 0 < step);
     varlen = var;
     this->step = step;
@@ -3483,8 +3486,7 @@ public:
 // cf. bitsofcotton/randtools .
 template <typename T, bool nonlinear = true> class P01 {
 public:
-  inline P01() { varlen = 0; }
-  inline P01(const int& var, const int& step = 1) {
+  inline P01(const int& var = 4, const int& step = 1) {
     assert(0 < var && 0 < step);
     this->varlen = var;
     this->step = step;
@@ -3501,7 +3503,7 @@ public:
     SimpleMatrix<T> invariants(3, nonlinear ? varlen + 2 : varlen);
     invariants.O();
     for(int i0 = 0; i0 < invariants.rows(); i0 ++) {
-      SimpleMatrix<T> toeplitz((in.size() - varlen - step + 2 - 1)
+      SimpleMatrix<T> toeplitz(in.size() - varlen - step + 2
                                - invariants.rows() + 1, invariants.cols());
       for(int i = i0; i < toeplitz.rows() + i0; i ++) {
         auto work(in.subVector(i, varlen));
@@ -3751,9 +3753,8 @@ template <typename T> class Decompose {
 public:
   typedef SimpleVector<T> Vec;
   typedef SimpleMatrix<T> Mat;
-  inline Decompose() { size = 0; }
-  inline Decompose(const int& size) {
-    assert(0 < size);
+  inline Decompose(const int& size = 0) {
+    assert(0 <= size);
     this->size = size;
   }
   inline ~Decompose() { ; }
@@ -4431,6 +4432,23 @@ template <typename T> static inline vector<SimpleMatrix<T> > xyz2rgb(const vecto
   assert(rgb[0].rows() == rgb[1].rows() && rgb[1].rows() == rgb[2].rows());
   assert(rgb[0].cols() == rgb[1].cols() && rgb[1].cols() == rgb[2].cols());
   return rgb;
+}
+
+static const vector<int>& pnTinySingle(const int& upper = 1) {
+  static vector<int> pn;
+  if(! pn.size()) pn.push_back(2);
+  pn.reserve(upper);
+  for(int i = pn.size(); i < upper; i ++) {
+    for(int j = pn[pn.size() - 1] + 1; 0 <= j; j ++) {
+      for(int k = 0; k < pn.size(); k ++)
+        if(! (j % pn[k])) goto next_pn;
+      pn.push_back(j);
+      break;
+     next_pn:
+      ;
+    }
+  }
+  return pn;
 }
 
 #define _SIMPLELIN_
