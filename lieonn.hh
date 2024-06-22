@@ -3127,7 +3127,7 @@ template <typename T> static inline vector<pair<vector<SimpleVector<T> >, vector
 
 template <typename T> class P012L {
 public:
-  inline P012L(const int& var = 4, const int& step = 1) {
+  inline P012L(const int& step = 1, const int& var = 4) {
     assert(1 < var && 0 < step);
     varlen = var;
     this->step = step;
@@ -3292,7 +3292,7 @@ public:
   }
   inline ~P0() { ; };
   inline T next(const SimpleVector<T>& in) {
-    return pnextcacher<T>(in.size(), step, r).dot(in);
+    return pnextcacher<T>(in.size(), ((step - 1) % in.size()) + 1, r).dot(in);
   }
   int step;
 };
@@ -3485,7 +3485,7 @@ public:
 // cf. bitsofcotton/randtools .
 template <typename T, bool nonlinear = true> class P01 {
 public:
-  inline P01(const int& var = 4, const int& step = 1) {
+  inline P01(const int& step = 1, const int& var = 4) {
     assert(0 < var && 0 < step);
     this->varlen = var;
     this->step = step;
@@ -3547,7 +3547,7 @@ private:
 template <typename T, typename P> class PBond {
 public:
   inline PBond() { ; }
-  inline PBond(P&& p, const int& status) {
+  inline PBond(const int& status, P&& p = P()) {
     assert(0 < status);
     this->p = p;
     f = idFeeder<T>(status);
@@ -3578,15 +3578,18 @@ public:
 
 // N.B. this class feeds new states into predictor as a new dimension of
 //      linear sum.
-template <typename T, typename P, bool lstart = true> class Pprogression {
+template <typename T, typename P> class Pprogression {
 public:
   inline Pprogression() { ; }
-  inline Pprogression(const P& p, const int& loop0 = 1, const int& istat = 3) {
+  inline Pprogression(const int& loop0, const int& istat) {
     assert(loop0);
     const auto loop(abs(loop0));
-    (this->p).resize(loop);
-    for(int i = 0; i < (this->p).size(); i ++)
-      (this->p)[i].resize(i + 1, p);
+    p.resize(loop);
+    for(int i = 0; i < (this->p).size(); i ++) {
+      p[i].reserve(i + 1);
+      for(int j = 0; j <= i; j ++)
+        p[i].emplace_back(PBond<T, P>(istat + i, P(i + 1)));
+    }
     h  = idFeeder<T>(loop);
     {
       vector<int> ph0;
@@ -3620,18 +3623,18 @@ public:
     auto M(zero);
     if(! h.full) return M;
     for(int i = 0; i < p.size(); i ++) {
-      if(! lstart || (p.size() - 1 - i) * istat <= t)
+      if(p.size() - 1 - i <= t)
         bb[i].next(p[i][t % p[i].size()].next(
           progression(hh, hh.size() - 1, i)));
     }
-    if(! lstart || p.size() * istat <= t)
+    if(p.size() <= t)
       for(int i = 0; i < p.size(); i ++)
         M += bb[i].res[0] + (i && addp ?
           progression(hh, hh.size() - 2, i - 1) : zero);
     t ++;
     return addp ? M /= T(int(p.size())) : M;
   }
-  vector<vector<P> > p;
+  vector<vector<PBond<T, P> > > p;
   idFeeder<T> h;
   vector<vector<int> > ph;
   vector<vector<T> > eh;
@@ -3656,10 +3659,10 @@ public:
 };
 
 template <typename T> using P10 =
-   PAthenB<T, Pprogression<T, PBond<T, P01<T> > >,
-     Pprogression<T, PBond<T, P0maxRank<T> > >  >;
+   PAthenB<T, Pprogression<T, P01<T> >,
+              Pprogression<T, P0maxRank<T> > >;
 template <typename T> using P210 =
-   PAthenB<T, Pprogression<T, PBond<T, P012L<T> > >, P10<T> >;
+   PAthenB<T, Pprogression<T, P012L<T> >, P10<T> >;
 
 // N.B. invariant gathers some of the group on the input pattern.
 template <typename T> SimpleMatrix<T> concat(const SimpleMatrix<T>& m0, const SimpleMatrix<T>& m1) {
@@ -4236,7 +4239,8 @@ template <typename T> pair<SimpleVector<T>, SimpleVector<T> > predv(const vector
     seconds[i] = makeProgramInvariant<T>(in[i], - T(int(1)), true).second;
   }
   // N.B. we need Pprogression<..., P01...> with maximum range.
-  const int p0(in.size() / (5 * 5 - 4 + 2));
+  const int istat(5 * 5 - 4 + 2);
+  const int p0((in.size() - istat) / 3);
   SimpleVector<T> p;
   SimpleVector<T> q;
   p.resize(in[0].size());
@@ -4248,15 +4252,17 @@ template <typename T> pair<SimpleVector<T>, SimpleVector<T> > predv(const vector
 #endif
   for(int j = 0; j < in[0].size(); j ++) {
     cerr << j << " / " << in[0].size() << endl;
-    Pprogression<T, PBond<T, P01<T> > > pf(PBond<T, P01<T> >(P01<T>(4), 5 * 5 - 4 + 2), p0, 5 * 5 - 4 + 2);
-    Pprogression<T, PBond<T, P01<T> > > pb(PBond<T, P01<T> >(P01<T>(4), 5 * 5 - 4 + 2), p0, 5 * 5 - 4 + 2);
+    Pprogression<T, P01<T> > pf(p0, istat);
+    Pprogression<T, P01<T> > pb(p0, istat);
     for(int i = 0; i < in.size(); i ++) {
-      p[j] = pf.next(makeProgramInvariantPartial<T>(in[i][j], seconds[i], true));
-      q[j] = pb.next(makeProgramInvariantPartial<T>(in[in.size() - i - 1][j], seconds[seconds.size() - i - 1], true));
+      p[j] = pf.next(makeProgramInvariantPartial<T>(in[i][j],
+        seconds[i], true));
+      q[j] = pb.next(makeProgramInvariantPartial<T>(in[in.size() - i - 1][j],
+        seconds[seconds.size() - i - 1], true));
     }
   }
-  Pprogression<T, PBond<T, P01<T> > > pf(PBond<T, P01<T> >(P01<T>(4), 5 * 5 - 4 + 2), p0, 5 * 5 - 4 + 2);
-  Pprogression<T, PBond<T, P01<T> > > pb(PBond<T, P01<T> >(P01<T>(4), 5 * 5 - 4 + 2), p0, 5 * 5 - 4 + 2);
+  Pprogression<T, P01<T> > pf(p0, istat);
+  Pprogression<T, P01<T> > pb(p0, istat);
   T rp;
   T rq;
   for(int i = 0; i < in.size(); i ++) {
@@ -4435,13 +4441,13 @@ template <typename T> static inline vector<SimpleMatrix<T> > xyz2rgb(const vecto
 
 static const vector<int>& pnTinySingle(const int& upper = 1) {
   static vector<int> pn;
-  if(! pn.size()) pn.push_back(2);
+  if(! pn.size()) pn.emplace_back(2);
   pn.reserve(upper);
   for(int i = pn.size(); i < upper; i ++) {
     for(int j = pn[pn.size() - 1] + 1; 0 <= j; j ++) {
       for(int k = 0; k < pn.size(); k ++)
         if(! (j % pn[k])) goto next_pn;
-      pn.push_back(j);
+      pn.emplace_back(j);
       break;
      next_pn:
       ;
