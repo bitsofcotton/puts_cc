@@ -2502,16 +2502,18 @@ template <typename T> static inline SimpleMatrix<T> exp01(const SimpleMatrix<T>&
 
 template <typename T> static inline SimpleMatrix<T> exp(const SimpleMatrix<T>& m) {
   const auto p0(ceil(sqrt(norm2M(m))));
+#if defined(_FLOAT_BITS_)
+  // XXX:
+  myuint p(p0.operator myint());
+#else
   myuint p(p0);
-  if(T(int(1)) < abs(p0 - T(p))) throw "too large abs num in exp matrix";
-  auto mm(exp01(m / T(p)));
+#endif
+  if(T(myint(int(1))) < abs(p0 - T(myint(p)))) throw "too large abs num in exp matrix";
+  auto mm(exp01(m / T(myint(p))));
   auto res(m);
-  res.I();
-  for( ; p; ) {
-    if(bool(p & myuint(int(1)))) res *= mm;
-    if(! (p >>= 1)) break;
-    mm *= mm;
-  }
+  for(res.I(); p; mm *= mm, p >>= 1)
+    if(bool(p & myuint(myint(int(1)))))
+      res *= mm;
   return res;
 }
 
@@ -3639,6 +3641,44 @@ public:
   bool addp;
 };
 
+template <typename T, typename P> class PpersistentOnce {
+public:
+  inline PpersistentOnce() { ; }
+  inline ~PpersistentOnce() { ; }
+  inline const T& progression(const SimpleVector<T>& h, const int& idx, const int& count) {
+    assert(0 <= idx && 0 <= count);
+    if(! count) return h[idx];
+    if(ph[idx][count]) return eh[idx][count];
+    ph[idx][count] = 1;
+    return (eh[idx][count] = progression(h, idx, count - 1) - progression(h, idx - 1, count - 1));
+  }
+  inline T next(const SimpleVector<T>& in0, const int& istat) {
+    const auto in(in0.size() & 1 ? in0.subVector(1, in0.size() - 1) : in0);
+    assert(! (in0.size() & 1) && 0 < istat);
+    {
+      vector<T> eh0;
+      vector<bool> ph0;
+      eh0.resize(in.size() / 2, T(int(0)));
+      ph0.resize(in.size() / 2, false);
+      eh.resize(in.size(), eh0);
+      ph.resize(in.size(), ph0);
+    }
+    T res(int(0));
+    for(int i = 0; i < in.size() / 2 - istat / 2; i ++) {
+      idFeeder<T> buf(in.size() / 2 - i + istat / 2);
+      for(int j = i; j < in.size() / 2 + istat / 2; j ++)
+        buf.next(progression(in, j, i));
+      // XXX align:
+      res += P(in.size() / 2 - istat / 2 - i).next(buf.res);
+      for(int j = i - 1, k = 1; 0 <= j; j --, k ++)
+        res += progression(in, in.size() - k, j);
+    }
+    return res /= T(in.size() / 2 - istat);
+  }
+  vector<vector<T> >    eh;
+  vector<vector<bool> > ph;
+};
+
 template <typename T, typename P, typename Q> class PAthenB {
 public:
   inline PAthenB() { ; }
@@ -4219,11 +4259,57 @@ template <typename T> static inline T getImgPt(const T& y, const T& h) {
   return yy % h;
 }
 
-template <typename T> pair<SimpleVector<T>, SimpleVector<T> > predv(const vector<SimpleVector<T> >& in) {
+template <typename T> SimpleMatrix<T> rotate(const SimpleMatrix<T>& d, const T& 
+theta) {
+  assert(abs(theta) < atan(T(1)));
+  const auto c(cos(theta));
+  const auto s(sin(theta));
+  const auto h0(abs(int(c * T(d.rows()) - s * T(d.cols()))));
+  const auto h1(h0 + abs(int(s * T(d.cols()))) * 2);
+  const auto w0(abs(int(s * T(d.rows()) + c * T(d.cols()))));
+  const auto w1(w0 + abs(int(s * T(d.rows()))) * 2);
+  SimpleMatrix<T> res(h0 < d.rows() ? h1 : h0,
+                      w0 < d.cols() ? w1 : w0);
+  const T offy(h0 < d.rows() ? abs(int(s * T(d.cols()))) : 0);
+  const T offx(w0 < d.cols() ? abs(int(s * T(d.rows()))) : 0);
+  res.O();
+  const auto diag(int(sqrt(res.rows() * res.rows() +
+                           res.cols() * res.cols())) + 1);
+  for(int j = - diag; j < diag; j ++)
+    for(int k = - diag; k < diag; k ++) {
+      const int yy(c * T(j) - s * T(k) + offy);
+      const int xx(s * T(j) + c * T(k) + offx);
+      if(0 <= yy && yy < res.rows() &&
+         0 <= xx && xx < res.cols()) {
+        const auto dyy(getImgPt<int>(j, d.rows()));
+        const auto dxx(getImgPt<int>(k, d.cols()));
+        {
+          res(yy, xx) = res(min(yy + 1, int(res.rows()) - 1), xx) =
+            res(yy, min(xx + 1, int(res.cols()) - 1)) =
+            res(min(yy + 1, int(res.rows()) - 1),
+                min(xx + 1, int(res.cols()) - 1)) =
+              d(dyy, dxx);
+        }
+      }
+    }
+  return res;
+}
+
+template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>& dr, const SimpleMatrix<T>& d) {
+  SimpleMatrix<T> res(d.rows(), d.cols());
+  for(int i = 0; i < res.rows(); i ++)
+    for(int j = 0; j < res.cols(); j ++)
+      res(i, j) = dr(max(int(0), min(i + (dr.rows() - d.rows()) / 2, dr.rows() - 1)),
+                     max(int(0), min(j + (dr.cols() - d.cols()) / 2, dr.cols() - 1)));
+  return res;
+}
+
+template <typename T, bool persistent = false> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv(const vector<SimpleVector<T> >& in) {
   // N.B. we need to initialize p0 vector.
   SimpleVector<T> init(3);
   for(int i = 0; i < init.size(); i ++)
     init[i] = T(int(i));
+  cerr << (const char*)(persistent ? "persistent" : "sloppy") << endl;
   cerr << "Coherent: P0: " << P0maxRank0<T>().next(init) << endl;
   SimpleVector<T> seconds(in.size());
   seconds.O();
@@ -4233,47 +4319,52 @@ template <typename T> pair<SimpleVector<T>, SimpleVector<T> > predv(const vector
   for(int i = 0; i < in.size(); i ++)  {
     seconds[i] = makeProgramInvariant<T>(in[i], - T(int(1)), true).second;
   }
-  // N.B. we need Pprogression<..., P01...> with maximum range.
+  // N.B. we need Ppersistent<..., P01...> with maximum range.
   const int istat(5 * 5 - 4 + 2);
-  const int p0((in.size() - istat) / 3);
-  SimpleVector<T> p;
-  SimpleVector<T> q;
-  p.resize(in[0].size());
-  q.resize(in[0].size());
-  p.O();
-  q.O();
+  const int p0((in.size() - istat) / 2);
+  vector<SimpleVector<T> > p;
+  vector<SimpleVector<T> > q;
+  p.resize(persistent ? 1 : p0, SimpleVector<T>(in[0].size()).O());
+  q.resize(persistent ? 1 : p0, SimpleVector<T>(in[0].size()).O());
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int j = 0; j < in[0].size(); j ++) {
     cerr << j << " / " << in[0].size() << endl;
-    Pprogression<T, P01<T> > pf(p0, istat);
-    Pprogression<T, P01<T> > pb(p0, istat);
-    for(int i = 0; i < in.size(); i ++) {
-      p[j] = pf.next(makeProgramInvariantPartial<T>(in[i][j],
-        seconds[i], true));
-      q[j] = pb.next(makeProgramInvariantPartial<T>(in[in.size() - i - 1][j],
-        seconds[seconds.size() - i - 1], true));
+    idFeeder<T> buf(in.size());
+    for(int i = 0; i < in.size(); i ++)
+      buf.next(makeProgramInvariantPartial<T>(in[i][j], seconds[i], true));
+    if(persistent) {
+      p[0][j] = PpersistentOnce<T, P01<T> >().next(buf.res, istat);
+      q[0][j] = PpersistentOnce<T, P01<T> >().next(buf.res.reverse(), istat);
+    } else for(int i = 0; i < p.size(); i ++) {
+      p[i][j] = P01<T>(i + 1).next(buf.res);
+      q[i][j] = P01<T>(i + 1).next(buf.res.reverse());
     }
   }
-  Pprogression<T, P01<T> > pf(p0, istat);
-  Pprogression<T, P01<T> > pb(p0, istat);
-  T rp;
-  T rq;
-  for(int i = 0; i < in.size(); i ++) {
-    rp = pf.next(seconds[i]);
-    rq = pb.next(seconds[seconds.size() - 1 - i]);
-  }
-  for(int j = 0; j < p.size(); j ++) {
-    p[j] = p[j] == T(int(0)) || rp == T(int(0)) ? T(int(1)) / T(int(2))
-      : revertProgramInvariant<T>(make_pair(p[j], rp), true);
-    q[j] = q[j] == T(int(0)) || rp == T(int(0)) ? T(int(1)) / T(int(2))
-      : revertProgramInvariant<T>(make_pair(q[j], rq), true);
+  if(persistent) {
+    const auto rp(PpersistentOnce<T, P01<T> >().next(seconds, istat));
+    const auto rq(PpersistentOnce<T, P01<T> >().next(seconds.reverse(), istat));
+    for(int j = 0; j < p.size(); j ++) {
+      p[0][j] = p[0][j] == T(int(0)) || rp == T(int(0)) ? T(int(1)) / T(int(2))
+        : revertProgramInvariant<T>(make_pair(p[0][j], rp), true);
+      q[0][j] = q[0][j] == T(int(0)) || rp == T(int(0)) ? T(int(1)) / T(int(2))
+        : revertProgramInvariant<T>(make_pair(q[0][j], rq), true);
+    }
+  } else for(int i = 0; i < p0; i ++) {
+    const auto rp(P01<T>(i + 1).next(seconds));
+    const auto rq(P01<T>(i + 1).next(seconds.reverse()));
+    for(int j = 0; j < p.size(); j ++) {
+      p[i][j] = p[i][j] == T(int(0)) || rp == T(int(0)) ? T(int(1)) / T(int(2))
+        : revertProgramInvariant<T>(make_pair(p[i][j], rp), true);
+      q[i][j] = q[i][j] == T(int(0)) || rp == T(int(0)) ? T(int(1)) / T(int(2))
+        : revertProgramInvariant<T>(make_pair(q[i][j], rq), true);
+    }
   }
   return make_pair(move(p), move(q));
 }
 
-template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
+template <typename T, bool persistent = false> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4286,20 +4377,49 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
       in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
-  const auto p(predv<T>(in));
-  pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > res;
-  res.first.resize(in0[0].size());
-  res.second.resize(in0[0].size());
-  for(int j = 0; j < in0[0].size(); j ++) {
-    res.first[j] =
-      p.first.subVector(in0[0][0].size() * j, in0[0][0].size());
-    res.second[j] =
-      p.second.subVector(in0[0][0].size() * j, in0[0][0].size());
+  const auto p(predv<T, persistent>(in));
+  pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > res;
+  res.first.resize(p.first.size());
+  res.second.resize(p.second.size());
+  for(int i = 0; i < res.first.size(); i ++) {
+    res.first[i].resize(in0[0].size());
+    res.second[i].resize(in0[0].size());
+    for(int j = 0; j < in0[0].size(); j ++) {
+      res.first[i][j] =
+        p.first[i].subVector(in0[0][0].size() * j, in0[0][0].size());
+      res.second[i][j] =
+        p.second[i].subVector(in0[0][0].size() * j, in0[0][0].size());
+    }
   }
   return res;
 }
 
-template <typename T> pair<vector<SimpleMatrix<T> >, vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
+template <typename T, bool persistent = false> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predMat(const vector<vector<SimpleMatrix<T> > >& in0, const int& rot = 20) {
+  assert(0 <= rot);
+  if(0 < rot) {
+    auto res(predMat<T, persistent>(in0, 0));
+    if(rot <= 1) return res;
+    for(int i = 0; i < rot; i ++) {
+      cerr << "rotate(" << i << ")" << endl << flush;
+      const auto theta((T(i) - T(rot - 1) / T(2)) * atan(T(1)) / (T(rot) / T(2)));
+            auto ini(in0);
+      for(int j = 0; j < ini.size(); j ++)
+        for(int k = 0; k < ini[j].size(); k ++)
+          ini[j][k] = rotate<T>(ini[j][k], theta);
+            auto resi(predMat<T, persistent>(ini, 0));
+      for(int j = 0; j < resi.first.size(); j ++)
+        for(int k = 0; k < resi.first[j].size(); k ++) {
+          res.first[j][k]  += center<T>(rotate<T>(resi.first[j][k],  - theta), res.first[j][k]);
+          res.second[j][k] += center<T>(rotate<T>(resi.second[j][k], - theta), res.second[j][k]);
+        }
+    }
+    for(int j = 0; j < res.first.size(); j ++)
+      for(int k = 0; k < res.first[j].size(); k ++) {
+        res.first[j][k]  /= T(rot);
+        res.second[j][k] /= T(rot);
+      }
+    return res;
+  }
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4314,28 +4434,32 @@ template <typename T> pair<vector<SimpleMatrix<T> >, vector<SimpleMatrix<T> > > 
                         k * in0[i][0].cols(), in0[i][j].row(k));
     }
   }
-  const auto p(predv<T>(in));
-  pair<vector<SimpleMatrix<T> >, vector<SimpleMatrix<T> > > res;
-  res.first.resize(in0[0].size());
-  res.second.resize(in0[0].size());
-  for(int j = 0; j < res.first.size(); j ++) {
-    res.first[j].resize(in0[0][0].rows(), in0[0][0].cols());
-    res.second[j].resize(in0[0][0].rows(), in0[0][0].cols());
-    for(int k = 0; k < in0[0][0].rows(); k ++) {
-      res.first[j].row(k) =
-        p.first.subVector(
-          j * in0[0][0].rows() * in0[0][0].cols() + k * in0[0][0].cols(),
-          in0[0][0].cols());
-      res.second[j].row(k) =
-        p.second.subVector(
-          j * in0[0][0].rows() * in0[0][0].cols() + k * in0[0][0].cols(),
-          in0[0][0].cols());
+  const auto p(predv<T, persistent>(in));
+  pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > res;
+  res.first.resize(p.first.size());
+  res.second.resize(p.second.size());
+  for(int i = 0; i < res.first.size(); i ++) {
+    res.first[i].resize(in0[0].size());
+    res.second[i].resize(in0[0].size());
+    for(int j = 0; j < res.first[i].size(); j ++) {
+      res.first[i][j].resize(in0[0][0].rows(), in0[0][0].cols());
+      res.second[i][j].resize(in0[0][0].rows(), in0[0][0].cols());
+      for(int k = 0; k < in0[0][0].rows(); k ++) {
+        res.first[i][j].row(k) =
+          p.first[i].subVector(
+            j * in0[0][0].rows() * in0[0][0].cols() + k * in0[0][0].cols(),
+            in0[0][0].cols());
+        res.second[i][j].row(k) =
+          p.second[i].subVector(
+            j * in0[0][0].rows() * in0[0][0].cols() + k * in0[0][0].cols(),
+            in0[0][0].cols());
+      }
     }
   }
   return res;
 }
 
-template <typename T> pair<SimpleSparseTensor<T>, SimpleSparseTensor<T> > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
+template <typename T, bool persistent = false> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
   assert(idx.size() && in0.size());
   // N.B. we don't do input scaling.
   // N.B. the data we target is especially string stream corpus.
@@ -4366,18 +4490,21 @@ template <typename T> pair<SimpleSparseTensor<T>, SimpleSparseTensor<T> > predST
             in[i][cnt ++] =
               (in0[i][idx[j]][idx[k]][idx[m]] + T(int(1))) / T(int(2));
   }
-  auto p(predv<T>(in));
+  auto p(predv<T, persistent>(in));
   in.resize(0);
-  pair<SimpleSparseTensor<T>, SimpleSparseTensor<T> > res;
-  for(int j = 0, cnt = 0; j < idx.size(); j ++)
-    for(int k = 0; k < idx.size(); k ++)
-      for(int m = 0; m < idx.size(); m ++) {
-        if(binary_search(absent.begin(), absent.end(),
-             make_pair(j, make_pair(k, m))))
-          continue;
-        res.first[idx[j]][idx[k]][idx[m]] = p.first[cnt] * T(int(2)) - T(int(1));
-        res.second[idx[j]][idx[k]][idx[m]] = p.second[cnt ++] * T(int(2)) - T(int(1));
-      }
+  pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > res;
+  res.first.resize(p.first.size());
+  res.second.resize(p.second.size());
+  for(int i = 0; i < res.first.size(); i ++)
+    for(int j = 0, cnt = 0; j < idx.size(); j ++)
+      for(int k = 0; k < idx.size(); k ++)
+        for(int m = 0; m < idx.size(); m ++) {
+          if(binary_search(absent.begin(), absent.end(),
+               make_pair(j, make_pair(k, m))))
+            continue;
+          res.first[i][idx[j]][idx[k]][idx[m]] = p.first[i][cnt] * T(int(2)) - T(int(1));
+          res.second[i][idx[j]][idx[k]][idx[m]] = p.second[i][cnt ++] * T(int(2)) - T(int(1));
+        }
   return res;
 }
 
