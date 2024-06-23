@@ -3584,12 +3584,9 @@ public:
   inline Pprogression(const int& loop0, const int& istat) {
     assert(loop0);
     const auto loop(abs(loop0));
-    p.resize(loop);
-    for(int i = 0; i < (this->p).size(); i ++) {
-      p[i].reserve(i + 1);
-      for(int j = 0; j <= i; j ++)
-        p[i].emplace_back(PBond<T, P>(istat + i, P(i + 1)));
-    }
+    p.reserve(loop);
+    for(int i = 0; i < loop; i ++)
+      p.emplace_back(PBond<T, P>(istat + i, P(i + 1)));
     h  = idFeeder<T>(loop);
     {
       vector<int> ph0;
@@ -3622,11 +3619,9 @@ public:
     const auto& hh(h.next(in));
     auto M(zero);
     if(! h.full) return M;
-    for(int i = 0; i < p.size(); i ++) {
+    for(int i = 0; i < p.size(); i ++)
       if(p.size() - 1 - i <= t)
-        bb[i].next(p[i][t % p[i].size()].next(
-          progression(hh, hh.size() - 1, i)));
-    }
+        bb[i].next(p[i].next(progression(hh, hh.size() - 1, i)));
     if(p.size() <= t)
       for(int i = 0; i < p.size(); i ++)
         M += bb[i].res[0] + (i && addp ?
@@ -3634,7 +3629,7 @@ public:
     t ++;
     return addp ? M /= T(int(p.size())) : M;
   }
-  vector<vector<PBond<T, P> > > p;
+  vector<PBond<T, P> > p;
   idFeeder<T> h;
   vector<vector<int> > ph;
   vector<vector<T> > eh;
