@@ -3625,9 +3625,11 @@ public:
       if(p.size() - 1 - i <= t)
         bb[i].next(p[i].next(progression(hh, hh.size() - 1, i)));
     if(p.size() <= t)
-      for(int i = 0; i < p.size(); i ++)
-        M += bb[i].res[0] + (i && addp ?
-          progression(hh, hh.size() - 2, i - 1) : zero);
+      for(int i = 0; i < p.size(); i ++) {
+        M += bb[i].res[0];
+        if(addp) for(int j = i - 1; 0 <= j; j --)
+          M += progression(hh, hh.size() - 1, j);
+      }
     t ++;
     return addp ? M /= T(int(p.size())) : M;
   }
@@ -3660,18 +3662,19 @@ public:
       vector<bool> ph0;
       eh0.resize(in.size() / 2, T(int(0)));
       ph0.resize(in.size() / 2, false);
+      eh.resize(0);
+      ph.resize(0);
       eh.resize(in.size(), eh0);
       ph.resize(in.size(), ph0);
     }
     T res(int(0));
     for(int i = 0; i < in.size() / 2 - istat / 2; i ++) {
-      idFeeder<T> buf(in.size() / 2 - i + istat / 2);
-      for(int j = i; j < in.size() / 2 + istat / 2; j ++)
+      idFeeder<T> buf(in.size() / 2 + istat / 2);
+      for(int j = i; j < in.size() / 2 + istat / 2 + i; j ++)
         buf.next(progression(in, j, i));
-      // XXX align:
       res += P(in.size() / 2 - istat / 2 - i).next(buf.res);
-      for(int j = i - 1, k = 1; 0 <= j; j --, k ++)
-        res += progression(in, in.size() - k, j);
+      for(int j = i - 1; 0 <= j; j --)
+        res += progression(in, in.size() - 1, j);
     }
     return res /= T(in.size() / 2 - istat);
   }
@@ -4396,7 +4399,7 @@ template <typename T, bool persistent = false> pair<vector<vector<SimpleVector<T
 
 template <typename T, bool persistent = false> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predMat(const vector<vector<SimpleMatrix<T> > >& in0, const int& rot = 20) {
   assert(0 <= rot);
-  if(0 < rot) {
+  if(0 < rot && ! persistent) {
     auto res(predMat<T, persistent>(in0, 0));
     if(rot <= 1) return res;
     for(int i = 0; i < rot; i ++) {
