@@ -1276,14 +1276,14 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
       break;
     }
   }
-  auto p(predSTen<T>(in, idx));
+  auto p(predSTen<T, true>(in, idx));
   vector<string> hist;
   os << "<hr />Forward: " << endl;
   corpus<T, U> pstats;
-  pstats.corpust = p.first;
+  pstats.corpust = p.first[0];
   getAbbreved<T>(pstats, detailtitle, detail, delimiter);
   os << pstats.simpleThresh(threshin).serialize() << "<br /><hr />Backward: ";
-  pstats.corpust = p.second;
+  pstats.corpust = p.second[0];
   getAbbreved<T>(pstats, detailtitle, detail, delimiter);
   os << pstats.simpleThresh(threshin).serialize() << "<br />";
   return os;

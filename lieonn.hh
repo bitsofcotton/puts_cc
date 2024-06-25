@@ -3656,7 +3656,7 @@ public:
   }
   inline T next(const SimpleVector<T>& in0, const int& istat) {
     const auto in(in0.size() & 1 ? in0.subVector(1, in0.size() - 1) : in0);
-    assert(! (in0.size() & 1) && 0 < istat);
+    assert(! (in.size() & 1) && 0 < istat);
     {
       vector<T> eh0;
       vector<bool> ph0;
