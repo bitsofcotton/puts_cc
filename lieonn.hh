@@ -3654,9 +3654,7 @@ public:
     ph[idx][count] = 1;
     return (eh[idx][count] = progression(h, idx, count - 1) - progression(h, idx - 1, count - 1));
   }
-  inline T next(const SimpleVector<T>& in0, const int& istat) {
-    const auto in(in0.size() & 1 ? in0.subVector(1, in0.size() - 1) : in0);
-    assert(! (in.size() & 1) && 0 < istat);
+  inline T next(const SimpleVector<T>& in, const int& istat) {
     {
       vector<T> eh0;
       vector<bool> ph0;
@@ -3667,17 +3665,19 @@ public:
       eh.resize(in.size(), eh0);
       ph.resize(in.size(), ph0);
     }
+    // N.B. we use half of the internal states to reduce sloppy behaviours.
+    const int nretry(in.size() / 2 - istat / 2);
     T res(int(0));
-    for(int i = 0; i < in.size() / 2 - istat / 2; i ++) {
-      idFeeder<T> buf(in.size() / 2);
-      for(int j = i; j < in.size() / 2 + istat / 2 + i; j ++)
+    for(int i = 0; i <= nretry; i ++) {
+      idFeeder<T> buf(in.size() - nretry);
+      for(int j = i; j < in.size() - nretry + i; j ++)
         buf.next(progression(in, j, i));
       assert(buf.full);
-      res += P(in.size() / 2 - istat / 2 - i).next(buf.res);
+      res += P(nretry - i + 1).next(buf.res);
       for(int j = i - 1; 0 <= j; j --)
         res += progression(in, in.size() - 1, j);
     }
-    return res /= T(in.size() / 2 - istat / 2);
+    return res /= T(nretry + 1);
   }
   vector<vector<T> >    eh;
   vector<vector<bool> > ph;
