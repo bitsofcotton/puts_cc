@@ -3669,14 +3669,15 @@ public:
     }
     T res(int(0));
     for(int i = 0; i < in.size() / 2 - istat / 2; i ++) {
-      idFeeder<T> buf(in.size() / 2 + istat / 2);
+      idFeeder<T> buf(in.size() / 2);
       for(int j = i; j < in.size() / 2 + istat / 2 + i; j ++)
         buf.next(progression(in, j, i));
+      assert(buf.full);
       res += P(in.size() / 2 - istat / 2 - i).next(buf.res);
       for(int j = i - 1; 0 <= j; j --)
         res += progression(in, in.size() - 1, j);
     }
-    return res /= T(in.size() / 2 - istat);
+    return res /= T(in.size() / 2 - istat / 2);
   }
   vector<vector<T> >    eh;
   vector<vector<bool> > ph;
@@ -4469,27 +4470,27 @@ template <typename T, bool persistent = false> pair<vector<SimpleSparseTensor<T>
   //      they are incontinuous one, so complementing with continuous stream
   //      shouldn't improve outputs.
   vector<SimpleVector<T> > in;
-  vector<pair<int, pair<int, int> > > absent;
+  vector<pair<int, pair<int, int> > > attend;
   in.resize(in0.size());
-  absent.reserve(idx.size() * idx.size() * idx.size());
+  attend.reserve(idx.size() * idx.size() * idx.size());
   for(int i = 0; i < idx.size(); i ++)
     for(int j = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++) {
         for(int ii = 0; ii < in0.size(); ii ++)
           if(in0[ii][idx[i]][idx[j]][idx[k]] != T(int(0)))
             goto next;
-        absent.emplace_back(make_pair(i, make_pair(j, k)));
+        continue;
        next:
-        ;
+        attend.emplace_back(make_pair(i, make_pair(j, k)));
       }
-  sort(absent.begin(), absent.end());
+  sort(attend.begin(), attend.end());
   for(int i = 0; i < in0.size(); i ++) {
-    in[i].resize(idx.size() * idx.size() * idx.size() - absent.size());
+    in[i].resize(attend.size());
     for(int j = 0, cnt = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
         for(int m = 0; m < idx.size(); m ++)
-          if(! binary_search(absent.begin(), absent.end(),
-            make_pair(j, make_pair(k, m))))
+          if(binary_search(attend.begin(), attend.end(),
+              make_pair(j, make_pair(k, m))))
             in[i][cnt ++] =
               (in0[i][idx[j]][idx[k]][idx[m]] + T(int(1))) / T(int(2));
   }
@@ -4501,13 +4502,12 @@ template <typename T, bool persistent = false> pair<vector<SimpleSparseTensor<T>
   for(int i = 0; i < res.first.size(); i ++)
     for(int j = 0, cnt = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
-        for(int m = 0; m < idx.size(); m ++) {
-          if(binary_search(absent.begin(), absent.end(),
-               make_pair(j, make_pair(k, m))))
-            continue;
-          res.first[i][idx[j]][idx[k]][idx[m]] = p.first[i][cnt] * T(int(2)) - T(int(1));
-          res.second[i][idx[j]][idx[k]][idx[m]] = p.second[i][cnt ++] * T(int(2)) - T(int(1));
-        }
+        for(int m = 0; m < idx.size(); m ++)
+          if(binary_search(attend.begin(), attend.end(),
+               make_pair(j, make_pair(k, m)))) {
+            res.first[i][idx[j]][idx[k]][idx[m]] = p.first[i][cnt] * T(int(2)) - T(int(1));
+            res.second[i][idx[j]][idx[k]][idx[m]] = p.second[i][cnt ++] * T(int(2)) - T(int(1));
+          }
   return res;
 }
 
