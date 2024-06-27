@@ -4198,6 +4198,15 @@ template <typename T> static inline vector<SimpleMatrix<T> > normalize(const vec
   return normalize<T>(w, upper)[0];
 }
 
+template <typename T> static inline SimpleVector<T> normalize(const SimpleVector<T>& in, const T& upper = T(1)) {
+  vector<vector<SimpleMatrix<T> > > w;
+  w.resize(1);
+  w[0].resize(1);
+  w[0][0].resize(1, in.size());
+  w[0][0].row(0) = in;
+  return normalize<T>(w, upper)[0][0].row(0);
+}
+
 template <typename T> static inline vector<SimpleMatrix<T> > autoLevel(const vector<SimpleMatrix<T> >& data, const int& count = 0) {
   vector<T> res;
   res.reserve(data[0].rows() * data[0].cols() * data.size());
@@ -4339,32 +4348,17 @@ template <typename T, bool persistent = false> pair<vector<SimpleVector<T> >, ve
     for(int i = 0; i < in.size(); i ++)
       buf.next(makeProgramInvariantPartial<T>(in[i][j], seconds[i], true));
     if(persistent) {
-      p[0][j] = PpersistentOnce<T, P01<T> >().next(buf.res, istat);
-      q[0][j] = PpersistentOnce<T, P01<T> >().next(buf.res.reverse(), istat);
+      p[0][j] = PpersistentOnce<T, P01<T, true> >().next(buf.res, istat);
+      q[0][j] = PpersistentOnce<T, P01<T, true> >().next(buf.res.reverse(), istat);
     } else for(int i = 0; i < p.size(); i ++) {
-      p[i][j] = P01<T>(i + 1).next(buf.res);
-      q[i][j] = P01<T>(i + 1).next(buf.res.reverse());
+      p[i][j] = P01<T, true>(i + 1).next(buf.res);
+      q[i][j] = P01<T, true>(i + 1).next(buf.res.reverse());
     }
   }
-  if(persistent) {
-    const auto rp(PpersistentOnce<T, P01<T> >().next(seconds, istat));
-    const auto rq(PpersistentOnce<T, P01<T> >().next(seconds.reverse(), istat));
-    for(int j = 0; j < p.size(); j ++) {
-      p[0][j] = p[0][j] == T(int(0)) || rp == T(int(0)) ? T(int(1)) / T(int(2))
-        : revertProgramInvariant<T>(make_pair(p[0][j], rp), true);
-      q[0][j] = q[0][j] == T(int(0)) || rp == T(int(0)) ? T(int(1)) / T(int(2))
-        : revertProgramInvariant<T>(make_pair(q[0][j], rq), true);
-    }
-  } else for(int i = 0; i < p0; i ++) {
-    const auto rp(P01<T>(i + 1).next(seconds));
-    const auto rq(P01<T>(i + 1).next(seconds.reverse()));
-    for(int j = 0; j < p.size(); j ++) {
-      p[i][j] = p[i][j] == T(int(0)) || rp == T(int(0)) ? T(int(1)) / T(int(2))
-        : revertProgramInvariant<T>(make_pair(p[i][j], rp), true);
-      q[i][j] = q[i][j] == T(int(0)) || rp == T(int(0)) ? T(int(1)) / T(int(2))
-        : revertProgramInvariant<T>(make_pair(q[i][j], rq), true);
-    }
-  }
+  // N.B. We believe predictor for each pixel context strong and
+  //      only the 0 <= x in R^n each orthogonality condition.
+  //      We should revertProgramInvariant in general, however, we bet
+  //      each pixel context strong.
   return make_pair(move(p), move(q));
 }
 
@@ -4398,32 +4392,7 @@ template <typename T, bool persistent = false> pair<vector<vector<SimpleVector<T
   return res;
 }
 
-template <typename T, bool persistent = false> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predMat(const vector<vector<SimpleMatrix<T> > >& in0, const int& rot = 20) {
-  assert(0 <= rot);
-  if(0 < rot && ! persistent) {
-    auto res(predMat<T, persistent>(in0, 0));
-    if(rot <= 1) return res;
-    for(int i = 0; i < rot; i ++) {
-      cerr << "rotate(" << i << ")" << endl << flush;
-      const auto theta((T(i) - T(rot - 1) / T(2)) * atan(T(1)) / (T(rot) / T(2)));
-            auto ini(in0);
-      for(int j = 0; j < ini.size(); j ++)
-        for(int k = 0; k < ini[j].size(); k ++)
-          ini[j][k] = rotate<T>(ini[j][k], theta);
-            auto resi(predMat<T, persistent>(ini, 0));
-      for(int j = 0; j < resi.first.size(); j ++)
-        for(int k = 0; k < resi.first[j].size(); k ++) {
-          res.first[j][k]  += center<T>(rotate<T>(resi.first[j][k],  - theta), res.first[j][k]);
-          res.second[j][k] += center<T>(rotate<T>(resi.second[j][k], - theta), res.second[j][k]);
-        }
-    }
-    for(int j = 0; j < res.first.size(); j ++)
-      for(int k = 0; k < res.first[j].size(); k ++) {
-        res.first[j][k]  /= T(rot);
-        res.second[j][k] /= T(rot);
-      }
-    return res;
-  }
+template <typename T, bool persistent = false> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
