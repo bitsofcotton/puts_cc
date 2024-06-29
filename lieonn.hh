@@ -3658,14 +3658,17 @@ public:
     {
       vector<T> eh0;
       vector<bool> ph0;
-      eh0.resize(in.size() / 2, T(int(0)));
-      ph0.resize(in.size() / 2, false);
+      eh0.resize(in.size(), T(int(0)));
+      ph0.resize(in.size(), false);
       eh.resize(0);
       ph.resize(0);
       eh.resize(in.size(), eh0);
       ph.resize(in.size(), ph0);
     }
-    // N.B. we use half of the internal states to reduce sloppy behaviours.
+    // N.B. use full of the input to reduce counter measure.
+    //      if our strategy is to feed sloppy predictor enough internal status,
+    //      this can be reduced. either, if ours is to reduce enough,
+    //      this can be increased. we balance them middle.
     const int nretry(in.size() / 2 - istat / 2);
     T res(int(0));
     for(int i = 0; i <= nretry; i ++) {

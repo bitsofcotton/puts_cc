@@ -1246,7 +1246,7 @@ template <typename T, typename U> vector<int> pseudoWordsBalance(const vector<U>
   return vres;
 }
 
-template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const int& nrwords0, const T& redig = T(1) ) {
+template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const int& nrwords0, const T& redig = T(1)) {
   assert(detailtitle.size() == detail.size());
   const int nrwords(sqrt(T(nrwords0)));
   os << "predTOC: " << flush;
@@ -1278,14 +1278,14 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
   }
   auto p(predSTen<T, true>(in, idx));
   vector<string> hist;
-  os << "<hr />Forward: " << endl;
+  os << "<hr />Forward: ";
   corpus<T, U> pstats;
   pstats.corpust = p.first[0];
   getAbbreved<T>(pstats, detailtitle, detail, delimiter);
-  os << pstats.simpleThresh(threshin).serialize() << "<br /><hr />Backward: ";
+  os << pstats.simpleThresh(threshin * threshin).serialize() << "Backward: ";
   pstats.corpust = p.second[0];
   getAbbreved<T>(pstats, detailtitle, detail, delimiter);
-  os << pstats.simpleThresh(threshin).serialize() << "<br />";
+  os << pstats.simpleThresh(threshin * threshin).serialize() << "<br />" << endl;
   return os;
 }
 
