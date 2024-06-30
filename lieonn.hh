@@ -4320,12 +4320,12 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
   return res;
 }
 
-template <typename T, bool persistent = false> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv(const vector<SimpleVector<T> >& in) {
+// N.B. the raw P01 predictor is useless because of their sloppiness.
+template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv(const vector<SimpleVector<T> >& in) {
   // N.B. we need to initialize p0 vector.
   SimpleVector<T> init(3);
   for(int i = 0; i < init.size(); i ++)
     init[i] = T(int(i));
-  cerr << (const char*)(persistent ? "persistent" : "sloppy") << endl;
   cerr << "Coherent: P0: " << P0maxRank0<T>().next(init) << endl;
   SimpleVector<T> seconds(in.size());
   seconds.O();
@@ -4337,11 +4337,10 @@ template <typename T, bool persistent = false> pair<vector<SimpleVector<T> >, ve
   }
   // N.B. we need Ppersistent<..., P01...> with maximum range.
   const int istat(5 * 5 - 4 + 2);
-  const int p0((in.size() - istat) / 2);
   vector<SimpleVector<T> > p;
   vector<SimpleVector<T> > q;
-  p.resize(persistent ? 1 : p0, SimpleVector<T>(in[0].size()).O());
-  q.resize(persistent ? 1 : p0, SimpleVector<T>(in[0].size()).O());
+  p.resize(1, SimpleVector<T>(in[0].size()).O());
+  q.resize(1, SimpleVector<T>(in[0].size()).O());
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -4350,22 +4349,26 @@ template <typename T, bool persistent = false> pair<vector<SimpleVector<T> >, ve
     idFeeder<T> buf(in.size());
     for(int i = 0; i < in.size(); i ++)
       buf.next(makeProgramInvariantPartial<T>(in[i][j], seconds[i], true));
-    if(persistent) {
-      p[0][j] = PpersistentOnce<T, P01<T, true> >().next(buf.res, istat);
-      q[0][j] = PpersistentOnce<T, P01<T, true> >().next(buf.res.reverse(), istat);
-    } else for(int i = 0; i < p.size(); i ++) {
-      p[i][j] = P01<T, true>(i + 1).next(buf.res);
-      q[i][j] = P01<T, true>(i + 1).next(buf.res.reverse());
-    }
+    p[0][j] = PpersistentOnce<T, P01<T, true> >().next(buf.res, istat);
+    q[0][j] = PpersistentOnce<T, P01<T, true> >().next(buf.res.reverse(), istat);
   }
   // N.B. We believe predictor for each pixel context strong and
   //      only the 0 <= x in R^n each orthogonality condition.
   //      We should revertProgramInvariant in general, however, we bet
   //      each pixel context strong.
+  const auto nseconds(sqrt(seconds.dot(seconds)));
+  const auto rp(PpersistentOnce<T, P01<T, true> >().next(seconds / nseconds, istat) * nseconds);
+  const auto rq(PpersistentOnce<T, P01<T, true> >().next(seconds.reverse() / nseconds, istat) * nseconds);
+  const auto p0(makeProgramInvariant<T>(normalize<T>(p[0]), - T(int(1)), true).first);
+  const auto q0(makeProgramInvariant<T>(normalize<T>(q[0]), - T(int(1)), true).first);
+  for(int j = 0; j < p[0].size(); j ++) {
+    p[0][j] = revertProgramInvariant<T>(make_pair(p0[j], rp), true);
+    q[0][j] = revertProgramInvariant<T>(make_pair(q0[j], rq), true);
+  }
   return make_pair(move(p), move(q));
 }
 
-template <typename T, bool persistent = false> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
+template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4378,7 +4381,7 @@ template <typename T, bool persistent = false> pair<vector<vector<SimpleVector<T
       in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
-  const auto p(predv<T, persistent>(in));
+  const auto p(predv<T>(in));
   pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > res;
   res.first.resize(p.first.size());
   res.second.resize(p.second.size());
@@ -4395,7 +4398,7 @@ template <typename T, bool persistent = false> pair<vector<vector<SimpleVector<T
   return res;
 }
 
-template <typename T, bool persistent = false> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
+template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4410,7 +4413,7 @@ template <typename T, bool persistent = false> pair<vector<vector<SimpleMatrix<T
                         k * in0[i][0].cols(), in0[i][j].row(k));
     }
   }
-  const auto p(predv<T, persistent>(in));
+  const auto p(predv<T>(in));
   pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > res;
   res.first.resize(p.first.size());
   res.second.resize(p.second.size());
@@ -4435,7 +4438,7 @@ template <typename T, bool persistent = false> pair<vector<vector<SimpleMatrix<T
   return res;
 }
 
-template <typename T, bool persistent = false> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
+template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > predSTen(const vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
   assert(idx.size() && in0.size());
   // N.B. we don't do input scaling.
   // N.B. the data we target is especially string stream corpus.
@@ -4466,7 +4469,7 @@ template <typename T, bool persistent = false> pair<vector<SimpleSparseTensor<T>
             in[i][cnt ++] =
               (in0[i][idx[j]][idx[k]][idx[m]] + T(int(1))) / T(int(2));
   }
-  auto p(predv<T, persistent>(in));
+  auto p(predv<T>(in));
   in.resize(0);
   pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > res;
   res.first.resize(p.first.size());

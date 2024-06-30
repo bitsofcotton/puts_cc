@@ -268,10 +268,7 @@ int main(int argc, const char* argv[]) {
     words.insert(words.end(), detailwords.begin(), detailwords.end());
     std::sort(words.begin(), words.end());
     words.erase(std::unique(words.begin(), words.end()), words.end());
-    std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
-    std::cout << "<body>";
     predTOC<num_t, std::string>(std::cout, input, detailwords, details, delimiter, szwindow, nrwords, redig);
-    std::cout << "<hr/>" << std::endl << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "prep") == 0) {
     std::vector<std::string> buf;
     for(int i = 0; i < input.size() / szwindow + 1; i ++) {
