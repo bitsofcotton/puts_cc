@@ -1281,10 +1281,10 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
   corpus<T, U> pstats;
   pstats.corpust = p.second[0];
   getAbbreved<T>(pstats, detailtitle, detail, delimiter);
-  os << pstats.simpleThresh(threshin * threshin).serialize() << input;
+  os << pstats.simpleThresh(threshin).serialize() << input;
   pstats.corpust = p.first[0];
   getAbbreved<T>(pstats, detailtitle, detail, delimiter);
-  return os << pstats.simpleThresh(threshin * threshin).serialize() << endl;
+  return os << pstats.simpleThresh(threshin).serialize() << endl;
 }
 
 #define _CORPUS_

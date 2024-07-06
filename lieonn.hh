@@ -3666,17 +3666,17 @@ public:
       ph.resize(in.size(), ph0);
     }
     // N.B. use full of the input to reduce counter measure.
-    //      if our strategy is to feed sloppy predictor enough internal status,
-    //      this can be reduced. either, if ours is to reduce enough,
-    //      this can be increased. we balance them middle.
+    //      we use maximum of the internal states bits for predictions.
     const int nretry(in.size() / 2 - istat / 2);
     T res(int(0));
     for(int i = 0; i <= nretry; i ++) {
-      idFeeder<T> buf(in.size() - nretry);
-      for(int j = i; j < in.size() - nretry + i; j ++)
+      // N.B. use maximum of the length for predictions.
+      idFeeder<T> buf(in.size() - i);
+      for(int j = i; j < in.size(); j ++)
         buf.next(progression(in, j, i));
       assert(buf.full);
-      res += P(nretry - i + 1).next(buf.res);
+      // N.B. only one step after.
+      res += P(1).next(buf.res);
       for(int j = i - 1; 0 <= j; j --)
         res += progression(in, in.size() - 1, j);
     }
@@ -4352,10 +4352,6 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
     p[0][j] = PpersistentOnce<T, P01<T, true> >().next(buf.res, istat);
     q[0][j] = PpersistentOnce<T, P01<T, true> >().next(buf.res.reverse(), istat);
   }
-  // N.B. We believe predictor for each pixel context strong and
-  //      only the 0 <= x in R^n each orthogonality condition.
-  //      We should revertProgramInvariant in general, however, we bet
-  //      each pixel context strong.
   const auto nseconds(sqrt(seconds.dot(seconds)));
   const auto rp(PpersistentOnce<T, P01<T, true> >().next(seconds / nseconds, istat) * nseconds);
   const auto rq(PpersistentOnce<T, P01<T, true> >().next(seconds.reverse() / nseconds, istat) * nseconds);
