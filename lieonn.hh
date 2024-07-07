@@ -2752,6 +2752,13 @@ template <typename T> static inline T revertProgramInvariant(const pair<T, T>& i
               * atan(T(int(1))) * T(int(2)) );
 }
 
+template <typename T> static inline SimpleVector<T> revertProgramInvariant(const pair<SimpleVector<T>, T>& in, const bool& on01 = false) {
+  auto res(in.first);
+  for(int i = 0; i < in.first.size(); i ++)
+    res[i] = revertProgramInvariant<T>(make_pair(in.first[i], in.second), on01);
+  return res;
+}
+
 template <typename T> class idFeeder {
 public:
   inline idFeeder(const int& size = 1) {
@@ -3588,8 +3595,8 @@ public:
     const auto loop(abs(loop0));
     p.reserve(loop);
     for(int i = 0; i < loop; i ++)
-      p.emplace_back(PBond<T, P>(istat + i, P(i + 1)));
-    h  = idFeeder<T>(loop);
+      p.emplace_back(PBond<T, P>(istat + i, P((addp = 0 < loop0) ? 1 : i + 1)));
+    h = idFeeder<T>(loop);
     {
       vector<int> ph0;
       ph0.resize(loop, 0);
@@ -3598,10 +3605,6 @@ public:
       eh0.resize(loop, T(int(0)));
       eh.resize(loop, eh0);
     }
-    addp = 0 < loop0;
-    bb.reserve(loop);
-    for(int i = 0; i < loop; i ++)
-      bb.emplace_back(idFeeder<T>(addp ? i + 1 : 1));
     t ^= t;
     this->istat = istat;
   }
@@ -3622,11 +3625,8 @@ public:
     auto M(zero);
     if(! h.full) return M;
     for(int i = 0; i < p.size(); i ++)
-      if(p.size() - 1 - i <= t)
-        bb[i].next(p[i].next(progression(hh, hh.size() - 1, i)));
-    if(p.size() <= t)
-      for(int i = 0; i < p.size(); i ++) {
-        M += bb[i].res[0];
+      if(p.size() - 1 - i <= t) {
+        M += p[i].next(progression(hh, hh.size() - 1, i));
         if(addp) for(int j = i - 1; 0 <= j; j --)
           M += progression(hh, hh.size() - 1, j);
       }
@@ -3637,9 +3637,8 @@ public:
   idFeeder<T> h;
   vector<vector<int> > ph;
   vector<vector<T> > eh;
-  vector<idFeeder<T> > bb;
-  int t;
-  int istat;
+  int  t;
+  int  istat;
   bool addp;
 };
 
@@ -4321,7 +4320,7 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
 }
 
 // N.B. the raw P01 predictor is useless because of their sloppiness.
-template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predv(const vector<SimpleVector<T> >& in) {
+template <typename T> pair<SimpleVector<T>, SimpleVector<T> > predv(const vector<SimpleVector<T> >& in) {
   // N.B. we need to initialize p0 vector.
   SimpleVector<T> init(3);
   for(int i = 0; i < init.size(); i ++)
@@ -4337,10 +4336,10 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
   }
   // N.B. we need Ppersistent<..., P01...> with maximum range.
   const int istat(5 * 5 - 4 + 2);
-  vector<SimpleVector<T> > p;
-  vector<SimpleVector<T> > q;
-  p.resize(1, SimpleVector<T>(in[0].size()).O());
-  q.resize(1, SimpleVector<T>(in[0].size()).O());
+  SimpleVector<T> p(in[0].size());
+  SimpleVector<T> q(in[0].size());
+  p.O();
+  q.O();
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -4349,19 +4348,18 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
     idFeeder<T> buf(in.size());
     for(int i = 0; i < in.size(); i ++)
       buf.next(makeProgramInvariantPartial<T>(in[i][j], seconds[i], true));
-    p[0][j] = PpersistentOnce<T, P01<T, true> >().next(buf.res, istat);
-    q[0][j] = PpersistentOnce<T, P01<T, true> >().next(buf.res.reverse(), istat);
+    assert(buf.full);
+    p[j] = PpersistentOnce<T, P01<T, true> >().next(buf.res, istat);
+    q[j] = PpersistentOnce<T, P01<T, true> >().next(buf.res.reverse(), istat);
   }
   const auto nseconds(sqrt(seconds.dot(seconds)));
-  const auto rp(PpersistentOnce<T, P01<T, true> >().next(seconds / nseconds, istat) * nseconds);
-  const auto rq(PpersistentOnce<T, P01<T, true> >().next(seconds.reverse() / nseconds, istat) * nseconds);
-  const auto p0(makeProgramInvariant<T>(normalize<T>(p[0]), - T(int(1)), true).first);
-  const auto q0(makeProgramInvariant<T>(normalize<T>(q[0]), - T(int(1)), true).first);
-  for(int j = 0; j < p[0].size(); j ++) {
-    p[0][j] = revertProgramInvariant<T>(make_pair(p0[j], rp), true);
-    q[0][j] = revertProgramInvariant<T>(make_pair(q0[j], rq), true);
-  }
-  return make_pair(move(p), move(q));
+  return make_pair(revertProgramInvariant<T>(make_pair(
+    makeProgramInvariant<T>(normalize<T>(p), - T(int(1)), true).first,
+      PpersistentOnce<T, P01<T, true> >().next(seconds / nseconds, istat) *
+        nseconds), true), revertProgramInvariant<T>(make_pair(
+    makeProgramInvariant<T>(normalize<T>(q), - T(int(1)), true).first,
+      PpersistentOnce<T, P01<T, true> >().next(seconds.reverse() / nseconds,
+        istat) * nseconds), true) );
 }
 
 template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
@@ -4379,16 +4377,16 @@ template <typename T> pair<vector<vector<SimpleVector<T> > >, vector<vector<Simp
   }
   const auto p(predv<T>(in));
   pair<vector<vector<SimpleVector<T> > >, vector<vector<SimpleVector<T> > > > res;
-  res.first.resize(p.first.size());
-  res.second.resize(p.second.size());
+  res.first.resize(1);
+  res.second.resize(1);
   for(int i = 0; i < res.first.size(); i ++) {
     res.first[i].resize(in0[0].size());
     res.second[i].resize(in0[0].size());
     for(int j = 0; j < in0[0].size(); j ++) {
       res.first[i][j] =
-        p.first[i].subVector(in0[0][0].size() * j, in0[0][0].size());
+        p.first.subVector(in0[0][0].size() * j, in0[0][0].size());
       res.second[i][j] =
-        p.second[i].subVector(in0[0][0].size() * j, in0[0][0].size());
+        p.second.subVector(in0[0][0].size() * j, in0[0][0].size());
     }
   }
   return res;
@@ -4411,8 +4409,8 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
   }
   const auto p(predv<T>(in));
   pair<vector<vector<SimpleMatrix<T> > >, vector<vector<SimpleMatrix<T> > > > res;
-  res.first.resize(p.first.size());
-  res.second.resize(p.second.size());
+  res.first.resize(1);
+  res.second.resize(1);
   for(int i = 0; i < res.first.size(); i ++) {
     res.first[i].resize(in0[0].size());
     res.second[i].resize(in0[0].size());
@@ -4421,11 +4419,11 @@ template <typename T> pair<vector<vector<SimpleMatrix<T> > >, vector<vector<Simp
       res.second[i][j].resize(in0[0][0].rows(), in0[0][0].cols());
       for(int k = 0; k < in0[0][0].rows(); k ++) {
         res.first[i][j].row(k) =
-          p.first[i].subVector(
+          p.first.subVector(
             j * in0[0][0].rows() * in0[0][0].cols() + k * in0[0][0].cols(),
             in0[0][0].cols());
         res.second[i][j].row(k) =
-          p.second[i].subVector(
+          p.second.subVector(
             j * in0[0][0].rows() * in0[0][0].cols() + k * in0[0][0].cols(),
             in0[0][0].cols());
       }
@@ -4468,16 +4466,16 @@ template <typename T> pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTe
   auto p(predv<T>(in));
   in.resize(0);
   pair<vector<SimpleSparseTensor<T> >, vector<SimpleSparseTensor<T> > > res;
-  res.first.resize(p.first.size());
-  res.second.resize(p.second.size());
+  res.first.resize(1);
+  res.second.resize(1);
   for(int i = 0; i < res.first.size(); i ++)
     for(int j = 0, cnt = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
         for(int m = 0; m < idx.size(); m ++)
           if(binary_search(attend.begin(), attend.end(),
                make_pair(j, make_pair(k, m)))) {
-            res.first[i][idx[j]][idx[k]][idx[m]] = p.first[i][cnt] * T(int(2)) - T(int(1));
-            res.second[i][idx[j]][idx[k]][idx[m]] = p.second[i][cnt ++] * T(int(2)) - T(int(1));
+            res.first[i][idx[j]][idx[k]][idx[m]] = p.first[cnt] * T(int(2)) - T(int(1));
+            res.second[i][idx[j]][idx[k]][idx[m]] = p.second[cnt ++] * T(int(2)) - T(int(1));
           }
   return res;
 }
