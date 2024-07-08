@@ -3666,20 +3666,20 @@ public:
     }
     // N.B. use full of the input to reduce counter measure.
     //      we use maximum of the internal states bits for predictions.
-    const int nretry(in.size() / 2 - istat / 2);
+    const auto nretry(in.size() - istat);
     T res(int(0));
-    for(int i = 0; i <= nretry; i ++) {
+    for(int i = 0; i < nretry; i ++) {
       // N.B. use maximum of the length for predictions.
       idFeeder<T> buf(in.size() - i);
       for(int j = i; j < in.size(); j ++)
         buf.next(progression(in, j, i));
       assert(buf.full);
       // N.B. only one step after.
-      res += P(1).next(buf.res);
+      res += P().next(buf.res);
       for(int j = i - 1; 0 <= j; j --)
         res += progression(in, in.size() - 1, j);
     }
-    return res /= T(nretry + 1);
+    return res /= T(nretry);
   }
   vector<vector<T> >    eh;
   vector<vector<bool> > ph;
