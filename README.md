@@ -109,4 +109,5 @@ This repository is archived, so without bug report, will no change.
 2024/07/06 merge latest ddpmopt.
 2024/07/07 merge latest ddpmopt.
 2024/07/08 merge latest ddpmopt.
+2024/07/09 predSTen code clean.
 

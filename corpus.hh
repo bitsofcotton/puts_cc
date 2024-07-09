@@ -1279,10 +1279,10 @@ template <typename T, typename U> std::ostream& predTOC(std::ostream& os, const 
   auto p(predSTen<T>(in, idx));
   vector<string> hist;
   corpus<T, U> pstats;
-  pstats.corpust = p.second[0];
+  pstats.corpust = move(p.second);
   getAbbreved<T>(pstats, detailtitle, detail, delimiter);
   os << pstats.simpleThresh(threshin).serialize() << input;
-  pstats.corpust = p.first[0];
+  pstats.corpust = move(p.first);
   getAbbreved<T>(pstats, detailtitle, detail, delimiter);
   return os << pstats.simpleThresh(threshin).serialize() << endl;
 }
