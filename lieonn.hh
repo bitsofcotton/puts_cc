@@ -2720,7 +2720,10 @@ template <typename T> static inline SimpleVector<T> linearInvariant(const Simple
 template <typename T> static inline T makeProgramInvariantPartial(const T& in, const T& ratio, const bool& on01 = false) {
   auto res(on01 ? in :
     ((atan(- in) / atan(T(int(1))) / T(int(2))) + T(int(1))) / T(int(2)) );
-  if(res == T(int(0)) ) res = T(int(1));
+  // N.B. better 0 handling, {0, 1} vanished before.
+  res += sqrt(SimpleMatrix<T>().epsilon());
+  // N.B. CPU float glitch.
+  res /= T(int(1)) + sqrt(sqrt(SimpleMatrix<T>().epsilon()));
   assert(T(int(0)) < res && res <= T(int(1)));
   return res *= ratio;
 }
