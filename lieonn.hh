@@ -2917,6 +2917,7 @@ template <typename T> using SimpleSparseMatrix = SimpleSparseVector<SimpleSparse
 template <typename T> using SimpleSparseTensor = SimpleSparseVector<SimpleSparseVector<SimpleSparseVector<T> > >;
 
 
+// N.B. start raw prediction operations.
 template <typename T> class CatG {
 public:
   inline CatG() { ; }
@@ -3454,7 +3455,7 @@ public:
     p = p0_t(p0_2t(p0_1t(p0_0t(step))));
   }
   inline ~P0maxRank() { ; }
-  inline T next(const SimpleVector<T>& in) {
+  inline T next(const SimpleVector<T>& in, const int& sute = 0) {
     return p.next(in);
   }
 /*
@@ -3495,7 +3496,11 @@ public:
 // Get invariant structure that
 // \[- &alpha, &alpha;\[ register computer with deterministic calculation.
 // cf. bitsofcotton/randtools .
-template <typename T, bool nonlinear = true> class P01 {
+// N.B. P = P01 recursive nothing effects in theoretical (f_0(f_1...) == f)
+//      however, in the information amount meaning, 6 recursive effects well.
+//      (2nd order saturation on the copied information on structure)
+//      on some of the experiments, no improves but different result.
+template <typename T, typename P = P0maxRank<T>, bool nonlinear = true> class P01 {
 public:
   inline P01(const int& step = 1, const int& var = 4) {
     assert(0 < var && 0 < step);
@@ -3503,7 +3508,7 @@ public:
     this->step = step;
   }
   inline ~P01() { ; }
-  inline T next(const SimpleVector<T>& in) {
+  inline T next(const SimpleVector<T>& in, const int& unit = 3) {
     static const T zero(0);
     static const T one(1);
     static const T two(2);
@@ -3511,7 +3516,8 @@ public:
     // XXX: division accuracy glitch.
     const auto nin(sqrt(in.dot(in) * (one + SimpleMatrix<T>().epsilon())));
     if(! isfinite(nin) || nin == zero) return zero;
-    SimpleMatrix<T> invariants(3, nonlinear ? varlen + 2 : varlen);
+    SimpleMatrix<T> invariants(typeid(P) == typeid(P0maxRank<T>) ? 3
+      : in.size() - unit, nonlinear ? varlen + 2 : varlen);
     invariants.O();
     for(int i0 = 0; i0 < invariants.rows(); i0 ++) {
       SimpleMatrix<T> toeplitz(in.size() - varlen - step + 2
@@ -3527,7 +3533,7 @@ public:
     SimpleVector<T> invariant(invariants.cols());
     invariant.O();
     for(int i = 0; i < invariants.cols(); i ++)
-      invariant[i] = P0maxRank0<T>().next(invariants.col(i));
+      invariant[i] = P().next(invariants.col(i), unit);
     if(invariant[varlen - 1] == zero) return zero;
     SimpleVector<T> work(varlen);
     for(int i = 1; i < work.size(); i ++)
@@ -3677,8 +3683,8 @@ public:
       for(int j = i; j < in.size(); j ++)
         buf.next(progression(in, j, i));
       assert(buf.full);
-      // N.B. only one step after.
-      res += P().next(buf.res);
+      // N.B. only one step after, option is for 6 layered P01 we don't use.
+      res += P().next(buf.res, buf.res.size() / 6);
       for(int j = i - 1; 0 <= j; j --)
         res += progression(in, in.size() - 1, j);
     }
@@ -3708,6 +3714,7 @@ template <typename T> using P10 =
 template <typename T> using P210 =
    PAthenB<T, Pprogression<T, P012L<T> >, P10<T> >;
 
+// N.B. start det diag operations.
 // N.B. invariant gathers some of the group on the input pattern.
 template <typename T> SimpleMatrix<T> concat(const SimpleMatrix<T>& m0, const SimpleMatrix<T>& m1) {
   // det diag result = det diag m0 + det diag m1
@@ -3795,6 +3802,7 @@ template <typename T> SimpleVector<T> reduce(const SimpleMatrix<T> m) {
 }
 
 
+// N.B. start Decompose
 template <typename T> class Decompose {
 public:
   typedef SimpleVector<T> Vec;
@@ -4036,6 +4044,7 @@ template <typename T> typename Decompose<T>::Mat Decompose<T>::represent(const M
 }
 
 
+// N.B. start image functions
 static inline bool whiteline(const string& s) {
   for(auto ss(s.begin()); ss < s.end(); ++ ss)
     if(! std::isspace(* ss) && *ss != '\n')
@@ -4322,6 +4331,7 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
   return res;
 }
 
+// N.B. start ddpmopt
 // N.B. the raw P01 predictor is useless because of their sloppiness.
 template <typename T> pair<SimpleVector<T>, SimpleVector<T> > predv(const vector<SimpleVector<T> >& in) {
   // N.B. we need to initialize p0 vector.
@@ -4338,7 +4348,7 @@ template <typename T> pair<SimpleVector<T>, SimpleVector<T> > predv(const vector
     seconds[i] = makeProgramInvariant<T>(in[i], - T(int(1)), true).second;
   }
   // N.B. we need Ppersistent<..., P01...> with maximum range.
-  const int istat(5 * 5 - 4 + 2);
+  const int istat(4 * 2 + 2);
   SimpleVector<T> p(in[0].size());
   SimpleVector<T> q(in[0].size());
   p.O();
@@ -4352,17 +4362,18 @@ template <typename T> pair<SimpleVector<T>, SimpleVector<T> > predv(const vector
     for(int i = 0; i < in.size(); i ++)
       buf.next(makeProgramInvariantPartial<T>(in[i][j], seconds[i], true));
     assert(buf.full);
-    p[j] = PpersistentOnce<T, P01<T, true> >().next(buf.res, istat);
-    q[j] = PpersistentOnce<T, P01<T, true> >().next(buf.res.reverse(), istat);
+    p[j] = PpersistentOnce<T, P01<T, P0maxRank<T>, true> >().next(buf.res, istat);
+    q[j] = PpersistentOnce<T, P01<T, P0maxRank<T>, true> >().next(buf.res.reverse(), istat);
   }
   const auto nseconds(sqrt(seconds.dot(seconds)));
   return make_pair(revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(p), - T(int(1)), true).first,
-      PpersistentOnce<T, P01<T, true> >().next(seconds / nseconds, istat) *
-        nseconds), true), revertProgramInvariant<T>(make_pair(
+      PpersistentOnce<T, P01<T, P0maxRank<T>, true> >().next(
+        seconds / nseconds, istat) * nseconds), true),
+    revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(q), - T(int(1)), true).first,
-      PpersistentOnce<T, P01<T, true> >().next(seconds.reverse() / nseconds,
-        istat) * nseconds), true) );
+      PpersistentOnce<T, P01<T, P0maxRank<T>, true> >().next(
+        seconds.reverse() / nseconds, istat) * nseconds), true) );
 }
 
 template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
@@ -4540,6 +4551,43 @@ static const vector<int>& pnTinySingle(const int& upper = 1) {
     }
   }
   return pn;
+}
+
+
+// N.B. start isolate
+template <typename T> static inline SimpleMatrix<T> harmlessSymmetrizeSquare(const SimpleMatrix<T>& m) {
+  assert(0 < m.rows() && 0 < m.cols() && m.cols() == m.rows());
+  SimpleMatrix<T> res(m.rows() + m.cols(), m.cols() + m.rows());
+  res.O();
+  return res.setMatrix(0, m.cols(), m.transpose() -
+     SimpleMatrix<T>(m.rows(), m.rows()).I()).
+    setMatrix(m.rows(), 0, m - SimpleMatrix<T>(m.cols(), m.cols()).I());
+}
+
+template <typename T> static inline SimpleVector<T> balanceIntInvariant(const SimpleMatrix<T>& m, const vector<SimpleMatrix<T> >& db) {
+  vector<SimpleMatrix<T> > logsymdb;
+  logsymdb.reserve(db.size());
+  for(int i = 0; i < db.size(); i ++) {
+    logsymdb.emplace_back(log(harmlessSymmetrizeSquare(db[i])));
+    assert(logsymdb[0].rows() == logsymdb[i].rows() &&
+           logsymdb[0].cols() == logsymdb[i].cols());
+  }
+  auto mm(log(harmlessSymmetrizeSquare(m)));
+  assert(logsymdb[0].rows() == mm.rows() &&
+         logsymdb[0].cols() == mm.cols());
+  SimpleMatrix<T> f(logsymdb.size(), logsymdb[0].rows() * logsymdb[0].cols());
+  f.O();
+  for(int i = 0; i < logsymdb.size(); i ++)
+    for(int j = 0; j < logsymdb[i].rows(); j ++)
+      for(int k = 0; k < logsymdb[i].cols(); k ++)
+        f(i, j * logsymdb[i].cols() + k) = move(logsymdb[i](j, k));
+  SimpleVector<T> vmm(mm.rows() * mm.cols());
+  for(int j = 0; j < mm.rows(); j ++)
+    for(int k = 0; k < mm.cols(); k ++)
+      vmm[j * mm.cols() + k] = move(mm(j, k));
+  // balance here.
+  // return f.solveN(vmm);
+  return SimpleVector<T>();
 }
 
 #define _SIMPLELIN_
