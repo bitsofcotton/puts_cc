@@ -3488,7 +3488,7 @@ public:
     static const T one(1);
     static const T two(2);
     // N.B. please use catgp to compete with over learning.
-    // XXX: division accuracy glitch.
+    // N.B. division accuracy glitch.
     const auto nin(sqrt(in.dot(in) * (one + SimpleMatrix<T>().epsilon())));
     if(! isfinite(nin) || nin == zero) return zero;
     SimpleMatrix<T> invariants(typeid(P) == typeid(P0maxRank<T>) ? 3
@@ -3590,7 +3590,6 @@ public:
       eh.resize(loop, eh0);
     }
     t ^= t;
-    this->istat = istat;
   }
   inline ~Pprogression() { ; }
   inline const T& progression(const SimpleVector<T>& h, const int& idx, const int& count) {
@@ -3622,7 +3621,6 @@ public:
   vector<vector<int> > ph;
   vector<vector<T> > eh;
   int  t;
-  int  istat;
   bool addp;
 };
 
