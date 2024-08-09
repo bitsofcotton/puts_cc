@@ -72,11 +72,11 @@ And, if we try to use this program to produce some mob character want to say, we
 If we use NOT word with accurate handle, we can roughly (but deeply differed to now) divide some insists.
 
 # The things undone (2)
-We can use pseudo base on intention as K^{4x4}:={ {A|#A&lt;&infty;},N,R,{f|f in 2^R}}^4 written in randtools representation but there's no fact the base is wider than the language descriptions.
+We can use pseudo base on intention as K^{4x4} (as a symbol) := { {A|#A&lt;&infty;},N,R,{f|f in 2^R}}^4 written in randtools representation but there's no fact the base is wider than the language descriptions.
 
-However in their case, we can use pseudo language base {K^{4x4},K^{4x4},f,t}^n as some of the words base, however we cannot describe all aspect of original sentences, so there's inforation lose around conversion.
+However in their case, we can use pseudo language base {K^{4x4},K^{4x4},f,t}^n as some of the words base, however we cannot describe all aspect of original sentences, so there's information loss around conversion.
 
-There's analogy {category,relation,geometry} between {intention start/end, binary operation on intension to intension, geometry ~ invariant ~ algorithm}.
+There's analogy between {category,relation,geometry} and {intention start/end, binary operation on intension to intension, geometry ~ invariant ~ algorithm}.
 
 # Archived
 This repository is archived, so without bug report, will no change.
@@ -118,4 +118,5 @@ This repository is archived, so without bug report, will no change.
 2024/07/08 merge latest ddpmopt.
 2024/07/09 predSTen code clean.
 2024/08/08 update readme.
+2024/08/09 fix typo.
 
