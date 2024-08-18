@@ -1956,6 +1956,7 @@ public:
     return result;
   }
   inline       SimpleVector<T>  solve(SimpleVector<T> other) const;
+  inline       SimpleVector<T>  solveN(SimpleVector<T> other) const;
   inline       SimpleVector<T>  projectionPt(const SimpleVector<T>& other) const;
   inline       SimpleMatrix<T>& fillP(const vector<int>& idx);
   inline       SimpleMatrix<T>  QR() const;
@@ -2102,6 +2103,13 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solve(SimpleVector
       other[j] -= other[i] * work.entity[j][i];
   }
   return other;
+}
+
+template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solveN(SimpleVector<T> other) const {
+  if(! (0 <= entity.size() && 0 <= ecols && entity.size() == ecols && entity.size() == other.size()) ) throw "SimpleMatrix<T>::SolveN error";
+  assert(0 && "SimpleMatrix<T>::solveN stub");
+  SimpleVector<T> res;
+  return res;
 }
 
 template <typename T> inline SimpleVector<T> SimpleMatrix<T>::projectionPt(const SimpleVector<T>& other) const {
@@ -2502,6 +2510,50 @@ template <typename T> static inline SimpleMatrix<T> log(const SimpleMatrix<T>& m
   return res;
 }
 
+template <typename T> static inline SimpleMatrix<T> logSym(const SimpleMatrix<T>& x, const SimpleMatrix<T>& b) {
+  // XXX stub.
+  assert(x.rows() == x.cols() && b.rows() == b.cols());
+  assert(! (x.rows() % b.rows()) && ! (x.cols() % b.cols()));
+  for(int i = 0; i < x.rows(); i ++)
+    for(int j = i + 1; j < x.cols(); j ++)
+      assert(x(i, j) == x(j, i));
+  for(int i = 0; i < b.rows(); i ++)
+    for(int j = i + 1; j < b.cols(); j ++)
+      assert(b(i, j) == b(j, i));
+  // N.B. Ux Lx Uxt == X := B^A == Ub Ua exp(La) Lb_k Uat Ubt.
+  const auto Ub(b.SVD());
+  const auto Ubt(b.transpose().SVD());
+  const auto Lb(Ub * b * Ubt.transpose());
+        auto Ux(x.SVD());
+        auto Uxt(x.transpose().SVD());
+  const auto Lx(Ux * x * Uxt.transpose());
+  // N.B. Lx == [[La log(Lb_k)]]
+  SimpleVector<T> Lawork(Ux.rows());
+  Lawork.O();
+  for(int i = 0; i < Lawork.size(); i ++)
+    // XXX:
+    Lawork[i] = log(Lx(i, i) / Lb(i / (x.rows() / b.rows())));
+  // N.B. Lawork.subVector... == another subVector in Ua diag(La) Uat condition.
+  // XXX: might be a wrong method.
+  SimpleMatrix<T> UUb(x.rows(), x.cols());
+  auto UUbt(UUb);
+  UUb.O();
+  UUbt.O();
+  for(int i = 0; i < Ub.rows(); i ++)
+    for(int j = 0; j < Ub.cols(); j ++) {
+      UUb.setMatrix( i * (x.rows() / Ub.rows()),  j * (x.cols() / Ub.cols()),
+        SimpleMatrix<T>(Ub.rows(), Ub.cols()).I(Ub(i, j)) );
+      UUbt.setMatrix(i * (x.rows() / Ubt.rows()), j * (x.cols() / Ubt.cols()),
+        SimpleMatrix<T>(Ubt.rows(), Ubt.cols()).I(Ubt(i, j)) );
+    }
+  Ux  = Ub.inverse()  * Ux;
+  Uxt = Ubt.inverse() * Uxt;
+  // N.B. Ux == Ua sqrt(diag(Lawork)) and same on right side.
+  // XXX:
+    assert(0 && "log (symmetric matrix A, symmetric matrix B) : stub");
+  return x;
+}
+
 template <typename T> static inline SimpleMatrix<T> exp01(const SimpleMatrix<T>& m) {
   SimpleMatrix<T> res(m.rows(), m.cols());
   static const int cut(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) * T(int(2)) );
@@ -2533,6 +2585,46 @@ template <typename T> static inline SimpleMatrix<T> exp(const SimpleMatrix<T>& m
 
 template <typename T> static inline SimpleMatrix<T> pow(const SimpleMatrix<T>& m, const T& p) {
   return exp(log(m) * p);
+}
+
+template <typename T> static inline SimpleMatrix<T> powSym(const SimpleMatrix<T>& m, const SimpleMatrix<T>& p) {
+  assert(m.rows() == m.cols() && p.rows() == p.cols());
+  for(int i = 0; i < m.rows(); i ++)
+    for(int j = i + 1; j < m.cols(); j ++)
+      assert(m(i, j) == m(j, i));
+  for(int i = 0; i < p.rows(); i ++)
+    for(int j = i + 1; j < p.cols(); j ++)
+      assert(p(i, j) == p(j, i));
+  // m = Um Lm Um^t, m^p == Um Lm^p Um^t.
+  // p = Up Lp Up^t, exp(log(Lm_i))^p == Up (Lp*log(Lm_i)) Up^t.
+  const auto Um(m.SVD());
+  const auto Umt(m.transpose().SVD());
+  const auto Lm(Um * m * Umt.transpose());
+  const auto Up(p.SVD());
+  const auto Upt(p.transpose().SVD());
+  const auto Lp(Up * p * Upt.transpose());
+  SimpleMatrix<T> res(m.rows() * p.rows(), m.cols() * p.cols());
+  res.O();
+  for(int i = 0; i < m.rows(); i ++) {
+    auto work(Up);
+    for(int j = 0; j < p.rows(); j ++)
+      work(i * p.rows() + j, j) = exp(Lp(j, j)) * Lm(i, i);
+    res.setMatrix(i * p.rows(), i * p.cols(), Up * work * Upt);
+  }
+  // XXX: here might not be trace trustworthy path,
+  //      so this might be a wrong method.
+  SimpleMatrix<T> UUm(m.rows() * p.rows(), m.cols() * p.cols());
+  auto UUmt(UUm);
+  UUm.O();
+  UUmt.O();
+  for(int i = 0; i < m.rows(); i ++)
+    for(int j = 0; j < m.rows(); j ++) {
+      UUm.setMatrix(i * p.rows(), j * p.cols(),
+        SimpleMatrix<T>(m.rows(), m.cols()).I(Um(i, j)));
+      UUmt.setMatrix(i * p.rows(), j * p.cols(),
+        SimpleMatrix<T>(m.rows(), m.cols()).I(Umt(i, j)));
+    }
+  return UUm * res * UUmt;
 }
 
 template <typename T> SimpleMatrix<complex<T> > dft(const int& size0) {
@@ -3624,10 +3716,10 @@ public:
   bool addp;
 };
 
-template <typename T, typename P> class PpersistentOnce {
+template <typename T, typename P> class PdeltaOnce {
 public:
-  inline PpersistentOnce() { ; }
-  inline ~PpersistentOnce() { ; }
+  inline PdeltaOnce() { ; }
+  inline ~PdeltaOnce() { ; }
   inline const T& progression(const SimpleVector<T>& h, const int& idx, const int& count) {
     assert(0 <= idx && 0 <= count);
     if(! count) return h[idx];
@@ -3635,7 +3727,7 @@ public:
     ph[idx][count] = 1;
     return (eh[idx][count] = progression(h, idx, count - 1) - progression(h, idx - 1, count - 1));
   }
-  inline T next(const SimpleVector<T>& in, const int& istat) {
+  inline T next(const SimpleVector<T>& in, const int& unit) {
     {
       vector<T> eh0;
       vector<bool> ph0;
@@ -3646,22 +3738,19 @@ public:
       eh.resize(in.size(), eh0);
       ph.resize(in.size(), ph0);
     }
-    // N.B. use full of the input to reduce counter measure.
-    //      we use maximum of the internal states bits for predictions.
-    const auto nretry(in.size() - istat);
-    T res(int(0));
-    for(int i = 0; i < nretry; i ++) {
-      // N.B. use maximum of the length for predictions.
-      idFeeder<T> buf(in.size() - i);
-      for(int j = i; j < in.size(); j ++)
-        buf.next(progression(in, j, i));
-      assert(buf.full);
-      // N.B. only one step after, option is for 6 layered P01 we don't use.
-      res += P().next(buf.res, buf.res.size() / 6);
-      for(int j = i - 1; 0 <= j; j --)
-        res += progression(in, in.size() - 1, j);
-    }
-    return res /= T(nretry);
+    // N.B. strategy changed, using some margin as delta to make
+    //      cont. cond., predict with remains.
+    //      this gets sharp edges but is able to be easily being jammed.
+    const auto& i(unit);
+          T     res(int(0));
+    idFeeder<T> buf(in.size() - i);
+    for(int j = i; j < in.size(); j ++)
+      buf.next(progression(in, j, i));
+    assert(buf.full);
+    for(int j = i - 1; 0 <= j; j --)
+      res += progression(in, in.size() - 1, j);
+    // N.B. also we can recursive this.
+    return res += P().next(buf.res, unit);
   }
   vector<vector<T> >    eh;
   vector<vector<bool> > ph;
@@ -4306,6 +4395,13 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
 
 
 // N.B. start ddpmopt
+
+// N.B. utility types used in predv.
+template <typename T> using PP0 = PdeltaOnce<T, P01<T, P0maxRank<T>, true> >;
+template <typename T> using PP3 = PdeltaOnce<T, P01<T, PdeltaOnce<T, P01<T, PdeltaOnce<T, P01<T, P0maxRank<T>, true> >, true> >, true> >;
+template <typename T> using PP6 = PdeltaOnce<T, P01<T, PdeltaOnce<T, P01<T, PdeltaOnce<T, P01<T, PdeltaOnce<T, P01<T, PdeltaOnce<T, P01<T, PdeltaOnce<T, P01<T, P0maxRank<T>, true> >, true> >, true> >, true> >, true> >, true> >;
+template <typename T> using PP9 = PdeltaOnce<T, P01<T, PdeltaOnce<T, P01<T, PdeltaOnce<T, P01<T, PdeltaOnce<T, P01<T, PdeltaOnce<T, P01<T, PdeltaOnce<T, P01<T, PdeltaOnce<T, P01<T, PdeltaOnce<T, P01<T, PdeltaOnce<T, P01<T, P0maxRank<T>, true> >, true> >, true> >, true> >, true> >, true> >, true> >, true> >, true> >;
+
 // N.B. the raw P01 predictor is useless because of their sloppiness.
 template <typename T> pair<SimpleVector<T>, SimpleVector<T> > predv(const vector<SimpleVector<T> >& in) {
   // N.B. we need to initialize p0 vector.
@@ -4321,8 +4417,17 @@ template <typename T> pair<SimpleVector<T>, SimpleVector<T> > predv(const vector
   for(int i = 0; i < in.size(); i ++)  {
     seconds[i] = makeProgramInvariant<T>(in[i], - T(int(1)), true).second;
   }
-  // N.B. we need Ppersistent<..., P01...> with maximum range.
-  const int istat(4 * 2 + 2);
+#if !defined(_PREDV_)
+  const int unit(in.size() / 2);
+#elif _PREDV_ == 3
+  const int unit(in.size() / 6);
+#elif _PREDV_ == 6
+  const int unit(in.size() / 12);
+#elif _PREDV_ == 9
+  const int unit(in.size() / 18);
+#else
+# error _PREDV_ has a invalid value
+#endif
   SimpleVector<T> p(in[0].size());
   SimpleVector<T> q(in[0].size());
   p.O();
@@ -4336,18 +4441,45 @@ template <typename T> pair<SimpleVector<T>, SimpleVector<T> > predv(const vector
     for(int i = 0; i < in.size(); i ++)
       buf.next(makeProgramInvariantPartial<T>(in[i][j], seconds[i], true));
     assert(buf.full);
-    p[j] = PpersistentOnce<T, P01<T, P0maxRank<T>, true> >().next(buf.res, istat);
-    q[j] = PpersistentOnce<T, P01<T, P0maxRank<T>, true> >().next(buf.res.reverse(), istat);
+#if !defined(_PREDV_)
+    p[j] = PP0<T>().next(buf.res, unit);
+    q[j] = PP0<T>().next(buf.res.reverse(), unit);
+#elif _PREDV_ == 3
+    p[j] = PP3<T>().next(buf.res, unit);
+    q[j] = PP3<T>().next(buf.res.reverse(), unit);
+#elif _PREDV_ == 6
+    p[j] = PP6<T>().next(buf.res, unit);
+    q[j] = PP6<T>().next(buf.res.reverse(), unit);
+#elif _PREDV_ == 9
+    p[j] = PP9<T>().next(buf.res, unit);
+    q[j] = PP9<T>().next(buf.res.reverse(), unit);
+#endif
   }
   const auto nseconds(sqrt(seconds.dot(seconds)));
   return make_pair(revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(p), - T(int(1)), true).first,
-      PpersistentOnce<T, P01<T, P0maxRank<T>, true> >().next(
-        seconds / nseconds, istat) * nseconds), true),
+#if !defined(_PREDV_)
+      PP0<T>().next(
+#elif _PREDV_ == 3
+      PP3<T>().next(
+#elif _PREDV_ == 6
+      PP6<T>().next(
+#elif _PREDV_ == 9
+      PP9<T>().next(
+#endif
+        seconds / nseconds, unit) * nseconds), true),
     revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(q), - T(int(1)), true).first,
-      PpersistentOnce<T, P01<T, P0maxRank<T>, true> >().next(
-        seconds.reverse() / nseconds, istat) * nseconds), true) );
+#if !defined(_PREDV_)
+      PP0<T>().next(
+#elif _PREDV_ == 3
+      PP3<T>().next(
+#elif _PREDV_ == 6
+      PP6<T>().next(
+#elif _PREDV_ == 9
+      PP9<T>().next(
+#endif
+        seconds.reverse() / nseconds, unit) * nseconds), true) );
 }
 
 template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
@@ -4559,11 +4691,23 @@ template <typename T> static inline SimpleVector<T> balanceIntInvariant(const Si
   for(int j = 0; j < mm.rows(); j ++)
     for(int k = 0; k < mm.cols(); k ++)
       vmm[j * mm.cols() + k] = move(mm(j, k));
-  // balance here.
-  // return f.solveN(vmm);
-  return SimpleVector<T>();
+  return f.solveN(vmm);
 }
 
+template <typename T> static inline SimpleVector<T> powProgram(const pair<SimpleVector<T>, T>& m, const T& p, const vector<SimpleMatrix<T> >& db) {
+  // N.B. power partial projected vector m by p using db.
+  //      this is: tan ([a_0,...,a_n]^t x) == tan(S_0 ... x) form,
+  //      getting (S_0...)^p.row(k) using program decomposition.
+  // N.B. without db, we cannot get unique m^p in this invariant meaning.
+  assert(db.size() && m.first.size() == db[0].cols() &&
+         db[0].rows() == db[0].cols());
+  for(int i = 1; i < db.size(); i ++)
+    assert(db[i].rows() == db[0].rows() && db[i].cols() == db[0].cols());
+  // N.B. balance inputs:
+  // N.B. stub.
+  assert(0 && "powProgram stub.");
+  return m;
+}
 
 // N.B. start goki check
 template <typename T> static inline bool less0(const T& x, const T& y) {
