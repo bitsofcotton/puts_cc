@@ -120,4 +120,5 @@ This repository is archived, so without bug report, will no change.
 2024/08/08 update readme.
 2024/08/09 fix typo.
 2024/08/18 merge update from ddpmopt.
+2024/09/28 merge latest ddpmopt result.
 
