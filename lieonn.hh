@@ -2106,6 +2106,7 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solve(SimpleVector
 
 template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solveN(SimpleVector<T> other) const {
   if(! (0 <= entity.size() && 0 <= ecols && entity.size() == ecols && entity.size() == other.size()) ) throw "SimpleMatrix<T>::SolveN error";
+  // XXX: stub
   assert(0 && "SimpleMatrix<T>::solveN stub");
   SimpleVector<T> res;
   return res;
@@ -2574,7 +2575,8 @@ template <typename T> static inline SimpleMatrix<T> exp(const SimpleMatrix<T>& m
   const auto p0(ceil(sqrt(norm2M(m))));
 #if defined(_FLOAT_BITS_)
   // XXX:
-  myuint p(p0.operator myint());
+  // myuint p(p0.operator myint());
+  myuint p(p0);
 #else
   myuint p(p0);
 #endif
@@ -4447,6 +4449,53 @@ template <typename T, int nprogress = 100> static inline vector<SimpleVector<T> 
   return res;
 }
 
+template <typename T, int nprogress = 3> static inline vector<SimpleVector<T> > predvall(vector<SimpleVector<T> >& in0) {
+  SimpleVector<SimpleVector<T> > in;
+  in.entity = move(in0);
+  vector<SimpleVector<T> > res;
+  for(int start = 0; start < in.size() / 2; start ++)
+    for(int step = 1; step < (in.size() - start) / 2; step ++)
+      for(int unit = step; unit < (in.size() - start) / 2 - step; unit ++) {
+        cerr << " *** " << start << " / " << in.size() / 2 << ", " << step << " / " << (in.size() - start) / 2 << ", " << unit << " / " << (in.size() - start) / 2 - step * 2 + 1 << " ***" << endl;
+        SimpleVector<SimpleVector<T> > p;
+        p.entity.reserve(unit);
+        for(int i = 0; i < unit; i ++)
+          p.entity.emplace_back(predv0<T, nprogress>(in.subVector(i + start, in.size() - start - unit + 1).entity, to_string(i) + string(" / ") + to_string(unit), step));
+        SimpleMatrix<T> ip(p.size() - step, in[0].size());
+#if defined(_OPENMP)
+#pragma omp parallel 
+#pragma for schedule(static, 1)
+#endif
+        for(int i = 0; i < ip.rows(); i ++) {
+          for(int j = 0; j < ip.cols(); j ++)
+            ip(i, j) = (p[i - ip.rows() + p.size() - step][j] *
+              T(int(2)) - T(int(1)) ) *
+                (in[i - ip.rows() + in.size()][j] * T(int(2)) - T(int(1)) );
+        }
+        for(int j = 0; j < ip.rows() - step; j ++)
+          for(int k = 0; k < step; k ++) {
+            SimpleVector<T> work(in[0].size());
+            work.O();
+            // N.B. we need gamma complement after this.
+            //      dftcache need to be single thread on first call.
+            work[0] = (P0maxRank0<T>(step - k).next(ip.col(0).subVector(j, ip.rows() - j)) *
+              (p[p.size() - 1 - k][0] * T(int(2)) - T(int(1)) ) + T(int(1)) ) / T(int(2));
+#if defined(_OPENMP)
+#pragma for schedule(static, 1)
+#endif
+            for(int i = 1; i < work.size(); i ++) {
+              if(nprogress && ! (i % (work.size() / nprogress)) )
+                cerr << i << " / " << work.size() << endl;
+              work[i] = (P0maxRank0<T>(step - k).next(ip.col(i).subVector(j, ip.rows() - j)) *
+                (p[p.size() - 1 - k][i] * T(int(2)) - T(int(1)) ) + T(int(1)) ) / T(int(2));
+            }
+            res.emplace_back(move(work));
+          }
+      }
+  in0 = move(in.entity);
+  return res;
+}
+
 template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0, const int& unit = - 1, const int& step = - 1) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
@@ -4463,7 +4512,7 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<Si
   const auto size0(in0[0].size());
   const auto size1(in0[0][0].size());
   in0.resize(0);
-  const auto p(predv<T>(in, unit, step));
+  const auto p(! unit && ! step ? predvall<T>(in) : predv<T>(in, unit, step));
   in.resize(0);
   vector<vector<SimpleVector<T> > > res;
   res.resize(p.size());
@@ -4494,7 +4543,7 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<Si
   const auto rows(in0[0][0].rows());
   const auto cols(in0[0][0].cols());
   in0.resize(0);
-  const auto p(predv<T>(in, unit, step));
+  const auto p(! unit && ! step ? predvall<T>(in) : predv<T>(in, unit, step));
   in.resize(0);
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(p.size());
@@ -4541,7 +4590,7 @@ template <typename T> vector<SimpleSparseTensor<T> > predSTen(vector<SimpleSpars
               (in0[i][idx[j]][idx[k]][idx[m]] + T(int(1))) / T(int(2));
   }
   in0.resize(0);
-  const auto p(predv<T>(in, unit, step));
+  const auto p(! unit && ! step ? predvall<T>(in) : predv<T>(in, unit, step));
   in.resize(0);
   vector<SimpleSparseTensor<T> > res;
   res.resize(p.size());
@@ -4551,7 +4600,7 @@ template <typename T> vector<SimpleSparseTensor<T> > predSTen(vector<SimpleSpars
         for(int m = 0; m < idx.size(); m ++)
           if(binary_search(attend.begin(), attend.end(),
                make_pair(j, make_pair(k, m))))
-            res[i][idx[j]][idx[k]][idx[m]] = p[i][cnt] * T(int(2)) - T(int(1));
+            res[i][idx[j]][idx[k]][idx[m]] = p[i][cnt ++] * T(int(2)) - T(int(1));
   return res;
 }
 
@@ -4630,10 +4679,11 @@ static const vector<int>& pnTinySingle(const int& upper = 1) {
 template <typename T> static inline SimpleMatrix<T> harmlessSymmetrizeSquare(const SimpleMatrix<T>& m) {
   assert(0 < m.rows() && 0 < m.cols() && m.cols() == m.rows());
   SimpleMatrix<T> res(m.rows() + m.cols(), m.cols() + m.rows());
-  res.O();
+  res.I();
   return res.setMatrix(0, m.cols(), m.transpose() -
      SimpleMatrix<T>(m.rows(), m.rows()).I()).
-    setMatrix(m.rows(), 0, m - SimpleMatrix<T>(m.cols(), m.cols()).I());
+    setMatrix(m.rows(), 0, flip<T>(flop<T>(m -
+      SimpleMatrix<T>(m.cols(), m.cols()).I() )) );
 }
 
 template <typename T> static inline SimpleVector<T> balanceIntInvariant(const SimpleMatrix<T>& m, const vector<SimpleMatrix<T> >& db) {
@@ -5845,7 +5895,9 @@ template <typename T> SimpleMatrix<T> tilt(const SimpleMatrix<T>& in, vector<tri
     auto& tri(triangles[j]);
     assert(tri.first.rows() == tri.first.cols() && tri.first.rows() == 3);
     // N.B. /= 3 isn't needed because only the order is the matter.
-    zbuf[j].first  = - (tri.first(0, 2) + tri.first(1, 2) + tri.first(2, 2));
+    // N.B.  = - ... isn't matches the .obj output.
+    //      also this matches bump output.
+    zbuf[j].first  = tri.first(0, 2) + tri.first(1, 2) + tri.first(2, 2);
     zbuf[j].second = move(tri);
   }
   sort(zbuf.begin(), zbuf.end(), lessf<pair<T, triangles_t<T> > >);
