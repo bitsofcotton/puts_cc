@@ -4442,12 +4442,12 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(co
   SimpleVector<T> res(in[0].size());
   res.O();
   SimpleMatrix<T> ip(p.size(), res.size());
-  for(int i = 0; i < step; i ++)
+  for(int i = 0; i < start + step; i ++)
     ip.row(i).O();
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int i = step; i < ip.rows(); i ++) {
+  for(int i = start + step; i < ip.rows(); i ++) {
     for(int j = 0; j < ip.cols(); j ++)
       ip(i, j) = (p[i - ip.rows() + p.size() - step][j] *
         T(int(2)) - T(int(1)) ) *
@@ -4470,13 +4470,15 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(co
   return res;
 }
 
-template <typename T, int nprogress = 20> static inline vector<SimpleVector<T> > predv(const SimpleVector<SimpleVector<T> >& in) {
-  const auto nstep(in.size() / 2);
-  vector<SimpleVector<T> > res;
-  res.reserve(nstep);
+template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(const SimpleVector<SimpleVector<T> >& in) {
+  const auto nstep(in.size() / 3 - 8);
+  SimpleVector<T> res(in[0].size());
+  res.O();
   for(int i = 0; i < nstep; i ++) {
     cerr << " *** PREDV STEP : " << i << " / " << nstep << " ***" << endl;
-    res.emplace_back(predv<T, nprogress>(in, i + 1));
+    res +=
+      predv<T, nprogress>(in.subVector(0, in.size() - i),
+        i + 1).subVector(0, res.size());
   }
   return res;
 }
@@ -4489,7 +4491,7 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(ve
   return res;
 }
 
-template <typename T, int nprogress = 20> static inline vector<SimpleVector<T> > predv(vector<SimpleVector<T> >& in) {
+template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(vector<SimpleVector<T> >& in) {
   SimpleVector<SimpleVector<T> > work;
   work.entity = move(in);
   auto res(predv<T, nprogress>(work));
@@ -4501,7 +4503,7 @@ template <typename T, int nprogress = 20> static inline vector<SimpleVector<T> >
 //      awared predictors they have a better prediction concerned with some
 //      series of a PRNG tests.
 
-template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0, const int& step = 0) {
+template <typename T> vector<SimpleVector<T> > predVec(vector<vector<SimpleVector<T> > >& in0, const int& step = 0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4517,21 +4519,16 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<Si
   const auto size0(in0[0].size());
   const auto size1(in0[0][0].size());
   in0.resize(0);
-  vector<SimpleVector<T> > p;
-  if(step) p.emplace_back(predv<T>(in, step));
-  else p = move(predv<T>(in));
+  auto p(step ? predv<T>(in, step) : predv<T>(in));
   in.resize(0);
-  vector<vector<SimpleVector<T> > > res;
-  res.resize(p.size());
-  for(int i = 0; i < res.size(); i ++) {
-    res[i].resize(size0);
-    for(int j = 0; j < res[i].size(); j ++)
-      res[i][j] = p[i].subVector(size1 * j, size1);
-  }
+  vector<SimpleVector<T> > res;
+  res.resize(size0);
+  for(int j = 0; j < res.size(); j ++)
+    res[j] = p.subVector(size1 * j, size1);
   return res;
 }
 
-template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0, const int& step = 0) {
+template <typename T> vector<SimpleMatrix<T> > predMat(vector<vector<SimpleMatrix<T> > >& in0, const int& step = 0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4550,24 +4547,19 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<Si
   const auto rows(in0[0][0].rows());
   const auto cols(in0[0][0].cols());
   in0.resize(0);
-  vector<SimpleVector<T> > p;
-  if(step) p.emplace_back(predv<T>(in, step));
-  else p = move(predv<T>(in));
+  auto p(step ? predv<T>(in, step) : predv<T>(in));
   in.resize(0);
-  vector<vector<SimpleMatrix<T> > > res;
-  res.resize(p.size());
-  for(int i = 0; i < res.size(); i ++) {
-    res[i].resize(size);
-    for(int j = 0; j < res[i].size(); j ++) {
-      res[i][j].resize(rows, cols);
-      for(int k = 0; k < rows; k ++)
-        res[i][j].row(k) = p[i].subVector(j * rows * cols + k * cols, cols);
-    }
+  vector<SimpleMatrix<T> > res;
+  res.resize(size);
+  for(int j = 0; j < res.size(); j ++) {
+    res[j].resize(rows, cols);
+    for(int k = 0; k < rows; k ++)
+      res[j].row(k) = p.subVector(j * rows * cols + k * cols, cols);
   }
   return res;
 }
 
-template <typename T> vector<SimpleSparseTensor<T> > predSTen(vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx, const int& step = 0) {
+template <typename T> SimpleSparseTensor<T> predSTen(vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx, const int& step = 0) {
   assert(idx.size() && in0.size());
   // N.B. we don't do input scaling.
   // N.B. the data we target is especially string stream corpus.
@@ -4599,19 +4591,15 @@ template <typename T> vector<SimpleSparseTensor<T> > predSTen(vector<SimpleSpars
               (in0[i][idx[j]][idx[k]][idx[m]] + T(int(1))) / T(int(2));
   }
   in0.resize(0);
-  vector<SimpleVector<T> > p;
-  if(step) p.emplace_back(predv<T>(in, step));
-  else p = move(predv<T>(in));
+  auto p(step ? predv<T>(in, step) : predv<T>(in));
   in.resize(0);
-  vector<SimpleSparseTensor<T> > res;
-  res.resize(p.size());
-  for(int i = 0; i < res.size(); i ++)
-    for(int j = 0, cnt = 0; j < idx.size(); j ++)
-      for(int k = 0; k < idx.size(); k ++)
-        for(int m = 0; m < idx.size(); m ++)
-          if(binary_search(attend.begin(), attend.end(),
-               make_pair(j, make_pair(k, m))))
-            res[i][idx[j]][idx[k]][idx[m]] = p[i][cnt ++] * T(int(2)) - T(int(1));
+  SimpleSparseTensor<T> res;
+  for(int j = 0, cnt = 0; j < idx.size(); j ++)
+    for(int k = 0; k < idx.size(); k ++)
+      for(int m = 0; m < idx.size(); m ++)
+        if(binary_search(attend.begin(), attend.end(),
+             make_pair(j, make_pair(k, m))))
+          res[idx[j]][idx[k]][idx[m]] = p[cnt ++] * T(int(2)) - T(int(1));
   return res;
 }
 
@@ -6892,13 +6880,10 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
     }
   }
   os << input;
-  const auto p(predSTen<T>(in, idx, 1));
-  for(int i = 0; i < p.size(); i ++) {
-    corpus<T, U> pstats;
-    pstats.corpust = p[i];
-    getAbbreved<T>(pstats, detailtitle, detail, delimiter);
-    os << pstats.simpleThresh(threshin).serialize();
-  }
+  corpus<T, U> pstats;
+  pstats.corpust = predSTen<T>(in, idx);
+  getAbbreved<T>(pstats, detailtitle, detail, delimiter);
+  os << pstats.simpleThresh(threshin).serialize();
   return os;
 }
 
