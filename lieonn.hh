@@ -2284,9 +2284,6 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::zeroFix(const Simp
     const auto& iidx(fidx[idx].second);
     const auto  orth(this->col(iidx));
     const auto  n2(orth.dot(orth));
-    // N.B. rank(*this) on call is max rank, should not be singular.
-    if(n2 <= epsilon())
-      continue;
     if(T(int(0)) < fidx[idx].first &&
        fidx[idx].first < sqrt(one.dot(one)) * epsilon()) {
       static bool shown(false);
@@ -2298,6 +2295,10 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::zeroFix(const Simp
       *this = Pb;
       break;
     }
+    // N.B. rank(*this) on call is max rank normally, should not be singular.
+    //      however, masp calls with rank isn't max cases.
+    if(n2 <= epsilon())
+      continue;
     Pb = *this;
     // N.B. O(mn) can be writed into O(lg m + lg n) in many core cond.
 #if defined(_OPENMP)
@@ -4425,7 +4426,7 @@ template <typename T, int nprogress = 20> SimpleVector<T> predv0(const vector<Si
 //      some of the PRNG test meaning broken. so revert them.
 //      (changed p1/pp3.cc predv call to predv0 call causes split predictions
 //       however the command line chain meaning unchanged.)
-template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(const SimpleVector<SimpleVector<T> >& in, const int& step) {
+template <typename T, int nprogress = 20> static inline SimpleVector<T> predv1(const SimpleVector<SimpleVector<T> >& in, const int& step = 1) {
   assert(0 < step && in.size() && 1 < in[0].size());
   // N.B. we specify what width in ordinary we get better result in average.
   //      we use minimum as a default, however we should use another length
@@ -4471,31 +4472,36 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(co
   return res;
 }
 
-template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(SimpleVector<SimpleVector<T> >& in) {
-  const auto nstep(in.size() / 3 - 8);
+// N.B. instead of recursive doing sliding input length (they hardly depends
+//      on first some steps), we use montecarlo method.
+//      recur == 11 is enough to get probability around .9 when we're using
+//      Condorcet-Jury counting.
+template <typename T, int nprogress = 6> static inline SimpleVector<T> predv(const SimpleVector<SimpleVector<T> >& in, const int& step = 1, const int& recur = 11) {
+  SimpleVector<SimpleVector<T> > m;
+  m.resize(in.size());
+  for(int i = 0; i < in.size(); i ++) {
+    m[i].resize(in[i].size() + 1);
+    m[i].setVector(1, in[i]);
+  }
   SimpleVector<T> res(in[0].size());
   res.O();
-  for(int i = 0; i < nstep; i ++) {
-    cerr << " *** PREDV STEP : " << i << " / " << nstep << " ***" << endl;
-    res += predv<T, nprogress>(in, i + 1).subVector(0, res.size());
-    in.resize(in.size() - 1);
+  for(int i = 0; i < recur; i ++) {
+    cerr << " *** PREDV : " << i << " / " << recur << " ***" << endl;
+    for(int j = 0; j < m.size(); j ++)
+#if defined(NOARCFOUR)
+      m[j][0] = T(random()) / T(int(RAND_MAX));
+#else
+      m[j][0] = T(arc4random_uniform(0xffff)) / T(int(0x10000));
+#endif
+    res += predv1<T, nprogress>(m, step).subVector(1, res.size());
   }
-  in.resize(0);
-  return res /= T(int(nstep));
+  return res /= T(recur);
 }
 
-template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(vector<SimpleVector<T> >& in, const int& step) {
+template <typename T, int nprogress = 6> static inline SimpleVector<T> predv(vector<SimpleVector<T> >& in, const int& step = 1, const int& recur = 11) {
   SimpleVector<SimpleVector<T> > work;
   work.entity = move(in);
-  auto res(predv<T, nprogress>(work, step));
-  in = move(work.entity);
-  return res;
-}
-
-template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(vector<SimpleVector<T> >& in) {
-  SimpleVector<SimpleVector<T> > work;
-  work.entity = move(in);
-  auto res(predv<T, nprogress>(work));
+  auto res(predv<T, nprogress>(work, step, recur));
   in = move(work.entity);
   return res;
 }
@@ -4504,7 +4510,7 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(ve
 //      awared predictors they have a better prediction concerned with some
 //      series of a PRNG tests.
 
-template <typename T> vector<SimpleVector<T> > predVec(vector<vector<SimpleVector<T> > >& in0, const int& step = 0) {
+template <typename T> vector<SimpleVector<T> > predVec(vector<vector<SimpleVector<T> > >& in0, const int& step = 1) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4520,7 +4526,7 @@ template <typename T> vector<SimpleVector<T> > predVec(vector<vector<SimpleVecto
   const auto size0(in0[0].size());
   const auto size1(in0[0][0].size());
   in0.resize(0);
-  auto p(step ? predv<T>(in, step) : predv<T>(in));
+  auto p(predv<T>(in, step));
   vector<SimpleVector<T> > res;
   res.resize(size0);
   for(int j = 0; j < res.size(); j ++)
@@ -4528,7 +4534,7 @@ template <typename T> vector<SimpleVector<T> > predVec(vector<vector<SimpleVecto
   return res;
 }
 
-template <typename T> vector<SimpleMatrix<T> > predMat(vector<vector<SimpleMatrix<T> > >& in0, const int& step = 0) {
+template <typename T> vector<SimpleMatrix<T> > predMat(vector<vector<SimpleMatrix<T> > >& in0, const int& step = 1) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4547,7 +4553,7 @@ template <typename T> vector<SimpleMatrix<T> > predMat(vector<vector<SimpleMatri
   const auto rows(in0[0][0].rows());
   const auto cols(in0[0][0].cols());
   in0.resize(0);
-  auto p(step ? predv<T>(in, step) : predv<T>(in));
+  auto p(predv<T>(in, step));
   vector<SimpleMatrix<T> > res;
   res.resize(size);
   for(int j = 0; j < res.size(); j ++) {
@@ -4558,7 +4564,7 @@ template <typename T> vector<SimpleMatrix<T> > predMat(vector<vector<SimpleMatri
   return res;
 }
 
-template <typename T> SimpleSparseTensor<T> predSTen(vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx, const int& step = 0) {
+template <typename T> SimpleSparseTensor<T> predSTen(vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx, const int& step = 1) {
   assert(idx.size() && in0.size());
   // N.B. we don't do input scaling.
   // N.B. the data we target is especially string stream corpus.
@@ -4590,7 +4596,7 @@ template <typename T> SimpleSparseTensor<T> predSTen(vector<SimpleSparseTensor<T
               (in0[i][idx[j]][idx[k]][idx[m]] + T(int(1))) / T(int(2));
   }
   in0.resize(0);
-  auto p(step ? predv<T>(in, step) : predv<T>(in));
+  auto p(predv<T>(in, step));
   SimpleSparseTensor<T> res;
   for(int j = 0, cnt = 0; j < idx.size(); j ++)
     for(int k = 0; k < idx.size(); k ++)

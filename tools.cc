@@ -117,6 +117,9 @@ inline void makelword(vector<string>& words, const std::string& input, const boo
 
 #undef int
 int main(int argc, const char* argv[]) {
+#if defined(NOARCFOUR)
+  srandom_dev();
+#endif
 #define int int64_t
   if(argc < 2) {
     usage();

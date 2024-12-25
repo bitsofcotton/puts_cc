@@ -5,6 +5,7 @@ CXXFLAGS+=	-Oz -mtune=native -gfull
 #CXXFLAGS+=	-Ofast -mtune=native -gfull
 #CXXFLAGS+=	-O2 -mtune=native -g3
 #CXXFLAGS+=	-pg
+#CXXFLAGS+=	-DNOARCFOUR
 CXXFLAGS+=	-std=c++11
 MPFLAGS=	-I/usr/local/include -L/usr/local/lib -lomp -fopenmp
 #MPFLAGS=	-I/usr/local/include -L/usr/local/lib -lgomp -fopenmp
