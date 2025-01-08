@@ -4537,7 +4537,7 @@ template <typename T, int nprogress = 6> static inline SimpleVector<T> predv4(ve
       const auto invariant(linearInvariant<T>(toeplitz));
       SimpleVector<T> work(5);
       work.O();
-      work.setVector(0, inw[inw.size() - 1].subVector(1, 4));
+      work.setVector(0, inw[inw.size() - 1].subVector(0, 4));
       work[work.size() - 1] = zero;
       auto last(sqrt(work.dot(work)));
       for(int ii = 0;
