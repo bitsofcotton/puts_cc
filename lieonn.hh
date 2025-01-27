@@ -4373,18 +4373,19 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
 template <typename T> using PP0 = P01<T, P01delim<T>, true>;
 
 // N.B. as ddpmopt:README.md, PP3 is least and enough normally.
-template <typename T, int nprogress = 20> SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const string& strloop = string(""), const int& step = 1) {
+template <typename T, int nprogress = 20> SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const string& strloop = string(""), const int& sz = 9, const int& step = 1) {
+  assert(0 < sz && sz <= in.size());
   // N.B. we need to initialize p0 vector.
-  SimpleVector<T> seconds(in.size());
+  SimpleVector<T> seconds(sz);
   seconds.O();
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int i = 0; i < in.size(); i ++)  {
+  for(int i = 0; i < sz; i ++)  {
     seconds[i] = makeProgramInvariant<T>(in[i], - T(int(1)), true).second;
   }
   // N.B. not in use, we use whole in.size() with PP0.
-  const int unit(in.size() / 2);
+  const int unit(sz / 2);
   SimpleVector<T> p(in[0].size());
   p.O();
 #if defined(_OPENMP)
@@ -4393,8 +4394,8 @@ template <typename T, int nprogress = 20> SimpleVector<T> predv0(const vector<Si
   for(int j = 0; j < in[0].size(); j ++) {
     if(nprogress && ! (j % max(int(1), int(in[0].size() / nprogress))) )
       cerr << j << " / " << in[0].size() << ", " << strloop << endl;
-    idFeeder<T> buf(in.size());
-    for(int i = 0; i < in.size(); i ++)
+    idFeeder<T> buf(sz);
+    for(int i = 0; i < sz; i ++)
       buf.next(makeProgramInvariantPartial<T>(in[i][j], seconds[i], true));
     assert(buf.full);
     p[j] = PP0<T>(step).next(buf.res, unit);
@@ -4429,13 +4430,18 @@ template <typename T, int nprogress = 20> SimpleVector<T> predv0(const vector<Si
 //      some of the PRNG test meaning broken. so revert them.
 //      (changed p1/pp3.cc predv call to predv0 call causes split predictions
 //       however the command line chain meaning unchanged.)
-template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(const SimpleVector<SimpleVector<T> >& in, const int& step = 1) {
+template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(const vector<SimpleVector<T> >& in, const int& step = 1) {
   assert(0 < step && in.size() && 1 < in[0].size());
-  // N.B. we specify what width in ordinary we get better result in average.
-  //      we use minimum as a default, however we should use another length
-  //      avoiding some of the jammers.
-  // N.B. it's up to size / 3, because we need P01 double states than P0.
-  //      P0 looks 4 times upper by complement, so we average double upper.
+  // N.B. we use whole width to get better result in average.
+  //      this is equivalent to the command: p1 1 | p0 1 :
+  //      enough prediction with integer-float classes (SimpleFloat<...>)
+  //      takes O(length^2) to get the result in their cases,
+  //      however with CPU implemented float they can have some unknown errors,
+  //      we should use at least p1 0 | p0 1 in their case
+  //      they takes O(length^3) to get such condition for each pixel.
+  // XXX: If we implement loop hard optimizer, we can use them with
+  //      O((length*pixel*accuracy)^2) for each pixel bit even also any of
+  //      the contexts they can have implementation.
   SimpleVector<SimpleVector<T> > p;
   p.entity.reserve(in.size());
   // N.B. optimal with PP0
@@ -4443,7 +4449,7 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(co
   for(int i = 1; i < start; i ++)
     p.entity.emplace_back(SimpleVector<T>(in[0].size()).O());
   for(int i = start; i <= in.size(); i ++)
-    p.entity.emplace_back(predv0<T, nprogress>(in.subVector(0, i).entity, to_string(i) + string(" / ") + to_string(in.size()), step));
+    p.entity.emplace_back(predv0<T, nprogress>(in, to_string(i) + string(" / ") + to_string(in.size()), i, step));
   SimpleVector<T> res(in[0].size());
   res.O();
   SimpleMatrix<T> ip(p.size(), res.size());
@@ -4480,23 +4486,14 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(co
 //      recur == 11 is enough to get probability around .9 when we're using
 //      Condorcet's jury counting.
 // N.B. the effect recur doesn't get better ones. So we eliminated them.
-
-template <typename T, int nprogress = 6> static inline SimpleVector<T> predv(vector<SimpleVector<T> >& in, const int& step = 1) {
-  SimpleVector<SimpleVector<T> > work;
-  work.entity = move(in);
-  auto res(predv<T, nprogress>(work, step));
-  in = move(work.entity);
-  return res;
-}
-
 // N.B. we eliminated predvall, we don't need them with whole internal states
 //      awared predictors they have a better prediction concerned with some
 //      series of a PRNG tests.
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
 template <typename T, int nprogress = 6> static inline SimpleVector<T> predv4(vector<SimpleVector<T> >& in) {
-  assert(1 < in.size() && ! (in[in.size() - 1].size() & 0x03) &&
-         ! (in.size() & 1));
+  assert(1 < in.size() && (in[in.size() - 1].size() == 4 ||
+                           in[in.size() - 1].size() == 12) );
   static const T zero(0);
   static const T one(1);
   static const T two(2);
@@ -4525,8 +4522,8 @@ template <typename T, int nprogress = 6> static inline SimpleVector<T> predv4(ve
       // XXX: following throws floating point exception, non zero divide.
       //  1 + ((i / (in[in.size() - 2].size() / in[in.size() - 1].size())) & (~ 0x03)), 4));
       vw[4] = inw[j * 2 + 2][i];
-      toeplitz0.row(toeplitz0.rows() - j - 1) =
-        makeProgramInvariant<T>(vw, T(int(toeplitz0.rows() - j)) / T(int(toeplitz0.rows() + 1)) ).first;
+      toeplitz0.row(j) =
+        makeProgramInvariant<T>(vw, T(j) / T(int(toeplitz0.rows() + 1)) ).first;
     }
     for(int i1 = 9; i1 <= toeplitz0.rows(); i1 ++) {
       if(nprogress && ! (i1 % max(int(1), int(toeplitz0.rows() / nprogress))) )
