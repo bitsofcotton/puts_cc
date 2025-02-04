@@ -4460,23 +4460,22 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(co
 #endif
   for(int i = start + step; i < ip.rows(); i ++) {
     for(int j = 0; j < ip.cols(); j ++)
-      ip(i, j) = (p[i - ip.rows() + p.size() - step][j] *
-        T(int(2)) - T(int(1)) ) *
-          (in[i - ip.rows() + in.size()][j] * T(int(2)) - T(int(1)) );
+      ip(i, j) = in[i - ip.rows() + in.size()][j] - 
+         p[i - ip.rows() + p.size() - step][j];
   }
   // N.B. we need gamma complement after this.
   //      dftcache need to be single thread on first call.
   // N.B. we bet combination subtracted series is continuous.
-  res[0] = (P0maxRank0<T>(step).next(ip.col(0)) *
-    (p[p.size() - 1][0] * T(int(2)) - T(int(1)) ) + T(int(1)) ) / T(int(2));
+  res[0] = ( (P0maxRank0<T>(step).next(ip.col(0)) + p[p.size() - 1][0]) +
+    T(int(4)) ) / T(int(8));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 1; i < res.size(); i ++) {
     if(nprogress && ! (i % max(int(1), int(res.size() / nprogress))) )
       cerr << i << " / " << res.size() << endl;
-    res[i] = (P0maxRank0<T>(step).next(ip.col(i)) *
-      (p[p.size() - 1][i] * T(int(2)) - T(int(1)) ) + T(int(1)) ) / T(int(2));
+    res[i] = ( (P0maxRank0<T>(step).next(ip.col(i)) + p[p.size() - 1][i]) +
+      T(int(4)) ) / T(int(8));
   }
   return res;
 }

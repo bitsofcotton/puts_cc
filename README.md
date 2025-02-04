@@ -125,4 +125,5 @@ This repository is archived, so without bug report, will no change.
 2024/12/06 merge latest ddpmopt result causes prediction improve.
 2024/12/26 merge latest ddpmopt result causes prediction improve.
 2025/01/27 merge latest lieonn causes improve memory usage need half ones differed to before.
+2025/02/05 merge latest lieonn affects pred cmd.
 
