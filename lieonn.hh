@@ -3326,7 +3326,7 @@ template <typename T> inline T P012L<T>::next(const SimpleVector<T>& d) {
     for(int j = 0; j < work.size(); j ++)
       score += work[j] * revertProgramInvariant<T>(make_pair(avg[j], vdp.second));
     res += score * work[work.size() - 1];
-    sscore += abs(score);
+    sscore += abs(score * sqrt(work.dot(work)));
   }
   return sscore == zero ? sscore : res / sscore;
 }
@@ -3657,6 +3657,57 @@ public:
   }
 private:
   int varlen;
+  int step;
+};
+
+template <typename T, typename P> class PSVD {
+public:
+  inline PSVD(const int& step = 1) { this->step = step; }
+  inline ~PSVD() { ; }
+  inline T next(const SimpleVector<T>& in, const int& unit = 1) {
+    vector<SimpleMatrix<T> > U;
+    vector<SimpleMatrix<T> > D;
+    vector<SimpleMatrix<T> > V;
+    U.reserve(in.size() - unit * 2 + 2);
+    D.reserve(in.size() - unit * 2 + 2);
+    V.reserve(in.size() - unit * 2 + 2);
+    for(int i = unit * 2 - 2; i < in.size(); i ++) {
+      SimpleMatrix<T> W(unit, unit);
+      for(int j = 0; j < W.rows(); j ++)
+        for(int k = 0; k < W.cols(); k ++)
+          W((j - abs(i - in.size()) % W.rows() + W.rows()) % W.rows(),
+            (k + abs(i - in.size()) % W.cols() + W.cols()) % W.cols()) =
+              in[i + (k - W.cols() + 1) + (j - W.rows() + 1)];
+      U.emplace_back(W.SVD());
+      V.emplace_back(W.transpose().SVD().transpose());
+      D.emplace_back(U[U.size() - 1] * W * V[V.size() - 1]);
+    }
+    assert(U.size() == D.size() && D.size() == V.size());
+    SimpleMatrix<T> pU(unit, unit);
+    SimpleMatrix<T> pD(unit, unit);
+    SimpleMatrix<T> pV(unit, unit);
+    pU.O(); pD.O(); pV.O();
+    for(int i = 0; i < unit; i ++)
+      for(int j = 0; j < unit; j ++) {
+        SimpleVector<T> work(U.size());
+        for(int k = 0; k < U.size(); k ++)
+           work[k] = U[k](i, j);
+        pU(i, j) = P(step).next(work);
+        for(int k = 0; k < D.size(); k ++)
+           work[k] = D[k](i, j);
+        pD(i, j) = P(step).next(work);
+        for(int k = 0; k < V.size(); k ++)
+           work[k] = V[k](i, j);
+        pV(i, j) = P(step).next(work);
+      }
+    const auto pW(pU * pD * pV);
+    SimpleVector<T> work(pV.cols());
+    work.O();
+    for(int i = 1; i < work.size(); i ++)
+      work[i - 1] = in[i - work.size() + in.size()];
+    work[work.size() - 1] = T(int(0));
+    return - pW.row(pW.rows() - 1).dot(work) / pW(pW.rows() - 1, pW.cols() - 1);
+  }
   int step;
 };
 
@@ -4370,6 +4421,8 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
 // template <typename T> using PP0 = PdeltaOnce<T, P01<T, P01delim<T>, true> >;
 // N.B. we are targetting the structure they appears additional states after
 //      additional states on given input range. so we don't use PdeltaOnce.
+// N.B. we can avoid timing-related prediction fails with following PSVD class.
+// template <typename T> using PP0 = PSVD<T, P01<T, P0maxRank<T>, true> >;
 template <typename T> using PP0 = P01<T, P01delim<T>, true>;
 
 // N.B. as ddpmopt:README.md, PP3 is least and enough normally.
@@ -4385,7 +4438,7 @@ template <typename T, int nprogress = 20> SimpleVector<T> predv0(const vector<Si
     seconds[i] = makeProgramInvariant<T>(in[i], - T(int(1)), true).second;
   }
   // N.B. not in use, we use whole in.size() with PP0.
-  const int unit(sz / 2);
+  const int unit(sz / 3);
   SimpleVector<T> p(in[0].size());
   p.O();
 #if defined(_OPENMP)
@@ -4430,15 +4483,14 @@ template <typename T, int nprogress = 20> SimpleVector<T> predv0(const vector<Si
 //      some of the PRNG test meaning broken. so revert them.
 //      (changed p1/pp3.cc predv call to predv0 call causes split predictions
 //       however the command line chain meaning unchanged.)
-template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(const vector<SimpleVector<T> >& in, const int& step = 1) {
+template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(vector<SimpleVector<T> >& in, const int& step = 1) {
   assert(0 < step && in.size() && 1 < in[0].size());
   // N.B. we use whole width to get better result in average.
-  //      this is equivalent to the command: p1 1 | p0 1 :
+  //      this is equivalent to the command: p1 | p0 :
   //      enough prediction with integer-float classes (SimpleFloat<...>)
   //      takes O(length^2) to get the result in their cases,
   //      however with CPU implemented float they can have some unknown errors,
-  //      we should use at least p1 0 | p0 1 in their case
-  //      they takes O(length^3) to get such condition for each pixel.
+  //      we should use at least p1-... | p0-... in their case.
   // XXX: If we implement loop hard optimizer, we can use them with
   //      O((length*pixel*accuracy)^2) for each pixel bit even also any of
   //      the contexts they can have implementation.
@@ -4446,6 +4498,8 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(co
   p.entity.reserve(in.size());
   // N.B. optimal with PP0
   const auto start(8 + step);
+  // N.B. with PSVD we need start *= 3 or we use only 3 blocks.
+  // const auto start(max((8 + step) * 3, int(in.size()) - 2));
   for(int i = 1; i < start; i ++)
     p.entity.emplace_back(SimpleVector<T>(in[0].size()).O());
   for(int i = start; i <= in.size(); i ++)
@@ -4460,26 +4514,48 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(co
 #endif
   for(int i = start + step; i < ip.rows(); i ++) {
     for(int j = 0; j < ip.cols(); j ++)
-      ip(i, j) = in[i - ip.rows() + in.size()][j] - 
-         p[i - ip.rows() + p.size() - step][j];
+      ip(i, j) =
+        (in[i - ip.rows() + in.size()][j] * T(int(2)) - T(int(1)) ) *
+        (p[i - ip.rows() + p.size() - step][j] * T(int(2)) - T(int(1)) );
   }
-  // N.B. we need gamma complement after this.
-  //      dftcache need to be single thread on first call.
+  // N.B. dftcache need to be single thread on first call.
   // N.B. we bet combination subtracted series is continuous.
-  res[0] = ( (P0maxRank0<T>(step).next(ip.col(0)) + p[p.size() - 1][0]) +
-    T(int(4)) ) / T(int(8));
+  // N.B. once we used differences prediction, but now, we only bet their signs.
+  //      so the result is: pred2(in * pred(in)) * pred(in) ~
+  //        sgn(pred3(in)) * alpha.
+  // N.B. either, diferrences prediction is better friendly to upper layer
+  //      monte-carlo methods, however, with some of the test we have isn't
+  //      get better result them (only returns last one image), so they're
+  //      eliminated.
+  res[0] = (P0maxRank0<T>(step).next(ip.col(0)) *
+    (p[p.size() - 1][0] * T(int(2)) - T(int(1)) ) +
+      T(int(1)) ) / T(int(2));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 1; i < res.size(); i ++) {
     if(nprogress && ! (i % max(int(1), int(res.size() / nprogress))) )
       cerr << i << " / " << res.size() << endl;
-    res[i] = ( (P0maxRank0<T>(step).next(ip.col(i)) + p[p.size() - 1][i]) +
-      T(int(4)) ) / T(int(8));
+    res[i] = (P0maxRank0<T>(step).next(ip.col(i)) *
+      (p[p.size() - 1][i] * T(int(2)) - T(int(1)) ) +
+        T(int(1)) ) / T(int(2));
   }
+  in.resize(0);
   return res;
 }
 
+// N.B. predv only returns last one picture on some of our tests with real
+//      data, but is effective returns better results with PRNG tests.
+//      so with real data, we only apply P0maxRank to each pixel.
+// N.B. eliminated below. this is because: our test is well done with the
+//      3 of combinations candidates normally with PRNGs:
+//      {catgp | p1 | p0, p1 | p0, p0} so these are 3 of the measurable
+//      conditions we suppose. So we're targetting only stable entropy feed
+//      after and after stream, so we make hypothesis Riemann-Stieljes cond.
+//      Otherwise, enough continuous datas have Riemann measurable cond.
+//      Either, enough complex datas have non Lebesgue measurable cond
+//      (No unique pure functions cond nor no non entropy phenomenon cond.).
+// N.B. we also eliminated above:
 // N.B. instead of recursive doing sliding input length (they hardly depends
 //      on first some steps), we use montecarlo method.
 //      recur == 11 is enough to get probability around .9 when we're using
@@ -4490,6 +4566,7 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(co
 //      series of a PRNG tests.
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
+//      mostly with slight speed hacks.
 template <typename T, int nprogress = 6> static inline SimpleVector<T> predv4(vector<SimpleVector<T> >& in) {
   assert(1 < in.size() && (in[in.size() - 1].size() == 4 ||
                            in[in.size() - 1].size() == 12) );
@@ -4511,9 +4588,9 @@ template <typename T, int nprogress = 6> static inline SimpleVector<T> predv4(ve
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int i = 8; i < gwork0.rows(); i ++) {
+  for(int i = 0; i < gwork0.rows(); i ++) {
     // N.B. imported from P01 class.
-    SimpleMatrix<T> toeplitz0(gwork0.cols() - 1, 7);
+    SimpleMatrix<T> toeplitz0(gwork0.cols(), 7);
     for(int j = 0; j < toeplitz0.rows(); j ++) {
       SimpleVector<T> vw(5);
       vw.O();
@@ -4533,7 +4610,7 @@ template <typename T, int nprogress = 6> static inline SimpleVector<T> predv4(ve
       const auto invariant(linearInvariant<T>(toeplitz));
       SimpleVector<T> work(5);
       work.O();
-      work.setVector(0, inw[inw.size() - 1].subVector(0, 4));
+      work.setVector(0, inw[(i1 - toeplitz0.rows()) * 2 + inw.size() - 1].subVector(0, 4));
       work[work.size() - 1] = zero;
       auto last(sqrt(work.dot(work)));
       for(int ii = 0;
@@ -4546,7 +4623,7 @@ template <typename T, int nprogress = 6> static inline SimpleVector<T> predv4(ve
           - (invariant.dot(work2.first) - invariant[4] * work2.first[4]) /
           invariant[4], work2.second));
       }
-      gwork0(i, i1) = work[work.size() - 1];
+      gwork0(i, i1 - 1) = work[work.size() - 1];
     }
   }
   for(int i1 = 9; i1 < gwork0.cols(); i1 ++) {
@@ -4560,20 +4637,21 @@ template <typename T, int nprogress = 6> static inline SimpleVector<T> predv4(ve
   gwork1.O();
   // N.B. imported from predv1.
   for(int i = 0; i < gwork1.rows(); i ++)
-    for(int j = 10; j < gwork1.cols(); j ++)
-      gwork1(i, j) = (gwork0(i, j - 1) * T(int(2)) - T(int(1)) ) *
-        (in[(j - gwork1.cols()) * 2 + in.size()][i] * T(int(2)) -
-          T(int(1)) );
+    for(int j = 9; j < gwork1.cols(); j ++)
+      gwork1(i, j) =
+        (in[(j - gwork1.cols()) * 2 + in.size()][i] * T(int(2)) - T(int(1)) ) *
+        (gwork0(i, j - 1) * T(int(2)) - T(int(1)) );
+  // N.B. same logic as predv, we bet only the sign of them.
   res[0] = (P0maxRank0<T>().next(gwork1.row(0)) *
-    (gwork0(0, gwork0.cols() - 1) * T(int(2)) - T(int(1)) ) + T(int(1)) ) /
-      T(int(2));
+    (gwork0(0, gwork0.cols() - 1) * T(int(2)) - T(int(1)) ) +
+      T(int(1)) ) / T(int(2));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 1; i < res.size(); i ++)
     res[i] = (P0maxRank0<T>().next(gwork1.row(i)) *
-      (gwork0(i, gwork0.cols() - 1) * T(int(2)) - T(int(1)) ) + T(int(1)) ) /
-        T(int(2));
+      (gwork0(i, gwork0.cols() - 1) * T(int(2)) - T(int(1)) ) +
+        T(int(1)) ) / T(int(2));
   return res;
 }
 
@@ -4601,8 +4679,23 @@ template <typename T> vector<SimpleVector<T> > predVec(vector<vector<SimpleVecto
   return res;
 }
 
+// N.B. once we have audo en/decoder which is DFT image[n] DFT with 
+//      input prediction direction sliding DFT also doing bit-wise separation
+//      giving into predv, however they only returns left-top white point and
+//      black outed image or only yellow outed images for a result.
+//      so we reverted to original plain predictions.
+// N.B. we also did them with result sgn middle stage predv result conversion,
+//      however they aren't changed result.
+// N.B. original DFT image[n] DFT conversion looks better with continuous
+//      input converted into discrete variables, however, our predictor isn't
+//      get 100% result, so some probability they slips, so their slips
+//      effects whole result graphics in IDFT.
+// N.B. sliding prediction direction DFT can have explicit relations to
+//      many much more on input graphics, they should works well but not for us.
+//      this either can be caused by prediction errors as a predv output.
+//      monte-carlo 11*11 times isn't changed this situation.
 template <typename T> vector<SimpleMatrix<T> > predMat(vector<vector<SimpleMatrix<T> > >& in0, const int& step = 1) {
-  assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
+assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
@@ -4637,6 +4730,8 @@ template <typename T> SimpleSparseTensor<T> predSTen(vector<SimpleSparseTensor<T
   // N.B. the data we target is especially string stream corpus.
   //      they are incontinuous one, so complementing with continuous stream
   //      shouldn't improve outputs.
+  // N.B. we should use each bit extended input stream but not now.
+  //      they uses large enough memory we cannot comput on our machines.
   vector<SimpleVector<T> > in;
   vector<pair<int, pair<int, int> > > attend;
   in.resize(in0.size());
@@ -6957,6 +7052,28 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
   os << pstats.simpleThresh(threshin).serialize();
   return os;
 }
+
+// N.B. start p2/persistent.cc
+template <typename T> static inline T pseudoerfscale(const T& x) {
+  return sgn<T>(x) == T(int(0)) ? x : sgn<T>(x) * exp(- x * x);
+}
+
+template <typename T> static inline T pseudoierfscale(const T& y) {
+  return sgn<T>(y) == T(int(0)) ? y : sgn<T>(y) * sqrt(abs(- log(abs(y))));
+}
+
+template <typename T> static inline T expscale(const T& x) {
+  return sgn<T>(x) * (exp(abs(x)) - T(int(1)));
+}
+
+template <typename T> static inline T logscale(const T& x) {
+  return sgn<T>(x) * log(abs(x) + T(int(1)));
+}
+
+// N.B. eliminated Persistent class and their functions.
+//      we cannot avoid such a error recusrive prediction's white noise with
+//      the method we once have. it's only accuracy limit dependant but reverse
+//      of them doesn't work.
 
 #define _SIMPLELIN_
 #endif
