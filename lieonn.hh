@@ -4483,7 +4483,12 @@ template <typename T, int nprogress = 20> SimpleVector<T> predv0(const vector<Si
 //      some of the PRNG test meaning broken. so revert them.
 //      (changed p1/pp3.cc predv call to predv0 call causes split predictions
 //       however the command line chain meaning unchanged.)
-template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(vector<SimpleVector<T> >& in, const int& step = 1) {
+// Important N.B. we use this function with delta input, [start + step + 1, -0[
+//                summation output.
+//                however, we correct them with real input, so raw option isn't
+//                needed.
+// N.B. we maybe in invariant controlled condition, so return 2 of candidates.
+template <typename T, int nprogress = 20> static inline pair<SimpleVector<T>, SimpleVector<T> > predv(vector<SimpleVector<T> >& in, const int& step = 1) {
   assert(0 < step && in.size() && 1 < in[0].size());
   // N.B. we use whole width to get better result in average.
   //      this is equivalent to the command: p1 | p0 :
@@ -4495,6 +4500,8 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(ve
   //      O((length*pixel*accuracy)^2) for each pixel bit even also any of
   //      the contexts they can have implementation.
   SimpleVector<SimpleVector<T> > p;
+  SimpleVector<T> res(in[0].size());
+  SimpleVector<T> resc(in[0].size());
   p.entity.reserve(in.size());
   // N.B. optimal with PP0
   const auto start(8 + step);
@@ -4504,8 +4511,6 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(ve
     p.entity.emplace_back(SimpleVector<T>(in[0].size()).O());
   for(int i = start; i <= in.size(); i ++)
     p.entity.emplace_back(predv0<T, nprogress>(in, to_string(i) + string(" / ") + to_string(in.size()), i, step));
-  SimpleVector<T> res(in[0].size());
-  res.O();
   SimpleMatrix<T> ip(p.size(), res.size());
   for(int i = 0; i < start + step; i ++)
     ip.row(i).O();
@@ -4527,21 +4532,33 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(ve
   //      monte-carlo methods, however, with some of the test we have isn't
   //      get better result them (only returns last one image), so they're
   //      eliminated.
-  res[0] = (P0maxRank0<T>(step).next(ip.col(0)) *
-    (p[p.size() - 1][0] * T(int(2)) - T(int(1)) ) +
-      T(int(1)) ) / T(int(2));
+  // N.B. we're in invariant controlled condition.
+  //      so raw real invariant is res, but we return {res, resc} for
+  //      res == 0 controlled conditions.
+  //      we can use delta input, sum output instead of this,
+  //      however we select resc condition because of P01 4 dimension condition.
+  //      if we do them with this hack, 4 dimensions we returns.
+  resc[0] = res[0] = (P0maxRank0<T>(step).next(ip.col(0)) *
+    (p[p.size() - 1][0] * T(int(2)) - T(int(1)) ) + T(int(1)) ) / T(int(2));
+  for(int j = start + step + 1; j < p.size() - 1; j ++) {
+    cerr << "pnext: " << j << " / " << p.size() - 1 << endl;
+    resc[0] -= (P0maxRank0<T>(step).next(ip.col(0).subVector(0, j + 1)) *
+      (p[j][0] * T(int(2)) - T(int(1)) ) + T(int(1)) ) / T(int(2));
+  }
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 1; i < res.size(); i ++) {
     if(nprogress && ! (i % max(int(1), int(res.size() / nprogress))) )
       cerr << i << " / " << res.size() << endl;
-    res[i] = (P0maxRank0<T>(step).next(ip.col(i)) *
-      (p[p.size() - 1][i] * T(int(2)) - T(int(1)) ) +
-        T(int(1)) ) / T(int(2));
+    resc[i] = res[i] = (P0maxRank0<T>(step).next(ip.col(i)) *
+      (p[p.size() - 1][i] * T(int(2)) - T(int(1)) ) + T(int(1)) ) / T(int(2));
+    for(int j = start + step + 1; j < p.size() - 1; j ++)
+      resc[i] -= (P0maxRank0<T>(step).next(ip.col(i).subVector(0, j + 1)) *
+        (p[j][i] * T(int(2)) - T(int(1)) ) + T(int(1)) ) / T(int(2));
   }
   in.resize(0);
-  return res;
+  return make_pair(res, resc);
 }
 
 // N.B. predv only returns last one picture on some of our tests with real
@@ -4567,14 +4584,16 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv(ve
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
 //      mostly with slight speed hacks.
-template <typename T, int nprogress = 6> static inline SimpleVector<T> predv4(vector<SimpleVector<T> >& in) {
+// N.B. we also make hypothesis on this function as delta input,
+//      [11, -0[ range summation output.
+template <typename T, int nprogress = 6> static inline pair<SimpleVector<T>, SimpleVector<T> > predv4(vector<SimpleVector<T> >& in) {
   assert(1 < in.size() && (in[in.size() - 1].size() == 4 ||
                            in[in.size() - 1].size() == 12) );
   static const T zero(0);
   static const T one(1);
   static const T two(2);
   SimpleVector<T> res(in[in.size() - 2].size());
-  res.O();
+  SimpleVector<T> resc(in[in.size() - 2].size());
   vector<SimpleVector<T> > inw;
   inw.reserve(in.size());
   SimpleVector<T> nwork(in.size());
@@ -4645,17 +4664,29 @@ template <typename T, int nprogress = 6> static inline SimpleVector<T> predv4(ve
   res[0] = (P0maxRank0<T>().next(gwork1.row(0)) *
     (gwork0(0, gwork0.cols() - 1) * T(int(2)) - T(int(1)) ) +
       T(int(1)) ) / T(int(2));
+  resc[0] = res[0];
+  for(int j = 11; j < gwork1.cols() - 1; j ++) {
+    cerr << "pnext: " << j << " / " << gwork1.cols() - 1 << endl;
+    resc[0] -= (P0maxRank0<T>().next(gwork1.row(0).subVector(0, j + 1)) *
+      (gwork0(0, gwork0.cols() - 1) * T(int(2)) - T(int(1)) ) +
+        T(int(1)) ) / T(int(2));
+  }
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int i = 1; i < res.size(); i ++)
-    res[i] = (P0maxRank0<T>().next(gwork1.row(i)) *
+  for(int i = 1; i < res.size(); i ++) {
+    resc[i] = res[i] = (P0maxRank0<T>().next(gwork1.row(i)) *
       (gwork0(i, gwork0.cols() - 1) * T(int(2)) - T(int(1)) ) +
         T(int(1)) ) / T(int(2));
-  return res;
+    for(int j = 11; j < gwork1.cols() - 1; j ++)
+      resc[i] -= (P0maxRank0<T>().next(gwork1.row(i).subVector(i, j + 1))
+        * (gwork0(i, gwork0.cols() - 1) * T(int(2)) - T(int(1)) ) +
+          T(int(1)) ) / T(int(2));
+  }
+  return make_pair(res, resc);
 }
 
-template <typename T> vector<SimpleVector<T> > predVec(vector<vector<SimpleVector<T> > >& in0, const int& step = 1) {
+template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0, const int& step = 1) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4672,10 +4703,13 @@ template <typename T> vector<SimpleVector<T> > predVec(vector<vector<SimpleVecto
   const auto size1(in0[0][0].size());
   in0.resize(0);
   auto p(predv<T>(in, step));
-  vector<SimpleVector<T> > res;
-  res.resize(size0);
-  for(int j = 0; j < res.size(); j ++)
-    res[j] = p.subVector(size1 * j, size1);
+  pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > res;
+  res.first.resize(size0);
+  res.second.resize(size0);
+  for(int j = 0; j < res.first.size(); j ++) {
+    res.first[j]  = p.first.subVector( size1 * j, size1);
+    res.second[j] = p.second.subVector(size1 * j, size1);
+  }
   return res;
 }
 
@@ -4694,8 +4728,10 @@ template <typename T> vector<SimpleVector<T> > predVec(vector<vector<SimpleVecto
 //      many much more on input graphics, they should works well but not for us.
 //      this either can be caused by prediction errors as a predv output.
 //      monte-carlo 11*11 times isn't changed this situation.
-template <typename T> vector<SimpleMatrix<T> > predMat(vector<vector<SimpleMatrix<T> > >& in0, const int& step = 1) {
-assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
+// N.B. we're now using better algorithm than sliding DFT implemented
+//      on predv they uses statistics continuity as half of output.
+template <typename T> pair<vector<SimpleMatrix<T> >, vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0, const int& step = 1) {
+  assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
@@ -4714,17 +4750,21 @@ assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   const auto cols(in0[0][0].cols());
   in0.resize(0);
   auto p(predv<T>(in, step));
-  vector<SimpleMatrix<T> > res;
-  res.resize(size);
-  for(int j = 0; j < res.size(); j ++) {
-    res[j].resize(rows, cols);
-    for(int k = 0; k < rows; k ++)
-      res[j].row(k) = p.subVector(j * rows * cols + k * cols, cols);
+  pair<vector<SimpleMatrix<T> >, vector<SimpleMatrix<T> > > res;
+  res.first.resize( size);
+  res.second.resize(size);
+  for(int j = 0; j < res.first.size(); j ++) {
+    res.first[ j].resize(rows, cols);
+    res.second[j].resize(rows, cols);
+    for(int k = 0; k < rows; k ++) {
+      res.first[ j].row(k) = p.first.subVector( j * rows * cols + k * cols, cols);
+      res.second[j].row(k) = p.second.subVector(j * rows * cols + k * cols, cols);
+    }
   }
   return res;
 }
 
-template <typename T> SimpleSparseTensor<T> predSTen(vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx, const int& step = 1) {
+template <typename T> pair<SimpleSparseTensor<T>, SimpleSparseTensor<T> > predSTen(vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx, const int& step = 1) {
   assert(idx.size() && in0.size());
   // N.B. we don't do input scaling.
   // N.B. the data we target is especially string stream corpus.
@@ -4759,13 +4799,17 @@ template <typename T> SimpleSparseTensor<T> predSTen(vector<SimpleSparseTensor<T
   }
   in0.resize(0);
   auto p(predv<T>(in, step));
-  SimpleSparseTensor<T> res;
+  pair<SimpleSparseTensor<T>, SimpleSparseTensor<T> > res;
   for(int j = 0, cnt = 0; j < idx.size(); j ++)
     for(int k = 0; k < idx.size(); k ++)
       for(int m = 0; m < idx.size(); m ++)
         if(binary_search(attend.begin(), attend.end(),
-             make_pair(j, make_pair(k, m))))
-          res[idx[j]][idx[k]][idx[m]] = p[cnt ++] * T(int(2)) - T(int(1));
+             make_pair(j, make_pair(k, m)))) {
+          res.first[idx[j]][idx[k]][idx[m]] =
+            p.first[cnt] * T(int(2)) - T(int(1));
+          res.second[idx[j]][idx[k]][idx[m]] =
+            p.second[cnt ++] * T(int(2)) - T(int(1));
+        }
   return res;
 }
 
@@ -7047,9 +7091,13 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
   }
   os << input;
   corpus<T, U> pstats;
-  pstats.corpust = predSTen<T>(in, idx);
+  auto p(predSTen<T>(in, idx));
+  pstats.corpust = move(p.first);
   getAbbreved<T>(pstats, detailtitle, detail, delimiter);
   os << pstats.simpleThresh(threshin).serialize();
+  pstats.corpust = move(p.second);
+  getAbbreved<T>(pstats, detailtitle, detail, delimiter);
+  os << " --- or --- " << pstats.simpleThresh(threshin).serialize();
   return os;
 }
 
