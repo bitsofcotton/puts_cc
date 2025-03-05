@@ -4489,7 +4489,7 @@ template <typename T, int nprogress = 20> SimpleVector<T> predv0(const vector<Si
 //                needed.
 // N.B. we maybe in invariant controlled condition, so return 2 of candidates.
 template <typename T, int nprogress = 20> static inline pair<SimpleVector<T>, SimpleVector<T> > predv(vector<SimpleVector<T> >& in, const int& step = 1) {
-  assert(0 < step && in.size() && 1 < in[0].size());
+  assert(0 < step && 10 + step * 2 <= in.size() && 1 < in[0].size());
   // N.B. we use whole width to get better result in average.
   //      this is equivalent to the command: p1 | p0 :
   //      enough prediction with integer-float classes (SimpleFloat<...>)
@@ -4661,10 +4661,9 @@ template <typename T, int nprogress = 6> static inline pair<SimpleVector<T>, Sim
         (in[(j - gwork1.cols()) * 2 + in.size()][i] * T(int(2)) - T(int(1)) ) *
         (gwork0(i, j - 1) * T(int(2)) - T(int(1)) );
   // N.B. same logic as predv, we bet only the sign of them.
-  res[0] = (P0maxRank0<T>().next(gwork1.row(0)) *
+  resc[0] = res[0] = (P0maxRank0<T>().next(gwork1.row(0)) *
     (gwork0(0, gwork0.cols() - 1) * T(int(2)) - T(int(1)) ) +
       T(int(1)) ) / T(int(2));
-  resc[0] = res[0];
   for(int j = 11; j < gwork1.cols() - 1; j ++) {
     cerr << "pnext: " << j << " / " << gwork1.cols() - 1 << endl;
     resc[0] -= (P0maxRank0<T>().next(gwork1.row(0).subVector(0, j + 1)) *
@@ -4679,7 +4678,7 @@ template <typename T, int nprogress = 6> static inline pair<SimpleVector<T>, Sim
       (gwork0(i, gwork0.cols() - 1) * T(int(2)) - T(int(1)) ) +
         T(int(1)) ) / T(int(2));
     for(int j = 11; j < gwork1.cols() - 1; j ++)
-      resc[i] -= (P0maxRank0<T>().next(gwork1.row(i).subVector(i, j + 1))
+      resc[i] -= (P0maxRank0<T>().next(gwork1.row(i).subVector(0, j + 1))
         * (gwork0(i, gwork0.cols() - 1) * T(int(2)) - T(int(1)) ) +
           T(int(1)) ) / T(int(2));
   }
