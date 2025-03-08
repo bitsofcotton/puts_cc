@@ -3343,8 +3343,15 @@ template <typename T> SimpleVector<T> minsq(const int& size) {
   return s;
 }
 
+#if !defined(_PNEXT_ON_MEMORY_)
+#define _PNEXT_ON_MEMORY_ true
+#endif
 template <typename T> const SimpleVector<T>& pnextcacher(const int& size, const int& step) {
   assert(0 < size && 0 <= step);
+  if(! _PNEXT_ON_MEMORY_) {
+    static SimpleVector<T> nonthreadsafe;
+    return nonthreadsafe = (dft<T>(- size) * (dft<T>(size * 2).subMatrix(0, 0, size, size * 2) * taylorc<T>(size * 2, T(step < 0 ? step * 2 : (size + step) * 2 - 1), T(step < 0 ? step * 2 + 2 : (size + step) * 2 - 3)) )).template real<T>();
+  }
   static vector<vector<SimpleVector<T> > > cp;
   if(cp.size() <= size)
     cp.resize(size + 1, vector<SimpleVector<T> >());
@@ -3353,6 +3360,7 @@ template <typename T> const SimpleVector<T>& pnextcacher(const int& size, const 
   if(cp[size][step].size()) return cp[size][step];
   return cp[size][step] = (dft<T>(- size) * (dft<T>(size * 2).subMatrix(0, 0, size, size * 2) * taylorc<T>(size * 2, T(step < 0 ? step * 2 : (size + step) * 2 - 1), T(step < 0 ? step * 2 + 2 : (size + step) * 2 - 3)) )).template real<T>();
 }
+#undef _PNEXT_ON_MEMORY_
 
 template <typename T> const SimpleVector<T>& mscache(const int& size) {
   assert(0 < size);
@@ -3402,36 +3410,6 @@ public:
     const auto pn(p.next(ff));
     if(pn == zero) return in[in.size() - 1];
     return one / pn;
-  }
-  P p;
-};
-
-template <typename T, typename P> class P0DFT {
-public:
-  inline P0DFT() { ; }
-  inline ~P0DFT() { ; };
-  inline T next(const SimpleVector<T>& in, const int& unit) {
-    const auto& cdft( dftcache<T>(  unit));
-    idFeeder<SimpleVector<T> > real(in.size() - unit + 1);
-    idFeeder<SimpleVector<T> > imag(in.size() - unit + 1);
-    for(int j = unit; j <= in.size(); j ++) {
-      const auto work(cdft * in.subVector(j - unit, unit).template cast<complex<T> >());
-      real.next(work.template real<T>());
-      imag.next(work.template imag<T>());
-    }
-    assert(real.full && imag.full);
-    SimpleVector<complex<T> > res(unit);
-    for(int i = 0; i < unit; i ++) {
-      idFeeder<T> wreal(real.res.size());
-      idFeeder<T> wimag(imag.res.size());
-      for(int j = 0; j < wreal.res.size(); j ++) {
-        wreal.next(real.res[j][i]);
-        wimag.next(imag.res[j][i]);
-      }
-      assert(wreal.full && wimag.full);
-      res[i] = complex<T>(P().next(wreal.res, unit), P().next(wimag.res, unit));
-    }
-    return dftcache<T>(- unit).row(unit - 1).dot(res).real();
   }
   P p;
 };
@@ -3544,9 +3522,10 @@ public:
   //      2 dimension semi-order causes (x, status) from input as sedenion.
   // N.B. we need only once P0DFT in general because associative condition
   //      is necessary for input ordering.
-  typedef P0DFT<T, p0_1t> p0_2t;
+  // N.B. we eliminated them. we're better to handle their structures than here.
+  // typedef P0DFT<T, p0_1t> p0_2t;
   // N.B. on any R to R into reasonable taylor.
-  typedef northPole<T, p0_2t> p0_6t;
+  typedef northPole<T, p0_1t> p0_6t;
   typedef northPole<T, p0_6t> p0_7t;
   // N.B. we treat periodical part as non aligned complex arg part.
   typedef logChain<T, p0_7t>  p0_8t;
@@ -3657,57 +3636,6 @@ public:
   }
 private:
   int varlen;
-  int step;
-};
-
-template <typename T, typename P> class PSVD {
-public:
-  inline PSVD(const int& step = 1) { this->step = step; }
-  inline ~PSVD() { ; }
-  inline T next(const SimpleVector<T>& in, const int& unit = 1) {
-    vector<SimpleMatrix<T> > U;
-    vector<SimpleMatrix<T> > D;
-    vector<SimpleMatrix<T> > V;
-    U.reserve(in.size() - unit * 2 + 2);
-    D.reserve(in.size() - unit * 2 + 2);
-    V.reserve(in.size() - unit * 2 + 2);
-    for(int i = unit * 2 - 2; i < in.size(); i ++) {
-      SimpleMatrix<T> W(unit, unit);
-      for(int j = 0; j < W.rows(); j ++)
-        for(int k = 0; k < W.cols(); k ++)
-          W((j - abs(i - in.size()) % W.rows() + W.rows()) % W.rows(),
-            (k + abs(i - in.size()) % W.cols() + W.cols()) % W.cols()) =
-              in[i + (k - W.cols() + 1) + (j - W.rows() + 1)];
-      U.emplace_back(W.SVD());
-      V.emplace_back(W.transpose().SVD().transpose());
-      D.emplace_back(U[U.size() - 1] * W * V[V.size() - 1]);
-    }
-    assert(U.size() == D.size() && D.size() == V.size());
-    SimpleMatrix<T> pU(unit, unit);
-    SimpleMatrix<T> pD(unit, unit);
-    SimpleMatrix<T> pV(unit, unit);
-    pU.O(); pD.O(); pV.O();
-    for(int i = 0; i < unit; i ++)
-      for(int j = 0; j < unit; j ++) {
-        SimpleVector<T> work(U.size());
-        for(int k = 0; k < U.size(); k ++)
-           work[k] = U[k](i, j);
-        pU(i, j) = P(step).next(work);
-        for(int k = 0; k < D.size(); k ++)
-           work[k] = D[k](i, j);
-        pD(i, j) = P(step).next(work);
-        for(int k = 0; k < V.size(); k ++)
-           work[k] = V[k](i, j);
-        pV(i, j) = P(step).next(work);
-      }
-    const auto pW(pU * pD * pV);
-    SimpleVector<T> work(pV.cols());
-    work.O();
-    for(int i = 1; i < work.size(); i ++)
-      work[i - 1] = in[i - work.size() + in.size()];
-    work[work.size() - 1] = T(int(0));
-    return - pW.row(pW.rows() - 1).dot(work) / pW(pW.rows() - 1, pW.cols() - 1);
-  }
   int step;
 };
 
@@ -4421,8 +4349,15 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
 // template <typename T> using PP0 = PdeltaOnce<T, P01<T, P01delim<T>, true> >;
 // N.B. we are targetting the structure they appears additional states after
 //      additional states on given input range. so we don't use PdeltaOnce.
-// N.B. we can avoid timing-related prediction fails with following PSVD class.
-// template <typename T> using PP0 = PSVD<T, P01<T, P0maxRank<T>, true> >;
+// N.B. once we had P0DFT class around P0 class, they slides DFT coefficients
+//      per each and predict with slided ones.
+//      handling such a method is much heavier than we now use below
+//      and not so efficient than we have. so we eliminated them.
+// N.B. once we had the class avoiding timing-related prediction fails with
+//      PSVD class. however they hardly depends on phase periods on input
+//      we suppose first. so we eliminated them.
+// N.B. with using predv with PRNG, we can apply before applying PP0 P012L.
+//      our tests on PRNG can improves the result.
 template <typename T> using PP0 = P01<T, P01delim<T>, true>;
 
 // N.B. as ddpmopt:README.md, PP3 is least and enough normally.
@@ -4488,7 +4423,7 @@ template <typename T, int nprogress = 20> SimpleVector<T> predv0(const vector<Si
 //                however, we correct them with real input, so raw option isn't
 //                needed.
 // N.B. we maybe in invariant controlled condition, so return 2 of candidates.
-template <typename T, int nprogress = 20> static inline pair<SimpleVector<T>, SimpleVector<T> > predv(vector<SimpleVector<T> >& in, const int& step = 1) {
+template <typename T, int nprogress = 20> static inline pair<SimpleVector<T>, SimpleVector<T> > predv1(vector<SimpleVector<T> >& in, const int& step = 1) {
   assert(0 < step && 10 + step * 2 <= in.size() && 1 < in[0].size());
   // N.B. we use whole width to get better result in average.
   //      this is equivalent to the command: p1 | p0 :
@@ -4559,6 +4494,45 @@ template <typename T, int nprogress = 20> static inline pair<SimpleVector<T>, Si
   }
   in.resize(0);
   return make_pair(res, resc);
+}
+
+// N.B. we apply PRNGs before to predict each of prediction in general.
+//      this is needed if original streams' entropy feeding is not stable
+//      case, the implicit recursive functions' average can be stable with
+//      this hack. also we might need P012L before to PP0 on each predv1.
+//      this is the condition: non Lebesgure measurable condition can feed
+//      each function entropy can be pred success or failure entropy they
+//      can slice some amount of prediction bit.
+//      however, this method either only slices some amount of the original
+//      structure and their internal states by PRNGs.
+//      so the output will be obscure enough if we cannot slice original
+//      structure enough with ours.
+//      in the most of the cases, we don't need P012L with better PRNGs.
+//      we suppose phase period doesn't connected to the original structures.
+template <typename T, int nrecur = 0, int nprogress = 20> static inline pair<SimpleVector<T>, SimpleVector<T> > predv(vector<SimpleVector<T> >& in, const int& step = 1) {
+  if(! nrecur) return predv1(in, step);
+  pair<SimpleVector<T>, SimpleVector<T> > res;
+  res.first.resize(in[0].size());
+  res.second.resize(in[0].size());
+  res.first.O();
+  res.second.O();
+  for(int i = 0; i < nrecur; i ++) {
+    auto rin(in);
+    for(int i = 0; i < rin.size(); i ++)
+      for(int j = 0; j < rin[i].size(); j ++)
+#if defined(_ARCFOUR_)
+        rin[i][j] = (rin[i][j] + T(arc4random_uniform(0x20001)) / T(0x20000)) / T(int(2));
+#else
+        rin[i][j] = (rin[i][j] + T(random() % 0x20000) / T(0x20000 - 1)) / T(int(2));
+#endif
+    // N.B. PRNG parts going to gray + small noise with large enough nrecur.
+    auto n(predv1(rin, step));
+    res.first  += n.first;
+    res.second += n.second;
+  }
+  res.first  /= T(nrecur);
+  res.second /= T(nrecur);
+  return res;
 }
 
 // N.B. predv only returns last one picture on some of our tests with real
@@ -4729,6 +4703,8 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
 //      monte-carlo 11*11 times isn't changed this situation.
 // N.B. we're now using better algorithm than sliding DFT implemented
 //      on predv they uses statistics continuity as half of output.
+// N.B. either, linear predictors doesn't affected by such of DFT
+//      transformations.
 template <typename T> pair<vector<SimpleMatrix<T> >, vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0, const int& step = 1) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
