@@ -128,4 +128,5 @@ This repository is archived, so without bug report, will no change.
 2025/02/05 merge latest lieonn affects pred cmd.
 2025/03/05 merge latest lieonn, avoiding one of the dimension being attacked condition.
 2025/03/09 merge latest lieonn.
+2025/03/17 normalize predTOC before to serialize.
 

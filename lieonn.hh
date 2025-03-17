@@ -3350,6 +3350,9 @@ template <typename T> const SimpleVector<T>& pnextcacher(const int& size, const 
   assert(0 < size && 0 <= step);
   if(! _PNEXT_ON_MEMORY_) {
     static SimpleVector<T> nonthreadsafe;
+    static int thisstep(0);
+    if(nonthreadsafe.size() == size && thisstep == step) return nonthreadsafe;
+    thisstep = step;
     return nonthreadsafe = (dft<T>(- size) * (dft<T>(size * 2).subMatrix(0, 0, size, size * 2) * taylorc<T>(size * 2, T(step < 0 ? step * 2 : (size + step) * 2 - 1), T(step < 0 ? step * 2 + 2 : (size + step) * 2 - 3)) )).template real<T>();
   }
   static vector<vector<SimpleVector<T> > > cp;
@@ -4510,7 +4513,7 @@ template <typename T, int nprogress = 20> static inline pair<SimpleVector<T>, Si
 //      in the most of the cases, we don't need P012L with better PRNGs.
 //      we suppose phase period doesn't connected to the original structures.
 template <typename T, int nrecur = 0, int nprogress = 20> static inline pair<SimpleVector<T>, SimpleVector<T> > predv(vector<SimpleVector<T> >& in, const int& step = 1) {
-  if(! nrecur) return predv1(in, step);
+  if(! nrecur) return predv1<T, nprogress>(in, step);
   pair<SimpleVector<T>, SimpleVector<T> > res;
   res.first.resize(in[0].size());
   res.second.resize(in[0].size());
@@ -4526,7 +4529,7 @@ template <typename T, int nrecur = 0, int nprogress = 20> static inline pair<Sim
         rin[i][j] = (rin[i][j] + T(random() % 0x20000) / T(0x20000 - 1)) / T(int(2));
 #endif
     // N.B. PRNG parts going to gray + small noise with large enough nrecur.
-    auto n(predv1(rin, step));
+    auto n(predv1<T, nprogress>(rin, step));
     res.first  += n.first;
     res.second += n.second;
   }
@@ -7069,9 +7072,11 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
   auto p(predSTen<T>(in, idx));
   pstats.corpust = move(p.first);
   getAbbreved<T>(pstats, detailtitle, detail, delimiter);
+  pstats.corpust /= pstats.absmax();
   os << pstats.simpleThresh(threshin).serialize();
   pstats.corpust = move(p.second);
   getAbbreved<T>(pstats, detailtitle, detail, delimiter);
+  pstats.corpust /= pstats.absmax();
   os << " --- or --- " << pstats.simpleThresh(threshin).serialize();
   return os;
 }
