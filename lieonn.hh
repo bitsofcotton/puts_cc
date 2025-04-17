@@ -3010,14 +3010,19 @@ template <typename T> static inline SimpleVector<T> revertProgramInvariant(const
 
 template <typename T> class idFeeder {
 public:
-  inline idFeeder(const int& size = 1) {
+  inline idFeeder(const int& size = 0) {
     res.resize(size);
     res.O();
-    full = false;
+    full = size ? 0 : 2;
     t = 0;
   }
   inline ~idFeeder() { ; }
   inline const SimpleVector<T>& next(const T& in) {
+    if(full == 2) {
+      res.entity.emplace_back(in);
+      ++ t;
+      return res;
+    }
     if(t < res.size())
       res[t] = in;
     else {
@@ -3025,11 +3030,11 @@ public:
         res[i - 1] = move(res[i]);
       res[res.size() - 1] = in;
     }
-    if(res.size() <= ++ t) full = true;
+    if(res.size() <= ++ t) full = 1;
     return res;
   }
   SimpleVector<T> res;
-  bool full;
+  char full;
 private:
   int  t;
 };
@@ -3265,14 +3270,15 @@ template <typename T> static inline vector<pair<vector<SimpleVector<T> >, vector
 
 template <typename T> class P012L {
 public:
-  inline P012L(const int& step = 1, const int& var = 4) {
-    assert(1 < var && 0 < step);
-    varlen = var;
+  inline P012L(const int& step = 1) {
+    assert(0 < step);
     this->step = step;
+    lastlen = varlen = 0;
   }
   inline ~P012L() { ; }
   T next(const SimpleVector<T>& in);
 private:
+  int lastlen;
   int varlen;
   int step;
 };
@@ -3285,12 +3291,21 @@ template <typename T> inline T P012L<T>::next(const SimpleVector<T>& d) {
     M = max(M, abs(d[i]));
   }
   if(M <= zero) return zero;
+  // N.B. same as P01 lastlen calculation.
+  if(lastlen != d.size()) {
+    lastlen = d.size();
+    const auto y(lastlen / 2 * (lastlen / 2 - 1));
+    for(int varlen = 4; 0 <= varlen && varlen < sizeof(int) * 8 &&
+      y < (varlen - 1) * (varlen - 1) * (int(1) << varlen); varlen ++) ;
+    varlen = max(-- varlen, int(4));
+  }
   vector<SimpleVector<T> > cache;
   cache.reserve(d.size() - varlen + 2);
   for(int i = 0; i < d.size() - varlen - step + 2; i ++) {
     cache.emplace_back(d.subVector(i, varlen));
     cache[cache.size() - 1][varlen - 1] = d[i + varlen + step - 2];
   }
+  if(cache.size() <= 0) return zero;
   const auto cat(crush<T>(cache, cache[0].size(), cache.size()));
   SimpleVector<T> work(varlen);
   for(int i = 1; i < work.size(); i ++)
@@ -3574,9 +3589,9 @@ public:
 //      on some of the experiments, no improves but different result.
 template <typename T, typename P = P0maxRank<T>, bool nonlinear = true> class P01 {
 public:
-  inline P01(const int& step = 1, const int& var = 4) {
-    assert(0 < var && 0 < step);
-    this->varlen = var;
+  inline P01(const int& step = 1) {
+    assert(0 < step);
+    lastlen = varlen = 0;
     this->step = step;
   }
   inline ~P01() { ; }
@@ -3588,6 +3603,19 @@ public:
     // N.B. division accuracy glitch.
     const auto nin(sqrt(in.dot(in) * (one + SimpleMatrix<T>().epsilon())));
     if(! isfinite(nin) || nin == zero) return zero;
+    // N.B. adaptive dimension adjustment.
+    if(lastlen != in.size()) {
+      lastlen = in.size();
+      // N.B. there exists amount 2^(x^2) : 2^(2^x), so to apply and maximize
+      //      omitted part as a omitted dimension.
+      // N.B. these adjustment is only for bit stream input/output.
+      //      so we don't use F_2 as a operation in/output, we should
+      //      increase large dimensions difered to this as a huge one we'll get.
+      const auto y(lastlen / 2 * (lastlen / 2 - 1));
+      for(int varlen = 4; 0 <= varlen && varlen < sizeof(int) * 8 &&
+        y < (varlen - 1) * (varlen - 1) * (int(1) << varlen); varlen ++) ;
+      varlen = max(-- varlen, int(4));
+    }
     // N.B. if we use last delimiter with unit size, they also causes
     //      many of the exhaust of the calculation resource can be cached
     //      and unstable result, this might means invariant continuity
@@ -3638,6 +3666,7 @@ public:
     return - invariant.dot(work) / invariant[varlen - 1];
   }
 private:
+  int lastlen;
   int varlen;
   int step;
 };
@@ -3647,7 +3676,7 @@ template <typename T, typename P> class PBond {
 public:
   inline PBond() { ; }
   inline PBond(const int& status, P&& p = P()) {
-    assert(0 < status);
+    assert(0 <= status);
     this->p = p;
     f = idFeeder<T>(status);
     M = T(int(1));
@@ -3656,7 +3685,7 @@ public:
   inline T next(const T& in) {
     M = max(M, abs(in));
     auto g(f.next(in));
-    if(! f.full) return T(int(0));
+    if(! f.full || g.size() <= 1) return T(int(0));
     // N.B. with 1-norm normalized input:
     T m(g[0] /= M);
     for(int i = 1; i < g.size(); i ++) m = min(m, g[i] /= M);
