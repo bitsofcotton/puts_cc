@@ -130,5 +130,5 @@ This repository is archived, so without bug report, will no change.
 2025/03/09 merge latest lieonn.
 2025/03/17 normalize predTOC before to serialize.
 2025/04/17 merge latest dimension auto tuner from ddpmopt.
-
+2025/04/18 step parameter strategy change, no logic change on this binary.
 

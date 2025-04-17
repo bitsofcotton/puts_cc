@@ -3270,9 +3270,7 @@ template <typename T> static inline vector<pair<vector<SimpleVector<T> >, vector
 
 template <typename T> class P012L {
 public:
-  inline P012L(const int& step = 1) {
-    assert(0 < step);
-    this->step = step;
+  inline P012L() {
     lastlen = varlen = 0;
   }
   inline ~P012L() { ; }
@@ -3280,10 +3278,10 @@ public:
 private:
   int lastlen;
   int varlen;
-  int step;
 };
 
 template <typename T> inline T P012L<T>::next(const SimpleVector<T>& d) {
+  static const auto step(1);
   static const T zero(int(0));
          auto    M(zero);
   for(int i = 0; i < d.size(); i ++) {
@@ -3404,14 +3402,12 @@ template <typename T> const SimpleMatrix<complex<T> >& dftcache(const int& size)
 
 template <typename T> class P0 {
 public:
-  inline P0(const int& step = 1) {
-    this->step = step;
-  }
-  inline ~P0() { ; };
+  inline P0() { ; }
+  inline ~P0() { ; }
   inline T next(const SimpleVector<T>& in, const int& sute = 0) {
+    static const auto step(1);
     return pnextcacher<T>(in.size(), ((step - 1) % in.size()) + 1).dot(in);
   }
-  int step;
 };
 
 template <typename T, typename P> class P0inv {
@@ -3503,9 +3499,9 @@ public:
 
 template <typename T> class P0maxRank0 {
 public:
-  inline P0maxRank0(const int& step = 1) {
-    p = p0_0t(P0<T>(step));
-    q = p0_i0t(p0_0t(P0<T>(step)));
+  inline P0maxRank0() {
+    p = p0_0t(P0<T>());
+    q = p0_i0t(p0_0t(P0<T>()));
   }
   inline ~P0maxRank0() { ; }
   inline T next(const SimpleVector<T>& in, const int& sute = 0) {
@@ -3528,8 +3524,8 @@ public:
 
 template <typename T> class P0maxRank {
 public:
-  inline P0maxRank(const int& step = 1) {
-    p = p0_t(p0_2t(p0_1t(p0_0t(step))));
+  inline P0maxRank() {
+    p = p0_t(p0_2t(p0_1t(p0_0t())));
   }
   inline ~P0maxRank() { ; }
   inline T next(const SimpleVector<T>& in, const int& sute = 0) {
@@ -3573,7 +3569,7 @@ public:
 
 template <typename T> class P01delim {
 public:
-  inline P01delim(const int& step = 1) { ; }
+  inline P01delim() { ; }
   inline ~P01delim() { ; }
   inline const T& next(const SimpleVector<T>& in, const int& sute = 0) {
     return in[in.size() - 1];
@@ -3589,13 +3585,12 @@ public:
 //      on some of the experiments, no improves but different result.
 template <typename T, typename P = P0maxRank<T>, bool nonlinear = true> class P01 {
 public:
-  inline P01(const int& step = 1) {
-    assert(0 < step);
+  inline P01() {
     lastlen = varlen = 0;
-    this->step = step;
   }
   inline ~P01() { ; }
   inline T next(const SimpleVector<T>& in, const int& unit = 3) {
+    static const auto step(1);
     static const T zero(0);
     static const T one(1);
     static const T two(2);
@@ -3668,7 +3663,6 @@ public:
 private:
   int lastlen;
   int varlen;
-  int step;
 };
 
 // N.B. we omit high frequency part (1/f(x) input) to be treated better in P.
@@ -4393,7 +4387,7 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
 template <typename T> using PP0 = P01<T, P01delim<T>, true>;
 
 // N.B. as ddpmopt:README.md, PP3 is least and enough normally.
-template <typename T, int nprogress = 20> SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const string& strloop = string(""), const int& sz = 9, const int& step = 1) {
+template <typename T, int nprogress = 20> SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
   assert(0 < sz && sz <= in.size());
   // N.B. we need to initialize p0 vector.
   SimpleVector<T> seconds(sz);
@@ -4418,12 +4412,12 @@ template <typename T, int nprogress = 20> SimpleVector<T> predv0(const vector<Si
     for(int i = 0; i < sz; i ++)
       buf.next(makeProgramInvariantPartial<T>(in[i][j], seconds[i], true));
     assert(buf.full);
-    p[j] = PP0<T>(step).next(buf.res, unit);
+    p[j] = PP0<T>().next(buf.res, unit);
   }
   const auto nseconds(sqrt(seconds.dot(seconds)));
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(p), - T(int(1)), true).first,
-      PP0<T>(step).next(seconds / nseconds, unit) * nseconds), true);
+      PP0<T>().next(seconds / nseconds, unit) * nseconds), true);
 }
 
 // N.B. as p8:README.md, predv once is enough for finite combinations
@@ -4455,7 +4449,8 @@ template <typename T, int nprogress = 20> SimpleVector<T> predv0(const vector<Si
 //                however, we correct them with real input, so raw option isn't
 //                needed.
 // N.B. we maybe in invariant controlled condition, so return 2 of candidates.
-template <typename T, int nprogress = 20> static inline pair<SimpleVector<T>, SimpleVector<T> > predv1(vector<SimpleVector<T> >& in, const int& step = 1) {
+template <typename T, int nprogress = 20> static inline pair<SimpleVector<T>, SimpleVector<T> > predv1(vector<SimpleVector<T> >& in) {
+  static const auto step(1);
   assert(0 < step && 10 + step * 2 <= in.size() && 1 < in[0].size());
   // N.B. we use whole width to get better result in average.
   //      this is equivalent to the command: p1 | p0 :
@@ -4477,7 +4472,7 @@ template <typename T, int nprogress = 20> static inline pair<SimpleVector<T>, Si
   for(int i = 1; i < start; i ++)
     p.entity.emplace_back(SimpleVector<T>(in[0].size()).O());
   for(int i = start; i <= in.size(); i ++)
-    p.entity.emplace_back(predv0<T, nprogress>(in, to_string(i) + string(" / ") + to_string(in.size()), i, step));
+    p.entity.emplace_back(predv0<T, nprogress>(in, i, to_string(i) + string(" / ") + to_string(in.size())));
   SimpleMatrix<T> ip(p.size(), res.size());
   for(int i = 0; i < start + step; i ++)
     ip.row(i).O();
@@ -4505,11 +4500,11 @@ template <typename T, int nprogress = 20> static inline pair<SimpleVector<T>, Si
   //      we can use delta input, sum output instead of this,
   //      however we select resc condition because of P01 4 dimension condition.
   //      if we do them with this hack, 4 dimensions we returns.
-  resc[0] = res[0] = (P0maxRank0<T>(step).next(ip.col(0)) *
+  resc[0] = res[0] = (P0maxRank0<T>().next(ip.col(0)) *
     (p[p.size() - 1][0] * T(int(2)) - T(int(1)) ) + T(int(1)) ) / T(int(2));
   for(int j = start + step + 1; j < p.size() - 1; j ++) {
     cerr << "pnext: " << j << " / " << p.size() - 1 << endl;
-    resc[0] -= (P0maxRank0<T>(step).next(ip.col(0).subVector(0, j + 1)) *
+    resc[0] -= (P0maxRank0<T>().next(ip.col(0).subVector(0, j + 1)) *
       (p[j][0] * T(int(2)) - T(int(1)) ) + T(int(1)) ) / T(int(2));
   }
 #if defined(_OPENMP)
@@ -4518,10 +4513,10 @@ template <typename T, int nprogress = 20> static inline pair<SimpleVector<T>, Si
   for(int i = 1; i < res.size(); i ++) {
     if(nprogress && ! (i % max(int(1), int(res.size() / nprogress))) )
       cerr << i << " / " << res.size() << endl;
-    resc[i] = res[i] = (P0maxRank0<T>(step).next(ip.col(i)) *
+    resc[i] = res[i] = (P0maxRank0<T>().next(ip.col(i)) *
       (p[p.size() - 1][i] * T(int(2)) - T(int(1)) ) + T(int(1)) ) / T(int(2));
     for(int j = start + step + 1; j < p.size() - 1; j ++)
-      resc[i] -= (P0maxRank0<T>(step).next(ip.col(i).subVector(0, j + 1)) *
+      resc[i] -= (P0maxRank0<T>().next(ip.col(i).subVector(0, j + 1)) *
         (p[j][i] * T(int(2)) - T(int(1)) ) + T(int(1)) ) / T(int(2));
   }
   in.resize(0);
@@ -4541,8 +4536,8 @@ template <typename T, int nprogress = 20> static inline pair<SimpleVector<T>, Si
 //      structure enough with ours.
 //      in the most of the cases, we don't need P012L with better PRNGs.
 //      we suppose phase period doesn't connected to the original structures.
-template <typename T, int nrecur = 0, int nprogress = 20> static inline pair<SimpleVector<T>, SimpleVector<T> > predv(vector<SimpleVector<T> >& in, const int& step = 1) {
-  if(! nrecur) return predv1<T, nprogress>(in, step);
+template <typename T, int nrecur = 0, int nprogress = 20> static inline pair<SimpleVector<T>, SimpleVector<T> > predv(vector<SimpleVector<T> >& in) {
+  if(! nrecur) return predv1<T, nprogress>(in);
   pair<SimpleVector<T>, SimpleVector<T> > res;
   res.first.resize(in[0].size());
   res.second.resize(in[0].size());
@@ -4558,7 +4553,7 @@ template <typename T, int nrecur = 0, int nprogress = 20> static inline pair<Sim
         rin[i][j] = (rin[i][j] + T(random() % 0x20000) / T(0x20000 - 1)) / T(int(2));
 #endif
     // N.B. PRNG parts going to gray + small noise with large enough nrecur.
-    auto n(predv1<T, nprogress>(rin, step));
+    auto n(predv1<T, nprogress>(rin));
     res.first  += n.first;
     res.second += n.second;
   }
@@ -4692,10 +4687,10 @@ template <typename T, int nprogress = 6> static inline pair<SimpleVector<T>, Sim
 }
 
 template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0, const int& step = 1) {
-  assert(in0.size() && in0[0].size() && in0[0][0].size());
+  assert(in0.size() && in0[0].size() && in0[0][0].size() && 0 < step);
   vector<SimpleVector<T> > in;
-  in.resize(in0.size());
-  for(int i = 0; i < in0.size(); i ++) {
+  in.resize(in0.size() / step);
+  for(int i = (in0.size() - step - 1) % step; i < in0.size(); i += step) {
     assert(in0[i].size() == in0[0].size() &&
            in0[i][0].size() == in0[0][0].size());
     in[i].resize(in0[i].size() * in0[i][0].size());
@@ -4707,7 +4702,7 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
   const auto size0(in0[0].size());
   const auto size1(in0[0][0].size());
   in0.resize(0);
-  auto p(predv<T>(in, step));
+  auto p(predv<T>(in));
   pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > res;
   res.first.resize(size0);
   res.second.resize(size0);
@@ -4740,8 +4735,8 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
 template <typename T> pair<vector<SimpleMatrix<T> >, vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0, const int& step = 1) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
-  in.resize(in0.size());
-  for(int i = 0; i < in0.size(); i ++) {
+  in.resize(in0.size() / step);
+  for(int i = (in0.size() - step - 1) % step; i < in0.size(); i += step) {
     assert(in0[i].size() == in0[0].size());
     in[i].resize(in0[i].size() * in0[i][0].rows() * in0[i][0].cols());
     for(int j = 0; j < in0[i].size(); j ++) {
@@ -4756,7 +4751,7 @@ template <typename T> pair<vector<SimpleMatrix<T> >, vector<SimpleMatrix<T> > > 
   const auto rows(in0[0][0].rows());
   const auto cols(in0[0][0].cols());
   in0.resize(0);
-  auto p(predv<T>(in, step));
+  auto p(predv<T>(in));
   pair<vector<SimpleMatrix<T> >, vector<SimpleMatrix<T> > > res;
   res.first.resize( size);
   res.second.resize(size);
@@ -4781,12 +4776,12 @@ template <typename T> pair<SimpleSparseTensor<T>, SimpleSparseTensor<T> > predST
   //      they uses large enough memory we cannot comput on our machines.
   vector<SimpleVector<T> > in;
   vector<pair<int, pair<int, int> > > attend;
-  in.resize(in0.size());
+  in.resize(in0.size() / step);
   attend.reserve(idx.size() * idx.size() * idx.size());
   for(int i = 0; i < idx.size(); i ++)
     for(int j = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++) {
-        for(int ii = 0; ii < in0.size(); ii ++)
+        for(int ii = (in0.size() - step - 1) % step; ii < in0.size(); ii += step)
           if(in0[ii][idx[i]][idx[j]][idx[k]] != T(int(0)))
             goto next;
         continue;
@@ -4794,7 +4789,7 @@ template <typename T> pair<SimpleSparseTensor<T>, SimpleSparseTensor<T> > predST
         attend.emplace_back(make_pair(i, make_pair(j, k)));
       }
   sort(attend.begin(), attend.end());
-  for(int i = 0; i < in0.size(); i ++) {
+  for(int i = (in0.size() - step - 1) % step; i < in0.size(); i += step) {
     in[i].resize(attend.size());
     for(int j = 0, cnt = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
@@ -4805,7 +4800,7 @@ template <typename T> pair<SimpleSparseTensor<T>, SimpleSparseTensor<T> > predST
               (in0[i][idx[j]][idx[k]][idx[m]] + T(int(1))) / T(int(2));
   }
   in0.resize(0);
-  auto p(predv<T>(in, step));
+  auto p(predv<T>(in));
   pair<SimpleSparseTensor<T>, SimpleSparseTensor<T> > res;
   for(int j = 0, cnt = 0; j < idx.size(); j ++)
     for(int k = 0; k < idx.size(); k ++)
