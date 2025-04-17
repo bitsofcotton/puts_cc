@@ -4689,7 +4689,7 @@ template <typename T, int nprogress = 6> static inline pair<SimpleVector<T>, Sim
 template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0, const int& step = 1) {
   assert(in0.size() && in0[0].size() && in0[0][0].size() && 0 < step);
   vector<SimpleVector<T> > in;
-  in.resize(in0.size() / step);
+  in.resize((in0.size() + step - 1) / step);
   for(int i = (in0.size() - step - 1) % step, ii = 0; i < in0.size();
           i += step, ii ++) {
     assert(in0[i].size() == in0[0].size() &&
@@ -4736,7 +4736,7 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
 template <typename T> pair<vector<SimpleMatrix<T> >, vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0, const int& step = 1) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
-  in.resize(in0.size() / step);
+  in.resize((in0.size() + step - 1) / step);
   for(int i = (in0.size() - step - 1) % step, ii = 0; i < in0.size();
           i += step, ii ++) {
     assert(in0[i].size() == in0[0].size());
@@ -4778,7 +4778,7 @@ template <typename T> pair<SimpleSparseTensor<T>, SimpleSparseTensor<T> > predST
   //      they uses large enough memory we cannot comput on our machines.
   vector<SimpleVector<T> > in;
   vector<pair<int, pair<int, int> > > attend;
-  in.resize(in0.size() / step);
+  in.resize((in0.size() + step - 1) / step);
   attend.reserve(idx.size() * idx.size() * idx.size());
   for(int i = 0; i < idx.size(); i ++)
     for(int j = 0; j < idx.size(); j ++)
