@@ -4690,13 +4690,14 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
   assert(in0.size() && in0[0].size() && in0[0][0].size() && 0 < step);
   vector<SimpleVector<T> > in;
   in.resize(in0.size() / step);
-  for(int i = (in0.size() - step - 1) % step; i < in0.size(); i += step) {
+  for(int i = (in0.size() - step - 1) % step, ii = 0; i < in0.size();
+          i += step, ii ++) {
     assert(in0[i].size() == in0[0].size() &&
            in0[i][0].size() == in0[0][0].size());
-    in[i].resize(in0[i].size() * in0[i][0].size());
+    in[ii].resize(in0[i].size() * in0[i][0].size());
     for(int j = 0; j < in0[i].size(); j ++) {
       assert(in0[i][0].size() == in0[i][j].size());
-      in[i].setVector(j * in0[i][0].size(), in0[i][j]);
+      in[ii].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
   const auto size0(in0[0].size());
@@ -4736,15 +4737,16 @@ template <typename T> pair<vector<SimpleMatrix<T> >, vector<SimpleMatrix<T> > > 
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size() / step);
-  for(int i = (in0.size() - step - 1) % step; i < in0.size(); i += step) {
+  for(int i = (in0.size() - step - 1) % step, ii = 0; i < in0.size();
+          i += step, ii ++) {
     assert(in0[i].size() == in0[0].size());
-    in[i].resize(in0[i].size() * in0[i][0].rows() * in0[i][0].cols());
+    in[ii].resize(in0[i].size() * in0[i][0].rows() * in0[i][0].cols());
     for(int j = 0; j < in0[i].size(); j ++) {
       assert(in0[i][j].rows() == in0[0][0].rows() &&
              in0[i][j].cols() == in0[0][0].cols());
       for(int k = 0; k < in0[i][j].rows(); k ++)
-        in[i].setVector(j * in0[i][0].rows() * in0[i][0].cols() +
-                        k * in0[i][0].cols(), in0[i][j].row(k));
+        in[ii].setVector(j * in0[i][0].rows() * in0[i][0].cols() +
+                         k * in0[i][0].cols(), in0[i][j].row(k));
     }
   }
   const auto size(in0[0].size());
@@ -4781,22 +4783,24 @@ template <typename T> pair<SimpleSparseTensor<T>, SimpleSparseTensor<T> > predST
   for(int i = 0; i < idx.size(); i ++)
     for(int j = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++) {
-        for(int ii = (in0.size() - step - 1) % step; ii < in0.size(); ii += step)
-          if(in0[ii][idx[i]][idx[j]][idx[k]] != T(int(0)))
+        for(int ii = (in0.size() - step - 1) % step, i2 = 0;
+                ii < in0.size(); ii += step, i2 ++)
+          if(in0[i2][idx[i]][idx[j]][idx[k]] != T(int(0)))
             goto next;
         continue;
        next:
         attend.emplace_back(make_pair(i, make_pair(j, k)));
       }
   sort(attend.begin(), attend.end());
-  for(int i = (in0.size() - step - 1) % step; i < in0.size(); i += step) {
-    in[i].resize(attend.size());
+  for(int i = (in0.size() - step - 1) % step, ii = 0; i < in0.size();
+          i += step, ii ++) {
+    in[ii].resize(attend.size());
     for(int j = 0, cnt = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
         for(int m = 0; m < idx.size(); m ++)
           if(binary_search(attend.begin(), attend.end(),
               make_pair(j, make_pair(k, m))))
-            in[i][cnt ++] =
+            in[ii][cnt ++] =
               (in0[i][idx[j]][idx[k]][idx[m]] + T(int(1))) / T(int(2));
   }
   in0.resize(0);
