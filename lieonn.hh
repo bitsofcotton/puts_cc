@@ -3158,7 +3158,7 @@ template <typename T> const SimpleVector<T>& mscache(const int& size) {
   return ms[size] = minsq<T>(size);
 }
 
-#if !defined(_PNEXT_ON_MEMORY_)
+#if defined(_PNEXT_NOT_ON_MEMORY_)
 template <typename T> SimpleVector<T> pnextcacher(const int& size, const int& step) {
   assert(0 < size && 0 <= step);
   static SimpleVector<T> nonthreadsafe;
