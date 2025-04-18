@@ -4686,18 +4686,26 @@ template <typename T, int nprogress = 6> static inline pair<SimpleVector<T>, Sim
   return make_pair(res, resc);
 }
 
-template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0, const int& step = 1) {
-  assert(in0.size() && in0[0].size() && in0[0][0].size() && 0 < step);
+template <typename X> vector<X> skipX(const vector<X>& in, const int& step = 1) {
+  assert(in.size());
+  vector<X> res;
+  res.resize((in.size() + step - 1) / step);
+  for(int i = (in.size() - step - 1) % step, ii = 0; i < in.size();
+          i += step, ii ++) res[ii] = in[i];
+  return res;
+}
+
+template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
+  assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
-  in.resize((in0.size() + step - 1) / step);
-  for(int i = (in0.size() - step - 1) % step, ii = 0; i < in0.size();
-          i += step, ii ++) {
+  in.resize(in0.size());
+  for(int i = 0; i < in0.size(); i ++) {
     assert(in0[i].size() == in0[0].size() &&
            in0[i][0].size() == in0[0][0].size());
-    in[ii].resize(in0[i].size() * in0[i][0].size());
+    in[i].resize(in0[i].size() * in0[i][0].size());
     for(int j = 0; j < in0[i].size(); j ++) {
       assert(in0[i][0].size() == in0[i][j].size());
-      in[ii].setVector(j * in0[i][0].size(), in0[i][j]);
+      in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
   const auto size0(in0[0].size());
@@ -4733,19 +4741,18 @@ template <typename T> pair<vector<SimpleVector<T> >, vector<SimpleVector<T> > > 
 //      on predv they uses statistics continuity as half of output.
 // N.B. either, linear predictors doesn't affected by such of DFT
 //      transformations.
-template <typename T> pair<vector<SimpleMatrix<T> >, vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0, const int& step = 1) {
+template <typename T> pair<vector<SimpleMatrix<T> >, vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
-  in.resize((in0.size() + step - 1) / step);
-  for(int i = (in0.size() - step - 1) % step, ii = 0; i < in0.size();
-          i += step, ii ++) {
+  in.resize(in0.size());
+  for(int i = 0; i < in0.size(); i ++) {
     assert(in0[i].size() == in0[0].size());
-    in[ii].resize(in0[i].size() * in0[i][0].rows() * in0[i][0].cols());
+    in[i].resize(in0[i].size() * in0[i][0].rows() * in0[i][0].cols());
     for(int j = 0; j < in0[i].size(); j ++) {
       assert(in0[i][j].rows() == in0[0][0].rows() &&
              in0[i][j].cols() == in0[0][0].cols());
       for(int k = 0; k < in0[i][j].rows(); k ++)
-        in[ii].setVector(j * in0[i][0].rows() * in0[i][0].cols() +
+        in[i].setVector(j * in0[i][0].rows() * in0[i][0].cols() +
                          k * in0[i][0].cols(), in0[i][j].row(k));
     }
   }
@@ -4768,7 +4775,7 @@ template <typename T> pair<vector<SimpleMatrix<T> >, vector<SimpleMatrix<T> > > 
   return res;
 }
 
-template <typename T> pair<SimpleSparseTensor<T>, SimpleSparseTensor<T> > predSTen(vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx, const int& step = 1) {
+template <typename T> pair<SimpleSparseTensor<T>, SimpleSparseTensor<T> > predSTen(vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
   assert(idx.size() && in0.size());
   // N.B. we don't do input scaling.
   // N.B. the data we target is especially string stream corpus.
@@ -4778,29 +4785,27 @@ template <typename T> pair<SimpleSparseTensor<T>, SimpleSparseTensor<T> > predST
   //      they uses large enough memory we cannot comput on our machines.
   vector<SimpleVector<T> > in;
   vector<pair<int, pair<int, int> > > attend;
-  in.resize((in0.size() + step - 1) / step);
+  in.resize(in0.size());
   attend.reserve(idx.size() * idx.size() * idx.size());
   for(int i = 0; i < idx.size(); i ++)
     for(int j = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++) {
-        for(int ii = (in0.size() - step - 1) % step, i2 = 0;
-                ii < in0.size(); ii += step, i2 ++)
-          if(in0[i2][idx[i]][idx[j]][idx[k]] != T(int(0)))
+        for(int ii = 0; ii < in0.size(); ii ++)
+          if(in0[ii][idx[i]][idx[j]][idx[k]] != T(int(0)))
             goto next;
         continue;
        next:
         attend.emplace_back(make_pair(i, make_pair(j, k)));
       }
   sort(attend.begin(), attend.end());
-  for(int i = (in0.size() - step - 1) % step, ii = 0; i < in0.size();
-          i += step, ii ++) {
-    in[ii].resize(attend.size());
+  for(int i = 0; i < in0.size(); i ++) {
+    in[i].resize(attend.size());
     for(int j = 0, cnt = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
         for(int m = 0; m < idx.size(); m ++)
           if(binary_search(attend.begin(), attend.end(),
               make_pair(j, make_pair(k, m))))
-            in[ii][cnt ++] =
+            in[i][cnt ++] =
               (in0[i][idx[j]][idx[k]][idx[m]] + T(int(1))) / T(int(2));
   }
   in0.resize(0);
