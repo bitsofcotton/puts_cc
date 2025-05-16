@@ -4558,7 +4558,7 @@ template <typename T, int nprogress = 6> static inline SimpleVector<T> predv4(ve
       //  1 + ((i / (in[in.size() - 2].size() / in[in.size() - 1].size())) & (~ 0x03)), 4));
       vw[4] = inw[j * 2 + 2][i];
       toeplitz0.row(j) =
-        makeProgramInvariant<T>(vw, T(j) / T(int(toeplitz0.rows() + 1)) ).first;
+        makeProgramInvariant<T>(R2bin<T>(vw), T(j) / T(int(toeplitz0.rows() + 1)) ).first;
     }
     for(int i1 = 9; i1 <= toeplitz0.rows(); i1 ++) {
       if(nprogress && ! (i1 % max(int(1), int(toeplitz0.rows() / nprogress))) )
@@ -4577,10 +4577,10 @@ template <typename T, int nprogress = 6> static inline SimpleVector<T> predv4(ve
               && sqrt(work.dot(work) * SimpleMatrix<T>().epsilon()) <
                  abs(work[work.size() - 1] - last); ii ++) {
         last = work[work.size() - 1];
-        const auto work2(makeProgramInvariant<T>(work, one));
-        work[work.size() - 1] = revertProgramInvariant<T>(make_pair(
+        const auto work2(makeProgramInvariant<T>(R2bin<T>(work), one));
+        work[work.size() - 1] = bin2R<T>(revertProgramInvariant<T>(make_pair(
           - (invariant.dot(work2.first) - invariant[4] * work2.first[4]) /
-          invariant[4], work2.second));
+          invariant[4], work2.second)) );
       }
       gwork0(i, i1 - 1) = work[work.size() - 1];
     }
