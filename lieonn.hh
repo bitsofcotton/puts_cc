@@ -3609,7 +3609,7 @@ template <typename T, T (*f)(const SimpleVector<T>&, const int&), const bool non
   //      many of the exhaust of the calculation resource can be cached
   //      and unstable result, this might means invariant continuity
   //      improves when length == 3 also we have prediction direction on them.
-  SimpleMatrix<T> invariants(f == p0max0next<T> ? 3
+  SimpleMatrix<T> invariants(f == p0maxNext<T> || f == p0max0next<T> ? 3
     : (f == p01delimNext<T> ? 1 : in.size() - unit),
       nonlinear ? varlen + 2 : varlen);
   invariants.O();
@@ -4469,15 +4469,13 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv1(v
   // N.B. revert to original walk conditions, our sample non PRNG result
   //      works well with this.
   res[0] = (p0maxNext<T>(ip.row(0)) *
-    (p[p.size() - 1][0] * T(int(2)) - T(int(1))) + T(int(1)) ) / T(int(2))
-    + T(int(1)) / T(int(2));
+    (p[p.size() - 1][0] * T(int(2)) - T(int(1))) + T(int(1)) ) / T(int(2));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 1; i < res.size(); i ++) {
     res[i] = (p0maxNext<T>(ip.row(i)) *
-      (p[p.size() - 1][i] * T(int(2)) - T(int(1))) + T(int(1)) ) / T(int(2))
-      + T(int(1)) / T(int(2));
+      (p[p.size() - 1][i] * T(int(2)) - T(int(1))) + T(int(1)) ) / T(int(2));
   }
   in.resize(0);
   return res;
@@ -4496,12 +4494,11 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv1(v
 //      structure enough with ours.
 //      in the most of the cases, we don't need P012L with better PRNGs.
 //      we suppose phase period doesn't connected to the original structures.
-// N.B. practically, nrecur == 0 with p0next0maxRank works well, we use this.
-//      nrecur == 11 * 11 with p0maxNext but we need huge computation time.
+// N.B. practically, nrecur == 0 works well with ddpmopt T cmd, we use this.
+//      we don't select better nrecur == 11 * 11 we need huge computation time.
 template <typename T, int nrecur = 0, int nprogress = 20> static inline SimpleVector<T> predv(vector<SimpleVector<T> >& in) {
   if(! nrecur) return predv1<T, nprogress>(in);
-  SimpleVector<T> res;
-  res.resize(in[0].size());
+  SimpleVector<T> res(in[0].size());
   res.O();
   for(int i = 0; i < nrecur; i ++) {
     auto rin(in);
