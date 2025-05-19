@@ -2360,7 +2360,7 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::inner(const Simple
   }
   // N.B. in zeroFix, we get linear Invariant s.t. |Ax| <= 1 possible enough.
         auto res(A.QR().zeroFix(A, fidx));
-  const auto z(*this * res * T(int(8)));
+  const auto z(*this * res * T(int(4)));
         T    t(int(1));
   for(int i = 0; i < z.size(); i ++)
     if(bu[i] * z[i] < T(int(0))) // N.B.: infeasible.
@@ -3909,31 +3909,29 @@ template <typename T, T (*p)(const SimpleVector<T>&, const int&)> static inline 
   depth(0, 2) = offsetHalf<T>(in[1]);
   for(int i = 2; i < in.size(); i ++) {
     if(depth.rows() < i / 3) depth.entity.emplace_back(SimpleVector<T>(3).O());
-    bool chain(false);
-    T    sign(int(1));
     auto d(in[i]);
     depth.row(0).setVector(1, in.subVector(0, 2));
-    for(int j = 1; j < depth.rows(); j ++, chain = ! chain) {
+    for(int j = 1; j < depth.rows(); j ++) {
       depth(j - 1, 0) = depth(j - 1, 1);
       depth(j - 1, 1) = depth(j - 1, 2);
-      if(! chain) {
-        depth(j - 1, 2) = d = (d + sign) / T(int(2));
-        depth(j, depth.cols() - 1) = d *= p(depth.row(j - 1), unit);
+      if(j & 1) {
+        depth(j - 1, 2) = offsetHalf<T>(d);
+        d *= depth(j, depth.cols() - 1) = p(depth.row(j - 1), unit);
       } else {
-        depth(j - 1, 2) = d = d * T(int(2)) - sign;
-        depth(j, depth.cols() - 1) = d -= p(depth.row(j - 1), unit);
-        sign = - sign;
+        depth(j - 1, 2) = d;
+        d -= depth(j, depth.cols() - 1) = p(depth.row(j - 1), unit);
+        d = - d;
       }
     }
   }
   if(depth.rows() < 2) return T(int(0));
-  T sign(depth.rows() / 2 & 1 ? - T(int(1)) : T(int(1)));
   T M(int(0));
-  for(int j = depth.rows() - (depth.rows() & 1) - 1; 0 <= j; j --) {
-    if(j & 1) M += depth(j, 2) * sign;
-    else {
+  for(int j = depth.rows() - 1; 0 < j; j --) {
+    if(j & 1)
       M *= depth(j, 2);
-      sign = - sign;
+    else {
+      M  = - M;
+      M += depth(j, 2);
     }
   }
   return M;
