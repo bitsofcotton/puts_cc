@@ -3927,6 +3927,9 @@ template <typename T, T (*p)(const SimpleVector<T>&, const int&)> static inline 
   if(depth.rows() < 2) return T(int(0));
   T M(int(0));
   for(int j = depth.rows() - 1; 0 < j; j --) {
+    // N.B. [[a, b], [- b, a]]^-1 == [[a, -b], [b, a]] / f(det(...))
+    //      we only stuck on sign of the result, multiply is better to stable.
+    //      (chain of the matrix multiplication causes weighted multiplication)
     if(j & 1)
       M *= depth(j, 2);
     else {
@@ -4571,6 +4574,28 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv0(c
       PP0<T>(seconds / nseconds, unit) * nseconds) );
 }
 
+template <typename T, int nprogress = 20> static inline SimpleVector<T> predvp(const vector<SimpleVector<T> >& in) {
+  SimpleVector<T> p(in[0].size());
+  idFeeder<T> buf(in.size());
+  for(int i = 0; i < in.size(); i ++)
+    buf.next(in[i][0]);
+  assert(buf.full);
+  p[0] = p0p<T, p0maxNext<T> >(buf.res);
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
+  for(int j = 1; j < in[0].size(); j ++) {
+    if(nprogress && ! (j % max(int(1), int(in[0].size() / nprogress))) )
+      cerr << j << " / " << in[0].size() << endl;
+    idFeeder<T> buf(in.size());
+    for(int i = 0; i < in.size(); i ++)
+      buf.next(in[i][j]);
+    assert(buf.full);
+    p[j] = p0p<T, p0maxNext<T> >(buf.res);
+  }
+  return p;
+}
+
 template <typename T, int nprogress = 20> static inline SimpleVector<T> predv1(vector<SimpleVector<T> >& in) {
   static const auto step(1);
   assert(0 < step && 10 + step * 2 <= in.size() && 1 < in[0].size());
@@ -4769,7 +4794,7 @@ template <typename T, int nprogress = 6> static inline SimpleVector<T> predv4(ve
   return res;
 }
 
-template <typename T> vector<SimpleVector<T> > predVec(vector<vector<SimpleVector<T> > >& in0) {
+template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4785,15 +4810,33 @@ template <typename T> vector<SimpleVector<T> > predVec(vector<vector<SimpleVecto
   const auto size0(in0[0].size());
   const auto size1(in0[0][0].size());
   in0.resize(0);
-  auto p(predv<T>(in));
-  vector<SimpleVector<T> > res;
-  res.resize(size0);
-  for(int j = 0; j < res.size(); j ++)
-    res[j]  = p.subVector(size1 * j, size1);
+  in = unOffsetHalf<T>(in);
+  for(int i = 0; i < in.size(); i ++)
+    in[i] = - in[i];
+  vector<vector<SimpleVector<T> > > res;
+  res.resize(3);
+  {
+    auto p(predvp<T>(in));
+    res[0].resize(size0);
+    for(int j = 0; j < res[0].size(); j ++)
+      res[0][j] = offsetHalf<T>(- p.subVector(size1 * j, size1));
+  }
+  for(int i = 0; i < in.size(); i ++)
+    in[i] = - in[i];
+  {
+    auto p(predvp<T>(in));
+    res[1].resize(size0);
+    for(int j = 0; j < res[1].size(); j ++)
+      res[1][j] = offsetHalf<T>(p.subVector(size1 * j, size1));
+  }
+  auto p(predv<T>(in = offsetHalf<T>(in)));
+  res[2].resize(size0);
+  for(int j = 0; j < res[2].size(); j ++)
+    res[2][j]  = p.subVector(size1 * j, size1);
   return res;
 }
 
-template <typename T> vector<SimpleVector<T> > predVec(const vector<vector<SimpleVector<T> > >& in0) {
+template <typename T> vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   auto res(in0);
   return predVec<T>(res);
 }
@@ -4806,7 +4849,7 @@ template <typename T> vector<SimpleVector<T> > predVec(const vector<vector<Simpl
 //      on predv they uses statistics continuity as half of output.
 // N.B. either, linear predictors doesn't affected by such of DFT
 //      transformations.
-template <typename T> vector<SimpleMatrix<T> > predMat(vector<vector<SimpleMatrix<T> > >& in0) {
+template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4825,23 +4868,46 @@ template <typename T> vector<SimpleMatrix<T> > predMat(vector<vector<SimpleMatri
   const auto rows(in0[0][0].rows());
   const auto cols(in0[0][0].cols());
   in0.resize(0);
-  auto p(predv<T>(in));
-  vector<SimpleMatrix<T> > res;
-  res.resize(size);
+  in = unOffsetHalf<T>(in);
+  for(int i = 0; i < in.size(); i ++)
+    in[i] = - in[i];
+  vector<vector<SimpleMatrix<T> > > res;
+  res.resize(3);
+  {
+    auto p(predvp<T>(in));
+    res[0].resize(size);
+    for(int j = 0; j < res[0].size(); j ++) {
+      res[0][j].resize(rows, cols);
+      for(int k = 0; k < rows; k ++)
+        res[0][j].row(k) = offsetHalf<T>(- p.subVector(j * rows * cols + k * cols, cols));
+    }
+  }
+  for(int i = 0; i < in.size(); i ++)
+    in[i] = - in[i];
+  {
+    auto p(predvp<T>(in));
+    res[1].resize(size);
+    for(int j = 0; j < res[1].size(); j ++) {
+      res[1][j].resize(rows, cols);
+      for(int k = 0; k < rows; k ++)
+        res[1][j].row(k) = offsetHalf<T>(p.subVector(j * rows * cols + k * cols, cols));
+    }
+  }
+  auto p(predv<T>(in = offsetHalf<T>(in)));
   for(int j = 0; j < res.size(); j ++) {
-    res[j].resize(rows, cols);
+    res[2][j].resize(rows, cols);
     for(int k = 0; k < rows; k ++)
-      res[j].row(k) = p.subVector(j * rows * cols + k * cols, cols);
+      res[2][j].row(k) = p.subVector(j * rows * cols + k * cols, cols);
   }
   return res;
 }
 
-template <typename T> vector<SimpleMatrix<T> > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
+template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
   auto res(in0);
   return predMat<T>(res);
 }
 
-template <typename T> SimpleSparseTensor<T> predSTen(vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
+template <typename T> vector<SimpleSparseTensor<T> > predSTen(vector<SimpleSparseTensor<T> >& in0, const vector<int>& idx) {
   assert(idx.size() && in0.size());
   // N.B. we don't do input scaling.
   // N.B. we should use each bit extended input stream but not now.
@@ -4871,14 +4937,38 @@ template <typename T> SimpleSparseTensor<T> predSTen(vector<SimpleSparseTensor<T
             in[i][cnt ++] = offsetHalf<T>(in0[i][idx[j]][idx[k]][idx[m]]);
   }
   in0.resize(0);
-  auto p(predv<T>(in));
-  SimpleSparseTensor<T> res;
+  vector<SimpleSparseTensor<T> > res;
+  res.resize(3);
+  in = unOffsetHalf<T>(in);
+  for(int i = 0; i < in.size(); i ++)
+    in[i] = - in[i];
+  {
+    auto p(predvp<T>(in));
+    for(int j = 0, cnt = 0; j < idx.size(); j ++)
+      for(int k = 0; k < idx.size(); k ++)
+        for(int m = 0; m < idx.size(); m ++)
+          if(binary_search(attend.begin(), attend.end(),
+               make_pair(j, make_pair(k, m))))
+            res[0][idx[j]][idx[k]][idx[m]] = - p[cnt ++];
+  }
+  for(int i = 0; i < in.size(); i ++)
+    in[i] = - in[i];
+  {
+    auto p(predvp<T>(in));
+    for(int j = 0, cnt = 0; j < idx.size(); j ++)
+      for(int k = 0; k < idx.size(); k ++)
+        for(int m = 0; m < idx.size(); m ++)
+          if(binary_search(attend.begin(), attend.end(),
+               make_pair(j, make_pair(k, m))))
+            res[1][idx[j]][idx[k]][idx[m]] = p[cnt ++];
+  }
+  auto p(predv<T>(in = offsetHalf<T>(in)));
   for(int j = 0, cnt = 0; j < idx.size(); j ++)
     for(int k = 0; k < idx.size(); k ++)
       for(int m = 0; m < idx.size(); m ++)
         if(binary_search(attend.begin(), attend.end(),
              make_pair(j, make_pair(k, m))))
-          res[idx[j]][idx[k]][idx[m]] = unOffsetHalf<T>(p[cnt ++]);
+          res[2][idx[j]][idx[k]][idx[m]] = unOffsetHalf<T>(p[cnt ++]);
   return res;
 }
 
@@ -7098,9 +7188,15 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
   os << input;
   corpus<T, U> pstats;
   auto p(predSTen<T>(in, idx));
-  pstats.corpust = move(p);
+  pstats.corpust = move(p[0]);
   getAbbreved<T>(pstats, detailtitle, detail, delimiter);
   os << pstats.simpleThresh(threshin / T(int(4))).serialize();
+  pstats.corpust = move(p[1]);
+  getAbbreved<T>(pstats, detailtitle, detail, delimiter);
+  os << endl << " --- " << pstats.simpleThresh(threshin / T(int(4))).serialize();
+  pstats.corpust = move(p[2]);
+  getAbbreved<T>(pstats, detailtitle, detail, delimiter);
+  os << endl << " --- " << pstats.simpleThresh(threshin / T(int(4))).serialize();
   return os;
 }
 
