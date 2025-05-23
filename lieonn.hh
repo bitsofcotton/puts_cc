@@ -3756,7 +3756,7 @@ template <typename T, const bool cultivated = false, const bool nonlinear = true
   //      and unstable result, this might means invariant continuity
   //      improves when length == 3 also we have prediction direction on them.
   SimpleMatrix<T> invariants(cultivated ?
-      (in.size() / 16 < 8 + step ? 1 : in.size() / 16) : 1,
+      (in.size() / 4 < 8 + step ? 1 : in.size() / 4) : 1,
       nonlinear ? varlen + 2 : varlen);
   invariants.O();
   for(int i0 = 0; i0 < invariants.rows(); i0 ++) {
