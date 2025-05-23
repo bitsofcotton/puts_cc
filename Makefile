@@ -18,6 +18,9 @@ LDFLAGS+=	-lc++ -L/usr/local/lib
 #CXXFLAGS+=	-D_FLOAT_BITS_=256
 #CXXFLAGS+=	-D_FLOAT_BITS_=512
 
+#CXXFLAGS+=	-D_ARCFOUR_
+CXXFLAGS+=	-D_FEED_MUCH_
+
 CLEANFILES= *.o puts putsmp puts32 puts32mp
 
 all:	puts putsmp puts32 puts32mp

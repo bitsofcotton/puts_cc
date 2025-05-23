@@ -3736,7 +3736,12 @@ template <typename T> static inline T p01delimNext(const SimpleVector<T>& in, co
 //      however, in the information amount meaning, 6 recursive effects well.
 //      (2nd order saturation on the copied information on structure)
 //      on some of the experiments, no improves but different result.
-template <typename T, T (*f)(const SimpleVector<T>&, const int&), const bool nonlinear = true> T p01next(const SimpleVector<T>& in, const int& unit = 3) {
+// N.B. with cultivated == true condition, we feed root of the description
+//      we can use to id. data amount.
+//      however, we only need 3 depth in normal root fixation.
+//      we select deep enough one because of the timing related attack jammer
+//      exists they can select arbitrary timing also such of the stream exists.
+template <typename T, const bool cultivated = false, const bool nonlinear = true> T p01next(const SimpleVector<T>& in, const int& unit = 3) {
   static const auto step(1);
   static const T zero(0);
   static const T one(1);
@@ -3750,8 +3755,8 @@ template <typename T, T (*f)(const SimpleVector<T>&, const int&), const bool non
   //      many of the exhaust of the calculation resource can be cached
   //      and unstable result, this might means invariant continuity
   //      improves when length == 3 also we have prediction direction on them.
-  SimpleMatrix<T> invariants(f == p0maxNext<T> || f == p0max0next<T> ? 3
-    : (f == p01delimNext<T> ? 1 : in.size() - unit),
+  SimpleMatrix<T> invariants(cultivated ?
+      (in.size() / 16 < 8 + step ? 1 : in.size() / 16) : 1,
       nonlinear ? varlen + 2 : varlen);
   invariants.O();
   for(int i0 = 0; i0 < invariants.rows(); i0 ++) {
@@ -3761,14 +3766,18 @@ template <typename T, T (*f)(const SimpleVector<T>&, const int&), const bool non
       auto work(in.subVector(i, varlen));
       work[work.size() - 1] = in[i + varlen + step - 2];
       toeplitz.row(i - i0) = nonlinear ? makeProgramInvariant<T>(R2bin<T>(work),
-        T(i + 1) / T(toeplitz.rows() + 1) ).first : binMargin<T>(work);
+        T(i + 1) / T(toeplitz.rows() + i0 + 1) ).first : binMargin<T>(work);
     }
     invariants.row(i0) = linearInvariant<T>(toeplitz);
   }
   SimpleVector<T> invariant(invariants.cols());
-  invariant.O();
-  for(int i = 0; i < invariants.cols(); i ++)
-    invariant[i] = f(invariants.col(i), unit);
+  if(invariants.rows() <= 1)
+    invariant = move(invariants.row(0));
+  else {
+    invariant.O();
+    for(int i = 0; i < invariants.cols(); i ++)
+      invariant[i] = p01next<T, cultivated, nonlinear>(invariants.col(i));
+  }
   if(invariant[varlen - 1] == zero) {
     cerr << "!" << flush;
     return zero;
@@ -3887,6 +3896,7 @@ template <typename T, T (*p)(const SimpleVector<T>&, const int&)> static inline 
   auto M(abs(in[0]));
   for(int i = 1; i < in.size(); i ++)
     M = max(M, in[i]);
+  if(M == T(int(0))) return T(int(0));
   // N.B. with 1-norm normalized input:
   T m(in[0] /= M);
   for(int i = 1; i < in.size(); i ++) m = min(m, in[i] /= M);
@@ -3901,7 +3911,7 @@ template <typename T, T (*p)(const SimpleVector<T>&, const int&)> static inline 
   return max(- M, min(M, p((in *= M) /= mavg, 0) * mavg));
 }
 
-template <typename T, T (*p)(const SimpleVector<T>&, const int&)> static inline T p0p(const SimpleVector<T>& in, const int& unit = 3) {
+template <typename T, T (*p)(const SimpleVector<T>&, const int&)> static inline T p0cultivatedDeep(const SimpleVector<T>& in, const int& unit = 3) {
   if(in.size() < 7) return T(int(0));
   SimpleMatrix<T> depth(1, 3);
   depth(0, 0) = T(int(0));
@@ -4537,11 +4547,19 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
 // N.B. if we're in result is in control condition, we need to output at least
 //      a pair on the prediction, however, we discontinue such a implementation.
 // N.B. as ddpmopt:README.md, PP3 is least and enough normally.
-template <typename T> static inline T PP0(const SimpleVector<T>& in, const int& ratio) {
-  return p01next<T, p01delimNext<T>, true>(in, ratio);
+template <typename T> static inline T PP(const SimpleVector<T>& in) {
+  return p01next<T, false, true>(in);
 }
 
-template <typename T, int nprogress = 20> static inline SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
+template <typename T> static inline T PPcultivatedDeep(const SimpleVector<T>& in) {
+  return p01next<T, true, true>(in);
+}
+
+#if defined(_FEED_MUCH_)
+template <typename T, int nprogress = 20, T (*pf)(const SimpleVector<T>&) = PPcultivatedDeep<T> > static inline SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
+#else
+template <typename T, int nprogress = 20, T (*pf)(const SimpleVector<T>&) = PP<T> > static inline SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
+#endif
   assert(0 < sz && sz <= in.size());
   // N.B. we need to initialize p0 vector.
   SimpleVector<T> seconds(sz);
@@ -4552,8 +4570,6 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv0(c
   for(int i = 0; i < sz; i ++)  {
     seconds[i] = makeProgramInvariant<T>(in[i]).second;
   }
-  // N.B. not in use, we use whole in.size() with PP0.
-  const int unit(sz / 3);
   SimpleVector<T> p(in[0].size());
   p.O();
 #if defined(_OPENMP)
@@ -4566,12 +4582,12 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv0(c
     for(int i = 0; i < sz; i ++)
       buf.next(in[i][j] * seconds[i]);
     assert(buf.full);
-    p[j] = PP0<T>(buf.res, unit);
+    p[j] = pf(buf.res);
   }
   const auto nseconds(sqrt(seconds.dot(seconds)));
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(p)).first,
-      PP0<T>(seconds / nseconds, unit) * nseconds) );
+      pf(seconds / nseconds) * nseconds) );
 }
 
 template <typename T, int nprogress = 20> static inline SimpleVector<T> predvp(const vector<SimpleVector<T> >& in) {
@@ -4580,7 +4596,7 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predvp(c
   for(int i = 0; i < in.size(); i ++)
     buf.next(in[i][0]);
   assert(buf.full);
-  p[0] = p0p<T, p0maxNext<T> >(buf.res);
+  p[0] = p0cultivatedDeep<T, p0maxNext<T> >(buf.res);
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -4591,14 +4607,18 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predvp(c
     for(int i = 0; i < in.size(); i ++)
       buf.next(in[i][j]);
     assert(buf.full);
-    p[j] = p0p<T, p0maxNext<T> >(buf.res);
+    p[j] = p0cultivatedDeep<T, p0maxNext<T> >(buf.res);
   }
   return p;
 }
 
 template <typename T, int nprogress = 20> static inline SimpleVector<T> predv1(vector<SimpleVector<T> >& in) {
   static const auto step(1);
+#if defined(_FEED_MUCH_)
+  assert(0 < step && 33 <= in.size() && 1 < in[0].size());
+#else
   assert(0 < step && 10 + step * 2 <= in.size() && 1 < in[0].size());
+#endif
   // N.B. we use whole width to get better result in average.
   //      this is equivalent to the command: p1 | p0 :
   //      enough prediction with integer-float classes (SimpleFloat<...>)
@@ -4611,7 +4631,6 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv1(v
   SimpleVector<SimpleVector<T> > p;
   SimpleVector<T> res(in[0].size());
   p.entity.reserve(in.size());
-  // N.B. optimal with PP0
   const auto start(8 + step);
   for(int i = 1; i < start; i ++)
     p.entity.emplace_back(SimpleVector<T>(in[0].size()).O());
@@ -4638,7 +4657,6 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv1(v
   //      average to complete gray.
   // N.B. revert to original walk conditions, our sample non PRNG result
   //      works well with this.
-  res[0] =
   res[0] = offsetHalf<T>(p0maxNext<T>(ip.row(0)) *
     unOffsetHalf<T>(p[p.size() - 1][0]) );
 #if defined(_OPENMP)
@@ -4707,91 +4725,60 @@ template <typename T, int nrecur = 0, int nprogress = 20> static inline SimpleVe
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
 //      mostly with slight speed hacks.
-template <typename T, int nprogress = 6> static inline SimpleVector<T> predv4(vector<SimpleVector<T> >& in) {
+template <typename T, int nprogress = 20> static inline SimpleVector<T> predv4(vector<SimpleVector<T> >& in) {
   assert(1 < in.size() && (in[in.size() - 1].size() == 4 ||
                            in[in.size() - 1].size() == 12) );
+  assert(in.size() & 1);
   static const T zero(0);
   static const T one(1);
   static const T two(2);
-  SimpleVector<T> res(in[in.size() - 2].size());
+  SimpleVector<T> res(in[1].size());
   vector<SimpleVector<T> > inw;
   inw.reserve(in.size());
   SimpleVector<T> nwork(in.size());
   for(int i = 0; i < in.size(); i ++) {
     auto inww(makeProgramInvariant<T>(in[i]));
-    inw.emplace_back(inww.first);
+    inw.emplace_back(move(inww.first));
     nwork[i] = inww.second;
   }
-  SimpleMatrix<T> gwork0(res.size(), inw.size() / 2 - 1);
-  gwork0.O();
+  const auto nseconds(sqrt(nwork.dot(nwork)));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int i = 0; i < gwork0.rows(); i ++) {
+  for(int i = 0; i < res.size(); i ++) {
+    if(nprogress && ! (i % max(int(1), int(res.size() / nprogress))) )
+      cerr << i << " / " << res.size() << endl;
     // N.B. imported from P01 class.
-    SimpleMatrix<T> toeplitz0(gwork0.cols(), 7);
-    for(int j = 0; j < toeplitz0.rows(); j ++) {
+    SimpleMatrix<T> toeplitz(in.size() / 2, 7);
+    for(int j = 0; j < toeplitz.rows(); j ++) {
       SimpleVector<T> vw(5);
       vw.O();
-      vw.setVector(0, inw[j * 2 + 1].subVector(0, 4));
-      // XXX: following throws floating point exception, non zero divide.
-      //  1 + ((i / (in[in.size() - 2].size() / in[in.size() - 1].size())) & (~ 0x03)), 4));
-      vw[4] = inw[j * 2 + 2][i];
-      toeplitz0.row(j) =
-        makeProgramInvariant<T>(R2bin<T>(vw), T(j) / T(int(toeplitz0.rows() + 1)) ).first;
+      vw.setVector(0, inw[j * 2].subVector(0, 4));
+      vw[4] = inw[j * 2 + 1][i];
+      toeplitz.row(j) =
+        makeProgramInvariant<T>(R2bin<T>(vw), T(j) / T(int(toeplitz.rows() + 1)) ).first;
     }
-    for(int i1 = 9; i1 <= toeplitz0.rows(); i1 ++) {
-      if(nprogress && ! (i1 % max(int(1), int(toeplitz0.rows() / nprogress))) )
-        cerr << i1 << " / " << toeplitz0.rows() << " : " << i << " / " << in[0].size() << endl;
-      SimpleMatrix<T> toeplitz(i1, toeplitz0.cols());
-      for(int j = 0; j < toeplitz.rows(); j ++)
-        toeplitz.row(j) = toeplitz0.row(j);
-      const auto invariant(linearInvariant<T>(toeplitz));
-      SimpleVector<T> work(5);
-      work.O();
-      work.setVector(0, inw[(i1 - toeplitz0.rows()) * 2 + inw.size() - 1].subVector(0, 4));
-      work[work.size() - 1] = zero;
-      auto last(sqrt(work.dot(work)));
-      for(int ii = 0;
-              ii < 2 * int(- log(SimpleMatrix<T>().epsilon()) / log(two) )
-              && sqrt(work.dot(work) * SimpleMatrix<T>().epsilon()) <
-                 abs(work[work.size() - 1] - last); ii ++) {
-        last = work[work.size() - 1];
-        const auto work2(makeProgramInvariant<T>(R2bin<T>(work), one));
-        work[work.size() - 1] = bin2R<T>(revertProgramInvariant<T>(make_pair(
-          - (invariant.dot(work2.first) - invariant[4] * work2.first[4]) /
+    const auto invariant(linearInvariant<T>(toeplitz));
+    SimpleVector<T> work(5);
+    work.O();
+    work.setVector(0, inw[inw.size() - 1].subVector(0, 4));
+    work[work.size() - 1] = zero;
+    auto last(sqrt(work.dot(work)));
+    for(int ii = 0;
+            ii < 2 * int(- log(SimpleMatrix<T>().epsilon()) / log(two) )
+            && sqrt(work.dot(work) * SimpleMatrix<T>().epsilon()) <
+               abs(work[work.size() - 1] - last); ii ++) {
+      last = work[work.size() - 1];
+      const auto work2(makeProgramInvariant<T>(R2bin<T>(work), one));
+      work[work.size() - 1] = bin2R<T>(revertProgramInvariant<T>(make_pair(
+        - (invariant.dot(work2.first) - invariant[4] * work2.first[4]) /
           invariant[4], work2.second)) );
-      }
-      gwork0(i, i1 - 1) = work[work.size() - 1];
     }
+    res[i] = work[work.size() - 1];
   }
-  for(int i1 = 9; i1 < gwork0.cols(); i1 ++) {
-    const auto nnwork(nwork.subVector(0, i1));
-    const auto nseconds(sqrt(nnwork.dot(nnwork)));
-    gwork0.setCol(i1, revertProgramInvariant<T>(make_pair(
-      makeProgramInvariant<T>(normalize<T>(gwork0.col(i1))).first,
-        PP0<T>(nnwork / nseconds, 0) * nseconds)).subVector(0, gwork0.rows()) );
-  }
-  auto gwork1(gwork0);
-  gwork1.O();
-  // N.B. imported from predv1.
-  for(int i = 0; i < gwork1.rows(); i ++)
-    for(int j = 9; j < gwork1.cols(); j ++)
-      gwork1(i, j) =
-        unOffsetHalf<T>(in[(j - gwork1.cols()) * 2 + in.size()][i]) *
-        unOffsetHalf<T>(gwork0(i, j - 1));
-  // N.B. dftcache need to be single thread on first call.
-  // N.B. same logic as predv, we bet only the sign of them.
-  res[0] = offsetHalf<T>(p0maxNext<T>(gwork1.row(0)) *
-    unOffsetHalf<T>(gwork0(0, gwork0.cols() - 1)) );
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-  for(int i = 1; i < res.size(); i ++) {
-    res[i] = offsetHalf<T>(p0maxNext<T>(gwork1.row(i)) *
-      unOffsetHalf<T>(gwork0(i, gwork0.cols() - 1)) );
-  }
-  return res;
+  return revertProgramInvariant<T>(make_pair(
+    makeProgramInvariant<T>(normalize<T>(res)).first,
+      PP<T>(nwork / nseconds) * nseconds));
 }
 
 template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
@@ -4894,7 +4881,8 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<Si
     }
   }
   auto p(predv<T>(in = offsetHalf<T>(in)));
-  for(int j = 0; j < res.size(); j ++) {
+  res[2].resize(size);
+  for(int j = 0; j < res[2].size(); j ++) {
     res[2][j].resize(rows, cols);
     for(int k = 0; k < rows; k ++)
       res[2][j].row(k) = p.subVector(j * rows * cols + k * cols, cols);
