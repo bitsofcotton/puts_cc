@@ -3569,7 +3569,7 @@ template <typename T> static inline vector<pair<vector<SimpleVector<T> >, vector
 }
 
 // N.B. non thread safe.
-template <typename T> static inline T p012next(const SimpleVector<T>& d, const int& sute = 0) {
+template <typename T> static inline T p012next(const SimpleVector<T>& d) {
   static const auto step(1);
   static const T zero(int(0));
          auto    M(zero);
@@ -3627,23 +3627,23 @@ template <typename T> static inline T p012next(const SimpleVector<T>& d, const i
   return sscore == zero ? sscore : res / sscore;
 }
 
-template <typename T> static inline T p0next(const SimpleVector<T>& in, const int& sute = 0) {
+template <typename T> static inline T p0next(const SimpleVector<T>& in) {
   static const auto step(1);
   return pnextcacher<T>(in.size(), ((step - 1) % in.size()) + 1).dot(in);
 }
 
-template <typename T, T (*f)(const SimpleVector<T>&, const int&)> static inline T p0invNext(const SimpleVector<T>& in, const int& sute = 0) {
+template <typename T, T (*f)(const SimpleVector<T>&)> static inline T invNext(const SimpleVector<T>& in) {
   static const T zero(int(0));
   static const T one(int(1));
   auto ff(in);
   for(int i = 0; i < in.size(); i ++) if(in[i] == zero) return in[in.size() - 1];
   else ff[i] = one / in[i];
-  const auto pn(f(ff, sute));
+  const auto pn(f(ff));
   if(pn == zero) return in[in.size() - 1];
   return one / pn;
 }
 
-template <typename T, T (*f)(const SimpleVector<T>&, const int&)> static inline T northPoleNext(const SimpleVector<T>& in, const int& unit = 3) {
+template <typename T, T (*f)(const SimpleVector<T>&)> static inline T northPoleNext(const SimpleVector<T>& in) {
   static const T zero(int(0));
   static const T one(int(1));
   static const T M(atan(one / sqrt(SimpleMatrix<T>().epsilon())));
@@ -3657,7 +3657,7 @@ template <typename T, T (*f)(const SimpleVector<T>&, const int&)> static inline 
       // ff[i] = atan(one / ff[i]);
       // assert(- M < ff[i] && ff[i] < M);
     }
-  auto work(f(ff, unit));
+  auto work(f(ff));
   // if(! isfinite(work) || work == zero) return in[in.size() - 1];
   if(! isfinite(work)) return in[in.size() - 1];
   // work = tan(max(- M, min(M, one / tan(max(- M, min(M, work))))));
@@ -3666,18 +3666,18 @@ template <typename T, T (*f)(const SimpleVector<T>&, const int&)> static inline 
   return in[in.size() - 1];
 }
 
-template <typename T, bool avg = false, T (*f)(const SimpleVector<T>&, const int&)> static inline T sumCNext(const SimpleVector<T>& in, const int& unit = 3) {
+template <typename T, bool avg = false, T (*f)(const SimpleVector<T>&)> static inline T sumCNext(const SimpleVector<T>& in) {
   auto ff(in);
   for(int i = 1; i < ff.size(); i ++)
     ff[i] += ff[i - 1];
-  if(! avg) return f(ff, unit) - ff[ff.size() - 1];
+  if(! avg) return f(ff) - ff[ff.size() - 1];
   const auto A(ff[ff.size() - 1] / T(ff.size()));
   for(int i = 0; i < ff.size(); i ++)
     ff[i] = in[i] - A;
-  return f(ff, unit) + A;
+  return f(ff) + A;
 }
 
-template <typename T, T (*f)(const SimpleVector<T>&, const int&)> static inline T logCNext(const SimpleVector<T>& in, const int& unit = 3) {
+template <typename T, T (*f)(const SimpleVector<T>&)> static inline T logCNext(const SimpleVector<T>& in) {
   static const T zero(int(0));
   static const T one(int(1));
   auto ff(in);
@@ -3688,10 +3688,10 @@ template <typename T, T (*f)(const SimpleVector<T>&, const int&)> static inline 
   gg.O();
   for(int i = 1; i < ff.size(); i ++)
     if(! isfinite(gg[i - 1] = ff[i] / ff[i - 1] - one)) return in[in.size() - 1];
-  return f(gg, unit) * ff[ff.size() - 1];
+  return f(gg) * ff[ff.size() - 1];
 }
 
-template <typename T> static inline T p0max0next(const SimpleVector<T>& in, const int& sute = 0) {
+template <typename T> static inline T p0max0next(const SimpleVector<T>& in) {
   // N.B. on existing taylor series.
   //      if the sampling frequency is not enough, middle range of the original
   //      function frequency (enough large bands) will effect prediction fail.
@@ -3701,16 +3701,16 @@ template <typename T> static inline T p0max0next(const SimpleVector<T>& in, cons
   //      so we should use sectional measurement for them.
   // N.B. the sectional measurament is done by following Ppad class.
   //      So this is only the raw prediction.
-  return (sumCNext<T, true, p0next<T> >(in, sute) +
-    p0invNext<T, sumCNext<T, true, p0next<T> > >(in, sute)) / T(int(2));
+  return (sumCNext<T, true, p0next<T> >(in) +
+    invNext<T, sumCNext<T, true, p0next<T> > >(in)) / T(int(2));
 }
 
-template <typename T> static inline T p0maxNext(const SimpleVector<T>& in, const int& sute = 0) {
+template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
   // N.B. we only handle lebesgue measurable and R(finite)-valued functions.
   //      so worse structures are handled by P01.
-  return sumCNext<T, true, sumCNext<T, false, northPoleNext<T, p0max0next<T> > > >(in, sute);
+  return sumCNext<T, true, sumCNext<T, false, northPoleNext<T, p0max0next<T> > > >(in);
   // N.B. plain complex form.
-  // return sumCNext<T, true, sumCNext<T, false, logCNext<T, logCNext<T, northPoleNext<T, p0max0next<T> > > > > >(in, sute);
+  // return sumCNext<T, true, sumCNext<T, false, logCNext<T, logCNext<T, northPoleNext<T, p0max0next<T> > > > > >(in);
   //
   // N.B. make information-rich not to associative/commutative.
   //      2 dimension semi-order causes (x, status) from input as sedenion.
@@ -3722,10 +3722,10 @@ template <typename T> static inline T p0maxNext(const SimpleVector<T>& in, const
   // N.B. we make the prediction on (delta) summation.
   // N.B. we take average as origin of input.
   // N.B. this needs huge memory to run.
-  // return sumCNext<T, true, sumCNext<T, false, logCNext<T, logCNext<T, P0DFT<T, p0max0next<T> > > > > >(in, sute);
+  // return sumCNext<T, true, sumCNext<T, false, logCNext<T, logCNext<T, P0DFT<T, p0max0next<T> > > > > >(in);
 }
 
-template <typename T> static inline T p01delimNext(const SimpleVector<T>& in, const int& sute = 0) {
+template <typename T> static inline T p01delimNext(const SimpleVector<T>& in) {
   return in[in.size() - 1];
 }
 
@@ -3741,7 +3741,7 @@ template <typename T> static inline T p01delimNext(const SimpleVector<T>& in, co
 //      however, we only need 3 depth in normal root fixation.
 //      we select deep enough one because of the timing related attack jammer
 //      exists they can select arbitrary timing also such of the stream exists.
-template <typename T, const bool cultivated = false, const bool nonlinear = true> T p01next(const SimpleVector<T>& in, const int& unit = 3) {
+template <typename T, const bool cultivated = true, const bool nonlinear = true> T p01next(const SimpleVector<T>& in) {
   static const auto step(1);
   static const T zero(0);
   static const T one(1);
@@ -3751,12 +3751,9 @@ template <typename T, const bool cultivated = false, const bool nonlinear = true
   const auto nin(sqrt(in.dot(in) * (one + SimpleMatrix<T>().epsilon())));
   if(! isfinite(nin) || nin == zero) return zero;
   const auto varlen(ind2vd(in.size()));
-  // N.B. if we use last delimiter with unit size, they also causes
-  //      many of the exhaust of the calculation resource can be cached
-  //      and unstable result, this might means invariant continuity
-  //      improves when length == 3 also we have prediction direction on them.
+  // N.B. we use whole data information size on each single layer's size.
   SimpleMatrix<T> invariants(cultivated ?
-      (in.size() / 4 < 8 + step ? 1 : in.size() / 4) : 1,
+      (in.size() / (varlen + 1) < 8 + step ? 1 : in.size() / (varlen + 1)) : 1,
       nonlinear ? varlen + 2 : varlen);
   invariants.O();
   for(int i0 = 0; i0 < invariants.rows(); i0 ++) {
@@ -3780,7 +3777,7 @@ template <typename T, const bool cultivated = false, const bool nonlinear = true
   }
   if(invariant[varlen - 1] == zero) {
     cerr << "!" << flush;
-    return zero;
+    return in[in.size() - 1];
   }
   SimpleVector<T> work(varlen);
   for(int i = 1; i < work.size(); i ++)
@@ -3891,7 +3888,7 @@ template <typename T> static inline SimpleVector<SimpleVector<T> > arctanFeeder(
 }
 
 // N.B. we omit high frequency part (1/f(x) input) to be treated better in P.
-template <typename T, T (*p)(const SimpleVector<T>&, const int&)> static inline T pbond(SimpleVector<T> in) {
+template <typename T, T (*p)(const SimpleVector<T>&)> static inline T pbond(SimpleVector<T> in) {
   if(in.size() <= 1) return T(int(0));
   auto M(abs(in[0]));
   for(int i = 1; i < in.size(); i ++)
@@ -3908,44 +3905,40 @@ template <typename T, T (*p)(const SimpleVector<T>&, const int&)> static inline 
   mavg /= T(int(in.size()));
   mavg  = exp(mavg);
   // N.B. we need nonlinear prediction, so * M before to predict.
-  return max(- M, min(M, p((in *= M) /= mavg, 0) * mavg));
+  return max(- M, min(M, p((in *= M) /= mavg) * mavg));
 }
 
-template <typename T, T (*p)(const SimpleVector<T>&, const int&)> static inline T p0cultivatedDeep(const SimpleVector<T>& in, const int& unit = 3) {
-  if(in.size() < 7) return T(int(0));
-  SimpleMatrix<T> depth(1, 3);
-  depth(0, 0) = T(int(0));
-  depth(0, 1) = offsetHalf<T>(in[0]);
-  depth(0, 2) = offsetHalf<T>(in[1]);
-  for(int i = 2; i < in.size(); i ++) {
-    if(depth.rows() < i / 3) depth.entity.emplace_back(SimpleVector<T>(3).O());
+template <typename T, T (*p)(const SimpleVector<T>&)> static inline T deep(const SimpleVector<T>& in, const int& unit = 3) {
+  assert(1 < unit);
+  vector<idFeeder<T> > depth;
+  depth.resize(in.size() / unit + 1, idFeeder<T>(unit));
+  for(int i = 0; i < min(unit - 1, in.size()); i ++)
+    depth[0].next(offsetHalf<T>(in[i]));
+  for(int i = unit - 1; i < in.size(); i ++) {
     auto d(in[i]);
-    depth.row(0).setVector(1, in.subVector(0, 2));
-    for(int j = 1; j < depth.rows(); j ++) {
-      depth(j - 1, 0) = depth(j - 1, 1);
-      depth(j - 1, 1) = depth(j - 1, 2);
+    depth[0].next(offsetHalf<T>(d));
+    assert(depth[0].full);
+    for(int j = 1; j < depth.size() && depth[j - 1].full; j ++)
       if(j & 1) {
-        depth(j - 1, 2) = offsetHalf<T>(d);
-        d *= depth(j, depth.cols() - 1) = p(depth.row(j - 1), unit);
+        auto q(p(depth[j - 1].res));
+        d *= q;
+        depth[j].next(move(q));
       } else {
-        depth(j - 1, 2) = d;
-        d -= depth(j, depth.cols() - 1) = p(depth.row(j - 1), unit);
-        d = - d;
+        auto q(p(depth[j - 1].res));
+        d = - (d -= q);
+        depth[j].next(offsetHalf<T>(move(q)));
       }
-    }
   }
-  if(depth.rows() < 2) return T(int(0));
   T M(int(0));
-  for(int j = depth.rows() - 1; 0 < j; j --) {
+  for(int j = depth.size() - 1; 0 < j; j --) {
     // N.B. [[a, b], [- b, a]]^-1 == [[a, -b], [b, a]] / f(det(...))
     //      we only stuck on sign of the result, multiply is better to stable.
     //      (chain of the matrix multiplication causes weighted multiplication)
+    if(! depth[j].full) continue;
     if(j & 1)
-      M *= depth(j, 2);
-    else {
-      M  = - M;
-      M += depth(j, 2);
-    }
+      M *= depth[j].res[depth[j].res.size() - 1];
+    else
+      (M = - M) += depth[j].res[depth[j].res.size() - 1];
   }
   return M;
 }
@@ -4547,19 +4540,8 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
 // N.B. if we're in result is in control condition, we need to output at least
 //      a pair on the prediction, however, we discontinue such a implementation.
 // N.B. as ddpmopt:README.md, PP3 is least and enough normally.
-template <typename T> static inline T PP(const SimpleVector<T>& in) {
-  return p01next<T, false, true>(in);
-}
 
-template <typename T> static inline T PPcultivatedDeep(const SimpleVector<T>& in) {
-  return p01next<T, true, true>(in);
-}
-
-#if defined(_FEED_MUCH_)
-template <typename T, int nprogress = 20, T (*pf)(const SimpleVector<T>&) = PPcultivatedDeep<T> > static inline SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
-#else
-template <typename T, int nprogress = 20, T (*pf)(const SimpleVector<T>&) = PP<T> > static inline SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
-#endif
+template <typename T, int nprogress = 20> static inline SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
   assert(0 < sz && sz <= in.size());
   // N.B. we need to initialize p0 vector.
   SimpleVector<T> seconds(sz);
@@ -4582,12 +4564,12 @@ template <typename T, int nprogress = 20, T (*pf)(const SimpleVector<T>&) = PP<T
     for(int i = 0; i < sz; i ++)
       buf.next(in[i][j] * seconds[i]);
     assert(buf.full);
-    p[j] = pf(buf.res);
+    p[j] = p01next<T>(buf.res);
   }
   const auto nseconds(sqrt(seconds.dot(seconds)));
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(p)).first,
-      pf(seconds / nseconds) * nseconds) );
+      p01next<T>(seconds / nseconds) * nseconds) );
 }
 
 template <typename T, int nprogress = 20> static inline SimpleVector<T> predvp(const vector<SimpleVector<T> >& in) {
@@ -4596,7 +4578,7 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predvp(c
   for(int i = 0; i < in.size(); i ++)
     buf.next(in[i][0]);
   assert(buf.full);
-  p[0] = p0cultivatedDeep<T, p0maxNext<T> >(buf.res);
+  p[0] = deep<T, p0maxNext<T> >(buf.res);
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -4607,18 +4589,14 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predvp(c
     for(int i = 0; i < in.size(); i ++)
       buf.next(in[i][j]);
     assert(buf.full);
-    p[j] = p0cultivatedDeep<T, p0maxNext<T> >(buf.res);
+    p[j] = deep<T, p0maxNext<T> >(buf.res);
   }
   return p;
 }
 
 template <typename T, int nprogress = 20> static inline SimpleVector<T> predv1(vector<SimpleVector<T> >& in) {
   static const auto step(1);
-#if defined(_FEED_MUCH_)
-  assert(0 < step && 33 <= in.size() && 1 < in[0].size());
-#else
   assert(0 < step && 10 + step * 2 <= in.size() && 1 < in[0].size());
-#endif
   // N.B. we use whole width to get better result in average.
   //      this is equivalent to the command: p1 | p0 :
   //      enough prediction with integer-float classes (SimpleFloat<...>)
@@ -4778,7 +4756,7 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv4(v
   }
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(res)).first,
-      PP<T>(nwork / nseconds) * nseconds));
+      p01next<T>(nwork / nseconds) * nseconds));
 }
 
 template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
@@ -5191,7 +5169,7 @@ template <typename T> bool loadobj(vector<SimpleVector<T> >& data, vector<Simple
   return true;
 }
   
-template <typename T> bool saveMTL(const char* photo, const char* filename) {
+template <typename T> static inline bool saveMTL(const char* photo, const char* filename) {
   ofstream output;
   output.open(filename, std::ios::out);
   if(output.is_open()) {
@@ -5216,7 +5194,7 @@ template <typename T> bool saveMTL(const char* photo, const char* filename) {
   return true;
 }
 
-template <typename T> bool loaddat(const char* filename, string& header, vector<vector<T> >& data) {
+template <typename T> static inline bool loaddat(const char* filename, string& header, vector<vector<T> >& data) {
   ifstream input;
   input.open(filename);
   if(input.is_open()) {
@@ -5245,7 +5223,7 @@ template <typename T> bool loaddat(const char* filename, string& header, vector<
   return true;
 }
   
-template <typename T> bool savedat(const char* filename, string& header, vector<vector<T> >& data) {
+template <typename T> static inline bool savedat(const char* filename, string& header, vector<vector<T> >& data) {
   ofstream output;
   output.open(filename, std::ios::out);
   if(output.is_open()) {
@@ -5263,7 +5241,7 @@ template <typename T> bool savedat(const char* filename, string& header, vector<
   return true;
 }
   
-template <typename T> bool loadcenterr(vector<SimpleVector<T> >& center, vector<T>& r, const char* filename) {
+template <typename T> static inline bool loadcenterr(vector<SimpleVector<T> >& center, vector<T>& r, const char* filename) {
   center = vector<SimpleVector<T> >();
   r      = vector<T>();
   ifstream input;
@@ -5289,7 +5267,7 @@ template <typename T> bool loadcenterr(vector<SimpleVector<T> >& center, vector<
   return center.size() == r.size();
 }
 
-template <typename T> bool savecenterr(const char* filename, const vector<SimpleVector<T> >& center, const vector<T>& r) {
+template <typename T> static inline bool savecenterr(const char* filename, const vector<SimpleVector<T> >& center, const vector<T>& r) {
   ofstream output;
   output.open(filename, std::ios::out);
   if(output.is_open()) {
@@ -5306,7 +5284,7 @@ template <typename T> bool savecenterr(const char* filename, const vector<Simple
   return true;
 }
 
-template <typename T> SimpleMatrix<T> sharpen(const int& size) {
+template <typename T> static inline SimpleMatrix<T> sharpen(const int& size) {
   assert(0 < size);
   SimpleMatrix<T> s;
   const auto file(string("./.cache/lieonn/sharpen-") + to_string(size) +
@@ -5980,7 +5958,7 @@ template <typename T> static inline void drawMatchTriangle(SimpleMatrix<T>& map,
   return;
 }
 
-template <typename T> void addMeshTri(vector<SimpleVector<int> >& res, vector<pair<SimpleVector<T>, int> >& scan, const vector<SimpleVector<T> >& p, const int& idx) {
+template <typename T> static inline void addMeshTri(vector<SimpleVector<int> >& res, vector<pair<SimpleVector<T>, int> >& scan, const vector<SimpleVector<T> >& p, const int& idx) {
   assert(0 <= idx && idx < scan.size());
   vector<int> elim;
   if(0 <= idx - 1 &&
