@@ -14,16 +14,11 @@
 #define int int64_t
 #include "lieonn.hh"
 typedef myfloat num_t;
-#include "corpus.hh"
 std::vector<std::string> words;
 
 std::vector<std::string> delimiter;
 std::vector<std::string> csvelim;
 std::vector<std::string> csvdelim;
-
-void usage() {
-  std::cout << "tools (lword|lbalance|toc|lack|redig|stat|findroot|diff|same|prep|pred)" << std::endl;
-}
 
 std::pair<std::string, std::string> loadbuf(const char* filename) {
   std::ifstream input;
@@ -52,79 +47,14 @@ std::pair<std::string, std::string> loadbuf(const char* filename) {
   return std::make_pair(name, inbuf);
 }
 
-inline std::string utf8align(const std::string& tob) {
-  int head = 0;
-  while(head < tob.size() && (tob[head] & 0xc0) == 0x80) head ++;
-  int tail = head;
-  for(int j = head; j < tob.size(); j ++) if((tob[j] & 0xc0) != 0x80) tail = j;
-  if(-- tail <= head) return tob.substr(0, 0);
-  int cnt(0);
-  for(int j = head; j <= tail; j ++) if((tob[j] & 0xc0) != 0x80) cnt ++;
-  return cnt <= 1 ? tob.substr(0, 0) : tob.substr(head, tail - head + 1);
-}
-
-inline void makelword(vector<string>& words, const std::string& input, const bool& show = false, const bool& utf8 = true) {
-  words.insert(words.end(), csvelim.begin(),  csvelim.end());
-  words.insert(words.end(), csvdelim.begin(), csvdelim.end());
-  std::sort(words.begin(), words.end());
-  words.erase(std::unique(words.begin(), words.end()), words.end());
-  std::vector<gram_t<std::string> > found;
-  const auto lwords(lword<char, std::string>(int(log(num_t(int(input.size() ))) / log(num_t(int(2)) ) )).compute(input));
-  for(auto itr = lwords.begin(); itr != lwords.end(); ++ itr) {
-    if(itr->rptr.size() < 2 && itr->str.size() < 3)
-      continue;
-    const auto lb(std::lower_bound(found.begin(), found.end(), *itr));
-    if(found.begin() <= lb && lb < found.end() && lb->str == itr->str)
-      lb->rptr.insert(lb->rptr.end(), itr->rptr.begin(), itr->rptr.end());
-    else
-      found.emplace_back(*itr);
-  }
-  for(auto itr = found.begin(); itr != found.end(); ++ itr) {   
-    std::sort(itr->rptr.begin(), itr->rptr.end());
-    itr->rptr.erase(std::unique(itr->rptr.begin(), itr->rptr.end()), itr->rptr.end());
-  }
-  std::sort(found.begin(), found.end(), lessCount<std::string>);
-  found.erase(std::unique(found.begin(), found.end()), found.end());
-  words.reserve(words.size() + found.size());
-  for(auto itr(found.begin()); itr < found.end(); ++ itr) {
-    const auto tob(utf8 ? utf8align(itr->str) : itr->str);
-    if(! tob.size()) continue;
-    words.emplace_back(tob);
-    if(show) std::cout << tob << ", " << itr->rptr.size() << std::endl;
-  }
-  std::sort(words.begin(), words.end());
-  words.erase(std::unique(words.begin(), words.end()), words.end());
-  auto mydelim(delimiter);
-  mydelim.insert(mydelim.end(), words.begin(), words.end());
-  sort(mydelim.begin(), mydelim.end());
-  auto inputs(cutText(input, words, mydelim));
-  std::sort(inputs.begin(), inputs.end());
-  inputs.erase(std::unique(inputs.begin(), inputs.end()), inputs.end());
-  if(utf8)
-    for(int i = 0; i < inputs.size(); i ++) {
-      inputs[i] = utf8align(inputs[i]);
-      if(inputs[i].size()) words.emplace_back(inputs[i]);
-    }
-  else
-    words.insert(words.end(), inputs.begin(), inputs.end());
-  std::sort(words.begin(), words.end());
-  words.erase(std::unique(words.begin(), words.end()), words.end());
-  if(show)
-    for(int i = 0; i < inputs.size(); i ++)
-      if(inputs[i].size()) std::cout << inputs[i] << ", 1" << std::endl;
-  return;
-}
-
 #undef int
 int main(int argc, const char* argv[]) {
 #if defined(NOARCFOUR)
   srandom_dev();
 #endif
 #define int int64_t
-  if(argc < 2) {
-    usage();
-    return - 2;
-  }
+  std::string input, line;
+  if(argc < 2) goto usage;
   delimiter.push_back(string("."));
   delimiter.push_back(string(","));
   delimiter.push_back(string("\'"));
@@ -143,33 +73,30 @@ int main(int argc, const char* argv[]) {
   std::sort(delimiter.begin(), delimiter.end());
   std::sort(csvelim.begin(), csvelim.end());
   std::sort(csvdelim.begin(), csvdelim.end());
-  std::string input, line;
   while(std::getline(std::cin, line)) {
     for(int i = 0; i < line.size(); i ++)
       if(line[i] == '<' || line[i] == '>' || line[i] == '&') line[i] = '!';
     input += line + std::string("\n");
   }
+  words.insert(words.end(), csvelim.begin(),  csvelim.end());
+  words.insert(words.end(), csvdelim.begin(), csvdelim.end());
+  std::sort(words.begin(), words.end());
+  words.erase(std::unique(words.begin(), words.end()), words.end());
   if(strcmp(argv[1], "lword") != 0) {
     if(2 < argc) {
       words = cutText(loadbuf(argv[2]).second, csvelim, csvdelim, true);
-      if(! words.size()) makelword(words, input);
+      if(! words.size()) makelword<num_t, std::string>(words, input, delimiter);
     } else
-      makelword(words, input);
+      makelword<num_t, std::string>(words, input, delimiter);
   } else if(2 < argc)
     words = cutText(loadbuf(argv[2]).second, csvelim, csvdelim, true);
   std::sort(words.begin(), words.end());
   words.erase(std::unique(words.begin(), words.end()), words.end());
-  // setup as default parameters.
-  const int szwindow(sqrt(num_t(int(input.size()))));
-  const int outblock(sqrt(sqrt(num_t(int(input.size() )) )) );
-  const num_t redig(int(1));
-  // N.B. cbrt is optimal but we use square except for predTOC.
-  const int nrwords(pow(num_t(int(19683)), num_t(int(2)) / num_t(int(3)) ));
   if(std::strcmp(argv[1], "lword") == 0)
-    makelword(words, input, true);
+    makelword<num_t, std::string>(words, input, delimiter, true, true, - 1);
   else if(std::strcmp(argv[1], "lbalance") == 0) {
     const auto cinput(cutText(input, csvelim, delimiter));
-    const auto idxs(pseudoWordsBalance<double, std::string>(cinput, words, szwindow));
+    const auto idxs(pseudoWordsBalance<double, std::string>(cinput, words));
     std::cout << idxs.size() << "sets." << std::endl;
     for(int i = 0; i < idxs.size(); i ++)
       std::cout << cinput[idxs[i]] << std::endl;
@@ -200,7 +127,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
     std::cout << "<body>";
-    preparedTOC<num_t, std::string>(std::cout, input, detailwords, details, tocwords, tocs, delimiter, szwindow, outblock, nrwords, redig, std::strcmp(argv[1], "lack") == 0);
+    preparedTOC<num_t, std::string>(std::cout, input, detailwords, details, tocwords, tocs, delimiter, std::strcmp(argv[1], "lack") == 0);
     std::cout << std::endl << "<br/></body></html>";
   } else if(std::strcmp(argv[1], "reconstruct") == 0)
     std::cout << corpus<double, std::string>(input, delimiter).serialize() << std::endl;
@@ -209,6 +136,7 @@ int main(int argc, const char* argv[]) {
     emph.push_back(4.);
     emph.push_back(1.);
     emph.push_back(.25);
+    const int szwindow(sqrt(num_t(int(input.size()))));
     for(int ei = 0; ei < emph.size(); ei ++) {
       for(int i = 0; i < input.size() / szwindow; i ++)
         std::cout << corpus<double, std::string>(input.substr(i * szwindow, szwindow), delimiter).reDig(emph[ei]).serialize() << std::endl;
@@ -242,7 +170,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
     std::cout << "<body>";
-    diff<num_t, std::string>(std::cout, input, details, detailwords, details2, detailwords2, delimiter, szwindow, outblock, nrwords, redig, strcmp(argv[1], "same") == 0);
+    diff<num_t, std::string>(std::cout, input, details, detailwords, details2, detailwords2, delimiter, strcmp(argv[1], "same") == 0);
     std::cout << "<hr/>" << std::endl << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "stat") == 0 ||
             std::strcmp(argv[1], "findroot") == 0) {
@@ -258,7 +186,7 @@ int main(int argc, const char* argv[]) {
     words.erase(std::unique(words.begin(), words.end()), words.end());
     std::cout << "<html><head><link rel=\"stylesheet\" type=\"text/css\" href=\"../../style.css\"><meta charset=\"utf-8\" /></head>" << std::endl;
     std::cout << "<body>";
-    optimizeTOC<num_t, std::string>(std::cout, input, rdetails, rdetailwords, delimiter, szwindow, outblock, nrwords, redig, std::strcmp(argv[1], "findroot") == 0);
+    optimizeTOC<num_t, std::string>(std::cout, input, rdetails, rdetailwords, delimiter, std::strcmp(argv[1], "findroot") == 0);
     std::cout << "<hr/>" << std::endl << "</body></html>" << std::endl;
   } else if(std::strcmp(argv[1], "pred") == 0) {
     std::vector<std::string> details;
@@ -271,9 +199,10 @@ int main(int argc, const char* argv[]) {
     words.insert(words.end(), detailwords.begin(), detailwords.end());
     std::sort(words.begin(), words.end());
     words.erase(std::unique(words.begin(), words.end()), words.end());
-    predTOC<num_t, std::string>(std::cout, input, detailwords, details, delimiter, szwindow, nrwords, redig);
+    predTOC<num_t, std::string>(std::cout, input, detailwords, details, delimiter);
   } else if(std::strcmp(argv[1], "prep") == 0) {
     std::vector<std::string> buf;
+    const int szwindow(sqrt(num_t(int(input.size()))));
     for(int i = 0; i < input.size() / szwindow + 1; i ++) {
       const auto work(corpus<double, std::string>(input.substr(i * szwindow, std::min(szwindow, int(input.size()) - i * szwindow)), delimiter).reverseLink().first);
       buf.insert(buf.end(), work.begin(), work.end());
@@ -292,10 +221,10 @@ int main(int argc, const char* argv[]) {
     assert(0 && "consistancy : Logics check so far...");
   else if(std::strcmp(argv[1], "logiccheck") == 0)
     assert(0 && "logic check : Logics check so far...");
-  else {
-    usage();
-    return - 2;
-  }
+  else goto usage;
   return 0;
+ usage:
+  std::cout << "tools (lword|lbalance|toc|lack|redig|stat|findroot|diff|same|prep|pred)" << std::endl;
+  return - 2;
 }
 

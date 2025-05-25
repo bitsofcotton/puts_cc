@@ -34,6 +34,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #if !defined(_SIMPLELIN_)
 
+// N.B. external linkage.
+extern std::vector<std::string> words;
+
 using std::max;
 using std::min;
 using std::abs;
@@ -67,11 +70,6 @@ using std::sort;
 using std::binary_search;
 using std::lower_bound;
 using std::unique;
-
-// N.B. external linkage.
-extern vector<string> words;
-template <typename T, typename U> class corpus;
-
 
 // --- N.B. start approximate Lie algebra on F_2^k. ---
 // N.B. start ifloat
@@ -311,51 +309,47 @@ public:
   inline                operator DUInt<T,bits> () const {
     return *this;
   }
+  friend istream& operator >> (istream& is, DUInt<T,bits>& v) {
+    v ^= v;
+    // skip white spaces.
+    while(! is.eof() && ! is.bad()) {
+      const auto buf(is.get());
+      if(buf != ' ' && buf != '\t') {
+        is.unget();
+        break;
+      }
+    }
+    while(! is.eof() && ! is.bad()) {
+      const auto buf(is.get());
+      if('0' <= buf && buf <= '9') {
+        v <<= 4;
+        v |= DUInt<T,bits>(int(buf - '0'));
+      } else if('a' <= buf && buf <= 'f') {
+        v <<= 4;
+        v |= DUInt<T,bits>(int(buf - 'a' + 10));
+      } else {
+        is.unget();
+        break;
+      }
+    }
+    return is;
+  }
+  friend ostream& operator << (ostream& os, DUInt<T,bits> v) {
+    vector<char> buf;
+    while(v) {
+      buf.emplace_back("0123456789abcdef"[int(v) & 0x0f]);
+      v >>= 4;
+    }
+    if(buf.size()) {
+      for(int i = 0; 0 <= i && i < buf.size(); i ++)
+        os << char(buf[buf.size() - 1 - i]);
+      return os;
+    }
+    return os << '0';
+  }
 
   T e[2];
 };
-
-template <typename T, int bits> ostream&  operator << (ostream& os, DUInt<T,bits> v) {
-  static const char* table = "0123456789abcdef";
-  vector<char> buf;
-  while(v) {
-    buf.emplace_back(table[int(v) & 0x0f]);
-    v >>= 4;
-  }
-  if(buf.size()) {
-    for(int i = 0; 0 <= i && i < buf.size(); i ++)
-      os << char(buf[buf.size() - 1 - i]);
-    return os;
-  }
-  return os << '0';
-}
-
-template <typename T, int bits> istream&  operator >> (istream& is, DUInt<T,bits>& v) {
-  v ^= v;
-  // skip white spaces.
-  while(! is.eof()) {
-    const auto buf(is.get());
-    if(buf != ' ' && buf != '\t') {
-      is.unget();
-      break;
-    }
-  }
-  while(! is.eof() ) {
-    const auto buf(is.get());
-    if('0' <= buf && buf <= '9') {
-      v <<= 4;
-      v |= DUInt<T,bits>(int(buf - '0'));
-    } else if('a' <= buf && buf <= 'f') {
-      v <<= 4;
-      v |= DUInt<T,bits>(int(buf - 'a' + 10));
-    } else {
-      is.unget();
-      break;
-    }
-  }
-  return is;
-}
-
 
 // add sign.
 template <typename T, int bits> class Signed : public T {
@@ -388,16 +382,15 @@ public:
   inline bool operator >= (const Signed<T,bits>& src) const {
     return ! (*this < src);
   }
-};
-
-template <typename T, int bits> ostream& operator << (ostream& os, Signed<T,bits> v) {
-  const static Signed<T,bits> zero(0);
-  if(v < zero) {
-    os << '-';
-    v = - v;
+  friend ostream& operator << (ostream& os, Signed<T,bits> v) {
+    const static Signed<T,bits> zero(0);
+    if(v < zero) {
+      os << '-';
+      v = - v;
+    }
+    return os << dynamic_cast<const T&>(v);
   }
-  return os << dynamic_cast<const T&>(v);
-}
+};
 
 // integer to integer float part.
 template <typename T, typename W, int bits, typename U> class SimpleFloat {
@@ -730,11 +723,94 @@ private:
   // XXX: these are NOT threadsafe on first call.
   const vector<SimpleFloat<T,W,bits,U> >& exparray()    const;
   const vector<SimpleFloat<T,W,bits,U> >& invexparray() const;
-/*
-friend:
-  ostream&    operator << (ostream& os, const SimpleFloat<T,W,bits,U>& v);
-  istream&    operator >> (istream& is, SimpleFloat<T,W,bits,U>& v);
-*/
+  friend ostream& operator << (ostream& os, const SimpleFloat<T,W,bits,U>& v) {
+    static const U uzero(int(0));
+    if(isnan(v))
+      return os << "NaN ";
+    if(isinf(v))
+      return os << (const char*)(v.s & (1 << v.SIGN) ? "-" : "") << "Inf ";
+    return os << (const char*)(v.s & (1 << v.SIGN) ? "-" : "") << std::hex << T(v.m) << "*2^" << (const char*)(v.e < uzero ? "-" : "") << (v.e < uzero ? U(- v.e) : v.e) << " " << std::dec;
+  }
+  friend istream& operator >> (istream& is, SimpleFloat<T,W,bits,U>& v) {
+    const static SimpleFloat<T,W,bits,U> two(2);
+                 SimpleFloat<T,W,bits,U> e(0);
+    bool mode(false);
+    bool sign(false);
+    bool fsign(false);
+    v = SimpleFloat<T,W,bits,U>(0);
+    while(! is.eof() && ! is.bad()) {
+      const auto buf(is.get());
+      if(buf != ' ' && buf != '\t' && buf != '\n') {
+        is.unget();
+        break;
+      }
+    }
+    while(! is.eof() && ! is.bad() ) {
+      const auto buf(is.get());
+      switch(buf) {
+      case '-':
+        sign  = true;
+      case '+':
+        if(fsign)
+          throw "Wrong input";
+        fsign = true;
+        break;
+      case '*':
+        if(mode)
+          goto ensure;
+        if(sign)
+          v   = - v;
+        mode  = true;
+        sign  = false;
+        fsign = false;
+        if(is.get() != '2') {
+          is.unget();
+          goto ensure;
+        }
+        if(is.get() != '^') {
+          is.unget();
+          is.unget();
+          goto ensure;
+        }
+        break;
+      case '.':
+        throw "not implemented now";
+        break;
+      case '0': case '1': case '2': case '3': case '4':
+      case '5': case '6': case '7': case '8': case '9':
+        if(mode) {
+          e <<= U(int(4));
+          e  += SimpleFloat<T,W,bits,U>(int(buf - '0'));
+        } else {
+          v <<= U(int(4));
+          v  += SimpleFloat<T,W,bits,U>(int(buf - '0'));
+        }
+        fsign = true;
+        break;
+      case 'a': case'b': case 'c': case 'd': case 'e': case 'f':
+        if(mode) {
+          e <<= U(int(4));
+          e  += SimpleFloat<T,W,bits,U>(int(buf - 'a' + 10));
+        } else {
+          v <<= U(int(4));
+          v  += SimpleFloat<T,W,bits,U>(int(buf - 'a' + 10));
+        }
+        fsign = true;
+        break;
+      default:
+        goto ensure;
+      }
+    }
+   ensure:
+    if(sign) {
+      if(mode)
+        e = - e;
+      else
+        v = - v;
+    }
+    v *= pow(two, e);
+    return is;
+  }
 };
 
 template <typename T, typename W, int bits, typename U> SimpleFloat<T,W,bits,U> SimpleFloat<T,W,bits,U>::log() const {
@@ -998,97 +1074,6 @@ template <typename T, typename W, int bits, typename U> inline SimpleFloat<T,W,b
   return (res + *this / res) >> U(1);
 }
 
-template <typename T, typename W, int bits, typename U> ostream& operator << (ostream& os, const SimpleFloat<T,W,bits,U>& v) {
-  static const U uzero(int(0));
-  if(isnan(v))
-    return os << "NaN ";
-  if(isinf(v))
-    return os << (const char*)(v.s & (1 << v.SIGN) ? "-" : "") << "Inf ";
-  return os << (const char*)(v.s & (1 << v.SIGN) ? "-" : "") << std::hex << T(v.m) << "*2^" << (const char*)(v.e < uzero ? "-" : "") << (v.e < uzero ? U(- v.e) : v.e) << " " << std::dec;
-}
-
-template <typename T, typename W, int bits, typename U> istream& operator >> (istream& is, SimpleFloat<T,W,bits,U>& v) {
-  const static SimpleFloat<T,W,bits,U> two(2);
-               SimpleFloat<T,W,bits,U> e(0);
-  bool mode(false);
-  bool sign(false);
-  bool fsign(false);
-  v = SimpleFloat<T,W,bits,U>(0);
-  // skip white spaces.
-  while(! is.eof()) {
-    const auto buf(is.get());
-    if(buf != ' ' && buf != '\t' && buf != '\n') {
-      is.unget();
-      break;
-    }
-  }
-  while(! is.eof() && ! is.bad() ) {
-    const auto buf(is.get());
-    switch(buf) {
-    case '-':
-      sign  = true;
-    case '+':
-      if(fsign)
-        throw "Wrong input";
-      fsign = true;
-      break;
-    case '*':
-      if(mode)
-        goto ensure;
-      if(sign)
-        v   = - v;
-      mode  = true;
-      sign  = false;
-      fsign = false;
-      if(is.get() != '2') {
-        is.unget();
-        goto ensure;
-      }
-      if(is.get() != '^') {
-        is.unget();
-        is.unget();
-        goto ensure;
-      }
-      break;
-    case '.':
-      throw "not implemented now";
-      break;
-    case '0': case '1': case '2': case '3': case '4':
-    case '5': case '6': case '7': case '8': case '9':
-      if(mode) {
-        e <<= U(int(4));
-        e  += SimpleFloat<T,W,bits,U>(int(buf - '0'));
-      } else {
-        v <<= U(int(4));
-        v  += SimpleFloat<T,W,bits,U>(int(buf - '0'));
-      }
-      fsign = true;
-      break;
-    case 'a': case'b': case 'c': case 'd': case 'e': case 'f':
-      if(mode) {
-        e <<= U(int(4));
-        e  += SimpleFloat<T,W,bits,U>(int(buf - 'a' + 10));
-      } else {
-        v <<= U(int(4));
-        v  += SimpleFloat<T,W,bits,U>(int(buf - 'a' + 10));
-      }
-      fsign = true;
-      break;
-    default:
-      goto ensure;
-    }
-  }
- ensure:
-  if(sign) {
-    if(mode)
-      e = - e;
-    else
-      v = - v;
-  }
-  v *= pow(two, e);
-  return is;
-}
-
 // N.B. only to enname, better languages can omit these.
 template <typename T, typename W, int bits, typename U> static inline bool isinf(const SimpleFloat<T,W,bits,U>& src) {
   return src.s & (1 << src.INF);
@@ -1184,8 +1169,7 @@ template <typename T, typename W, int bits, typename U> static inline SimpleFloa
   return exp(log(src) * dst);
 }
 
-
-// class complex part:
+// N.B. start class complex part:
 template <typename T> class Complex {
 public:
   inline Complex() { ; }
@@ -1346,34 +1330,30 @@ public:
   inline const T& imag() const {
     return _imag;
   }
+  friend ostream& operator << (ostream& os, const Complex<T>& v) {
+    return os << v.real() << "+i" << v.imag();
+  }
+  friend istream& operator >> (istream& is, Complex<T>& v) {
+    is >> v._real;
+    if('+' != is.get()) {
+      is.unget();
+      goto ensure;
+    }
+    if('i' != is.get()) {
+      is.unget();
+      is.unget();
+      goto ensure;
+    }
+    is >> v._imag;
+    return is;
+   ensure:
+    v._imag = T(int(0));
+    return is;
+  }
   T _real;
   T _imag;
 };
 
-template <typename T> ostream& operator << (ostream& os, const Complex<T>& v) {
-  return os << v.real() << "+i" << v.imag();
-}
-
-template <typename T> istream& operator >> (istream& is, Complex<T>& v) {
-  is >> v._real;
-  if('+' != is.get()) {
-    is.unget();
-    goto ensure;
-  }
-  if('i' != is.get()) {
-    is.unget();
-    is.unget();
-    goto ensure;
-  }
-  is >> v._imag;
-  return is;
- ensure:
-  v._imag = T(int(0));
-  return is;
-}
-
-
-// N.B. enname
 template <typename T> static inline T abs(const Complex<T>& s) {
   return s.abs();
 }
@@ -1684,74 +1664,72 @@ public:
       res[i] = entity[entity.size() - 1 - i];
     return res;
   }
-  
-  vector<T> entity;
-};
-
-template <typename T> ostream& operator << (ostream& os, const SimpleVector<T>& v) {
-  SimpleVector<string> buf(v.size());
-  int M(0);
+  friend ostream& operator << (ostream& os, const SimpleVector<T>& v) {
+    SimpleVector<string> buf(v.size());
+    int M(0);
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int i = 0; i < v.size(); i ++) {
-    stringstream ss;
-    ss << v[i];
-    buf[i] = ss.str();
+    for(int i = 0; i < v.size(); i ++) {
+      stringstream ss;
+      ss << v[i];
+      buf[i] = ss.str();
 #if defined(_OPENMP)
 #pragma omp critical
 #endif
-    {
-      M = max(int(buf[i].size()), M);
+      {
+        M = max(int(buf[i].size()), M);
+      }
     }
+    os << v.size() << " : [";
+    for(int i = 0; i < buf.size(); i ++) {
+      for(int j = buf[i].size(); j <= M; j ++)
+        os << " ";
+      os << buf[i];
+      if(i < buf.size() - 1) os << ", ";
+    }
+    os << "]" << endl;
+    return os;
   }
-  os << v.size() << " : [";
-  for(int i = 0; i < buf.size(); i ++) {
-    for(int j = buf[i].size(); j <= M; j ++)
-      os << " ";
-    os << buf[i];
-    if(i < buf.size() - 1) os << ", ";
+  friend istream& operator >> (istream& is, SimpleVector<T>& v) {
+    int s;
+    is >> s;
+    v.resize(0);
+    if(s <= 0) return is;
+    v.resize(s);
+    int i(0);
+    for( ; i < v.size() && ! is.eof() && ! is.bad(); ) {
+      const auto c(is.get());
+      if(c == ' ' || c == '\t' || c == ':' || c == ',' || c == '[' || c == '\n') continue;
+      is.unget();
+      is >> v[i ++];
+    }
+    while(!is.eof() && ! is.bad()) {
+      const auto c(is.get());
+      if(c == ' ' || c == '\t' || c == '\n') continue;
+      else if(c == ']') break;
+      is.unget();
+      cerr << "XXX SimpleVector<T>::operator >> (\']\')" << flush;
+      break;
+    }
+    while(!is.eof() && ! is.bad()) {
+      const auto c(is.get());
+      if(c == ' ' || c == '\t') continue;
+      else if(c == '\n') break;
+      is.unget();
+      cerr << "XXX SimpleVector<T>::operator >> (\'\\n\')" << flush;
+      break;
+    }
+    if(i < v.size()) {
+      cerr << "XXX SimpleVector<T>::operator >> (index)" << flush;
+      for( ; i < v.size(); i ++)
+        v[i] = T(int(0));
+    }
+    return is;
   }
-  os << "]" << endl;
-  return os;
-}
-
-template <typename T> istream& operator >> (istream& is, SimpleVector<T>& v) {
-  int s;
-  is >> s;
-  if(s <= 0) return is;
-  v.resize(s);
-  int i(0);
-  for( ; i < v.size() && ! is.eof() && ! is.bad(); ) {
-    const auto c(is.get());
-    if(c == ' ' || c == '\t' || c == ':' || c == ',' || c == '[' || c == '\n') continue;
-    is.unget();
-    is >> v[i ++];
-  }
-  while(!is.eof() && ! is.bad()) {
-    const auto c(is.get());
-    if(c == ' ' || c == '\t' || c == '\n') continue;
-    else if(c == ']') break;
-    is.unget();
-    cerr << "XXX SimpleVector<T>::operator >> (\']\')" << flush;
-    break;
-  }
-  while(!is.eof() && ! is.bad()) {
-    const auto c(is.get());
-    if(c == ' ' || c == '\t') continue;
-    else if(c == '\n') break;
-    is.unget();
-    cerr << "XXX SimpleVector<T>::operator >> (\'\\n\')" << flush;
-    break;
-  }
-  if(i < v.size()) {
-    cerr << "XXX SimpleVector<T>::operator >> (index)" << flush;
-    for( ; i < v.size(); i ++)
-      v[i] = T(int(0));
-  }
-  return is;
-}
-
+  
+  vector<T> entity;
+};
 
 template <typename T> class SimpleMatrix {
 public:
@@ -2042,9 +2020,142 @@ public:
     return eps;
   }
 
-  // friend ostream& operator << (ostream& os, const SimpleVector<T>& v);
-  // friend istream& operator >> (istream& os, SimpleVector<T>& v);
-
+  friend ostream& operator << (ostream& os, const SimpleMatrix<T>& v) {
+    SimpleMatrix<string> buf(v.rows(), v.cols());
+    int M(0);
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
+    for(int i = 0; i < v.rows(); i ++)
+      for(int j = 0; j < v.cols(); j ++) {
+        stringstream ss;
+        ss << v(i, j);
+        buf(i, j) = ss.str();
+#if defined(_OPENMP)
+#pragma omp critical
+#endif
+        {
+          M = max(int(buf(i, j).size()), M);
+        }
+      }
+    os << "(" << buf.rows() << ", " << buf.cols() << ")" << "[" << endl;
+    for(int i = 0; i < buf.rows(); i ++) {
+      os << "[";
+      for(int j = 0; j < buf.cols(); j ++) {
+        for(int k = buf(i, j).size(); k <= M; k ++)
+          os << " ";
+        os << buf(i, j);
+        if(j < buf.cols() - 1) os << ", ";
+      }
+      os << "]";
+      if(i < buf.rows() - 1) os << ", ";
+      os << endl;
+    }
+    os << "]" << endl;
+    return os;
+  }
+  friend istream& operator >> (istream& is, SimpleMatrix<T>& v) {
+    while(! is.eof() && ! is.bad()) {
+      const auto c(is.get());
+      if(c == ' ' || c == '\t' || c == '\n') continue;
+      else if(c == '(') break;
+      is.unget();
+      break;
+    }
+    int r, c;
+    is >> r;
+    if(r <= 0) return is;
+    while(! is.eof() && ! is.bad()) {
+      const auto c(is.get());
+      if(c == ' ' || c == '\t' || c == '\n') continue;
+      else if(c == ',') break;
+      is.unget();
+      break;
+    }
+    is >> c;
+    while(! is.eof() && ! is.bad()) {
+      const auto c(is.get());
+      if(c == ' ' || c == '\t' || c == '\n') continue;
+      else if(c == ')') break;
+      is.unget();
+      break;
+    }
+    if(c <= 0) return is;
+    v.resize(r, c);
+    int i(0);
+    int j(0);
+    while(! is.eof() && ! is.bad()) {
+      const auto c(is.get());
+      if(c == ' ' || c == '\t' || c == '\n') continue;
+      else if(c == '[') break;
+      is.unget();
+      break;
+    }
+    for( ; i < v.rows() && ! is.eof() && ! is.bad(); i ++) {
+      while(! is.eof() && ! is.bad()) {
+        const auto c(is.get());
+        if(c == ' ' || c == '\t' || c == '\n') continue;
+        else if(c == '[') break;
+        is.unget();
+        break;
+      }
+      for(j = 0; j < v.cols() && ! is.eof() && ! is.bad(); j ++) {
+        is >> v(i, j);
+        if(v.cols() - 1 <= j) {
+          j ++;
+          break;
+        }
+        while(! is.eof() && ! is.bad()) {
+          const auto c(is.get());
+          if(c == ' ' || c == '\t' || c == '\n') continue;
+          else if(c == ',') break;
+          is.unget();
+          break;
+        }
+      }
+      while(! is.eof() && ! is.bad()) {
+        const auto c(is.get());
+        if(c == ' ' || c == '\t' || c == '\n') continue;
+        else if(c == ']') break;
+        is.unget();
+        break;
+      }
+      if(v.rows() - 1 <= i) {
+        i ++;
+        break;
+      }
+      while(! is.eof() && ! is.bad()) {
+        const auto c(is.get());
+        if(c == ' ' || c == '\t' || c == '\n') continue;
+        else if(c == ',') break;
+        is.unget();
+        break;
+      }
+    }
+    while(! is.eof() && ! is.bad()) {
+      const auto c(is.get());
+      if(c == ' ' || c == '\t' || c =='\n') continue;
+      else if(c == ']') break;
+      cerr << "XXX SimpleMatrix<T>::operator >> (\']\')" << flush;
+      is.unget();
+      break;
+    }
+    while(! is.eof() && ! is.bad()) {
+      const auto c(is.get());
+      if(c == ' ' || c == '\t') continue;
+      else if(c == '\n') break;
+      cerr << "XXX SimpleMatrix<T>::operator >> (\'\\n\')" << flush;
+      is.unget();
+      break;
+    }
+    if(i < v.rows() || j < v.cols()) {
+      cerr << "XXX SimpleMatrix<T>::operator >> (index)" << flush;
+      for( ; i < v.rows(); i ++)
+        for( ; j < v.cols(); j ++)
+          v(i, j) = T(int(0));
+    }
+    return is;
+  }
   // this isn't better idea for faster calculations.
   vector<SimpleVector<T> > entity;
   int ecols;
@@ -2190,6 +2301,9 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVDleft1d() const 
   //                (C + C^-1) * C^-1
   // N.B. since S is symmetric, singular value on SS^t = QRR^tQ^t is
   //      same square root as singular value on R.
+  // N.B. this is INCOMPLETE, so geometrical non separable ones cannot be
+  //      separated by this SVD function but not affects to the most of our
+  //      repositories.
   const auto S(*this * transpose());
   const auto Qt(S.QR());
   const auto A((Qt * S).transpose());
@@ -2284,7 +2398,9 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::zeroFix(const Simp
     one[fidx[i].second] = - fidx[i].first;
     fidx[i].first = - T(int(1));
   }
-  // we now have: Q [R [x t] ] <= {0, 1}^m cond.
+  // N.B. we now have: Q [R [x t] ] <= {0, 1}^m cond.
+  //      so this isn't normalized by super spherical ones.
+  //      but it's normalized by elliptic like ones.
   auto Pb(*this);
   const auto on(projectionPt(one));
   fidx.reserve(fidx.size() + this->cols());
@@ -2312,7 +2428,7 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::zeroFix(const Simp
     if(n2 <= epsilon())
       continue;
     Pb = *this;
-    // N.B. O(mn) can be writed into O(lg m + lg n) in many core cond.
+    // N.B. O(mn) can be written into O(lg m + lg n) in many core cond.
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -2334,7 +2450,7 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::zeroFix(const Simp
     const auto on(projectionPt(one));
     if(sqrt(on.dot(on)) < sqrt(one.dot(one)) * epsilon()) *this = move(Pb);
   }
-  // N.B. now we have fix indexes that to be P R [x 1] * t == 0.
+  // N.B. now we have fix indices that to be P R [x 1] * t == 0.
   return R.solve((*this) * one);
 }
 
@@ -2369,144 +2485,6 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::inner(const Simple
       t = bl[i] * z[i] < T(int(0)) ? min(t, bu[i] / z[i]) :
                   min(t, min(bu[i] / z[i], bl[i] / z[i]));
   return res *= t;
-}
-
-template <typename T> ostream& operator << (ostream& os, const SimpleMatrix<T>& v) {
-  SimpleMatrix<string> buf(v.rows(), v.cols());
-  int M(0);
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-  for(int i = 0; i < v.rows(); i ++)
-    for(int j = 0; j < v.cols(); j ++) {
-      stringstream ss;
-      ss << v(i, j);
-      buf(i, j) = ss.str();
-#if defined(_OPENMP)
-#pragma omp critical
-#endif
-      {
-        M = max(int(buf(i, j).size()), M);
-      }
-    }
-  os << "(" << buf.rows() << ", " << buf.cols() << ")" << "[" << endl;
-  for(int i = 0; i < buf.rows(); i ++) {
-    os << "[";
-    for(int j = 0; j < buf.cols(); j ++) {
-      for(int k = buf(i, j).size(); k <= M; k ++)
-        os << " ";
-      os << buf(i, j);
-      if(j < buf.cols() - 1) os << ", ";
-    }
-    os << "]";
-    if(i < buf.rows() - 1) os << ", ";
-    os << endl;
-  }
-  os << "]" << endl;
-  return os;
-}
-
-template <typename T> istream& operator >> (istream& is, SimpleMatrix<T>& v) {
-  while(! is.eof() && ! is.bad()) {
-    const auto c(is.get());
-    if(c == ' ' || c == '\t' || c == '\n') continue;
-    else if(c == '(') break;
-    is.unget();
-    break;
-  }
-  int r, c;
-  is >> r;
-  if(r <= 0) return is;
-  while(! is.eof() && ! is.bad()) {
-    const auto c(is.get());
-    if(c == ' ' || c == '\t' || c == '\n') continue;
-    else if(c == ',') break;
-    is.unget();
-    break;
-  }
-  is >> c;
-  while(! is.eof() && ! is.bad()) {
-    const auto c(is.get());
-    if(c == ' ' || c == '\t' || c == '\n') continue;
-    else if(c == ')') break;
-    is.unget();
-    break;
-  }
-  if(c <= 0) return is;
-  v.resize(r, c);
-  int i(0);
-  int j(0);
-  while(! is.eof() && ! is.bad()) {
-    const auto c(is.get());
-    if(c == ' ' || c == '\t' || c == '\n') continue;
-    else if(c == '[') break;
-    is.unget();
-    break;
-  }
-  for( ; i < v.rows() && ! is.eof() && ! is.bad(); i ++) {
-    while(! is.eof() && ! is.bad()) {
-      const auto c(is.get());
-      if(c == ' ' || c == '\t' || c == '\n') continue;
-      else if(c == '[') break;
-      is.unget();
-      break;
-    }
-    for(j = 0; j < v.cols() && ! is.eof() && ! is.bad(); j ++) {
-      is >> v(i, j);
-      if(v.cols() - 1 <= j) {
-        j ++;
-        break;
-      }
-      while(! is.eof() && ! is.bad()) {
-        const auto c(is.get());
-        if(c == ' ' || c == '\t' || c == '\n') continue;
-        else if(c == ',') break;
-        is.unget();
-        break;
-      }
-    }
-    while(! is.eof() && ! is.bad()) {
-      const auto c(is.get());
-      if(c == ' ' || c == '\t' || c == '\n') continue;
-      else if(c == ']') break;
-      is.unget();
-      break;
-    }
-    if(v.rows() - 1 <= i) {
-      i ++;
-      break;
-    }
-    while(! is.eof() && ! is.bad()) {
-      const auto c(is.get());
-      if(c == ' ' || c == '\t' || c == '\n') continue;
-      else if(c == ',') break;
-      is.unget();
-      break;
-    }
-  }
-  while(! is.eof() && ! is.bad()) {
-    const auto c(is.get());
-    if(c == ' ' || c == '\t' || c =='\n') continue;
-    else if(c == ']') break;
-    cerr << "XXX SimpleMatrix<T>::operator >> (\']\')" << flush;
-    is.unget();
-    break;
-  }
-  while(! is.eof() && ! is.bad()) {
-    const auto c(is.get());
-    if(c == ' ' || c == '\t') continue;
-    else if(c == '\n') break;
-    cerr << "XXX SimpleMatrix<T>::operator >> (\'\\n\')" << flush;
-    is.unget();
-    break;
-  }
-  if(i < v.rows() || j < v.cols()) {
-    cerr << "XXX SimpleMatrix<T>::operator >> (index)" << flush;
-    for( ; i < v.rows(); i ++)
-      for( ; j < v.cols(); j ++)
-        v(i, j) = T(int(0));
-  }
-  return is;
 }
 
 template <typename T> static inline T norm2M(const SimpleMatrix<T>& m) {
@@ -2648,7 +2626,7 @@ template <typename T> static inline SimpleMatrix<T> powSym(const SimpleMatrix<T>
   return UUm * res * UUmt;
 }
 
-template <typename T> SimpleMatrix<complex<T> > dft(const int& size0) {
+template <typename T> static inline SimpleMatrix<complex<T> > dft(const int& size0) {
   const auto size(abs(size0));
   if(! size) {
     const static SimpleMatrix<complex<T> > m0;
@@ -2690,7 +2668,7 @@ template <typename T> SimpleMatrix<complex<T> > dft(const int& size0) {
   return size0 < 0 ? eidft : edft;
 }
 
-template <typename T> SimpleMatrix<T> diff(const int& size0) {
+template <typename T> static inline SimpleMatrix<T> diff(const int& size0) {
   const auto size(abs(size0));
   if(! size) {
     static const SimpleMatrix<T> m0;
@@ -2752,62 +2730,6 @@ template <typename T> SimpleMatrix<T> diff(const int& size0) {
     ocache << ii;
     ocache.close();
     cerr << "." << flush;
-  }
-  return size0 < 0 ? ii : dd;
-}
-
-template <typename T> SimpleMatrix<T> diffRecur(const int& size0) {
-  const auto size(abs(size0));
-  if(! size) {
-    static const SimpleMatrix<T> m0;
-    return m0;
-  }
-  SimpleMatrix<T> dd;
-  SimpleMatrix<T> ii;
-  const auto file(string("./.cache/lieonn/diffrecur-") + to_string(size) +
-#if defined(_FLOAT_BITS_)
-    string("-") + to_string(_FLOAT_BITS_)
-#else
-    string("-ld")
-#endif
-  );
-  ifstream cache(file.c_str());
-  if(cache.is_open()) {
-    cache >> dd;
-    cache >> ii;
-    cache.close();
-  } else {
-    dd = SimpleMatrix<T>(size, size).O().setMatrix(0, 0,
-         diffRecur<T>(size - 1));
-    ii = SimpleMatrix<T>(size, size).O().setMatrix(0, 0,
-         diffRecur<T>(- size + 1));
-    cerr << "." << flush;
-    if(3 < size) {
-      dd += diff<T>(  size) +
-        SimpleMatrix<T>(size, size).O().setMatrix(1, 1,
-          diffRecur<T>(size - 1));
-      ii += diff<T>(- size) +
-        SimpleMatrix<T>(size, size).O().setMatrix(1, 1,
-          diffRecur<T>(- size + 1));
-      dd.row(0) /= T(int(2));
-      dd.row(dd.rows() - 1) /= T(int(2));
-      ii.row(0) /= T(int(2));
-      ii.row(dd.rows() - 1) /= T(int(2));
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-      for(int i = 1; i < dd.rows() - 1; i ++)
-        dd.row(i) /= T(int(3));
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-      for(int i = 1; i < ii.rows() - 1; i ++)
-        ii.row(i) /= T(int(3));
-      ofstream ocache(file.c_str());
-      ocache << dd;
-      ocache << ii;
-      ocache.close();
-    }
   }
   return size0 < 0 ? ii : dd;
 }
@@ -3568,7 +3490,6 @@ template <typename T> static inline vector<pair<vector<SimpleVector<T> >, vector
   return crushWithOrder<T>(v, cs, max(int(2), int(sqrt(T(v.size())))));
 }
 
-// N.B. non thread safe.
 template <typename T> static inline T p012next(const SimpleVector<T>& d) {
   static const auto step(1);
   static const T zero(int(0));
@@ -3652,8 +3573,7 @@ template <typename T, T (*f)(const SimpleVector<T>&)> static inline T northPoleN
     if(! isfinite(in[i]) || in[i] == zero) return in[in.size() - 1];
     else {
       ff[i] = atan(in[i]);
-      // assert(- M < ff[i] && ff[i] < M);
-      // N.B. we don't avoid right hand side, it's harmless.
+      // N.B. we avoid right hand side, it's harmless.
       // ff[i] = atan(one / ff[i]);
       // assert(- M < ff[i] && ff[i] < M);
     }
@@ -3698,26 +3618,22 @@ template <typename T> static inline T p0max0next(const SimpleVector<T>& in) {
   //      this is because we only observes highest and lowest frequency on
   //      sampling points, so omitted part exists.
   //      even if the parameter on P0 is large, situation unchange.
-  //      so we should use sectional measurement for them.
-  // N.B. the sectional measurament is done by following Ppad class.
-  //      So this is only the raw prediction.
+  // N.B. however, sectional measurement can be jammed as normally.
+  //      so cutting by sliding window with statistical one goes better handle.
   return (sumCNext<T, true, p0next<T> >(in) +
     invNext<T, sumCNext<T, true, p0next<T> > >(in)) / T(int(2));
 }
 
 template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
   // N.B. we only handle lebesgue measurable and R(finite)-valued functions.
-  //      so worse structures are handled by P01.
+  //      so worse structures are handled by p01next.
   return sumCNext<T, true, sumCNext<T, false, northPoleNext<T, p0max0next<T> > > >(in);
   // N.B. plain complex form.
   // return sumCNext<T, true, sumCNext<T, false, logCNext<T, logCNext<T, northPoleNext<T, p0max0next<T> > > > > >(in);
-  //
-  // N.B. make information-rich not to associative/commutative.
-  //      2 dimension semi-order causes (x, status) from input as sedenion.
   // N.B. we need only once P0DFT in general because associative condition
-  //      is necessary for input ordering.
+  //      is necessary for input ordering even we work with sedenion.
   // N.B. we eliminated them. we're better to handle their structures than here.
-  // N.B. on any R to R into reasonable taylor.
+  // N.B. on any R to R into reasonable C^omega.
   // N.B. we treat periodical part as non aligned complex arg part.
   // N.B. we make the prediction on (delta) summation.
   // N.B. we take average as origin of input.
@@ -3732,21 +3648,18 @@ template <typename T> static inline T p01delimNext(const SimpleVector<T>& in) {
 // Get invariant structure that
 // \[- &alpha, &alpha;\[ register computer with deterministic calculation.
 // cf. bitsofcotton/randtools .
-// N.B. P = P01 recursive nothing effects in theoretical (f_0(f_1...) == f)
-//      however, in the information amount meaning, 6 recursive effects well.
-//      (2nd order saturation on the copied information on structure)
-//      on some of the experiments, no improves but different result.
 // N.B. with cultivated == true condition, we feed root of the description
 //      we can use to id. data amount.
 //      however, we only need 3 depth in normal root fixation.
 //      we select deep enough one because of the timing related attack jammer
 //      exists they can select arbitrary timing also such of the stream exists.
+//      this isn't avoid completely the condition, so it's only to ease
+//      our mind with much of input stream size in probable.
 template <typename T, const bool cultivated = true, const bool nonlinear = true> T p01next(const SimpleVector<T>& in) {
   static const auto step(1);
   static const T zero(0);
   static const T one(1);
   static const T two(2);
-  // N.B. please use catgp to compete with over learning.
   // N.B. division accuracy glitch.
   const auto nin(sqrt(in.dot(in) * (one + SimpleMatrix<T>().epsilon())));
   if(! isfinite(nin) || nin == zero) return zero;
@@ -3775,10 +3688,8 @@ template <typename T, const bool cultivated = true, const bool nonlinear = true>
     for(int i = 0; i < invariants.cols(); i ++)
       invariant[i] = p01next<T, cultivated, nonlinear>(invariants.col(i));
   }
-  if(invariant[varlen - 1] == zero) {
-    cerr << "!" << flush;
+  if(invariant[varlen - 1] == zero)
     return in[in.size() - 1];
-  }
   SimpleVector<T> work(varlen);
   for(int i = 1; i < work.size(); i ++)
     work[i - 1] = in[i - work.size() + in.size()];
@@ -3943,15 +3854,6 @@ template <typename T, T (*p)(const SimpleVector<T>&)> static inline T deep(const
   return M;
 }
 
-// N.B. if we use each progression for average into input one, they can
-//      improve the result. however, if prediction is almost linear,
-//      it's useless enough. if the prediction is valid for any input
-//      they either useless.
-// N.B. if we use some delta into input, they can be progression like effects.
-//      however, this makes hypothesis the input is smaller than we get on the
-//      stream. this is the condition we lose the interest. so implementation
-//      had be eliminated.
-
 // N.B. start det diag operations.
 // N.B. invariant gathers some of the group on the input pattern.
 template <typename T> SimpleMatrix<T> concat(const SimpleMatrix<T>& m0, const SimpleMatrix<T>& m1) {
@@ -4037,7 +3939,6 @@ template <typename T> SimpleVector<T> reduce(const SimpleMatrix<T> m) {
     work = diff(work, i);
   return work.row(0);
 }
-
 
 // N.B. start Decompose
 template <typename T> class Decompose {
@@ -4189,7 +4090,6 @@ template <typename T> typename Decompose<T>::Vec Decompose<T>::enlarge(const Vec
   auto result(ee.synth(bm, ff));
   return result *= sqrt(in.dot(in) / result.dot(result) * T(r));
 }
-
 
 // N.B. start image functions
 template <typename T> static inline bool loadstub(istream& input, const int& nmax, const int& ncolor, vector<SimpleMatrix<T> >& datas) {
@@ -4512,38 +4412,14 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
   return res;
 }
 
-
 // N.B. start ddpmopt
-
-// N.B. utility types used in predv.
-// N.B. once we had PP3, PP6, PP9 and so on but it's a saturation in
-//      second order or more also only a simplicity improves.
-//      the result we get isn't depends on simplicity on loop, so we elim it.
-// N.B. we use maximum of them as invariant compatible, no continuous condition.
-// N.B. we make insurance as PdeltaOnce, this causes tan(Ax-x)==tan(Bx),
-//      diag(eigen(B)) ~~ diag(1) hypothesis but usually the original stream
-//      matrix is larger than this. we might need P0DFT after doing this but
-//      they should be included in P01 also friendly to orthogonal matrices.
-// N.B. some of the soft PRNG tests doesn't need PdeltaOnce.
-// template <typename T> using PP0 = PdeltaOnce<T, P01<T, P01delim<T>, true> >;
 // N.B. we are targetting the structure they appears additional states after
-//      additional states on given input range. so we don't use PdeltaOnce.
-// N.B. once we had P0DFT class around P0 class, they slides DFT coefficients
-//      per each and predict with slided ones.
-//      handling such a method is much heavier than we now use below
-//      and not so efficient than we have. so we eliminated them.
-// N.B. once we had the class avoiding timing-related prediction fails with
-//      PSVD class. however they hardly depends on phase periods on input
-//      we suppose first. so we eliminated them.
-// N.B. with using predv with PRNG, we can apply before applying PP0 P012L.
-//      our tests on PRNG can improves the result.
+//      additional states on given input range.
 // N.B. if we're in result is in control condition, we need to output at least
-//      a pair on the prediction, however, we discontinue such a implementation.
-// N.B. as ddpmopt:README.md, PP3 is least and enough normally.
+//      a 3 on the prediction.
 
 template <typename T, int nprogress = 20> static inline SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
   assert(0 < sz && sz <= in.size());
-  // N.B. we need to initialize p0 vector.
   SimpleVector<T> seconds(sz);
   seconds.O();
 #if defined(_OPENMP)
@@ -4598,11 +4474,7 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv1(v
   static const auto step(1);
   assert(0 < step && 10 + step * 2 <= in.size() && 1 < in[0].size());
   // N.B. we use whole width to get better result in average.
-  //      this is equivalent to the command: p1 | p0 :
-  //      enough prediction with integer-float classes (SimpleFloat<...>)
-  //      takes O(length^2) to get the result in their cases,
-  //      however with CPU implemented float they can have some unknown errors,
-  //      we should use at least p1-... | p0-... in their case.
+  //      this is equivalent to the command: p1 | p0 0.
   // N.B. If we implement loop hard optimizer, we can use them with
   //      O((length*pixel*accuracy)^2) for each pixel bit even also any of
   //      the contexts they can have implementation.
@@ -4625,16 +4497,8 @@ template <typename T, int nprogress = 20> static inline SimpleVector<T> predv1(v
         unOffsetHalf<T>(p[i - step][j]);
   }
   // N.B. dftcache need to be single thread on first call.
-  // N.B. either, differences prediction is better friendly to upper layer
-  //      monte-carlo methods, however, with some of the test we have isn't
-  //      get better result them (only returns last one image), so they're
-  //      eliminated.
   // N.B. we bet orthogonal function phenomenon causes measurement condition
   //      increase (0 <= vector condition with prediction walk).
-  // N.B. however, in this condition, we need scattered last input graphics
-  //      average to complete gray.
-  // N.B. revert to original walk conditions, our sample non PRNG result
-  //      works well with this.
   res[0] = offsetHalf<T>(p0maxNext<T>(ip.row(0)) *
     unOffsetHalf<T>(p[p.size() - 1][0]) );
 #if defined(_OPENMP)
@@ -4681,25 +4545,6 @@ template <typename T, int nrecur = 0, int nprogress = 20> static inline SimpleVe
   }
   return res /= T(nrecur);
 }
-
-// N.B. predv only returns last one picture on some of our tests with real
-//      data, but is effective returns better results with PRNG tests.
-//      so with real data, we only apply P0maxRank to each pixel.
-// N.B. eliminated below. this is because: our test is well done with the
-//      3 of combinations candidates normally with PRNGs:
-//      {catgp | p1 | p0, p1 | p0, p0} so these are 3 of the measurable
-//      conditions we suppose. So we're targetting only stable entropy feed
-//      after and after stream, so we make hypothesis Riemann-Stieljes cond.
-//      Otherwise, enough continuous datas have Riemann measurable cond.
-//      Either, enough complex datas have non Lebesgue measurable cond
-//      (No unique pure functions cond nor no non entropy phenomenon cond.).
-// N.B. instead of recursive doing sliding input length (they hardly depends
-//      on first some steps), we use montecarlo method.
-//      recur == 11 is enough to get probability around .9 when we're using
-//      Condorcet's jury counting.
-// N.B. we eliminated predvall, we don't need them with whole internal states
-//      awared predictors they have a better prediction concerned with some
-//      series of a PRNG tests.
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
 //      mostly with slight speed hacks.
@@ -4801,20 +4646,20 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<Si
   return res;
 }
 
-template <typename T> vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
+template <typename T> static inline vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   auto res(in0);
   return predVec<T>(res);
 }
 
-// N.B. original DFT image[n] DFT conversion looks better with continuous
-//      input converted into discrete variables, however, our predictor isn't
-//      get 100% result, so some probability they slips, so their slips
-//      effects whole result graphics in IDFT.
-// N.B. we're now using better algorithm than sliding DFT implemented
-//      on predv they uses statistics continuity as half of output.
-// N.B. either, linear predictors doesn't affected by such of DFT
-//      transformations.
 template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0) {
+  // N.B. original DFT image[n] DFT conversion looks better with continuous
+  //      input converted into discrete variables, however, our predictor isn't
+  //      get 100% result, so some probability they slips, so their slips
+  //      effects whole result graphics in IDFT.
+  // N.B. we're now using better algorithm than sliding DFT implemented
+  //      on predv they uses statistics continuity as half of output.
+  // N.B. either, linear predictors doesn't affected by such of DFT
+  //      transformations.
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4868,7 +4713,7 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<Si
   return res;
 }
 
-template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
+template <typename T> static inline vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
   auto res(in0);
   return predMat<T>(res);
 }
@@ -5007,7 +4852,6 @@ static const vector<int>& pnTinySingle(const int& upper = 1) {
   }
   return pn;
 }
-
 
 // N.B. start isolate
 template <typename T> static inline SimpleMatrix<T> harmlessSymmetrizeSquare(const SimpleMatrix<T>& m) {
@@ -5299,17 +5143,6 @@ template <typename T> static inline SimpleMatrix<T> sharpen(const int& size) {
     cache >> s;
     cache.close();
   } else {
-/*
-    if(2 < size) {
-      const auto s0(sharpen<T>(size - 1) * T(size - 1));
-      s = SimpleMatrix<T>(size, size).O().setMatrix(0, 0, s0);
-      s.setMatrix(1, 1, s.subMatrix(1, 1, size - 1, size - 1) + s0);
-      s.row(0) *= T(2);
-      s.row(s.rows() - 1) *= T(2);
-      s /= T(2);
-    } else
-      s  = SimpleMatrix<T>(size, size).O();
-*/
     auto dfts(dft<T>(size));
     static const auto Pi(atan(T(1)) * T(4));
     dfts.row(0) *= complex<T>(T(0));
@@ -5323,10 +5156,6 @@ template <typename T> static inline SimpleMatrix<T> sharpen(const int& size) {
       dfts.row(i) /= exp(complex<T>(T(0), Pi * T(i) / T(dfts.rows()))) - complex<T>(T(1));
     }
     s = (dft<T>(- size) * dfts).template real<T>() / T(size - 1);
-/*
-    if(2 < size)
-      s /= T(size);
-*/
     ofstream ocache(file.c_str());
     ocache << s;
     ocache.close();
@@ -5334,7 +5163,6 @@ template <typename T> static inline SimpleMatrix<T> sharpen(const int& size) {
   }
   return s;
 }
-
 
 // N.B. this function is NOT thread safe.
 template <typename T> SimpleMatrix<T> filter(const SimpleMatrix<T>& data, const direction_t& dir, const int& recur = 2, const int& rot = 0) {
@@ -5430,7 +5258,6 @@ template <typename T> SimpleMatrix<T> filter(const SimpleMatrix<T>& data, const 
         cerr << "e" << flush;
         eop.resize((size - 1) * recur + 1, size);
         for(int j = 0; j < eop.rows(); j ++)
-          // N.B. sampling th. hack isn't work well.
           eop.row(j) = taylor<T>(eop.cols(),
             (T(j) + T(int(1)) / T(int(2))) / T(eop.rows() - 1) * T(eop.cols() - 1),
             (T(j) - T(int(1)) / T(int(2))) / T(eop.rows() - 1) * T(eop.cols() - 1));
@@ -6778,6 +6605,619 @@ template <typename T, typename U> vector<gram_t<U> > lword<T, U>::compute(const 
   return result;
 }
 
+template <typename T, typename U> class corpus {
+public:
+  typedef SimpleSparseVector<T> Vec;
+  typedef SimpleSparseMatrix<T> Mat;
+  typedef SimpleSparseTensor<T> Tensor;
+
+  corpus(const U& input, const vector<U>& delimiter);
+
+  inline corpus() { ; }
+  inline corpus(const corpus<T, U>& other) { *this = other; }
+  inline corpus(corpus<T, U>&& other) { *this = other; }
+  inline ~corpus() { ; }
+
+  inline U getAttributed(const vector<U>& highlight) const {
+    U   result;
+    int i;
+    for(i = 0; i < orig.size(); ) {
+      const auto lb(upper_bound(highlight.begin(), highlight.end(), U(&(orig.c_str()[i])), lessEqualStrClip<U>));
+      if(highlight.begin() <= lb && lb < highlight.end() && equalStrClip<U>(*lb, U(&(orig.c_str()[i])))) {
+        result += U("<font class=\"match\">");
+        result += *lb;
+        result += U("</font>");
+        i      += lb->size();
+      } else
+        result += orig[i ++];
+    }
+    return result;
+  }
+  inline pair<vector<U>, U> reverseLink() const {
+    pair<vector<U>, U> res;
+    const auto idx(countIdx(T(0)));
+    res.first.reserve(idx.size());
+    for(int i = 0; i < idx.size(); i ++)
+      res.first.emplace_back(words[idx[i]]);
+    res.second = getAttributed(res.first);
+    return res;
+  }
+  inline corpus<T, U>& operator += (const corpus<T, U>& other) {
+    orig    += U("+") + other.orig;
+    corpust += other.corpust;
+    return *this;
+  }
+  inline corpus<T, U>& operator -= (const corpus<T, U>& other) {
+    orig    += U("-") + other.orig;
+    corpust -= other.corpust;
+    return *this;
+  }
+  inline corpus<T, U>& operator *= (const T& t) {
+    orig    += U("*") + U(to_string(t));
+    corpust *= t;
+    return *this;
+  }
+  inline corpus<T, U>& operator /= (const T& t) {
+    orig    += U("/") + U(to_string(t));
+    corpust /= t;
+    return *this;
+  }
+  inline corpus<T, U>  operator +  (const corpus<T, U>& other) const {
+    auto result(*this);
+    return result += other;
+  }
+  inline corpus<T, U>  operator -  () const {
+    auto result(*this);
+    result.orig    = U("-") + result.orig;
+    result.corpust = - result.corpust;
+    return result;
+  }
+  inline corpus<T, U>  operator -  (const corpus<T, U>& other) const {
+    auto result(*this);
+    return result -= other;
+  }
+  inline corpus<T, U>  operator *  (const T& t)                  const {
+    auto result(*this);
+    return result *= t;
+  }
+  inline corpus<T, U>  operator /  (const T& t)                  const {
+    auto result(*this);
+    return result /= t;
+  }
+  inline corpus<T, U>& operator =  (const corpus<T, U>& other) {
+    corpust = other.corpust;
+    orig    = other.orig;
+    return *this;
+  }
+  inline corpus<T, U>& operator =  (corpus<T, U>&& other) {
+    corpust = move(other.corpust);
+    orig    = move(other.orig);
+    return *this;
+  }
+  inline bool          operator == (const corpus<T, U>& other) const {
+    return ! (*this != other);
+  }
+  inline bool          operator != (const corpus<T, U>& other) const {
+    return corpust != other.corpust;
+  }
+  T             cdot(const corpus<T, U>& other) const {
+    T res(0);
+    const auto& oi0(other.corpust.iter());
+    for(auto itr0(oi0.begin()); itr0 != oi0.end(); ++ itr0)
+      if(const_cast<const Tensor&>(corpust)[itr0->first].iter().size()) {
+        const auto& oi1(itr0->second.iter());
+        for(auto itr1(oi1.begin()); itr1 != oi1.end(); ++ itr1)
+          if(const_cast<const Tensor&>(corpust)[itr0->first][itr1->first].iter().size()) {
+            const auto& oi2(itr1->second.iter());
+            for(auto itr2(oi2.begin()); itr2 != oi2.end(); ++ itr2)
+              res += itr2->second * (const_cast<const Tensor&>(corpust))[itr0->first][itr1->first][itr2->first];
+          }
+    }
+    return res;
+  }
+  T             absmax() const {
+    T res(0);
+    const auto& ci0(corpust.iter());
+    for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
+      const auto& ci1(itr0->second.iter());
+      for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
+        const auto& ci2(itr1->second.iter());
+        for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2)
+          res = max(res, abs(itr2->second));
+      }
+    }
+    return res;
+  }
+  corpus<T, U>& reDig(const T& ratio) {
+    auto& ci0(corpust.iter());
+    for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
+      auto& ci1(itr0->second.iter());
+      for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
+        auto& ci2(itr1->second.iter());
+        for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2)
+          itr2->second = (itr2->second < T(0) ? - T(1) : T(1)) * exp(log(abs(itr2->second)) * ratio);
+      }
+    }
+    return *this;
+  }
+  corpus<T, U> simpleThresh(const T& ratio) const {
+    assert(T(int(0)) <= ratio);
+    const auto thisabsmax(absmax());
+    const auto okidx(countIdx(ratio * thisabsmax));
+    corpus<T, U> result;
+    result.orig = orig;
+    for(int i = 0; i < okidx.size(); i ++) {
+      const auto& ii(okidx[i]);
+      if((const_cast<const Tensor&>(corpust))[okidx[i]].iter().size())
+        for(int j = 0; j < okidx.size(); j ++) {
+          const auto& jj(okidx[j]);
+          if((const_cast<const Tensor&>(corpust))[okidx[i]][okidx[j]].iter().size())
+            for(int k = 0; k < okidx.size(); k ++) {
+              const auto& kk(okidx[k]);
+              if(ratio * thisabsmax < abs((const_cast<const Tensor&>(corpust))[ii][jj][kk]))
+                result.corpust[ii][jj][kk] = (const_cast<const Tensor&>(corpust))[ii][jj][kk];
+            }
+        }
+    }
+    return result;
+  }
+  inline SimpleVector<T> singularValues(const SimpleMatrix<T>& m) const {
+    const auto SV(m.SVD() * m);
+    SimpleVector<T> w(SV.rows());
+    for(int i = 0; i < w.size(); i ++)
+      w[i] = sqrt(SV.row(i).dot(SV.row(i)));
+    return w;
+  }
+  vector<int>  countIdx(const T& thresh = T(0)) const {
+    vector<int> okidx;
+    const auto& ci0(corpust.iter());
+    for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
+      const auto& ci1(itr0->second.iter());
+      for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
+        const auto& ci2(itr1->second.iter());
+        for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
+          if(thresh < abs(itr2->second)) {
+            okidx.emplace_back(itr0->first);
+            okidx.emplace_back(itr1->first);
+            okidx.emplace_back(itr2->first);
+          }
+        }
+      }
+    }
+    sort(okidx.begin(), okidx.end());
+    okidx.erase(unique(okidx.begin(), okidx.end()), okidx.end());
+    return okidx;
+  }
+  inline const T       prej(const corpus<T, U>& prejs) const {
+    const auto n2this(cdot(*this));
+    if(n2this == T(0)) return T(0);
+    const auto n2p(prejs.cdot(prejs));
+    if(n2p == T(0)) return T(0);
+    return cdot(prejs) / sqrt(n2this * n2p);
+  }
+  inline const T       prej2(const vector<corpus<T, U> >& prej0, const vector<corpus<T, U> >& prej1, const T& thresh) const {
+    // XXX confirm me: is this correct counting method?
+    corpus<T, U> p0(*this), p1(*this);
+    for(int i = 0; i < prej0.size(); i ++)
+      p0 = p0.abbrev(string("P") + to_string(i), prej0[i]);
+    for(int i = 0; i < prej1.size(); i ++)
+      p1 = p1.abbrev(string("Q") + to_string(i), prej1[i]);
+    p0 = p0.simpleThresh(thresh);
+    p1 = p1.simpleThresh(thresh);
+    return T(words.size() - prej0.size()) / T(words.size() - prej1.size());
+  }
+  corpus<T, U>& invertInsist() {
+    assert(0 && "confirm me: corpus::invertInsist do not implemented NOT word table.");
+    // XXX confirm me: this method cannot calculate in logically correct
+    //                 because of it's method.
+    return *this;
+  }
+  corpus<T, U>  conflictPart() const {
+    assert(0 && "confirm me: corpus::conflictPart do not implemented NOT word table.");
+    // search conflict parts.
+    // dictionary base of the word 'NOT' is needed.
+    corpus<T, U> result;
+    return result;
+  }
+  inline U             serialize() const {
+    cerr << "s" << flush;
+    auto plus(*this);
+    return plus.absfy().serializeSub(plus.countIdx(T(int(0))));
+  }
+  corpus<T, U>  withDetail(const U& word, const corpus<T, U>& other, const T& thresh = T(0)) const;
+  corpus<T, U>  abbrev(const U& word, const corpus<T, U>& work, const T& thresh = T(0)) const;
+  pair<T, T>    compareStructure(const corpus<T, U>& src, const T& thresh = T(1e-4), const T& thresh2 = T(.125)) const;
+  corpus<T, U>& absfy();
+
+  Tensor corpust;
+private:
+  SimpleVector<T> singularValues() const;
+  U     serializeSub(const vector<int>& idxs) const;
+  inline void  merge5(Tensor& d, const int& i, const int& ki, const int& kk, const int& kj, const int& j, const T& intensity) const {
+    if(intensity == T(0)) return;
+    d[ i][kk][ki] += intensity;
+    d[ i][kj][ki] += intensity;
+    d[ i][ j][ki] += intensity;
+    d[ i][kj][kk] += intensity;
+    d[ i][ j][kk] += intensity;
+    d[ i][ j][kj] += intensity;
+    d[ki][kj][kk] += intensity;
+    d[ki][ j][kk] += intensity;
+    d[ki][ j][kj] += intensity;
+    d[kk][ j][kj] += intensity;
+    return;
+  }
+  U     orig;
+};
+
+template <typename T, typename U> corpus<T,U>::corpus(const U& input, const vector<U>& delimiter) {
+  // get word ptrs.
+  vector<vector<int> > ptrs;
+  vector<int>          uptrs;
+  vector<int>          pdelim;
+  ptrs.resize(words.size(), vector<int>());
+  pdelim.emplace_back(0);
+  U work;
+  vector<int> matchwidx;
+  vector<int> matchidxs;
+  int dM(0);
+  for(int i = 0; i < delimiter.size(); i ++)
+    dM = max(dM, int(delimiter[i].size()));
+  vector<U> workd;
+  for(int i = 0; i < dM; i ++) {
+    workd.emplace_back(U(""));
+    for(int j = i; j < dM; j ++)
+      workd[i] += U(" ");
+  }
+  orig = U(input);
+  int i(0), i0(0), Midx(0), lastlen(0);
+  for( ; i < orig.size(); i ++) {
+    work += orig[i];
+    for(int ii = 0; ii < workd.size(); ii ++) {
+      workd[ii]  = workd[ii].substr(1, workd[ii].size() - 1);
+      workd[ii] += orig[i];
+      for(int j = 0; j < delimiter.size(); j ++)
+        if(workd[ii] == delimiter[j] && pdelim[pdelim.size() - 1] < i)
+          pdelim.emplace_back(i);
+    }
+    auto lo(upper_bound(words.begin(), words.end(), work, lessEqualStrClip<U>));
+    auto up(upper_bound(words.begin(), words.end(), work, lessNotEqualStrClip<U>));
+    bool match(false);
+    for(auto itr(lo); itr < up; ++ itr)
+      if(equalStrClip<U>(work, *itr)) {
+        if(work.size() == itr->size()) {
+          matchwidx.emplace_back(distance(words.begin(), itr));
+          matchidxs.emplace_back(i0);
+          lastlen = max(lastlen, int(work.size()));
+        } else if(work.size() < itr->size())
+          match = true;
+      }
+    if(match && i < orig.size() - 1)
+      continue;
+    if(matchwidx.size() > 0) {
+      const int j(matchwidx.size() - 1);
+      ptrs[matchwidx[j]].emplace_back(matchidxs[j]);
+      uptrs.emplace_back(matchwidx[j]);
+      Midx = matchidxs[j];
+      matchwidx.resize(0);
+      matchidxs.resize(0);
+      i0 = (i -= work.size() - lastlen - 1) + 1;
+      lastlen = 0;
+    } else
+      i0 = (i -= work.size() - 1) + 1;
+    if(i == orig.size() - 1)
+      break;
+    work = U();
+  }
+  pdelim.emplace_back(Midx + 2);
+  const auto headidx(distance(words.begin(), lower_bound(words.begin(), words.end(), U("^"))));
+  const auto tailidx(distance(words.begin(), lower_bound(words.begin(), words.end(), U("$"))));
+  assert(0 <= headidx && headidx < words.size());
+  assert(0 <= tailidx && tailidx < words.size());
+  ptrs[headidx] = pdelim;
+  ptrs[tailidx] = pdelim;
+  uptrs.emplace_back(headidx);
+  uptrs.emplace_back(tailidx);
+  sort(uptrs.begin(), uptrs.end());
+  uptrs.erase(unique(uptrs.begin(), uptrs.end()), uptrs.end());
+
+  // corpus each
+  corpust = Tensor();
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
+  for(auto itr0(uptrs.begin()); itr0 != uptrs.end(); ++ itr0) {
+    const int i(*itr0);
+    if(!ptrs[i].size()) continue;
+    for(auto itr1(itr0); itr1 != uptrs.end(); ++ itr1) {
+      const int j(*itr1);
+      if(!ptrs[j].size()) continue;
+      for(auto itr2(itr1); itr2 != uptrs.end(); ++ itr2) {
+        const int k(*itr2);
+        if(!ptrs[k].size()) continue;
+        // XXX checkme:
+        if(words[i] == U("$") || words[j] == U("$") || words[k] == U("$") ||
+           words[i] == U("^") || words[j] == U("^") || words[k] == U("^"))
+          continue;
+        int ctru = 0;
+        int ctrv = 0;
+        int kk   = 0;
+        for(auto itr = ptrs[k].begin(); itr != ptrs[k].end(); ++ itr) {
+          while(ctru < ptrs[i].size() && ptrs[i][ctru] < *itr) ctru ++;
+          ctru --;
+          if(ctru < 0) ctru = 0;
+          assert(0 <= ctru && ctru < ptrs[i].size());
+          if(*itr <= ptrs[i][ctru])
+            continue;
+          while(ctrv < ptrs[j].size() && ptrs[j][ctrv] < *itr) ctrv ++;
+          if(ptrs[j].size() <= ctrv || ptrs[j][ctrv] <= *itr)
+            break;
+          assert(0 <= ctrv && ctrv < ptrs[j].size());
+          for( ; kk < pdelim.size() - 1; kk ++)
+            if(pdelim[kk] <= *itr && *itr < pdelim[kk + 1])
+              break;
+          assert(0 <= kk && kk < pdelim.size());
+          if(ptrs[i][ctru] < pdelim[kk] && pdelim[kk] <= ptrs[j][ctrv])
+            continue;
+          // XXX configure me:
+          const T buf0(log(T(abs(*itr + .5 - ptrs[i][ctru])) * T(2) * exp(T(1))));
+          const T buf1(log(T(abs(*itr + .5 - ptrs[j][ctrv])) * T(2) * exp(T(1))));
+          // const T buf0(abs(*itr + .5 - ptrs[i][ctru]));
+          // const T buf1(abs(*itr + .5 - ptrs[j][ctrv]));
+          const T work(T(1) / (buf0 * buf0 + buf1 * buf1));
+          if(isfinite(work)) {
+#if defined(_OPENMP)
+#pragma omp critical
+#endif
+            {
+              corpust[i][j][k] += sqrt(work) / T(int(Midx));
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+template <typename T, typename U> corpus<T, U>& corpus<T, U>::absfy() {
+  const auto& pi0(corpust.iter());
+  for(auto itr0(pi0.begin()); itr0 != pi0.end(); ++ itr0) {
+    const auto& pi1(itr0->second.iter());
+    for(auto itr1(pi1.begin()); itr1 != pi1.end(); ++ itr1) {
+      const auto& pi2(itr1->second.iter());
+      for(auto itr2(pi2.begin()); itr2 != pi2.end(); ++ itr2)
+        if(itr2->second < T(0)) {
+          // N.B. we estimate minus sign on the tensor as to be reverse order.
+          corpust[itr1->first][itr0->first][itr2->first] -= itr2->second;
+          corpust[itr0->first][itr1->first][itr2->first]  = T(int(0));
+        }
+    }
+  }
+  return *this = simpleThresh(T(int(0)));
+}
+
+template <typename T, typename U> U corpus<T, U>::serializeSub(const vector<int>& idxs) const {
+  cerr << "." << flush;
+  if(idxs.size() <= 1) {
+    if(idxs.size())
+      return words[idxs[0]];
+    return U();
+  }
+  vector<pair<int, int> > score;
+  score.reserve(idxs.size());
+  // N.B. i0 - i1 - i2 is stored in corpust[i0][i2][i1].
+  for(int i = 0; i < idxs.size(); i ++) {
+    int lscore(0);
+    for(int j = 0; j < idxs.size(); j ++)
+      if(const_cast<const Tensor&>(corpust)[idxs[j]].iter().size()) {
+        for(int k = 0; k < idxs.size(); k ++)
+          if(const_cast<const Tensor&>(corpust)[idxs[j]][idxs[i]][idxs[k]] != T(0))
+            lscore --;
+      }
+    const auto& ii(const_cast<const Tensor&>(corpust)[idxs[i]].iter());
+    if(ii.size()) for(int j = 0; j < idxs.size(); j ++)
+      if(const_cast<const Tensor&>(corpust)[idxs[i]][idxs[j]].iter().size()) {
+        for(int k = 0; k < idxs.size(); k ++)
+          if(const_cast<const Tensor&>(corpust)[idxs[i]][idxs[j]][idxs[k]] != T(0))
+            lscore ++;
+      }
+    // XXX: middle data ignored.
+    score.emplace_back(make_pair(lscore, idxs[i]));
+  }
+  sort(score.begin(), score.end());
+  vector<int> left, right;
+  left.reserve(idxs.size());
+  right.reserve(idxs.size());
+  int i(0);
+  // N.B.: we only focus orders itself.
+  for( ; i < score.size() / 2; i ++)
+    left.emplace_back(score[i].second);
+  for( ; i < score.size(); i ++)
+    right.emplace_back(score[i].second);
+  return serializeSub(left) + serializeSub(right);
+}
+
+template <typename T, typename U> pair<T, T> corpus<T, U>::compareStructure(const corpus<T, U>& src, const T& thresh, const T& thresh2) const {
+  // get H-SVD singular values for each of them and sort:
+  const auto s0(singularValues()), s1(src.singularValues());
+
+  // get compared.
+  pair<T, T> result;
+  result.first = result.second = T(0);
+  SimpleMatrix<T> S0(s0.size(), s0.size());
+  SimpleMatrix<T> S1(s1.size(), s1.size());
+  for(int i = 0; i < S0.rows(); i ++)
+    for(int j = 0; j < S0.cols(); j ++) {
+      S0(i, j) = s0[i] / s0[j];
+      if(!isfinite(S0(i, j)) || T(1) / thresh < abs(S0(i, j)))
+        S0(i, j) = T(0);
+    }
+  for(int i = 0; i < S1.rows(); i ++)
+    for(int j = 0; j < S1.cols(); j ++) {
+      S1(i, j) = s1[i] / s1[j];
+      if(!isfinite(S1(i, j)) || T(1) / thresh < abs(S1(i, j)))
+        S1(i, j) = T(0);
+    }
+  const auto ss0(singularValues(S0));
+  const auto ss1(singularValues(S1));
+  int i(0), j(0);
+  for( ; i < ss0.size() && j < ss1.size(); )
+    if(abs(ss0[i] - ss1[j]) / max(abs(ss0[i]), abs(ss1[i])) < thresh2) {
+      result.first  += ss0[i] * ss0[i] + ss1[j] * ss1[j];
+      i ++, j ++;
+    } else {
+      result.second += ss0[i] * ss0[i] + ss1[j] * ss1[j];
+      if(ss0[i] > ss1[j])
+        i ++;
+      else
+        j ++;
+    }
+  for( ; i < ss0.size(); i ++)
+    result.second += ss0[i] * ss0[i];
+  for( ; j < ss1.size(); j ++)
+    result.second += ss1[j] * ss1[j];
+  return result;
+}
+
+template <typename T, typename U> SimpleVector<T> corpus<T, U>::singularValues() const {
+  SimpleMatrix<T> planes(words.size(), words.size());
+  for(int i = 0; i < words.size(); i ++) {
+    SimpleMatrix<T> buf(words.size(), words.size());
+    for(int j = 0; j < words.size(); j ++) {
+      for(int k = 0; k < words.size(); k ++)
+        if(isfinite((const_cast<const Tensor&>(corpust))[i][j][k]))
+          buf(k, j) = (const_cast<const Tensor&>(corpust))[i][j][k];
+        else {
+          cerr << "nan" << flush;
+          buf(k, j) = T(0);
+        }
+      for(int k = words.size(); k < buf.rows(); k ++)
+        buf(k, j) = T(0);
+    }
+    planes.col(i) = singularValues(buf);
+  }
+  return singularValues(planes);
+}
+
+template <typename T, typename U> corpus<T, U> corpus<T, U>::withDetail(const U& word, const corpus<T, U>& other, const T& thresh) const {
+  const auto itr(lower_bound(words.begin(), words.end(), word));
+  const int  eeidx(distance(words.begin(), itr));
+  assert(0 <= eeidx && eeidx < words.size() && *itr == word);
+  const auto idxs(countIdx(T(0)));
+  if(!binary_search(idxs.begin(), idxs.end(), eeidx))
+    return *this;
+  cerr << "withDetail : " << word << endl;
+  corpus<T, U> result(*this);
+  // XXX:
+  // corpus<T, U> result(*this + other);
+  const T x0(const_cast<const Tensor&>(corpust)[eeidx][eeidx][eeidx]);
+  const auto& ci0(other.corpust.iter());
+  for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
+    const auto& ci1(itr0->second.iter());
+    const auto& ii(itr0->first);
+    for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
+      const auto& ci2(itr1->second.iter());
+      const auto& jj(itr1->first);
+      for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
+        // Sum-up detailed word into result pool without definition row, col.
+        const int& kk(itr2->first);
+        if(itr2->second == T(0) || !(ii == eeidx || jj == eeidx || kk == eeidx))
+          continue;
+        // add crossing points
+        const auto& ti0(corpust.iter());
+        for(auto titr0(ti0.begin()); titr0 != ti0.end(); ++ titr0) {
+          const auto& ti1(titr0->second.iter());
+          const int& tii(titr0->first);
+          if(tii == eeidx) continue;
+          // add line points.
+          for(auto titr1(ti1.begin()); titr1 != ti1.end(); ++ titr1) {
+            const int& tjj(titr1->first);
+            if(tjj == eeidx) continue;
+            merge5(result.corpust, tii, ii, kk, jj, tjj, titr1->second[eeidx] * itr2->second * (x0 + T(1)));
+          }
+        }
+        for(auto titr0(ti0.begin()); titr0 != ti0.end(); ++ titr0) {
+          const auto& ti2(const_cast<const Mat&>(titr0->second)[eeidx].iter());
+          const int& tii(titr0->first);
+          if(tii == eeidx) continue;
+          for(auto titr2(ti2.begin()); titr2 != ti2.end(); ++ titr2) {
+            const int& tkk(titr2->first);
+            if(tkk == eeidx) continue;
+            merge5(result.corpust, tii, tkk, ii, kk, jj, titr2->second * itr2->second * (x0 + T(1)));
+          }
+        }
+        const auto& ti1(const_cast<const Tensor&>(corpust)[eeidx].iter());
+        for(auto titr1(ti1.begin()); titr1 != ti1.end(); ++ titr1) {
+          const auto& ti2(titr1->second.iter());
+          const int& tjj(titr1->first);
+          if(tjj == eeidx) continue;
+          for(auto titr2(ti2.begin()); titr2 != ti2.end(); ++ titr2) {
+            const int& tkk(titr2->first);
+            if(tkk == eeidx) continue;
+            merge5(result.corpust, ii, kk, jj, tkk, tjj, titr2->second * itr2->second * (x0 + T(1)));
+          }
+        }
+      }
+    }
+  }
+  return result;
+}
+
+template <typename T, typename U> corpus<T, U> corpus<T, U>::abbrev(const U& word, const corpus<T, U>& work, const T& thresh) const {
+  const T tn(     cdot(work));
+  const T td(work.cdot(work));
+  if(td <= T(0))
+    return *this;
+  cerr << "abbrev: " << word << " : fixme ratio." << endl;
+  auto result(*this);
+  // XXX:
+  //auto result((*this * td - work * tn) / td);
+  const int widx(distance(words.begin(), lower_bound(words.begin(), words.end(), word)));
+  assert(0 <= widx && widx < words.size() && words[widx] == word);
+  result.corpust[widx][widx][widx] += (tn < T(0) ? - T(1) : T(1)) * sqrt(abs(tn));
+  const auto& ci0(result.corpust.iter());
+  Mat c_ij, c_jk, c_ik;
+  for(auto itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
+    const auto& ci1(itr0->second.iter());
+    for(auto itr1(ci1.begin()); itr1 != ci1.end(); ++ itr1) {
+      const auto& ci2(itr1->second.iter());
+      for(auto itr2(ci2.begin()); itr2 != ci2.end(); ++ itr2) {
+        const int& i1(itr0->first);
+        const int& j1(itr1->first);
+        const int& k1(itr2->first);
+        if(0 <= i1 && 0 <= j1)
+          c_ij[i1][j1] += itr2->second;
+        if(0 <= j1 && 0 <= k1)
+          c_jk[j1][k1] += itr2->second;
+        if(0 <= k1 && 0 <= i1)
+          c_ik[i1][k1] += itr2->second;
+      }
+    }
+  }
+  const auto okidx(result.countIdx(T(0)));
+  for(int i = 0; i < okidx.size(); i ++) {
+    const auto& ii(okidx[i]);
+    if(ii == widx) continue;
+    for(int j = 0; j < okidx.size(); j ++) {
+      const auto& jj(okidx[j]);
+      if(jj == widx) continue;
+      for(int k = 0; k < okidx.size(); k ++) {
+        const auto& kk(okidx[k]);
+        if(kk == widx) continue;
+        const auto  denom(c_ij[ii][jj] + c_jk[jj][kk] + c_ik[ii][kk]);
+        // XXX:
+        if(denom == T(0)) continue;
+        const auto& score((const_cast<const Tensor&>(corpust))[ii][jj][kk]);
+        result.corpust[widx][jj][kk] += score * c_jk[jj][kk] / denom;
+        result.corpust[ii][widx][kk] += score * c_ik[ii][kk] / denom;
+        result.corpust[ii][jj][widx] += score * c_ij[ii][jj] / denom;
+        result.corpust[ii][jj][kk]   -= score;
+      }
+    }
+  }
+  return result.simpleThresh(thresh);
+}
+
 template <typename T, typename U> static inline U getCut(const U& input, const int& idx, const int& szwindow) {
   if(idx < 0 || input.size() <= idx * szwindow / 2)
     return U("XXX: getCut");
@@ -6813,7 +7253,8 @@ template <typename T, typename U> static inline bool getDetailed(corpus<T, U>& c
   return true;
 }
 
-template <typename T, typename U> ostream& preparedTOC(ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& topictitle, const vector<U>& topics, const vector<U>& delimiter, const int& szwindow, const int& outblock, const int& nrwords, const T& redig = T(1), const bool& reverse = false) {
+// N.B. nrwords = 3^3 for f(input,state,output) countup.
+template <typename T, typename U> ostream& preparedTOC(ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& topictitle, const vector<U>& topics, const vector<U>& delimiter, const int& szwindow, const int& outblock, const bool& reverse = false, const T& redig = T(int(1)), const int& nrwords = 27) {
   assert(detailtitle.size() == detail.size());
   assert(topictitle.size()  == topics.size());
   os << "prepTOC: " << flush;
@@ -6878,9 +7319,13 @@ template <typename T, typename U> ostream& preparedTOC(ostream& os, const U& inp
   return os;
 }
 
-template <typename T, typename U> ostream& optimizeTOC(ostream& os, const U& input, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const int& szwindow, const int& outblock, const int& nrwords, const T& redig = T(1), const bool& countnum = false, const U& notcheck = U("")) {
+template <typename T, typename U> static inline ostream& preparedTOC(ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& topictitle, const vector<U>& topics, const vector<U>& delimiter, const bool& reverse = false) {
+  return preparedTOC<T, U>(os, input, detailtitle, detail, topictitle, topics, delimiter, int(sqrt(T(int(input.size())))), int(sqrt(sqrt(T(int(input.size()))))), reverse);
+}
+
+template <typename T, typename U> ostream& optimizeTOC(ostream& os, const U& input, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const int& szwindow, const int& outblock, const bool& countnum = false, const U& notcheck = U(""), const T& redig = T(int(1)), const int& nrwords = 27) {
   assert(notcheck == U(""));
-  os << "optTOC: " << flush;
+  os << "optimizeTOC: " << flush;
   SimpleSparseMatrix<T> scores;
   int Midx(0);
   vector<corpus<T, U> > stats;
@@ -6905,7 +7350,7 @@ template <typename T, typename U> ostream& optimizeTOC(ostream& os, const U& inp
   }
   for(int i = 0; i < stats.size(); i ++)
     for(int j = i + 1; j < stats.size(); j ++) {
-      scores[i][j] = - stats[i].prej(stats[j]);
+      scores[i][j] = stats[i].prej(stats[j]);
       Midx = max(Midx, j);
     }
   os << "." << flush;
@@ -6983,7 +7428,11 @@ template <typename T, typename U> ostream& optimizeTOC(ostream& os, const U& inp
   return os << endl;
 }
 
-template <typename T, typename U> ostream& diff(ostream& os, const U& input, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const int& outblock, const int& nrwords, const T& redig = T(1), const bool& same = false) {
+template <typename T, typename U> static inline ostream& optimizeTOC(ostream& os, const U& input, const vector<U>& detail, const vector<U>& detailtitle, const vector<U>& delimiter, const bool& countnum = false) {
+  return optimizeTOC<T, U>(os, input, detail, detailtitle, delimiter, int(sqrt(T(int(input.size())))), int(sqrt(sqrt(T(int(input.size()))))), countnum);
+}
+
+template <typename T, typename U> ostream& diff(ostream& os, const U& input, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const int& szwindow, const int& outblock, const bool& same = false, const T& redig = T(int(1)), const int& nrwords = 27) {
   assert(detail0.size() == detailtitle0.size() &&
          detail1.size() == detailtitle1.size());
   os << "diff:" << flush;
@@ -7048,33 +7497,8 @@ template <typename T, typename U> ostream& diff(ostream& os, const U& input, con
   return os << endl;
 }
 
-template <typename T> static inline vector<T> cutText(const T& input, const vector<T>& eliminate, const vector<T>& delimiter, const bool& f_sort = false) {
-  vector<T> result;
-  T         workbuf;
-  for(int i = 0; i < input.size(); i ++) {
-    workbuf += input[i];
-    for(int j = 0; j < delimiter.size(); j ++)
-      if(workbuf.size() >= delimiter[j].size() &&
-         workbuf.substr(workbuf.size() - delimiter[j].size(), delimiter[j].size()) == delimiter[j]) {
-        if(workbuf.size() - delimiter[j].size())
-          result.emplace_back(workbuf.substr(0, workbuf.size() - delimiter[j].size()));
-        workbuf = T();
-        goto next;
-      }
-    for(int j = 0; j < eliminate.size(); j ++)
-      if(workbuf.size() >= eliminate[j].size() &&
-        workbuf.substr(workbuf.size() - eliminate[j].size(), eliminate[j].size()) == eliminate[j]) {
-        workbuf = workbuf.substr(0, workbuf.size() - eliminate[j].size());
-        break;
-      }
-   next:
-    ;
-  }
-  if(workbuf.size())
-    result.emplace_back(workbuf);
-  if(f_sort)
-    sort(result.begin(), result.end());
-  return result;
+template <typename T, typename U> static inline ostream& diff(ostream& os, const U& input, const vector<U>& detail0, const vector<U>& detailtitle0, const vector<U>& detail1, const vector<U>& detailtitle1, const vector<U>& delimiter, const bool& same = false) {
+  return diff<T, U>(os, input, detail0, detailtitle0, detail1, detailtitle1, delimiter, int(sqrt(T(int(input.size())))), int(sqrt(sqrt(T(int(input.size()))))), same);
 }
 
 template <typename T, typename U> static inline SimpleVector<T> countWords(const U& orig, const vector<U>& words) {
@@ -7121,42 +7545,45 @@ template <typename T, typename U> vector<int> pseudoWordsBalance(const vector<U>
   return vres;
 }
 
-template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const int& nrwords0, const T& redig = T(1)) {
+template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter, const int& szwindow, const T& redig = T(int(1)), const int& nrwords = 27) {
   assert(detailtitle.size() == detail.size());
-  const int nrwords(sqrt(T(nrwords0)));
   cerr << "predTOC: " << flush;
-  vector<SimpleSparseTensor<T> > in;
+  vector<corpus<T, U> > stats;
   T threshin(int(0));
-  vector<int> idx;
   for(int i = - int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) );
           i <= 0; i ++) {
-    vector<corpus<T, U> > istats;
     threshin = T(int(1)) - pow(T(int(2)), - T(abs(i)));
-    idx.resize(0);
-    istats.resize(input.size() / (szwindow / 2));
-    for(int j = 0; j < istats.size(); j ++) {
-      getDetailed<T, U>(istats[j], input, j, detailtitle, detail, delimiter, szwindow, threshin);
-      istats[j].reDig(redig);
-      istats[j].absfy();
-      auto lidx(istats[j].countIdx());
+    vector<int> idx;
+    stats.resize(0);
+    stats.resize(input.size() / (szwindow / 2));
+    for(int j = 0; j < stats.size(); j ++) {
+      getDetailed<T, U>(stats[j], input, j, detailtitle, detail, delimiter, szwindow, threshin);
+      stats[j].reDig(redig);
+      stats[j].absfy();
+      auto lidx(stats[j].countIdx());
       idx.insert(idx.end(), lidx.begin(), lidx.end());
     }
     sort(idx.begin(), idx.end());
     idx.erase(unique(idx.begin(), idx.end()), idx.end());
     cerr << threshin << " : " << idx.size() << endl;
-    if(nrwords <= idx.size()) {
-      in.resize(istats.size());
-      for(int j = 0; j < istats.size(); j ++)
-        in[j] = move(istats[j].corpust);
-      break;
-    }
+    if(nrwords <= idx.size()) break;
+  }
+  vector<int> idx;
+  vector<SimpleSparseTensor<T> > in;
+  in.reserve(stats.size());
+  for(int i = 0; i < stats.size(); i ++) {
+    auto lidx(stats[i].countIdx());
+    idx.insert(idx.end(), lidx.begin(), lidx.end());
+    sort(idx.begin(), idx.end());
+    idx.erase(unique(idx.begin(), idx.end()), idx.end());
+    in.emplace_back(move(stats[i].corpust));
   }
   os << input;
   corpus<T, U> pstats;
   auto p(predSTen<T>(in, idx));
   pstats.corpust = move(p[0]);
   getAbbreved<T>(pstats, detailtitle, detail, delimiter);
-  os << pstats.simpleThresh(threshin / T(int(4))).serialize();
+  os << endl << " --- " << pstats.simpleThresh(threshin / T(int(4))).serialize();
   pstats.corpust = move(p[1]);
   getAbbreved<T>(pstats, detailtitle, detail, delimiter);
   os << endl << " --- " << pstats.simpleThresh(threshin / T(int(4))).serialize();
@@ -7166,11 +7593,115 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
   return os;
 }
 
+template <typename T, typename U> static inline ostream& predTOC(ostream& os, const U& input, const vector<U>& detailtitle, const vector<U>& detail, const vector<U>& delimiter) {
+  return predTOC<T, U>(os, input, detailtitle, detail, delimiter, int(sqrt(T(int(input.size())))) );
+}
 
-// N.B. eliminated Persistent class and their functions.
-//      we cannot avoid such a error recusrive prediction's white noise with
-//      the method we once have. it's only accuracy limit dependant but reverse
-//      of them doesn't work.
+template <typename T> static inline vector<T> cutText(const T& input, const vector<T>& eliminate, const vector<T>& delimiter, const bool& f_sort = false) {
+  vector<T> result;
+  T         workbuf;
+  for(int i = 0; i < input.size(); i ++) {
+    workbuf += input[i];
+    for(int j = 0; j < delimiter.size(); j ++)
+      if(workbuf.size() >= delimiter[j].size() &&
+         workbuf.substr(workbuf.size() - delimiter[j].size(), delimiter[j].size()) == delimiter[j]) {
+        if(workbuf.size() - delimiter[j].size())
+          result.emplace_back(workbuf.substr(0, workbuf.size() - delimiter[j].size()));
+        workbuf = T();
+        goto next;
+      }
+    for(int j = 0; j < eliminate.size(); j ++)
+      if(workbuf.size() >= eliminate[j].size() &&
+        workbuf.substr(workbuf.size() - eliminate[j].size(), eliminate[j].size()) == eliminate[j]) {
+        workbuf = workbuf.substr(0, workbuf.size() - eliminate[j].size());
+        break;
+      }
+   next:
+    ;
+  }
+  if(workbuf.size())
+    result.emplace_back(workbuf);
+  if(f_sort)
+    sort(result.begin(), result.end());
+  return result;
+}
+
+static inline std::string utf8align(const std::string& tob) {
+  int head = 0;
+  while(head < tob.size() && (tob[head] & 0xc0) == 0x80) head ++;
+  int tail = head;
+  for(int j = head; j < tob.size(); j ++) if((tob[j] & 0xc0) != 0x80) tail = j;
+  if(-- tail <= head) return tob.substr(0, 0);
+  int cnt(0);
+  for(int j = head; j <= tail; j ++) if((tob[j] & 0xc0) != 0x80) cnt ++;
+  return cnt <= 1 ? tob.substr(0, 0) : tob.substr(head, tail - head + 1);
+}
+
+template <typename T, typename U> static inline void makelword(vector<U>& words, const U& input, const vector<U>& delimiter, const bool& show = false, const bool& utf8 = true, const int& limit = - 1) {
+  std::vector<gram_t<U> > found;
+  const auto lwords(lword<char, U>(int(log(T(int(input.size() ))) / log(T(int(2)) ) )).compute(input));
+  for(auto itr = lwords.begin(); itr != lwords.end(); ++ itr) {
+    if(itr->rptr.size() < 2 && itr->str.size() < 3)
+      continue;
+    const auto lb(std::lower_bound(found.begin(), found.end(), *itr));
+    if(found.begin() <= lb && lb < found.end() && lb->str == itr->str)
+      lb->rptr.insert(lb->rptr.end(), itr->rptr.begin(), itr->rptr.end());
+    else
+      found.emplace_back(*itr);
+  }
+  for(auto itr = found.begin(); itr != found.end(); ++ itr) {
+    std::sort(itr->rptr.begin(), itr->rptr.end());
+    itr->rptr.erase(std::unique(itr->rptr.begin(), itr->rptr.end()), itr->rptr.end());
+  }
+  std::sort(found.begin(), found.end(), lessCount<U>);
+  found.erase(std::unique(found.begin(), found.end()), found.end());
+  if(0 < limit && limit < found.size()) found.resize(limit);
+  words.reserve(words.size() + found.size());
+  for(auto itr(found.begin()); itr < found.end(); ++ itr) {
+    const auto tob(utf8 ? utf8align(itr->str) : itr->str);
+    if(! tob.size()) continue;
+    words.emplace_back(tob);
+    if(show) std::cout << tob << ", " << itr->rptr.size() << std::endl;
+  }
+  std::sort(words.begin(), words.end());
+  words.erase(std::unique(words.begin(), words.end()), words.end());
+  auto mydelim(delimiter);
+  mydelim.insert(mydelim.end(), words.begin(), words.end());
+  sort(mydelim.begin(), mydelim.end());
+  auto inputs(cutText(input, words, mydelim));
+  std::sort(inputs.begin(), inputs.end());
+  inputs.erase(std::unique(inputs.begin(), inputs.end()), inputs.end());
+  if(utf8)
+    for(int i = 0; i < inputs.size(); i ++) {
+      inputs[i] = utf8align(inputs[i]);
+      if(inputs[i].size()) words.emplace_back(inputs[i]);
+    }
+  else
+    words.insert(words.end(), inputs.begin(), inputs.end());
+  std::sort(words.begin(), words.end());
+  words.erase(std::unique(words.begin(), words.end()), words.end());
+  if(show)
+    for(int i = 0; i < inputs.size(); i ++)
+      if(inputs[i].size()) std::cout << inputs[i] << ", 1" << std::endl;
+  return;
+}
+
+// N.B. once implemented but abandoned and cleaned from this source code
+//      the reason why:
+// (00) predictions via linear sum/diff based some reformation input and revert:
+//      it's all integrated skipX concerns, the jammer either jam out us
+//      even *ANY* reformation and revert them in which way.
+//      so it's integrated int *linear* meanings to reform prediction vector.
+//      eg. PdeltaOnce, Ppersistent, Pprogression, (P0DFT).
+//      they goes well because timing-related concerns A_0 ... A_k B x_0
+//      made initial entropy and A'^k B' x_0 -> x_k structures.
+// (01) however, our predictor either being attacked,
+//      predv only returns last one picture on some of our tests with real
+//      data, but is effective returns better results with PRNG tests.
+//      so with real data, we only apply P0maxRank to each pixel.
+// (02) we eliminated predvall, we don't need them with whole internal states
+//      awared predictors they have a better prediction concerned with some
+//      series of a PRNG tests.
 
 #define _SIMPLELIN_
 #endif
