@@ -95,7 +95,6 @@ public:
   inline DUInt(const DUInt<DUInt<T,bits>,bits*2>& src) { *this = src; }
   inline DUInt(DUInt<T,bits>&& src) { *this = src; }
   inline ~DUInt() { ; }
-  
   inline DUInt<T,bits>& operator ++ () {
     ++ e[0];
     if(!e[0]) ++ e[1];
@@ -412,7 +411,6 @@ public:
   inline SimpleFloat(const SimpleFloat<T,W,bits,U>& src) { *this = src; }
   inline SimpleFloat(SimpleFloat<T,W,bits,U>&& src) { *this = src; }
   inline ~SimpleFloat() { ; }
-  
   inline SimpleFloat<T,W,bits,U>  operator -  () const {
     auto work(*this);
     work.s ^= 1 << SIGN;
@@ -512,7 +510,6 @@ public:
     m  = T(mm >> bits);
     return ensureFlag();
   }
-
   inline SimpleFloat<T,W,bits,U>  operator %  (const SimpleFloat<T,W,bits,U>& src) const {
     return *this - (*this / src).floor() * src;
   }
@@ -624,7 +621,6 @@ public:
     }
     return fl;
   }
-
   inline SimpleFloat<T,W,bits,U>  abs()  const {
     auto work(*this);
     work.s &= ~ (1 << SIGN);
@@ -1188,7 +1184,6 @@ public:
     _imag = move(imag);
   }
   inline ~Complex() { ; }
-
   inline Complex<T>  operator ~  ()                    const {
     return Complex<T>(  _real, - _imag);
   }
@@ -1307,7 +1302,6 @@ public:
   inline             operator T    () const {
     return this->_real;
   }
-  
   const Complex<T>& i() const {
     const static auto I(Complex<T>(T(int(0)), T(int(1))));
     return I;
@@ -1489,7 +1483,6 @@ public:
   inline SimpleVector(const SimpleVector<T>& other) { *this = other; }
   inline SimpleVector(SimpleVector<T>&& other) { *this = other; }
   inline ~SimpleVector() { ; }
-  
   inline       SimpleVector<T>  operator -  () const {
     SimpleVector<T> res(entity.size());
 #if defined(_OPENMP)
@@ -1727,7 +1720,6 @@ public:
     }
     return is;
   }
-  
   vector<T> entity;
 };
 
@@ -1747,7 +1739,6 @@ public:
   inline SimpleMatrix(const SimpleMatrix<T>& other) { *this = other; }
   inline SimpleMatrix(SimpleMatrix<T>&& other) { *this = other; }
   inline ~SimpleMatrix() { ; }
-  
   inline       SimpleMatrix<T>  operator -  () const {
     SimpleMatrix<T> res(entity.size(), ecols);
 #if defined(_OPENMP)
@@ -2019,7 +2010,6 @@ public:
 #endif
     return eps;
   }
-
   friend ostream& operator << (ostream& os, const SimpleMatrix<T>& v) {
     SimpleMatrix<string> buf(v.rows(), v.cols());
     int M(0);
@@ -2781,7 +2771,6 @@ public:
   inline SimpleSparseVector(const SimpleSparseVector<T>& other) { *this = other; }
   inline SimpleSparseVector(SimpleSparseVector<T>&& other) { *this = other; }
   inline ~SimpleSparseVector() { ; }
-  
   inline SimpleSparseVector<T>  operator -  () const {
     auto res(*this);
     for(auto itr(res.entity.begin()); itr != res.entity.end(); ++ itr)
@@ -3058,7 +3047,8 @@ template <typename T> static inline pair<SimpleVector<T>, T> makeProgramInvarian
 }
 
 template <typename T> static inline T revertProgramInvariant(const pair<T, T>& in) {
-  const auto r0(in.first / in.second);
+  const auto r0(in.second == T(int(0)) ?
+    sgn<T>(in.second) / SimpleMatrix<T>().epsilon() : in.first / in.second);
   const auto r1(T(int(0)) < r0 ? r0 - floor(r0) : ceil(- r0) + r0);
   return T(int(0)) == r1 ? T(int(1)) : r1;
 }
@@ -3516,7 +3506,6 @@ template <typename T> static inline T p012next(const SimpleVector<T>& d) {
   auto sscore(zero);
   for(int i = 0; i < cat.size(); i ++) {
     if(! cat[i].first.size()) continue;
-    if(! (cat[i].first.size() <= cat[i].first[0].size() + 1)) cerr << "!" << flush;
     SimpleVector<T> avg(cat[i].first[0].size() + 1);
     avg.O();
     for(int j = 0; j < cat[i].first.size(); j ++)
@@ -3641,10 +3630,6 @@ template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
   // return sumCNext<T, true, sumCNext<T, false, logCNext<T, logCNext<T, P0DFT<T, p0max0next<T> > > > > >(in);
 }
 
-template <typename T> static inline T p01delimNext(const SimpleVector<T>& in) {
-  return in[in.size() - 1];
-}
-
 // Get invariant structure that
 // \[- &alpha, &alpha;\[ register computer with deterministic calculation.
 // cf. bitsofcotton/randtools .
@@ -3711,7 +3696,7 @@ template <typename T, const bool cultivated = true, const bool nonlinear = true>
   }
   return - invariant.dot(work) / invariant[varlen - 1];
 }
- 
+
 // N.B. class-capsules for serial stream.
 template <typename T> class idFeeder {
 public:
@@ -3743,82 +3728,7 @@ public:
 private:
   int  t;
 };
-
-template <typename T> static inline int tanPio4Scale(const int& idx, const int& size) {
-  const static T pio4(atan(T(int(1)) ));
-  return int(tan(T(idx) / T(size) * pio4) / tan(pio4 / T(size)) );
-}
-
-template <typename T> static inline int ceilInvTanPio4Scale(const int& y) {
-  const static T pio4(atan(T(int(1)) ));
-  // for( ; int(tan(pio4) / tan(pio4 / T(sz)) ) < y; sz ++) ;
-  return int(ceil(pio4 / atan(T(int(1)) / T(y)) ));
-}
-
-template <typename T> static inline SimpleVector<T> arctanFeeder(const SimpleVector<T>& in) {
-  const static SimpleVector<T> null;
-  if(! in.size()) return null;
-  const auto sz(ceilInvTanPio4Scale<T>(in.size()) - 1);
-  if(sz <= 1) return null;
-  SimpleVector<T> res(sz);
-  res.O();
-  for(int i = 0; i < res.size(); i ++)
-    for(int j = in.size() - tanPio4Scale<T>(i + 1, sz);
-            j < in.size() - tanPio4Scale<T>(i, sz); j ++)
-      res[res.size() - i - 1] += in[j];
-  // N.B. tanPio4Scale is monotonic increasingly function.
-  int denom(ceil(tanPio4Scale<T>(sz, sz) - tanPio4Scale<T>(sz - 1, sz)));
-  if(! denom) return null;
-  // XXX: CPU float glitch.
-  denom ++;
-  for(int i = 0; i < res.size(); i ++)
-    res[i] /= T(denom);
-  return res;
-}
-
-template <typename T> static inline SimpleVector<SimpleVector<T> > arctanFeeder(const SimpleVector<SimpleVector<T> >& in) {
-  const static SimpleVector<SimpleVector<T> > null;
-  if(! in.size()) return null;
-  const auto sz(ceilInvTanPio4Scale<T>(in.size()) - 1);
-  if(sz <= 1) return null;
-  SimpleVector<SimpleVector<T> > res(sz);
-  for(int i = 0; i < res.size(); i ++) {
-    res[i].resize(in[0].size());
-    res[i].O();
-  }
-  for(int i = 0; i < res.size(); i ++)
-    for(int j = in.size() - tanPio4Scale<T>(i + 1, sz);
-            j < in.size() - tanPio4Scale<T>(i, sz); j ++)
-      res[res.size() - i - 1] += in[j];
-  int denom(ceil(tanPio4Scale<T>(sz, sz) - tanPio4Scale<T>(sz - 1, sz)));
-  if(! denom) return null;
-  denom ++;
-  for(int i = 0; i < res.size(); i ++)
-    res[i] /= T(denom);
-  return res;
-}
-
-// N.B. we omit high frequency part (1/f(x) input) to be treated better in P.
-template <typename T, T (*p)(const SimpleVector<T>&)> static inline T pbond(SimpleVector<T> in) {
-  if(in.size() <= 1) return T(int(0));
-  auto M(abs(in[0]));
-  for(int i = 1; i < in.size(); i ++)
-    M = max(M, in[i]);
-  if(M == T(int(0))) return T(int(0));
-  // N.B. with 1-norm normalized input:
-  T m(in[0] /= M);
-  for(int i = 1; i < in.size(); i ++) m = min(m, in[i] /= M);
-  // N.B. offset const.
-  m -= T(int(1));
-  // N.B. 0 < v, normalize with v's orthogonality:
-  T mavg(log(in[0] - m));
-  for(int i = 1; i < in.size(); i ++) mavg += log(in[i] - m);
-  mavg /= T(int(in.size()));
-  mavg  = exp(mavg);
-  // N.B. we need nonlinear prediction, so * M before to predict.
-  return max(- M, min(M, p((in *= M) /= mavg) * mavg));
-}
-
+ 
 template <typename T, T (*p)(const SimpleVector<T>&)> static inline T deep(const SimpleVector<T>& in, const int& unit = 3) {
   assert(1 < unit);
   vector<idFeeder<T> > depth;
@@ -3852,6 +3762,220 @@ template <typename T, T (*p)(const SimpleVector<T>&)> static inline T deep(const
       (M = - M) += depth[j].res[depth[j].res.size() - 1];
   }
   return M;
+}
+
+// N.B. unit for prediction bricks.
+template <typename T> static inline vector<T> pbullet2(const SimpleVector<T>& in) {
+  vector<T> M;
+  M.reserve(2);
+  M.emplace_back(  deep<T, p0maxNext<T> >(  in, 3));
+  M.emplace_back(- deep<T, p0maxNext<T> >(- in, 3));
+  return M;
+}
+
+// N.B. jammer to the predictor to make grip or lose grip.
+//      we want to use this jammer to lose usual grip on predictor.
+template <typename T> static inline pair<T, T> pSubesube(const T& d0, const pair<vector<T>, vector<T> >& j, const int& t, const vector<int>& idx = vector<int>()) {
+  assert(j.first.size() == j.second.size());
+  assert(! idx.size() || idx.size() == j.first.size());
+  T n2n(int(0));
+  T M2n(int(0));
+  for(int i = 0; i < j.first.size(); i ++)
+    n2n += j.first[i] * j.first[i];
+  for(int i = 0; i < j.second.size(); i ++)
+    M2n += j.second[i] * j.second[i];
+  const auto ridx(idx.size() ? idx[t % j.first.size()] : t % j.first.size());
+  const auto tt(t + 1);
+  const auto rridx(idx.size() ? idx[tt % j.first.size()] : tt % j.first.size());
+  const auto sq0(n2n - j.first[ridx] * j.first[ridx]);
+  const auto sqM(M2n - j.second[rridx] * j.second[rridx]);
+  const auto rd0( n2n == T(int(0)) || sq0 <= T(int(0)) ? T(int(0)) : d0 * sqrt(sq0 / n2n));
+  const auto absM(M2n == T(int(0)) || sqM <= T(int(0)) ? T(int(0)) :      sqrt(sqM / M2n));
+  return make_pair(
+    rd0  * (j.first[  ridx] == T(int(0)) ? T(int(1)) :
+      sgn<T>(j.first[  ridx] * (t & 1 ? T(1) : - T(1)) ) ),
+    absM * (j.second[rridx] == T(int(0)) ? T(int(1)) :
+      sgn<T>(j.second[rridx] * (t & 1 ? - T(1) : T(1)) ) ) );
+}
+
+template <typename T> class pslip_t {
+public:
+  inline pslip_t() {
+    pipe.resize(3 * 3 * 3 - 1);
+    {
+      vector<T> lM;
+      lM.resize(2, T(int(0)));
+      lastM.resize(27, lM);
+    }
+    pipe.resize(3 * 3 * 3 - 1);
+    std::random_device seed_gen;
+    std::mt19937 engine(seed_gen());
+    shf.resize(0);
+    shf.reserve(2);
+    for(int i = 0; i < 2; i ++)
+      shf.emplace_back(i);
+    std::shuffle(shf.begin(), shf.end(), engine);
+    nshf = shf;
+  }
+  vector<idFeeder<T> > pipe;
+  vector<vector<T> > lastM;
+  vector<int> shf;
+  vector<int> nshf;
+};
+
+// N.B. one of the bricks stack condition, so not unique and verbose to impl.
+// N.B. this aims to kill 'jammer-like-behaviour on input stream feedback'.
+template <typename T> static inline T pSlipJamQuad3(const SimpleVector<T>& in, vector<idFeeder<T> >& pipe, vector<vector<T> >& lastM, vector<int>& shf, vector<int>& nshf, const int& t) {
+  vector<vector<T> > apb;
+  vector<pair<T, T> > aq;
+  apb.reserve(3 * 3 * 3);
+  aq.reserve(3 * 3 * 3);
+
+  auto t0(t);
+#define UPDPSJQ3(inp,qinp,sec,i) \
+  apb.emplace_back(pbullet2(inp)); \
+  for(int k = 0; k < apb[(i)].size(); k ++) apb[(i)][k] *= (sec); \
+  aq.emplace_back(pSubesube<T>((qinp), make_pair(lastM[(i)], apb[(i)]), t0 = t));
+
+  UPDPSJQ3(in,in[in.size()-1],T(1),0);
+  
+  pipe[0].next(aq[0].first);
+  UPDPSJQ3(pipe[0].res,aq[0].first,aq[0].second,1);
+  aq[1].second *= aq[0].second;
+  
+  pipe[1].next(aq[1].first);
+  UPDPSJQ3(pipe[1].res,in[in.size()-1],aq[1].second,2);
+  
+  pipe[2].next(aq[2].first);
+  UPDPSJQ3(pipe[2].res,aq[2].first,aq[2].second,3);
+  aq[3].second *= aq[2].second;
+  
+  pipe[3].next(aq[3].first);
+  UPDPSJQ3(pipe[3].res,aq[3].first,aq[3].second,4);
+  aq[4].second *= aq[3].second;
+  
+  pipe[4].next(aq[4].first);
+  UPDPSJQ3(pipe[4].res,in[in.size()-1],aq[4].second,5);
+  
+  pipe[5].next(aq[5].first);
+  UPDPSJQ3(pipe[5].res,aq[5].first,aq[5].second,6);
+  aq[6].second *= aq[5].second;
+  
+  pipe[6].next(aq[6].first);
+  UPDPSJQ3(pipe[6].res,aq[6].first,aq[6].second,7);
+  aq[7].second *= aq[6].second;
+
+  pipe[7].next(aq[7].first);
+  UPDPSJQ3(pipe[7].res,in[in.size()-1],aq[7].second,8);
+  
+#if defined(_ARCFOUR_)
+  const auto tridx(arc4random() & 1);
+#else
+  const auto tridx(random() & 1);
+#endif
+#undef UPDPSJQ3
+#define UPDPSJQ3(inp,qinp,sec,i) \
+  apb.emplace_back(pbullet2(inp)); \
+  for(int k = 0; k < apb[(i)].size(); k ++) apb[(i)][k] *= (sec); \
+  aq.emplace_back(pSubesube<T>((qinp), make_pair(lastM[(i)], apb[(i)]), tridx));
+
+  pipe[8].next(aq[8].first);
+  UPDPSJQ3(pipe[8].res,aq[8].first,aq[8].second,9);
+  aq[9].second *= aq[8].second;
+
+  pipe[9].next(aq[9].first);
+  UPDPSJQ3(pipe[9].res,aq[9].first,aq[9].second,10);
+  aq[10].second *= aq[9].second;
+
+  pipe[10].next(aq[10].first);
+  UPDPSJQ3(pipe[10].res,aq[8].first,aq[10].second,11);
+  aq[11].second *= aq[8].second;
+
+  
+  pipe[11].next(aq[11].first);
+  UPDPSJQ3(pipe[11].res,aq[11].first,aq[11].second,12);
+  aq[12].second *= aq[11].second;
+
+  pipe[12].next(aq[12].first);
+  UPDPSJQ3(pipe[12].res,aq[12].first,aq[12].second,13);
+  aq[13].second *= aq[12].second;
+
+  pipe[13].next(aq[13].first);
+  UPDPSJQ3(pipe[13].res,aq[8].first,aq[13].second,14);
+  aq[14].second *= aq[8].second;
+
+
+  pipe[14].next(aq[14].first);
+  UPDPSJQ3(pipe[14].res,aq[14].first,aq[14].second,15);
+  aq[15].second *= aq[14].second;
+
+  pipe[15].next(aq[15].first);
+  UPDPSJQ3(pipe[15].res,aq[15].first,aq[15].second,16);
+  aq[16].second *= aq[15].second;
+
+  pipe[16].next(aq[16].first);
+//  UPDPSJQ3(pipe[16].res,aq[8].first,aq[16].second,17);
+//  aq[17].second *= aq[8].second;
+  UPDPSJQ3(pipe[16].res,in[in.size() - 1],aq[16].second,17);
+
+   
+  shf[(t + 1) % shf.size()] = nshf[(t + 1) % shf.size()];
+  if(! ((t + 2) % shf.size()) ) {
+    for(int i = 0; i < nshf.size(); i ++) nshf[i] = i;
+    std::random_device seed_gen;
+    std::mt19937 engine(seed_gen());
+    std::shuffle(nshf.begin(), nshf.end(), engine);
+  }
+#undef UPDPSJQ3
+#define UPDPSJQ3(inp,qinp,sec,i) \
+  apb.emplace_back(pbullet2(inp)); \
+  for(int k = 0; k < apb[(i)].size(); k ++) apb[(i)][k] *= (sec); \
+  aq.emplace_back(pSubesube<T>((qinp), make_pair(lastM[(i)], apb[(i)]), t0 = t, shf));
+
+  pipe[17].next(aq[17].first);
+  UPDPSJQ3(pipe[17].res,aq[17].first,aq[17].second,18);
+  aq[18].second *= aq[17].second;
+
+  pipe[18].next(aq[18].first);
+  UPDPSJQ3(pipe[18].res,aq[18].first,aq[18].second,19);
+  aq[19].second *= aq[18].second;
+  
+  pipe[19].next(aq[19].first);
+  UPDPSJQ3(pipe[19].res,aq[17].first,aq[19].second,20);
+  aq[20].second *= aq[17].second;
+
+
+  pipe[20].next(aq[20].first);
+  UPDPSJQ3(pipe[20].res,aq[20].first,aq[20].second,21);
+  aq[21].second *= aq[20].second;
+  
+  pipe[21].next(aq[21].first);
+  UPDPSJQ3(pipe[21].res,aq[21].first,aq[21].second,22);
+  aq[22].second *= aq[21].second;
+
+  pipe[22].next(aq[22].first);
+  UPDPSJQ3(pipe[22].res,aq[17].first,aq[22].second,23);
+  aq[23].second *= aq[17].second;
+
+
+  pipe[23].next(aq[23].first);
+  UPDPSJQ3(pipe[23].res,aq[23].first,aq[23].second,24);
+  aq[24].second *= aq[23].second;
+
+  pipe[24].next(aq[24].first);
+  UPDPSJQ3(pipe[24].res,aq[24].first,aq[24].second,25);
+  aq[25].second *= aq[24].second;
+
+  pipe[25].next(aq[25].first);
+//  UPDPSJQ3(pipe[25].res,aq[17].first,aq[25].second,26);
+//  aq[26].second *= aq[17].second;
+  UPDPSJQ3(pipe[25].res,in[in.size()-1],aq[25].second,26);
+  
+#undef UPDPSJQ3
+
+  assert(apb.size() == aq.size());
+  lastM = move(apb);
+  return aq[aq.size() - 1].second;
 }
 
 // N.B. start det diag operations.
@@ -5012,7 +5136,7 @@ template <typename T> bool loadobj(vector<SimpleVector<T> >& data, vector<Simple
   }
   return true;
 }
-  
+
 template <typename T> static inline bool saveMTL(const char* photo, const char* filename) {
   ofstream output;
   output.open(filename, std::ios::out);
@@ -5066,7 +5190,7 @@ template <typename T> static inline bool loaddat(const char* filename, string& h
   }
   return true;
 }
-  
+
 template <typename T> static inline bool savedat(const char* filename, string& header, vector<vector<T> >& data) {
   ofstream output;
   output.open(filename, std::ios::out);
@@ -5084,7 +5208,7 @@ template <typename T> static inline bool savedat(const char* filename, string& h
   }
   return true;
 }
-  
+
 template <typename T> static inline bool loadcenterr(vector<SimpleVector<T> >& center, vector<T>& r, const char* filename) {
   center = vector<SimpleVector<T> >();
   r      = vector<T>();
@@ -5735,7 +5859,6 @@ template <typename T> static inline vector<match_t<T> > matchPartial(const vecto
     m[i] = ~ m[i];
   return m;
 }
-
 
 template <typename T> static inline void drawMatchLine(SimpleMatrix<T>& map, const SimpleVector<T>& lref0, const SimpleVector<T>& lref1, const T& c) {
   int idxm(0);
@@ -6442,9 +6565,7 @@ public:
     this->dicts.resize(loop, vector<gram_t<U> >());
   }
   inline ~lword() { ; }
-  
   vector<gram_t<U> > compute(const U& input);
-
 private:
   inline bool       isin(const U& key) {
     assert(key.size() < dicts.size());
@@ -6454,7 +6575,6 @@ private:
     auto p(lower_bound(dict.begin(), dict.end(), key0));
     return dict.begin() <= p && p < dict.end() && p->str == key;
   }
-
   inline gram_t<U>& find(const U& key) {
     static gram_t<U> dummy;
     assert(key.size() < dicts.size());
@@ -6468,7 +6588,6 @@ private:
     }
     return *p;
   }
-
   inline void       assign(const gram_t<U>& val) {
     assert(val.str.size() < dicts.size());
     vector<gram_t<U> >& dict(dicts[val.str.size()]);
@@ -6489,7 +6608,6 @@ private:
       dict.erase(p);
     return;
   }
-
   vector<T>                   dict0;
   vector<vector<gram_t<U> > > dicts;
 };
@@ -6612,12 +6730,10 @@ public:
   typedef SimpleSparseTensor<T> Tensor;
 
   corpus(const U& input, const vector<U>& delimiter);
-
   inline corpus() { ; }
   inline corpus(const corpus<T, U>& other) { *this = other; }
   inline corpus(corpus<T, U>&& other) { *this = other; }
   inline ~corpus() { ; }
-
   inline U getAttributed(const vector<U>& highlight) const {
     U   result;
     int i;
@@ -7040,7 +7156,6 @@ template <typename T, typename U> U corpus<T, U>::serializeSub(const vector<int>
 template <typename T, typename U> pair<T, T> corpus<T, U>::compareStructure(const corpus<T, U>& src, const T& thresh, const T& thresh2) const {
   // get H-SVD singular values for each of them and sort:
   const auto s0(singularValues()), s1(src.singularValues());
-
   // get compared.
   pair<T, T> result;
   result.first = result.second = T(0);
@@ -7626,7 +7741,7 @@ template <typename T> static inline vector<T> cutText(const T& input, const vect
   return result;
 }
 
-static inline std::string utf8align(const std::string& tob) {
+static inline string utf8align(const string& tob) {
   int head = 0;
   while(head < tob.size() && (tob[head] & 0xc0) == 0x80) head ++;
   int tail = head;
@@ -7638,39 +7753,39 @@ static inline std::string utf8align(const std::string& tob) {
 }
 
 template <typename T, typename U> static inline void makelword(vector<U>& words, const U& input, const vector<U>& delimiter, const bool& show = false, const bool& utf8 = true, const int& limit = - 1) {
-  std::vector<gram_t<U> > found;
+  vector<gram_t<U> > found;
   const auto lwords(lword<char, U>(int(log(T(int(input.size() ))) / log(T(int(2)) ) )).compute(input));
   for(auto itr = lwords.begin(); itr != lwords.end(); ++ itr) {
     if(itr->rptr.size() < 2 && itr->str.size() < 3)
       continue;
-    const auto lb(std::lower_bound(found.begin(), found.end(), *itr));
+    const auto lb(lower_bound(found.begin(), found.end(), *itr));
     if(found.begin() <= lb && lb < found.end() && lb->str == itr->str)
       lb->rptr.insert(lb->rptr.end(), itr->rptr.begin(), itr->rptr.end());
     else
       found.emplace_back(*itr);
   }
   for(auto itr = found.begin(); itr != found.end(); ++ itr) {
-    std::sort(itr->rptr.begin(), itr->rptr.end());
-    itr->rptr.erase(std::unique(itr->rptr.begin(), itr->rptr.end()), itr->rptr.end());
+    sort(itr->rptr.begin(), itr->rptr.end());
+    itr->rptr.erase(unique(itr->rptr.begin(), itr->rptr.end()), itr->rptr.end());
   }
-  std::sort(found.begin(), found.end(), lessCount<U>);
-  found.erase(std::unique(found.begin(), found.end()), found.end());
+  sort(found.begin(), found.end(), lessCount<U>);
+  found.erase(unique(found.begin(), found.end()), found.end());
   if(0 < limit && limit < found.size()) found.resize(limit);
   words.reserve(words.size() + found.size());
   for(auto itr(found.begin()); itr < found.end(); ++ itr) {
     const auto tob(utf8 ? utf8align(itr->str) : itr->str);
     if(! tob.size()) continue;
     words.emplace_back(tob);
-    if(show) std::cout << tob << ", " << itr->rptr.size() << std::endl;
+    if(show) std::cout << tob << ", " << itr->rptr.size() << endl;
   }
-  std::sort(words.begin(), words.end());
-  words.erase(std::unique(words.begin(), words.end()), words.end());
+  sort(words.begin(), words.end());
+  words.erase(unique(words.begin(), words.end()), words.end());
   auto mydelim(delimiter);
   mydelim.insert(mydelim.end(), words.begin(), words.end());
   sort(mydelim.begin(), mydelim.end());
   auto inputs(cutText(input, words, mydelim));
-  std::sort(inputs.begin(), inputs.end());
-  inputs.erase(std::unique(inputs.begin(), inputs.end()), inputs.end());
+  sort(inputs.begin(), inputs.end());
+  inputs.erase(unique(inputs.begin(), inputs.end()), inputs.end());
   if(utf8)
     for(int i = 0; i < inputs.size(); i ++) {
       inputs[i] = utf8align(inputs[i]);
@@ -7678,11 +7793,11 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
     }
   else
     words.insert(words.end(), inputs.begin(), inputs.end());
-  std::sort(words.begin(), words.end());
-  words.erase(std::unique(words.begin(), words.end()), words.end());
+  sort(words.begin(), words.end());
+  words.erase(unique(words.begin(), words.end()), words.end());
   if(show)
     for(int i = 0; i < inputs.size(); i ++)
-      if(inputs[i].size()) std::cout << inputs[i] << ", 1" << std::endl;
+      if(inputs[i].size()) std::cout << inputs[i] << ", 1" << endl;
   return;
 }
 
@@ -7691,7 +7806,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 // (00) predictions via linear sum/diff based some reformation input and revert:
 //      it's all integrated skipX concerns, the jammer either jam out us
 //      even *ANY* reformation and revert them in which way.
-//      so it's integrated int *linear* meanings to reform prediction vector.
+//      so it's integrated into *linear* meanings to reform prediction vector.
 //      eg. PdeltaOnce, Ppersistent, Pprogression, (P0DFT).
 //      they goes well because timing-related concerns A_0 ... A_k B x_0
 //      made initial entropy and A'^k B' x_0 -> x_k structures.
@@ -7702,6 +7817,11 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 // (02) we eliminated predvall, we don't need them with whole internal states
 //      awared predictors they have a better prediction concerned with some
 //      series of a PRNG tests.
+// (03) arctanFeeder concerns intended to avoid some jammers.
+//      we shouldn't completely avoid the jammers by them because of the
+//      jammers' strategy can select *any* function.
+// (04) p2next: the p012next, p01next, p0...next integrator.
+//      it's verbose, we should target *thin-layered* ones they can grip stable.
 
 #define _SIMPLELIN_
 #endif

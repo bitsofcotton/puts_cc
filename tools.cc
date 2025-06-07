@@ -16,10 +16,6 @@
 typedef myfloat num_t;
 std::vector<std::string> words;
 
-std::vector<std::string> delimiter;
-std::vector<std::string> csvelim;
-std::vector<std::string> csvdelim;
-
 std::pair<std::string, std::string> loadbuf(const char* filename) {
   std::ifstream input;
   std::string   line;
@@ -54,6 +50,9 @@ int main(int argc, const char* argv[]) {
 #endif
 #define int int64_t
   std::string input, line;
+  std::vector<std::string> delimiter;
+  std::vector<std::string> csvelim;
+  std::vector<std::string> csvdelim;
   if(argc < 2) goto usage;
   delimiter.push_back(string("."));
   delimiter.push_back(string(","));
