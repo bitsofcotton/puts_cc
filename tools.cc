@@ -8,10 +8,11 @@
 #include <map>
 #include <algorithm>
 #include <cctype>
-#include <random>
 #include <assert.h>
 
 #define int int64_t
+#define _COMPILE_PUTS_
+#define _COMPILE_PRED_
 #include "lieonn.hh"
 typedef myfloat num_t;
 std::vector<std::string> words;

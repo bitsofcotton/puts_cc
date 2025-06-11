@@ -1,11 +1,14 @@
 CXX=	clang++
+#CXX=	c++
 
 # compiler flags.
 CXXFLAGS+=	-Oz -mtune=native -gfull
 #CXXFLAGS+=	-Ofast -mtune=native -gfull
 #CXXFLAGS+=	-O2 -mtune=native -g3
+#CXXFLAGS+=	-O2 -g3
 #CXXFLAGS+=	-pg
 CXXFLAGS+=	-std=c++11
+#CXXFLAGS+=	-std=gnu++98
 MPFLAGS=	-I/usr/local/include -L/usr/local/lib -lomp -fopenmp
 #MPFLAGS=	-I/usr/local/include -L/usr/local/lib -lgomp -fopenmp
 LDFLAGS+=	-lc++ -L/usr/local/lib
@@ -19,6 +22,9 @@ LDFLAGS+=	-lc++ -L/usr/local/lib
 #CXXFLAGS+=	-D_FLOAT_BITS_=512
 
 #CXXFLAGS+=	-D_ARCFOUR_
+
+# N.B. sed -e s/static\ inline//g | sed -e s/inline//g
+#CXXFLAGS+=     -D_OLDCPP_ -ftemplate-depth-99
 
 CLEANFILES= *.o puts putsmp puts32 puts32mp
 
