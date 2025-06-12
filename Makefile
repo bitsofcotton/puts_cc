@@ -21,10 +21,11 @@ LDFLAGS+=	-lc++ -L/usr/local/lib
 #CXXFLAGS+=	-D_FLOAT_BITS_=256
 #CXXFLAGS+=	-D_FLOAT_BITS_=512
 
-#CXXFLAGS+=	-D_ARCFOUR_
+CXXFLAGS+=	-D_ARCFOUR_
 
 # N.B. sed -e s/static\ inline//g | sed -e s/inline//g
 #CXXFLAGS+=     -D_OLDCPP_ -ftemplate-depth-99
+#LDFLAGS+=	-lm
 
 CLEANFILES= *.o puts putsmp puts32 puts32mp
 

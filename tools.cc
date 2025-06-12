@@ -10,9 +10,9 @@
 #include <cctype>
 #include <assert.h>
 
+#if !defined(_OLDCPP_)
 #define int int64_t
-#define _COMPILE_PUTS_
-#define _COMPILE_PRED_
+#endif
 #include "lieonn.hh"
 typedef myfloat num_t;
 std::vector<std::string> words;
@@ -44,12 +44,16 @@ std::pair<std::string, std::string> loadbuf(const char* filename) {
   return std::make_pair(name, inbuf);
 }
 
+#if !defined(_OLDCPP_)
 #undef int
+#endif
 int main(int argc, const char* argv[]) {
-#if defined(NOARCFOUR)
+#if !defined(_ARCFOUR_)
   srandom_dev();
 #endif
+#if !defined(_OLDCPP_)
 #define int int64_t
+#endif
   std::string input, line;
   std::vector<std::string> delimiter;
   std::vector<std::string> csvelim;
@@ -95,8 +99,8 @@ int main(int argc, const char* argv[]) {
   if(std::strcmp(argv[1], "lword") == 0)
     makelword<num_t, std::string>(words, input, delimiter, true, true, - 1);
   else if(std::strcmp(argv[1], "lbalance") == 0) {
-    const auto cinput(cutText(input, csvelim, delimiter));
-    const auto idxs(pseudoWordsBalance<double, std::string>(cinput, words));
+    const vector<string> cinput(cutText(input, csvelim, delimiter));
+    const vector<int> idxs(pseudoWordsBalance<num_t, std::string>(cinput, words));
     std::cout << idxs.size() << "sets." << std::endl;
     for(int i = 0; i < idxs.size(); i ++)
       std::cout << cinput[idxs[i]] << std::endl;
@@ -112,7 +116,7 @@ int main(int argc, const char* argv[]) {
         toc = true;
         continue;
       }
-      const auto work(loadbuf(argv[iidx]));
+      const pair<string, string> work(loadbuf(argv[iidx]));
       if(toc) {
         tocs.push_back(work.second);
         tocwords.push_back(work.first);
@@ -130,16 +134,16 @@ int main(int argc, const char* argv[]) {
     preparedTOC<num_t, std::string>(std::cout, input, detailwords, details, tocwords, tocs, delimiter, std::strcmp(argv[1], "lack") == 0);
     std::cout << std::endl << "<br/></body></html>";
   } else if(std::strcmp(argv[1], "reconstruct") == 0)
-    std::cout << corpus<double, std::string>(input, delimiter).serialize() << std::endl;
+    std::cout << corpus<num_t, std::string>(input, delimiter).serialize() << std::endl;
   else if(std::strcmp(argv[1], "redig") == 0) {
-    std::vector<double> emph;
+    std::vector<num_t> emph;
     emph.push_back(4.);
     emph.push_back(1.);
     emph.push_back(.25);
     const int szwindow(sqrt(num_t(int(input.size()))));
     for(int ei = 0; ei < emph.size(); ei ++) {
       for(int i = 0; i < input.size() / szwindow; i ++)
-        std::cout << corpus<double, std::string>(input.substr(i * szwindow, szwindow), delimiter).reDig(emph[ei]).serialize() << std::endl;
+        std::cout << corpus<num_t, std::string>(input.substr(i * szwindow, szwindow), delimiter).reDig(emph[ei]).serialize() << std::endl;
       std::cout << std::endl << std::endl;
     }
   } else if(std::strcmp(argv[1], "diff") == 0 ||
@@ -155,7 +159,7 @@ int main(int argc, const char* argv[]) {
         second = true;
         continue;
       }
-      const auto work(loadbuf(argv[iidx]));
+      const pair<string, string> work(loadbuf(argv[iidx]));
       if(second) {
         details2.push_back(work.second);
         detailwords2.push_back(work.first);
@@ -177,7 +181,7 @@ int main(int argc, const char* argv[]) {
     std::vector<std::string> rdetails;
     std::vector<std::string> rdetailwords;
     for(int iidx = 3; iidx < argc; iidx ++) {
-      const auto work(loadbuf(argv[iidx]));
+      const pair<string, string> work(loadbuf(argv[iidx]));
       rdetails.push_back(work.second);
       rdetailwords.push_back(work.first);
     }
@@ -192,7 +196,7 @@ int main(int argc, const char* argv[]) {
     std::vector<std::string> details;
     std::vector<std::string> detailwords;
     for(int iidx = 3; iidx < argc; iidx ++) {
-      const auto work(loadbuf(argv[iidx]));
+      const pair<string, string> work(loadbuf(argv[iidx]));
       details.push_back(work.second);
       detailwords.push_back(work.first);
     }
@@ -204,7 +208,7 @@ int main(int argc, const char* argv[]) {
     std::vector<std::string> buf;
     const int szwindow(sqrt(num_t(int(input.size()))));
     for(int i = 0; i < input.size() / szwindow + 1; i ++) {
-      const auto work(corpus<double, std::string>(input.substr(i * szwindow, std::min(szwindow, int(input.size()) - i * szwindow)), delimiter).reverseLink().first);
+      const vector<string> work(corpus<num_t, std::string>(input.substr(i * szwindow, std::min(szwindow, int(input.size()) - i * szwindow)), delimiter).reverseLink().first);
       buf.insert(buf.end(), work.begin(), work.end());
     }
     std::sort(buf.begin(), buf.end());

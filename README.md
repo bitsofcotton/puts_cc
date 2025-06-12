@@ -136,4 +136,5 @@ This repository is archived, so without bug report, will no change.
 2025/05/23 merge latest ddpmopt result as feed_much.
 2025/05/25 merge latest ddpmopt result.
 2025/06/08 merge latest ddpmopt result.
+2025/06/12 compat compile option with one variant of gcc2.95.3.
 
