@@ -37,6 +37,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // N.B. external linkage.
 extern std::vector<std::string> words;
 
+#if defined(_OLDCPP_)
+#define move 
+#define emplace_back push_back
+#else
 using std::max;
 using std::min;
 using std::abs;
@@ -45,10 +49,6 @@ using std::exp;
 using std::log;
 using std::isfinite;
 
-#if defined(_OLDCPP_)
-#define move 
-#define emplace_back push_back
-#else
 using std::move;
 #endif
 using std::swap;
@@ -111,8 +111,8 @@ public:
       *this = - *this;
   }
   inline DUInt(const DUInt<T,bits>& src) { *this = src; }
-  inline DUInt(const DUInt<DUInt<T,bits>,bits*2>& src) { *this = src; }
 #if !defined(_OLDCPP_)
+  inline DUInt(const DUInt<DUInt<T,bits>,bits*2>& src) { *this = src; }
   inline DUInt(DUInt<T,bits>&& src) { *this = src; }
 #endif
   inline ~DUInt() { ; }
@@ -282,10 +282,10 @@ public:
     e[0] = src.e[0]; e[1] = src.e[1];
     return *this;
   }
+#if !defined(_OLDCPP_)
   inline DUInt<T,bits>& operator =  (const DUInt<DUInt<T,bits>,bits*2>& src) {
     return *this = src.e[0];
   }
-#if !defined(_OLDCPP_)
   inline DUInt<T,bits>& operator =  (DUInt<T,bits>&& src) {
     e[0] = move(src.e[0]); e[1] = move(src.e[1]);
     return *this;
@@ -388,8 +388,8 @@ public:
     return dynamic_cast<const T&>(*this) != dynamic_cast<const T&>(src);
   }
   inline bool operator <  (const Signed<T,bits>& src) const {
-    const Signed<T,bits> mthis(int(*this >> (bits - 1)));
-    const Signed<T,bits> msrc( int(src   >> (bits - 1)));
+    const int mthis(int(*this >> (bits - 1)));
+    const int msrc( int(src   >> (bits - 1)));
     if(mthis ^ msrc) return mthis;
     if(mthis)
       return - dynamic_cast<const T&>(src) < - dynamic_cast<const T&>(*this);
@@ -1487,6 +1487,17 @@ template <typename T> static inline T ccot(const T& s) {
     #include <cmath>
     using namespace std;
 #  if defined(_OLDCPP_)
+    // N.B. too old c++ compilers we don't compile this should have:
+    //  * int32_t in operator ++ need to be replaced into int in this;
+    //  * reference type syntax is a little stricter.
+    //  * they don't admit variable definition in 'for' directive.
+    //  * same name different type template is restricted.
+    //  * in template struct::type isn't allowed.
+    //  * math.h definitions isn't included so we should implement them.
+    //  * random() isn't defined, use rand() instead of them;
+    //  * operator >> type match is also a little stricter.
+    //  typedef unsigned myuint;
+    //  typedef int myint;
     typedef uint32_t myuint;
     typedef int32_t myint;
     typedef double myfloat;
@@ -3890,6 +3901,7 @@ template <typename T, T (*p)(const SimpleVector<T>&)> static inline T deep(const
         T q(p(depth[j - 1].res));
         d *= q;
         depth[j].next(move(q));
+        // depth[j].next(unOffsetHalf<T>(move(q)));
       } else {
         T q(p(depth[j - 1].res));
         d = - (d -= q);
@@ -3904,9 +3916,16 @@ template <typename T, T (*p)(const SimpleVector<T>&)> static inline T deep(const
     if(! depth[j].full) continue;
     if(j & 1)
       M *= depth[j].res[depth[j].res.size() - 1];
+      // M *= offsetHalf<T>(depth[j].res[depth[j].res.size() - 1]);
     else
-      (M = - M) += depth[j].res[depth[j].res.size() - 1];
+      (M = - M) += unOffsetHalf<T>(depth[j].res[depth[j].res.size() - 1]);
   }
+  // N.B. the comment out code causes (...(in+1)*p/2-1/2+1)*q/2-1/2+1)*r...)
+  //      also the code causes (...(-((in+1)*p/2+q+1)/2*p'+q'+1)/2...)
+  //  the reverse of former makes a sense because it's only a pivoting.
+  //  the second one case also makes a sense forward conversion because
+  //  they're also a pivoting with sign reverse chain.
+  //  the reverse of second needs unOffsetHalf chain so we fixed this.
   return M;
 }
 
@@ -5740,7 +5759,7 @@ public:
     return *this;
   }
   inline T distance(const match_t<T>& other, const Vec& p) {
-    const match_t<T> d(transform(p) - other.transform(p));
+    const Vec d(transform(p) - other.transform(p));
     return sqrt(d.dot(d));
   }
   inline vector<Veci> hullConv(const vector<Veci>& srchull) const {
