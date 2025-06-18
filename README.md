@@ -137,4 +137,6 @@ This repository is archived, so without bug report, will no change.
 2025/05/25 merge latest ddpmopt result.
 2025/06/08 merge latest ddpmopt result.
 2025/06/12 compat compile option with one variant of gcc2.95.3.
+2025/06/17 merge latest ddpmopt fix.
+2025/06/19 merge latest ddpmopt fix.
 

@@ -1496,6 +1496,7 @@ template <typename T> static inline T ccot(const T& s) {
     //  * math.h definitions isn't included so we should implement them.
     //  * random() isn't defined, use rand() instead of them;
     //  * operator >> type match is also a little stricter.
+    //  * template in template is not admitted, so we should use another ones.
     //  typedef unsigned myuint;
     //  typedef int myint;
     typedef uint32_t myuint;
@@ -3900,8 +3901,7 @@ template <typename T, T (*p)(const SimpleVector<T>&)> static inline T deep(const
       if(j & 1) {
         T q(p(depth[j - 1].res));
         d *= q;
-        depth[j].next(move(q));
-        // depth[j].next(unOffsetHalf<T>(move(q)));
+        depth[j].next(unOffsetHalf<T>(move(q)));
       } else {
         T q(p(depth[j - 1].res));
         d = - (d -= q);
@@ -3915,17 +3915,13 @@ template <typename T, T (*p)(const SimpleVector<T>&)> static inline T deep(const
     //      (chain of the matrix multiplication causes weighted multiplication)
     if(! depth[j].full) continue;
     if(j & 1)
-      M *= depth[j].res[depth[j].res.size() - 1];
-      // M *= offsetHalf<T>(depth[j].res[depth[j].res.size() - 1]);
+      M *= offsetHalf<T>(depth[j].res[depth[j].res.size() - 1]);
     else
       (M = - M) += unOffsetHalf<T>(depth[j].res[depth[j].res.size() - 1]);
   }
-  // N.B. the comment out code causes (...(in+1)*p/2-1/2+1)*q/2-1/2+1)*r...)
-  //      also the code causes (...(-((in+1)*p/2+q+1)/2*p'+q'+1)/2...)
-  //  the reverse of former makes a sense because it's only a pivoting.
-  //  the second one case also makes a sense forward conversion because
-  //  they're also a pivoting with sign reverse chain.
-  //  the reverse of second needs unOffsetHalf chain so we fixed this.
+  // N.B. once we have incomplete offset reverse chain better than this.
+  //      however, we test now isn't. so we trust logical one.
+  //      so our numerical test isn't reliable any which on our environment.
   return M;
 }
 
