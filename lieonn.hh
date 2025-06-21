@@ -2803,9 +2803,11 @@ template <typename T> static inline SimpleMatrix<complex(T) > dft(const int& siz
       }
     }
     ofstream ocache(file.c_str());
-    ocache << edft;
-    ocache << eidft;
-    ocache.close();
+    if(ocache.is_open()) {
+      ocache << edft;
+      ocache << eidft;
+      ocache.close();
+    }
   }
   return size0 < 0 ? eidft : edft;
 }
@@ -2870,9 +2872,11 @@ template <typename T> static inline SimpleMatrix<T> diff(const int& size0) {
     dd =   (dft<T>(- size) * DD).template real<T>();
     ii = - (dft<T>(- size) * II).template real<T>();
     ofstream ocache(file.c_str());
-    ocache << dd;
-    ocache << ii;
-    ocache.close();
+    if(ocache.is_open()) {
+      ocache << dd;
+      ocache << ii;
+      ocache.close();
+    }
     cerr << "." << flush;
   }
   return size0 < 0 ? ii : dd;
@@ -4772,7 +4776,7 @@ template <typename T, int nprogress> SimpleVector<T> predvp(const vector<SimpleV
     for(int i = 0; i < in.size(); i ++)
       buf.next(in[i][j]);
     assert(buf.full);
-    p[j] = deep<T, p0maxNext<T> >(buf.res);
+    p[j] = (deep<T, p0maxNext<T> >(buf.res) - deep<T, p0maxNext<T> >(- buf.res)) / T(int(2));
   }
   return p;
 }
@@ -5426,8 +5430,10 @@ template <typename T> static inline SimpleMatrix<T> sharpen(const int& size) {
     }
     s = (dft<T>(- size) * dfts).template real<T>() / T(size - 1);
     ofstream ocache(file.c_str());
-    ocache << s;
-    ocache.close();
+    if(ocache.is_open()) {
+      ocache << s;
+      ocache.close();
+    }
     cerr << "." << flush;
   }
   return s;
