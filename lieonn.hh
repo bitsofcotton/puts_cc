@@ -90,7 +90,6 @@ using std::lower_bound;
 using std::unique;
 
 // --- N.B. start approximate Lie algebra on F_2^k. ---
-#if defined(_FLOAT_BITS_)
 // N.B. start ifloat
 // Double int to new int class.
 template <typename T, int bits> class DUInt {
@@ -328,6 +327,9 @@ public:
   inline                operator T    () const {
     return e[0];
   }
+  inline                operator double () const {
+    return double(e[0]) + double(e[1]) * pow(double(2), double(bits));
+  }
   friend istream& operator >> (istream& is, DUInt<T,bits>& v) {
     v ^= v;
     // skip white spaces.
@@ -404,6 +406,14 @@ public:
   inline bool operator >= (const Signed<T,bits>& src) const {
     return ! (*this < src);
   }
+  inline      operator double () const {
+    if(*this < Signed<T,bits>(T(int(0))) ) {
+      Signed<T,bits> mthis(- *this);
+      T work(dynamic_cast<const T&>(mthis));
+      return - double(work);
+    }
+    return double(dynamic_cast<const T&>(*this));
+  }
   friend ostream& operator << (ostream& os, Signed<T,bits> v) {
     const static Signed<T,bits> zero(0);
     if(v < zero) {
@@ -422,7 +432,7 @@ public:
     s |= (1 << NaN) | (1 << INF);
   }
   template <typename V> inline SimpleFloat(const V& src) {
-    const static V vzero(0);
+    const static V vzero(int(0));
     s ^= s;
     m  = T(int(src < vzero ? - src : src));
     e ^= e;
@@ -615,6 +625,10 @@ public:
   inline                  operator int  () const {
     return int(this->operator T());
   }
+  inline                  operator double () const {
+    return (s & (1 << SIGN) ? - double(m) * pow(double(2), double(e)) 
+                            :   double(m) * pow(double(2), double(e)) );
+  }
   inline                  operator T    () const {
     SimpleFloat<T,W,bits,U> deci(*this);
     if(deci.s & (1 << INF)) throw "Inf to convert int";
@@ -783,7 +797,7 @@ private:
   }
   friend istream& operator >> (istream& is, SimpleFloat<T,W,bits,U>& v) {
     const static SimpleFloat<T,W,bits,U> two(T(int(2)));
-                 SimpleFloat<T,W,bits,U> e(T(int(0)));
+                 T e(int(0));
     bool mode(false);
     bool sign(false);
     bool fsign(false);
@@ -829,20 +843,20 @@ private:
       case '0': case '1': case '2': case '3': case '4':
       case '5': case '6': case '7': case '8': case '9':
         if(mode) {
-          e <<= U(int(4));
-          e  += SimpleFloat<T,W,bits,U>(T(int(buf - '0')));
+          e <<= int(4);
+          e  += T(int(buf - '0'));
         } else {
-          v <<= U(int(4));
+          v <<= int(4);
           v  += SimpleFloat<T,W,bits,U>(T(int(buf - '0')));
         }
         fsign = true;
         break;
       case 'a': case'b': case 'c': case 'd': case 'e': case 'f':
         if(mode) {
-          e <<= U(int(4));
-          e  += SimpleFloat<T,W,bits,U>(T(int(buf - 'a' + 10)));
+          e <<= int(4);
+          e  += T(int(buf - 'a' + 10));
         } else {
-          v <<= U(int(4));
+          v <<= int(4);
           v  += SimpleFloat<T,W,bits,U>(T(int(buf - 'a' + 10)));
         }
         fsign = true;
@@ -854,11 +868,11 @@ private:
    ensure:
     if(sign) {
       if(mode)
-        e = - e;
+        v >>= U(e);
       else
         v = - v;
-    }
-    v *= pow(two, e);
+    } else if(mode)
+      v <<= U(e);
     return is;
   }
 };
@@ -1218,7 +1232,6 @@ template <typename T, typename W, int bits, typename U> static inline SimpleFloa
   }
   return exp(log(src) * dst);
 }
-#endif
 
 // N.B. start class complex part:
 template <typename T> class Complex {
@@ -1467,8 +1480,12 @@ template <typename T> static inline T ccot(const T& s) {
 }
 
 #if defined(_PERSISTENT_)
-# if _FLOAT_BITS_ == 16
-    typedef DUInt<uint8_t> myuint;
+# if ! defined(_FLOAT_BITS_)
+    typedef DUInt<size_t, sizeof(size_t) * 8> myuint;
+    typedef Signed<myuint, sizeof(size_t) * 16> myint;
+    typedef SimpleFloat<myuint, DUInt<myuint, sizeof(size_t) * 16>, sizeof(size_t) * 16, myint> myfloat;
+# elif _FLOAT_BITS_ == 16
+    typedef DUInt<uint8_t, 8> myuint;
     typedef Signed<myuint, 16> myint;
     typedef SimpleFloat<myuint, DUInt<myuint, 16>, 16, myint> myfloat;
 # elif _FLOAT_BITS_ == 32
@@ -1479,6 +1496,10 @@ template <typename T> static inline T ccot(const T& s) {
     typedef DUInt<uint32_t, 32> myuint;
     typedef Signed<myuint, 64> myint;
     typedef SimpleFloat<myuint, DUInt<myuint, 64>, 64, myint> myfloat;
+# elif _FLOAT_BITS_ == 128
+    typedef DUInt<uint64_t, 64> myuint;
+    typedef Signed<myuint, 128> myint;
+    typedef SimpleFloat<myuint, DUInt<myuint, 128>, 128, myint> myfloat;
 # else
 #   error cannot handle float
 # endif
@@ -2119,7 +2140,11 @@ public:
     return;
   }
   myfloat      epsilon() const {
-#if defined(_FLOAT_BITS_)
+#if defined(_PERSISTENT_) && ! defined(_FLOAT_BITS_)
+    // N.B. conservative.
+    static const myfloat eps(sqrt(myfloat(int(1)) >> myint((sizeof(size_t) * 16) - 1)));
+    // static const myfloat eps(myfloat(int(1)) >> myint((sizeof(size_t) * 16) - 1));
+#elif defined(_FLOAT_BITS_)
     // N.B. conservative.
     static const myfloat eps(sqrt(myfloat(int(1)) >> myint(_FLOAT_BITS_ - 1)));
     // static const myfloat eps(myfloat(int(1)) >> myint(_FLOAT_BITS_ - 1));
@@ -2750,7 +2775,9 @@ template <typename T> static inline SimpleMatrix<complex(T) > dft(const int& siz
   SimpleMatrix<complex(T) > edft( size, size);
   SimpleMatrix<complex(T) > eidft(size, size);
   const string file(string("./.cache/lieonn/dft-") + to_string(size) +
-#if defined(_FLOAT_BITS_)
+#if defined(_PERSISTENT_) && ! defined(_FLOAT_BITS_)
+    string("-") + to_string(sizeof(size_t) * 16)
+#elif defined(_FLOAT_BITS_)
     string("-") + to_string(_FLOAT_BITS_)
 #else
     string("-ld")
@@ -2792,7 +2819,9 @@ template <typename T> static inline SimpleMatrix<T> diff(const int& size0) {
   SimpleMatrix<T> dd;
   SimpleMatrix<T> ii;
   const string file(string("./.cache/lieonn/diff-") + to_string(size) +
-#if defined(_FLOAT_BITS_)
+#if defined(_PERSISTENT_) && ! defined(_FLOAT_BITS_)
+    string("-") + to_string(sizeof(size_t) * 16)
+#elif defined(_FLOAT_BITS_)
     string("-") + to_string(_FLOAT_BITS_)
 #else
     string("-ld")
@@ -4732,7 +4761,7 @@ template <typename T, int nprogress> SimpleVector<T> predvp(const vector<SimpleV
   for(int i = 0; i < in.size(); i ++)
     buf.next(in[i][0]);
   assert(buf.full);
-  p[0] = deep<T, p0maxNext<T> >(buf.res);
+  p[0] = (deep<T, p0maxNext<T> >(buf.res) - deep<T, p0maxNext<T> >(- buf.res)) / T(int(2));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -4897,29 +4926,18 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<Si
   const int size0(in0[0].size());
   const int size1(in0[0][0].size());
   in0.resize(0);
-  in = unOffsetHalf<T>(in);
-  for(int i = 0; i < in.size(); i ++)
-    in[i] = - in[i];
   vector<vector<SimpleVector<T> > > res;
-  res.resize(3);
+  res.resize(2);
   {
-    SimpleVector<T> p(predv<T, predvp<T, 20>, 0>(in));
+    SimpleVector<T> p(predv<T, predvp<T, 20>, 0>(unOffsetHalf<T>(in)));
     res[0].resize(size0);
     for(int j = 0; j < res[0].size(); j ++)
       res[0][j] = offsetHalf<T>(- p.subVector(size1 * j, size1));
   }
-  for(int i = 0; i < in.size(); i ++)
-    in[i] = - in[i];
-  {
-    SimpleVector<T> p(predv<T, predvp<T, 20>, 0>(in));
-    res[1].resize(size0);
-    for(int j = 0; j < res[1].size(); j ++)
-      res[1][j] = offsetHalf<T>(p.subVector(size1 * j, size1));
-  }
-  SimpleVector<T> p(predv<T, predvq<T, 20>, 0>(in = offsetHalf<T>(in)));
-  res[2].resize(size0);
-  for(int j = 0; j < res[2].size(); j ++)
-    res[2][j]  = p.subVector(size1 * j, size1);
+  SimpleVector<T> p(predv<T, predvq<T, 20>, 0>(in));
+  res[1].resize(size0);
+  for(int j = 0; j < res[1].size(); j ++)
+    res[1][j]  = p.subVector(size1 * j, size1);
   return res;
 }
 
@@ -4955,13 +4973,10 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<Si
   const int rows(in0[0][0].rows());
   const int cols(in0[0][0].cols());
   in0.resize(0);
-  in = unOffsetHalf<T>(in);
-  for(int i = 0; i < in.size(); i ++)
-    in[i] = - in[i];
   vector<vector<SimpleMatrix<T> > > res;
-  res.resize(3);
+  res.resize(2);
   {
-    SimpleVector<T> p(predv<T, predvp<T, 20>, 0>(in));
+    SimpleVector<T> p(predv<T, predvp<T, 20>, 0>(unOffsetHalf<T>(in)));
     res[0].resize(size);
     for(int j = 0; j < res[0].size(); j ++) {
       res[0][j].resize(rows, cols);
@@ -4969,23 +4984,12 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<Si
         res[0][j].row(k) = offsetHalf<T>(- p.subVector(j * rows * cols + k * cols, cols));
     }
   }
-  for(int i = 0; i < in.size(); i ++)
-    in[i] = - in[i];
-  {
-    SimpleVector<T> p(predv<T, predvp<T, 20>, 0>(in));
-    res[1].resize(size);
-    for(int j = 0; j < res[1].size(); j ++) {
-      res[1][j].resize(rows, cols);
-      for(int k = 0; k < rows; k ++)
-        res[1][j].row(k) = offsetHalf<T>(p.subVector(j * rows * cols + k * cols, cols));
-    }
-  }
-  SimpleVector<T> p(predv<T, predvq<T, 20>, 0>(in = offsetHalf<T>(in)));
-  res[2].resize(size);
-  for(int j = 0; j < res[2].size(); j ++) {
-    res[2][j].resize(rows, cols);
+  SimpleVector<T> p(predv<T, predvq<T, 20>, 0>(in));
+  res[1].resize(size);
+  for(int j = 0; j < res[1].size(); j ++) {
+    res[1][j].resize(rows, cols);
     for(int k = 0; k < rows; k ++)
-      res[2][j].row(k) = p.subVector(j * rows * cols + k * cols, cols);
+      res[1][j].row(k) = p.subVector(j * rows * cols + k * cols, cols);
   }
   return res;
 }
@@ -5026,12 +5030,9 @@ template <typename T> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSpars
   }
   in0.resize(0);
   vector<SimpleSparseTensor(T) > res;
-  res.resize(3);
-  in = unOffsetHalf<T>(in);
-  for(int i = 0; i < in.size(); i ++)
-    in[i] = - in[i];
+  res.resize(2);
   {
-    SimpleVector<T> p(predv<T, predvp<T, 20>, 0>(in));
+    SimpleVector<T> p(predv<T, predvp<T, 20>, 0>(unOffsetHalf<T>(in)));
     for(int j = 0, cnt = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
         for(int m = 0; m < idx.size(); m ++)
@@ -5039,24 +5040,13 @@ template <typename T> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSpars
                make_pair(j, make_pair(k, m))))
             res[0][idx[j]][idx[k]][idx[m]] = - p[cnt ++];
   }
-  for(int i = 0; i < in.size(); i ++)
-    in[i] = - in[i];
-  {
-    SimpleVector<T> p(predv<T, predvp<T, 20>, 0>(in));
-    for(int j = 0, cnt = 0; j < idx.size(); j ++)
-      for(int k = 0; k < idx.size(); k ++)
-        for(int m = 0; m < idx.size(); m ++)
-          if(binary_search(attend.begin(), attend.end(),
-               make_pair(j, make_pair(k, m))))
-            res[1][idx[j]][idx[k]][idx[m]] = p[cnt ++];
-  }
-  SimpleVector<T> p(predv<T, predvq<T, 20>, 0>(in = offsetHalf<T>(in)));
+  SimpleVector<T> p(predv<T, predvq<T, 20>, 0>(in));
   for(int j = 0, cnt = 0; j < idx.size(); j ++)
     for(int k = 0; k < idx.size(); k ++)
       for(int m = 0; m < idx.size(); m ++)
         if(binary_search(attend.begin(), attend.end(),
              make_pair(j, make_pair(k, m))))
-          res[2][idx[j]][idx[k]][idx[m]] = unOffsetHalf<T>(p[cnt ++]);
+          res[1][idx[j]][idx[k]][idx[m]] = unOffsetHalf<T>(p[cnt ++]);
   return res;
 }
 
@@ -5409,7 +5399,9 @@ template <typename T> static inline SimpleMatrix<T> sharpen(const int& size) {
   assert(0 < size);
   SimpleMatrix<T> s;
   const string file(string("./.cache/lieonn/sharpen-") + to_string(size) +
-#if defined(_FLOAT_BITS_)
+#if defined(_PERSISTENT_) && !defined(_FLOAT_BITS_)
+    string("-") + to_string(sizeof(size_t) * 16)
+#elif defined(_FLOAT_BITS_)
     string("-") + to_string(_FLOAT_BITS_)
 #else
     string("-ld")
