@@ -4877,9 +4877,6 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
 
 // N.B. however, we often get predv result as differ <~ abs(p - 1/2) * 2 result.
 //      if we're lucky enough, we face them in 1 bit on abs(p - 1/2) prediction.
-//      so we recursively do them as triple to get 3 bit including sign bit.
-//      also we take 2 of the prediction function to get 1 bit meaning for
-//      each prediction as a entropy source.
 template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), vector<SimpleVector<T> > (*q)(const vector<SimpleVector<T> >&, const string&) > vector<SimpleVector<T> > static inline pgoshigoshi(const vector<SimpleVector<T> >& in) {
   vector<vector<vector<SimpleVector<T> > > > hist;
   vector<vector<SimpleVector<T> > > work;
@@ -4909,19 +4906,18 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
       const int sizeq(min(tworkq.size(), max(int(in.size()) * (loop - 1 - i) / loop, int(2))) );
       nwork.emplace_back(tworkq.subVector(tworkq.size() - sizeq, sizeq).entity);
     }
-    for(int j = 0; j < nwork.size(); j ++) {
+    for(int j = 0; j < nwork.size(); j ++)
       for(int ii = 0; ii < nwork[j].size() - 1; ii ++)
         for(int jj = 0; jj < nwork[j][ii].size(); jj ++) {
           // 1 bit margin.
           T div(abs(unOffsetHalf<T>(work[j / 2][ii - nwork[j].size() + work[j / 2].size() + 1][jj] )));
           // fixed color depth 16-bit.
           if(div == T(int(0))) div = T(int(1)) / T(int(65536));
-          // 
+          // delta offset them with clip.
           nwork[j][ii][jj] = max(T(int(0)), min(T(int(1)), offsetHalf<T>(
             (work[j / 2][ii - nwork[j].size() + work[j / 2].size() + 1][jj] -
             nwork[j][ii][jj]) / div)));
         }
-    }
     if(i)
       for(int j = 0; j < nwork.size(); j ++)
         nwork[j].resize(nwork[j].size() - 1);
@@ -4936,7 +4932,7 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
     for(int j = hist.size() - 1; 0 < j; j --) {
       SimpleVector<T>& temp(hist[j][i >> (hist.size() - j)][hist[j][i >> (hist.size() - j)].size() - 1]);
       for(int k = 0; k < temp.size(); k ++)
-        res[i][k] += temp[k] * abs(unOffsetHalf<T>(res[i][k] - temp[k]));
+        res[i][k] += temp[k] * abs(res[i][k] - temp[k]);
     }
     res[i] /= T(hist.size());
   }
