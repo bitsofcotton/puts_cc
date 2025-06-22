@@ -1847,7 +1847,6 @@ public:
       if(c == ' ' || c == '\t') continue;
       else if(c == '\n') break;
       is.unget();
-      cerr << "XXX SimpleVector<T>::operator >> (\'\\n\')" << flush;
       break;
     }
     if(i < v.size()) {
@@ -2278,7 +2277,6 @@ public:
       const int c(is.get());
       if(c == ' ' || c == '\t') continue;
       else if(c == '\n') break;
-      cerr << "XXX SimpleMatrix<T>::operator >> (\'\\n\')" << flush;
       is.unget();
       break;
     }
@@ -4886,11 +4884,12 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   vector<vector<vector<SimpleVector<T> > > > hist;
   vector<vector<SimpleVector<T> > > work;
   work.emplace_back(in);
-  const int loop(min(int(in.size() / 14), int(4)));
-  if(loop < 4) {
+  // N.B. 1 bit for margin, 1 bit for sign, 1 bit per loop we made hypothesis.
+  const int loop(min(int(in.size() / 13), int(2)));
+  if(loop < 2) {
     static bool shown = false;
     if(! shown) {
-      cerr << "pgoshigoshi needs at least 56 input size to get better result." << endl;
+      cerr << "pgoshigoshi needs at least 26 input size to get better result." << endl;
       shown = true;
     }
   }
@@ -4914,13 +4913,13 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
       for(int ii = 0; ii < nwork[j].size() - 1; ii ++)
         for(int jj = 0; jj < nwork[j][ii].size(); jj ++) {
           // 1 bit margin.
-          T div(abs(unOffsetHalf<T>(work[j / 2][ii - nwork[j].size() + work[j / 2].size()][jj] )));
+          T div(abs(unOffsetHalf<T>(work[j / 2][ii - nwork[j].size() + work[j / 2].size() + 1][jj] )));
           // fixed color depth 16-bit.
           if(div == T(int(0))) div = T(int(1)) / T(int(65536));
           // 
           nwork[j][ii][jj] = max(T(int(0)), min(T(int(1)), offsetHalf<T>(
-            abs(work[j / 2][ii - nwork[j].size() + work[j / 2].size() + 1][jj] -
-               nwork[j][ii][jj]) )));
+            (work[j / 2][ii - nwork[j].size() + work[j / 2].size() + 1][jj] -
+            nwork[j][ii][jj]) / div)));
         }
     }
     if(i)
@@ -4933,9 +4932,12 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   res.reserve(work.size());
   for(int i = 0; i < work.size(); i ++) {
     assert(work[i].size());
-    res.emplace_back(move(work[i][work[i].size() - 1]));
-    for(int j = 1; j < hist.size(); j ++)
-      res[i] += hist[j][i >> (hist.size() - j)][hist[j][i >> (hist.size() - j)].size() - 1];
+    res.emplace_back(work[i][work[i].size() - 1]);
+    for(int j = hist.size() - 1; 0 < j; j --) {
+      SimpleVector<T>& temp(hist[j][i >> (hist.size() - j)][hist[j][i >> (hist.size() - j)].size() - 1]);
+      for(int k = 0; k < temp.size(); k ++)
+        res[i][k] += temp[k] * abs(unOffsetHalf<T>(res[i][k] - temp[k]));
+    }
     res[i] /= T(hist.size());
   }
   return move(res);
@@ -5113,15 +5115,13 @@ template <typename T> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSpars
   vector<SimpleVector<T> > pres(
     pgoshigoshi<T, predv<T, predvp<T, 20>, 0>, predv<T, predvq<T, 20>, 0> >(in));
   res.resize(pres.size());
-  for(int i = 0; i < res.size(); i ++) {
-    SimpleVector<T> p(predv<T, predvp<T, 20>, 0>(unOffsetHalf<T>(in)));
+  for(int i = 0; i < res.size(); i ++)
     for(int j = 0, cnt = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
         for(int m = 0; m < idx.size(); m ++)
           if(binary_search(attend.begin(), attend.end(),
                make_pair(j, make_pair(k, m))))
             res[i][idx[j]][idx[k]][idx[m]] = pres[i][cnt ++];
-  }
   return move(res);
 }
 
