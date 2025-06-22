@@ -4768,7 +4768,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > predvp(const vecto
   buf.res = unOffsetHalf<T>(buf.res);
   SimpleVector<T> work(offsetHalf<T>((deep0<T, p0maxNext<T> >(buf.res) - deep0<T, p0maxNext<T> >(- buf.res)) / T(int(2))));
   p.resize(work.size(), SimpleVector<T>(in[0].size()).O());
-  for(int i = 0; i < work.size(); i ++) p[i][0] = move(work[i]);
+  for(int i = 0; i < work.size(); i ++) p[i][0] = offsetHalf<T>(work[i]);
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -4783,7 +4783,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > predvp(const vecto
     SimpleVector<T> work(offsetHalf<T>((deep0<T, p0maxNext<T> >(buf.res) - deep0<T, p0maxNext<T> >(- buf.res)) / T(int(2))));
     assert(work.size() == p.size());
     for(int i = 0; i < work.size(); i ++)
-      p[i][j] = move(work[i]);
+      p[i][j] = offsetHalf<T>(work[i]);
   }
   return p;
 }
