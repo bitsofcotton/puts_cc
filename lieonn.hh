@@ -1866,9 +1866,6 @@ public:
   inline SimpleMatrix(const int& rows, const int& cols) {
     assert(0 <= rows && 0 <= cols);
     entity.resize(rows);
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
     for(int i = 0; i < entity.size(); i ++)
       entity[i].resize(cols);
     ecols = cols;
@@ -2132,9 +2129,6 @@ public:
     assert(0 <= rows && 0 <= cols);
     ecols = cols;
     entity.resize(rows);
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
     for(int i = 0; i < entity.size(); i ++)
       entity[i].resize(ecols);
     return;
@@ -3920,8 +3914,10 @@ private:
   int  t;
 };
  
-template <typename T, T (*p)(const SimpleVector<T>&)> static inline T deep(const SimpleVector<T>& in, const int& unit = 3) {
+template <typename T, T (*p)(const SimpleVector<T>&)> static inline SimpleVector<T> deep0(const SimpleVector<T>& in, const int& unit = 3) {
   assert(1 < unit);
+  SimpleVector<T> res;
+  res.entity.reserve(in.size() - unit);
   vector<idFeeder<T> > depth;
   depth.resize(in.size() / unit + 1, idFeeder<T>(unit));
   for(int i = 0; i < min(unit - 1, in.size()); i ++)
@@ -3940,22 +3936,28 @@ template <typename T, T (*p)(const SimpleVector<T>&)> static inline T deep(const
         d = - (d -= q);
         depth[j].next(offsetHalf<T>(move(q)));
       }
-  }
-  T M(int(0));
-  for(int j = depth.size() - 1; 0 < j; j --) {
-    // N.B. [[a, b], [- b, a]]^-1 == [[a, -b], [b, a]] / f(det(...))
-    //      we only stuck on sign of the result, multiply is better to stable.
-    //      (chain of the matrix multiplication causes weighted multiplication)
-    if(! depth[j].full) continue;
-    if(j & 1)
-      M *= offsetHalf<T>(depth[j].res[depth[j].res.size() - 1]);
-    else
-      (M = - M) += unOffsetHalf<T>(depth[j].res[depth[j].res.size() - 1]);
+    T M(int(0));
+    for(int j = depth.size() - 1; 0 < j; j --) {
+      // N.B. [[a, b], [- b, a]]^-1 == [[a, -b], [b, a]] / f(det(...))
+      //      we only stuck on sign of the result, multiply is better to stable.
+      //      (chain of the matrix multiplication causes weighted multiplication)
+      if(! depth[j].full) continue;
+      if(j & 1)
+        M *= offsetHalf<T>(depth[j].res[depth[j].res.size() - 1]);
+      else
+        (M = - M) += unOffsetHalf<T>(depth[j].res[depth[j].res.size() - 1]);
+    }
+    res.entity.emplace_back(move(M));
   }
   // N.B. once we have incomplete offset reverse chain better than this.
   //      however, we test now isn't. so we trust logical one.
   //      so our numerical test isn't reliable any which on our environment.
-  return M;
+  return move(res);
+}
+
+template <typename T, T (*p)(const SimpleVector<T>&)> static inline T deep(const SimpleVector<T>& in, const int& unit = 3) {
+  SimpleVector<T> res(deep0<T, p>(in, unit));
+  return res[res.size() - 1];
 }
 
 // N.B. jammer to the predictor to make grip or lose grip.
@@ -4759,13 +4761,16 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv0(const 
       p01next<T, true, true>(seconds / nseconds) * nseconds) );
 }
 
-template <typename T, int nprogress> SimpleVector<T> predvp(const vector<SimpleVector<T> >& in, const string& strloop) {
-  SimpleVector<T> p(in[0].size());
+template <typename T, int nprogress> vector<SimpleVector<T> > predvp(const vector<SimpleVector<T> >& in, const string& strloop) {
+  vector<SimpleVector<T> > p;
   idFeeder<T> buf(in.size());
   for(int i = 0; i < in.size(); i ++)
     buf.next(in[i][0]);
   assert(buf.full);
-  p[0] = (deep<T, p0maxNext<T> >(buf.res) - deep<T, p0maxNext<T> >(- buf.res)) / T(int(2));
+  buf.res = unOffsetHalf<T>(buf.res);
+  SimpleVector<T> work(offsetHalf<T>((deep0<T, p0maxNext<T> >(buf.res) - deep0<T, p0maxNext<T> >(- buf.res)) / T(int(2))));
+  p.resize(work.size(), SimpleVector<T>(in[0].size()).O());
+  for(int i = 0; i < work.size(); i ++) p[i][0] = move(work[i]);
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -4776,12 +4781,16 @@ template <typename T, int nprogress> SimpleVector<T> predvp(const vector<SimpleV
     for(int i = 0; i < in.size(); i ++)
       buf.next(in[i][j]);
     assert(buf.full);
-    p[j] = (deep<T, p0maxNext<T> >(buf.res) - deep<T, p0maxNext<T> >(- buf.res)) / T(int(2));
+    buf.res = unOffsetHalf<T>(buf.res);
+    SimpleVector<T> work(offsetHalf<T>((deep0<T, p0maxNext<T> >(buf.res) - deep0<T, p0maxNext<T> >(- buf.res)) / T(int(2))));
+    assert(work.size() == p.size());
+    for(int i = 0; i < work.size(); i ++)
+      p[i][j] = move(work[i]);
   }
   return p;
 }
 
-template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleVector<T> >& in, const string& strloop) {
+template <typename T, int nprogress> vector<SimpleVector<T> > predvq(const vector<SimpleVector<T> >& in, const string& strloop) {
   static const int step(1);
   assert(0 < step && 10 + step * 2 <= in.size() && 1 < in[0].size());
   // N.B. we use whole width to get better result in average.
@@ -4790,36 +4799,42 @@ template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleV
   //      O((length*pixel*accuracy)^2) for each pixel bit even also any of
   //      the contexts they can have implementation.
   SimpleVector<SimpleVector<T> > p;
-  SimpleVector<T> res(in[0].size());
+  vector<SimpleVector<T> > res;
   p.entity.reserve(in.size());
   const int start(8 + step);
+  res.resize(in.size() - (start + step), SimpleVector<T>(in[0].size()).O());
   for(int i = 1; i < start; i ++)
     p.entity.emplace_back(SimpleVector<T>(in[0].size()).O());
   for(int i = start; i <= in.size(); i ++)
     p.entity.emplace_back(predv0<T, nprogress>(in, i, to_string(i) + string(" / ") + to_string(in.size()) + strloop));
-  SimpleMatrix<T> ip(res.size(), p.size());
+  SimpleMatrix<T> ip(res[0].size(), p.size());
   ip.O();
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = start + step; i < p.size(); i ++) {
-    for(int j = 0; j < res.size(); j ++)
+    for(int j = 0; j < res[0].size(); j ++)
       ip(j, i) = unOffsetHalf<T>(in[i - p.size() + in.size()][j]) *
         unOffsetHalf<T>(p[i - step][j]);
   }
   // N.B. dftcache need to be single thread on first call.
   // N.B. we bet orthogonal function phenomenon causes measurement condition
   //      increase (0 <= vector condition with prediction walk).
-  res[0] = offsetHalf<T>(p0maxNext<T>(ip.row(0)) *
-    unOffsetHalf<T>(p[p.size() - 1][0]) );
+  for(int j = start + step; j < res.size(); j ++)
+    res[j - (start + step)][0] =
+      offsetHalf<T>(p0maxNext<T>(ip.row(0).subVector(0,
+          j - in.size() + ip.cols() + 1)) *
+        unOffsetHalf<T>(p[j - in.size() + p.size()][0]) );
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int i = 1; i < res.size(); i ++) {
-    res[i] = offsetHalf<T>(p0maxNext<T>(ip.row(i)) *
-      unOffsetHalf<T>(p[p.size() - 1][i]) );
+  for(int i = 1; i < res[0].size(); i ++) {
+    for(int j = start + step; j < res.size(); j ++)
+      res[j - (start + step)][i] = offsetHalf<T>(p0maxNext<T>(
+        ip.row(i).subVector(0, j - in.size() + ip.cols() + 1)) *
+          unOffsetHalf<T>(p[j - in.size() + p.size()][i]) );
   }
-  return res;
+  return move(res);
 }
 
 // N.B. we apply PRNGs before to predict each of prediction in general.
@@ -4837,10 +4852,9 @@ template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleV
 //      we suppose phase period doesn't connected to the original structures.
 // N.B. practically, nrecur == 0 works well with ddpmopt T cmd, we use this.
 //      we don't select better nrecur == 11 * 11 we need huge computation time.
-template <typename T, SimpleVector<T> (*p)(const vector<SimpleVector<T> >&, const string&), int nrecur> SimpleVector<T> static inline predv(const vector<SimpleVector<T> >& in) {
-  if(! nrecur) return p(in, string(", 0 / 1"));
-  SimpleVector<T> res(in[0].size());
-  res.O();
+template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), int nrecur> vector<SimpleVector<T> > static inline predv(const vector<SimpleVector<T> >& in, const string& strloop) {
+  if(! nrecur) return p(in, string(", 0 / 1") + strloop);
+  vector<SimpleVector<T> > res;
   for(int i0 = 0; i0 < nrecur; i0 ++) {
     vector<SimpleVector<T> > rin(in);
     for(int i = 0; i < rin.size(); i ++)
@@ -4851,9 +4865,80 @@ template <typename T, SimpleVector<T> (*p)(const vector<SimpleVector<T> >&, cons
         rin[i][j] = (rin[i][j] + T(random() % 0x20000) / T(0x20000 - 1)) / T(int(2));
 #endif
     // N.B. PRNG parts going to gray + small noise with large enough nrecur.
-    res += p(rin, string(", ") + to_string(i0) + string(" / ") + to_string(nrecur));
+    if(res.size()) {
+      vector<SimpleVector<T> > work(p(rin, string(", ") + to_string(i0) + string(" / ") + to_string(nrecur) + strloop));
+      assert(res.size() == work.size());
+      for(int j = 0; j < work.size(); j ++)
+        res[j] += work[j];
+    } else
+      res = p(rin, string(", ") + to_string(i0) + string(" / ") + to_string(nrecur) + strloop);
   }
-  return res /= T(nrecur);
+  for(int i = 0; i < res.size(); i ++) res[i] /= T(nrecur);
+  return move(res);
+}
+
+// N.B. however, we often get predv result as differ <~ abs(p - 1/2) * 2 result.
+//      if we're lucky enough, we face them in 1 bit on abs(p - 1/2) prediction.
+//      so we recursively do them as triple to get 3 bit including sign bit.
+//      also we take 2 of the prediction function to get 1 bit meaning for
+//      each prediction as a entropy source.
+template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), vector<SimpleVector<T> > (*q)(const vector<SimpleVector<T> >&, const string&) > vector<SimpleVector<T> > static inline pgoshigoshi(const vector<SimpleVector<T> >& in) {
+  vector<vector<vector<SimpleVector<T> > > > hist;
+  vector<vector<SimpleVector<T> > > work;
+  work.emplace_back(in);
+  const int loop(min(int(in.size() / 14), int(4)));
+  if(loop < 4) {
+    static bool shown = false;
+    if(! shown) {
+      cerr << "pgoshigoshi needs at least 56 input size to get better result." << endl;
+      shown = true;
+    }
+  }
+  for(int i = 0; i < loop; i ++) {
+    vector<vector<SimpleVector<T> > > nwork;
+    nwork.reserve(8);
+    for(int j = 0; j < work.size(); j ++) {
+      vector<SimpleVector<T> > tempp(p(work[j], string(", ") + to_string(j) + " / " + to_string(work.size()) + string(", ") + to_string(i) + string(" / ") + to_string(loop)));
+      SimpleVector<SimpleVector<T> > tworkp;
+      tworkp.entity = move(tempp);
+      const int sizep(min(tworkp.size(), max(int(in.size()) * (loop - 1 - i) / loop, int(2))) );
+      nwork.emplace_back(tworkp.subVector(tworkp.size() - sizep, sizep).entity);
+      
+      vector<SimpleVector<T> > tempq(q(work[j], string(", ") + to_string(j) + " / " + to_string(work.size()) + string(", ") + to_string(i) + string(" / ") + to_string(loop)));
+      SimpleVector<SimpleVector<T> > tworkq;
+      tworkq.entity = move(tempq);
+      const int sizeq(min(tworkq.size(), max(int(in.size()) * (loop - 1 - i) / loop, int(2))) );
+      nwork.emplace_back(tworkq.subVector(tworkq.size() - sizeq, sizeq).entity);
+    }
+    for(int j = 0; j < nwork.size(); j ++) {
+      for(int ii = 0; ii < nwork[j].size() - 1; ii ++)
+        for(int jj = 0; jj < nwork[j][ii].size(); jj ++) {
+          // 1 bit margin.
+          T div(abs(unOffsetHalf<T>(work[j / 2][ii - nwork[j].size() + work[j / 2].size()][jj] )));
+          // fixed color depth 16-bit.
+          if(div == T(int(0))) div = T(int(1)) / T(int(65536));
+          // 
+          nwork[j][ii][jj] = max(T(int(0)), min(T(int(1)), offsetHalf<T>(
+            abs(work[j / 2][ii - nwork[j].size() + work[j / 2].size() + 1][jj] -
+               nwork[j][ii][jj]) )));
+        }
+    }
+    if(i)
+      for(int j = 0; j < nwork.size(); j ++)
+        nwork[j].resize(nwork[j].size() - 1);
+    hist.emplace_back(move(work));
+    work = move(nwork);
+  }
+  vector<SimpleVector<T> > res;
+  res.reserve(work.size());
+  for(int i = 0; i < work.size(); i ++) {
+    assert(work[i].size());
+    res.emplace_back(move(work[i][work[i].size() - 1]));
+    for(int j = 1; j < hist.size(); j ++)
+      res[i] += hist[j][i >> (hist.size() - j)][hist[j][i >> (hist.size() - j)].size() - 1];
+    res[i] /= T(hist.size());
+  }
+  return move(res);
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
@@ -4931,18 +5016,15 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<Si
   const int size1(in0[0][0].size());
   in0.resize(0);
   vector<vector<SimpleVector<T> > > res;
-  res.resize(2);
-  {
-    SimpleVector<T> p(predv<T, predvp<T, 20>, 0>(unOffsetHalf<T>(in)));
-    res[0].resize(size0);
+  vector<SimpleVector<T> > pres(
+    pgoshigoshi<T, predv<T, predvp<T, 20>, 0>, predv<T, predvq<T, 20>, 0> >(in));
+  res.resize(pres.size());
+  for(int i = 0; i < res.size(); i ++) {
+    res[i].resize(size0);
     for(int j = 0; j < res[0].size(); j ++)
-      res[0][j] = offsetHalf<T>(- p.subVector(size1 * j, size1));
+      res[i][j] = pres[i].subVector(size1 * j, size1);
   }
-  SimpleVector<T> p(predv<T, predvq<T, 20>, 0>(in));
-  res[1].resize(size0);
-  for(int j = 0; j < res[1].size(); j ++)
-    res[1][j]  = p.subVector(size1 * j, size1);
-  return res;
+  return move(res);
 }
 
 template <typename T> static inline vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
@@ -4978,24 +5060,18 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<Si
   const int cols(in0[0][0].cols());
   in0.resize(0);
   vector<vector<SimpleMatrix<T> > > res;
-  res.resize(2);
-  {
-    SimpleVector<T> p(predv<T, predvp<T, 20>, 0>(unOffsetHalf<T>(in)));
-    res[0].resize(size);
+  vector<SimpleVector<T> > pres(
+    pgoshigoshi<T, predv<T, predvp<T, 20>, 0>, predv<T, predvq<T, 20>, 0> >(in));
+  res.resize(pres.size());
+  for(int i = 0; i < res.size(); i ++) {
+    res[i].resize(size);
     for(int j = 0; j < res[0].size(); j ++) {
-      res[0][j].resize(rows, cols);
+      res[i][j].resize(rows, cols);
       for(int k = 0; k < rows; k ++)
-        res[0][j].row(k) = offsetHalf<T>(- p.subVector(j * rows * cols + k * cols, cols));
+        res[i][j].row(k) = pres[i].subVector(j * rows * cols + k * cols, cols);
     }
   }
-  SimpleVector<T> p(predv<T, predvq<T, 20>, 0>(in));
-  res[1].resize(size);
-  for(int j = 0; j < res[1].size(); j ++) {
-    res[1][j].resize(rows, cols);
-    for(int k = 0; k < rows; k ++)
-      res[1][j].row(k) = p.subVector(j * rows * cols + k * cols, cols);
-  }
-  return res;
+  return move(res);
 }
 
 template <typename T> static inline vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
@@ -5034,24 +5110,19 @@ template <typename T> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSpars
   }
   in0.resize(0);
   vector<SimpleSparseTensor(T) > res;
-  res.resize(2);
-  {
+  vector<SimpleVector<T> > pres(
+    pgoshigoshi<T, predv<T, predvp<T, 20>, 0>, predv<T, predvq<T, 20>, 0> >(in));
+  res.resize(pres.size());
+  for(int i = 0; i < res.size(); i ++) {
     SimpleVector<T> p(predv<T, predvp<T, 20>, 0>(unOffsetHalf<T>(in)));
     for(int j = 0, cnt = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
         for(int m = 0; m < idx.size(); m ++)
           if(binary_search(attend.begin(), attend.end(),
                make_pair(j, make_pair(k, m))))
-            res[0][idx[j]][idx[k]][idx[m]] = - p[cnt ++];
+            res[i][idx[j]][idx[k]][idx[m]] = pres[i][cnt ++];
   }
-  SimpleVector<T> p(predv<T, predvq<T, 20>, 0>(in));
-  for(int j = 0, cnt = 0; j < idx.size(); j ++)
-    for(int k = 0; k < idx.size(); k ++)
-      for(int m = 0; m < idx.size(); m ++)
-        if(binary_search(attend.begin(), attend.end(),
-             make_pair(j, make_pair(k, m))))
-          res[1][idx[j]][idx[k]][idx[m]] = unOffsetHalf<T>(p[cnt ++]);
-  return res;
+  return move(res);
 }
 
 template <typename T> static inline vector<SimpleMatrix<T> > rgb2xyz(const vector<SimpleMatrix<T> >& rgb) {
