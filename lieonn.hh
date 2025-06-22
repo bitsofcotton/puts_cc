@@ -4818,19 +4818,19 @@ template <typename T, int nprogress> vector<SimpleVector<T> > predvq(const vecto
   // N.B. dftcache need to be single thread on first call.
   // N.B. we bet orthogonal function phenomenon causes measurement condition
   //      increase (0 <= vector condition with prediction walk).
-  for(int j = start + step; j < res.size(); j ++)
-    res[j - (start + step)][0] =
+  for(int j = 0; j < res.size(); j ++)
+    res[j][0] =
       offsetHalf<T>(p0maxNext<T>(ip.row(0).subVector(0,
-          j - in.size() + ip.cols() + 1)) *
-        unOffsetHalf<T>(p[j - in.size() + p.size()][0]) );
+          j - res.size() + ip.cols() + 1)) *
+        unOffsetHalf<T>(p[j - res.size() + p.size()][0]) );
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 1; i < res[0].size(); i ++) {
-    for(int j = start + step; j < res.size(); j ++)
-      res[j - (start + step)][i] = offsetHalf<T>(p0maxNext<T>(
-        ip.row(i).subVector(0, j - in.size() + ip.cols() + 1)) *
-          unOffsetHalf<T>(p[j - in.size() + p.size()][i]) );
+    for(int j = 0; j < res.size(); j ++)
+      res[j][i] = offsetHalf<T>(p0maxNext<T>(
+        ip.row(i).subVector(0, j - res.size() + ip.cols() + 1)) *
+          unOffsetHalf<T>(p[j - res.size() + p.size()][i]) );
   }
   return move(res);
 }
