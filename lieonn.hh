@@ -1530,8 +1530,7 @@ template <typename T> static inline T ccot(const T& s) {
 #  else
     typedef uint64_t myuint;
     typedef int64_t  myint;
-    // XXX:
-    // typedef long double myfloat;
+    // XXX: typedef long double myfloat;
     typedef double myfloat;
 #  endif
 # elif _FLOAT_BITS_ == 8
@@ -1580,7 +1579,7 @@ template <typename T> static inline T ccot(const T& s) {
     typedef uint1024_t myuint;
     typedef int1024_t  myint;
     typedef SimpleFloat<myuint, DUInt<myuint, 1024>, 1024, myint> myfloat;
-#e lif _FLOAT_BITS_ == 2048
+# elif _FLOAT_BITS_ == 2048
     typedef DUInt<uint64_t, 64> uint128_t;
     typedef DUInt<uint128_t, 128> uint256_t;
     typedef DUInt<uint256_t, 256> uint512_t;
@@ -2661,7 +2660,7 @@ template <typename T> static inline SimpleMatrix<T> logSym(const SimpleMatrix<T>
   SimpleVector<T> Lawork(Ux.rows());
   Lawork.O();
   for(int i = 0; i < Lawork.size(); i ++)
-    // XXX:
+    // XXX stub:
     Lawork[i] = log(Lx(i, i) / Lb(i / (x.rows() / b.rows())));
   // N.B. Lawork.subVector... == another subVector in Ua diag(La) Uat condition.
   // XXX: might be a wrong method.
@@ -2679,7 +2678,7 @@ template <typename T> static inline SimpleMatrix<T> logSym(const SimpleMatrix<T>
   Ux  = Ub.inverse()  * Ux;
   Uxt = Ubt.inverse() * Uxt;
   // N.B. Ux == Ua sqrt(diag(Lawork)) and same on right side.
-  // XXX:
+  // XXX stub:
     assert(0 && "log (symmetric matrix A, symmetric matrix B) : stub");
   return x;
 }
@@ -2699,8 +2698,7 @@ template <typename T> static inline SimpleMatrix<T> exp01(const SimpleMatrix<T>&
 template <typename T> static inline SimpleMatrix<T> exp(const SimpleMatrix<T>& m) {
   const T p0(ceil(sqrt(norm2M(m))));
 #if defined(_FLOAT_BITS_)
-  // XXX:
-  // myuint p(p0.operator myint());
+  // XXX: myuint p(p0.operator myint());
   myuint p(p0);
 #else
   myuint p(p0);
@@ -2898,6 +2896,7 @@ template <typename T> static inline SimpleVector<complex(T) > taylorc(const int&
           / complexctor(T)(T(int(0)), - T(int(2)) * Pi * T(i) / T(res.size()) ) :
         complexctor(T)(T(int(0))) )
       : exp(complexctor(T)(T(int(0)), - T(int(2)) * Pi * T(i) * residue / T(res.size()) ));
+  // cf. integrate layer + exp phase shift layer + dft layer == 3 layers.
   return dft<T>(size).transpose() * res;
 }
 
@@ -3382,6 +3381,23 @@ static inline int ind2vd(const int& indim) {
   return max(-- varlen, int(4));
 }
 
+static inline const vector<int>& pnTinySingle(const int& upper = int(1)) {
+  static vector<int> pn;
+  if(! pn.size()) pn.emplace_back(2);
+  pn.reserve(upper);
+  for(int i = pn.size(); i < upper; i ++) {
+    for(int j = pn[pn.size() - 1] + 1; 0 <= j; j ++) {
+      for(int k = 0; k < pn.size(); k ++)
+        if(! (j % pn[k])) goto next_pn;
+      pn.emplace_back(j);
+      break;
+     next_pn:
+      ;
+    }
+  }
+  return pn;
+}
+
 template <typename T> static inline SimpleVector<T> minsq(const int& size) {
   assert(1 < size);
   const T xsum(size * (size - 1) / 2);
@@ -3792,6 +3808,7 @@ template <typename T> T p0max0next(const SimpleVector<T>& in) {
   //      even if the parameter on P0 is large, situation unchange.
   // N.B. however, sectional measurement can be jammed as normally.
   //      so cutting by sliding window with statistical one goes better handle.
+  // cf.  we stack 2+1 layered on rooting plain p0next.
   return (sumCNext<T, true, p0next<T> >(in) +
     invNext<T, sumCNext<T, true, p0next<T> > >(in)) / T(int(2));
 }
@@ -3799,6 +3816,7 @@ template <typename T> T p0max0next(const SimpleVector<T>& in) {
 template <typename T> T p0maxNext(const SimpleVector<T>& in) {
   // N.B. we only handle lebesgue measurable and R(finite)-valued functions.
   //      so worse structures are handled by p01next.
+  // cf.  we stack 3 layers on rooting plain p0max0next.
   return sumCNext<T, true, sumCNext<T, false, northPoleNext<T, p0max0next<T> > > >(in);
   // N.B. plain complex form.
   // return sumCNext<T, true, sumCNext<T, false, logCNext<T, logCNext<T, northPoleNext<T, p0max0next<T> > > > > >(in);
@@ -3832,6 +3850,7 @@ template <typename T, const bool cultivated, const bool nonlinear> T p01next(con
   const T nin(sqrt(in.dot(in) * (one + SimpleMatrix<T>().epsilon())));
   if(! isfinite(nin) || nin == zero) return zero;
   const int varlen(ind2vd(in.size()));
+  // cf.  2nd layered invariant calculation + recursive layer == 3 layered.
   // N.B. we use whole data information size on each single layer's size.
   SimpleMatrix<T> invariants(cultivated ?
       (in.size() / (varlen + 1) < 8 + step ? 1 : in.size() / (varlen + 1)) : 1,
@@ -4877,12 +4896,12 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
 
 // N.B. however, we often get predv result as differ <~ abs(p - 1/2) * 2 result.
 //      if we're lucky enough, we face them in 1 bit on abs(p - 1/2) prediction.
-template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), vector<SimpleVector<T> > (*q)(const vector<SimpleVector<T> >&, const string&) > vector<SimpleVector<T> > static inline pgoshigoshi(const vector<SimpleVector<T> >& in) {
+template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), vector<SimpleVector<T> > (*q)(const vector<SimpleVector<T> >&, const string&) > vector<SimpleVector<T> > static inline pgoshigoshi(const vector<SimpleVector<T> >& in, const string& strloop) {
   vector<vector<vector<SimpleVector<T> > > > hist;
   vector<vector<SimpleVector<T> > > work;
   work.emplace_back(in);
   // N.B. 1 bit for margin, 1 bit for sign, 1 bit per loop we made hypothesis.
-  const int loop(min(int(in.size() / 13), int(2)));
+  const int loop(max(int(1), min(int(in.size() / 13), int(2))));
   if(loop < 2) {
     static bool shown = false;
     if(! shown) {
@@ -4894,13 +4913,13 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
     vector<vector<SimpleVector<T> > > nwork;
     nwork.reserve(8);
     for(int j = 0; j < work.size(); j ++) {
-      vector<SimpleVector<T> > tempp(p(work[j], string(", ") + to_string(j) + " / " + to_string(work.size()) + string(", ") + to_string(i) + string(" / ") + to_string(loop)));
+      vector<SimpleVector<T> > tempp(p(work[j], string(", ") + to_string(j) + " / " + to_string(work.size()) + string(", ") + to_string(i) + string(" / ") + to_string(loop) + strloop));
       SimpleVector<SimpleVector<T> > tworkp;
       tworkp.entity = move(tempp);
       const int sizep(min(tworkp.size(), max(int(in.size()) * (loop - 1 - i) / loop, int(2))) );
       nwork.emplace_back(tworkp.subVector(tworkp.size() - sizep, sizep).entity);
       
-      vector<SimpleVector<T> > tempq(q(work[j], string(", ") + to_string(j) + " / " + to_string(work.size()) + string(", ") + to_string(i) + string(" / ") + to_string(loop)));
+      vector<SimpleVector<T> > tempq(q(work[j], string(", ") + to_string(j) + " / " + to_string(work.size()) + string(", ") + to_string(i) + string(" / ") + to_string(loop) + strloop));
       SimpleVector<SimpleVector<T> > tworkq;
       tworkq.entity = move(tempq);
       const int sizeq(min(tworkq.size(), max(int(in.size()) * (loop - 1 - i) / loop, int(2))) );
@@ -4937,6 +4956,25 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
     res[i] /= T(hist.size());
   }
   return move(res);
+}
+
+template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), bool skipx> vector<SimpleVector<T> > static inline pskipp(vector<SimpleVector<T> >& in, const string& strloop) {
+  const vector<int>& pnt(pnTinySingle(int(in.size() / 2)));
+  const int in0size(in.size());
+  vector<SimpleVector<T> > res;
+  for(int i0 = 0; i0 < pnt.size(); i0 ++) {
+    const int i(i0 - 1);
+    if(skipx && 0 < i0) {
+      in.resize(in.size() - (pnt[i] - (i ? pnt[i - 1] : i)) + 1);
+      assert(in.size() + pnt[i] == in0size + 1);
+    }
+    vector<SimpleVector<T> > sx(skipx && 0 < i0 ? skipX<SimpleVector<T> >(in, pnt[i]) : in);
+    res.resize(res.size() + sx.size());
+    for(int i = 0; i < sx.size(); i ++)
+      res[i - sx.size() + res.size()] = move(sx[i]);
+    if(! skipx) break;
+  }
+  return res;
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
@@ -4997,7 +5035,26 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
       p01next<T, true, true>(nwork / nseconds) * nseconds));
 }
 
-template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
+// cf.  predictor function we use is:
+//   pskipp(pgoshigoshi(predv(predvp),predv(predvq))).
+//   this is [34]+PRNG layered standing on root predictors (p01next, p0maxNext).
+// cf.  the predictor in the layer we're rooting copys their form as
+//   the amount of input * 3 typically, p01next might get larger layers
+//   to avoid timing related attacks.
+// cf.  pgoshigoshi blends PRNG layers on the amount loop numbers.
+//
+// N.B. we might need to construct upper layers on them to mimic external
+//      expspace dependant internal states forwarded prediction.
+//      however, since we have (9|12) layered whole from arithmatic operations,
+//      f(input, states, output, unobserved) form it's on unobserved part if
+//      states is calculated from input stream itself.
+//      also 9 layered is coded: f(in/output,states,unobserved) == 0 invariant.
+//      however, which to determine is operator matter from our computation
+//      calculus. So it's whole or none if the computer is trustable.
+//      however, whole is \bar({}), so we end with this if we select
+//      thin-layered and simple enough also measureable condition predictors.
+
+template <typename T, bool skipx = false> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -5015,8 +5072,10 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<Si
   in0.resize(0);
   vector<vector<SimpleVector<T> > > res;
   vector<SimpleVector<T> > pres(
-    pgoshigoshi<T, predv<T, predvp<T, 20>, 0>, predv<T, predvq<T, 20>, 0> >(in));
+    pskipp<T, pgoshigoshi<T, predv<T, predvp<T, 20>, 0>,
+      predv<T, predvq<T, 20>, 0> >, skipx>(in, string("")));
   res.resize(pres.size());
+  assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++) {
     res[i].resize(size0);
     for(int j = 0; j < res[0].size(); j ++)
@@ -5030,15 +5089,7 @@ template <typename T> static inline vector<vector<SimpleVector<T> > > predVec(co
   return predVec<T>(res);
 }
 
-template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0) {
-  // N.B. original DFT image[n] DFT conversion looks better with continuous
-  //      input converted into discrete variables, however, our predictor isn't
-  //      get 100% result, so some probability they slips, so their slips
-  //      effects whole result graphics in IDFT.
-  // N.B. we're now using better algorithm than sliding DFT implemented
-  //      on predv they uses statistics continuity as half of output.
-  // N.B. either, linear predictors doesn't affected by such of DFT
-  //      transformations.
+template <typename T, bool skipx = false> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -5057,16 +5108,19 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<Si
   const int rows(in0[0][0].rows());
   const int cols(in0[0][0].cols());
   in0.resize(0);
-  vector<vector<SimpleMatrix<T> > > res;
   vector<SimpleVector<T> > pres(
-    pgoshigoshi<T, predv<T, predvp<T, 20>, 0>, predv<T, predvq<T, 20>, 0> >(in));
+    pskipp<T, pgoshigoshi<T, predv<T, predvp<T, 20>, 0>,
+      predv<T, predvq<T, 20>, 0> >, skipx>(in, string("")));
+  vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
+  assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++) {
     res[i].resize(size);
     for(int j = 0; j < res[0].size(); j ++) {
       res[i][j].resize(rows, cols);
       for(int k = 0; k < rows; k ++)
-        res[i][j].row(k) = pres[i].subVector(j * rows * cols + k * cols, cols);
+        res[i][j].row(k) =
+          pres[i].subVector(j * rows * cols + k * cols, cols);
     }
   }
   return move(res);
@@ -5077,7 +5131,7 @@ template <typename T> static inline vector<vector<SimpleMatrix<T> > > predMat(co
   return predMat<T>(res);
 }
 
-template <typename T> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx) {
+template <typename T, bool skipx = false> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx) {
   assert(idx.size() && in0.size());
   // N.B. we don't do input scaling.
   // N.B. we should use each bit extended input stream but not now.
@@ -5109,8 +5163,10 @@ template <typename T> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSpars
   in0.resize(0);
   vector<SimpleSparseTensor(T) > res;
   vector<SimpleVector<T> > pres(
-    pgoshigoshi<T, predv<T, predvp<T, 20>, 0>, predv<T, predvq<T, 20>, 0> >(in));
+    pskipp<T, pgoshigoshi<T, predv<T, predvp<T, 20>, 0>,
+      predv<T, predvq<T, 20>, 0> >, skipx>(in, string("")));
   res.resize(pres.size());
+  assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++)
     for(int j = 0, cnt = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
@@ -5119,76 +5175,6 @@ template <typename T> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSpars
                make_pair(j, make_pair(k, m))))
             res[i][idx[j]][idx[k]][idx[m]] = pres[i][cnt ++];
   return move(res);
-}
-
-template <typename T> static inline vector<SimpleMatrix<T> > rgb2xyz(const vector<SimpleMatrix<T> >& rgb) {
-  // CIE 1931 XYZ from wikipedia.org
-  SimpleMatrix<T> mRGB2XYZ(3, 3);
-  mRGB2XYZ(0, 0) = T(49000);
-  mRGB2XYZ(0, 1) = T(31000);
-  mRGB2XYZ(0, 2) = T(20000);
-  mRGB2XYZ(1, 0) = T(17697);
-  mRGB2XYZ(1, 1) = T(81240);
-  mRGB2XYZ(1, 2) = T( 1063);
-  mRGB2XYZ(2, 0) = T(0);
-  mRGB2XYZ(2, 1) = T( 1000);
-  mRGB2XYZ(2, 2) = T(99000);
-  mRGB2XYZ /= T(17697);
-  assert(rgb.size() == 3);
-  assert(rgb[0].rows() == rgb[1].rows() && rgb[1].rows() == rgb[2].rows());
-  assert(rgb[0].cols() == rgb[1].cols() && rgb[1].cols() == rgb[2].cols());
-  vector<SimpleMatrix<T> > xyz(rgb);
-  xyz[0] = rgb[0] * mRGB2XYZ(0, 0) + rgb[1] * mRGB2XYZ(0, 1) + rgb[2] * mRGB2XYZ(0, 2);
-  xyz[1] = rgb[0] * mRGB2XYZ(1, 0) + rgb[1] * mRGB2XYZ(1, 1) + rgb[2] * mRGB2XYZ(1, 2);
-  xyz[2] = rgb[0] * mRGB2XYZ(2, 0) + rgb[1] * mRGB2XYZ(2, 1) + rgb[2] * mRGB2XYZ(2, 2);
-  assert(xyz.size() == 3);
-  assert(xyz[0].rows() == xyz[1].rows() && xyz[1].rows() == xyz[2].rows());
-  assert(xyz[0].cols() == xyz[1].cols() && xyz[1].cols() == xyz[2].cols());
-  return xyz;
-}
-
-template <typename T> static inline vector<SimpleMatrix<T> > xyz2rgb(const vector<SimpleMatrix<T> >& xyz) {
-  // CIE 1931 XYZ from wikipedia.org
-  SimpleMatrix<T> mRGB2XYZ(3, 3);
-  mRGB2XYZ(0, 0) = T(49000);
-  mRGB2XYZ(0, 1) = T(31000);
-  mRGB2XYZ(0, 2) = T(20000);
-  mRGB2XYZ(1, 0) = T(17697);
-  mRGB2XYZ(1, 1) = T(81240);
-  mRGB2XYZ(1, 2) = T( 1063);
-  mRGB2XYZ(2, 0) = T(0);
-  mRGB2XYZ(2, 1) = T( 1000);
-  mRGB2XYZ(2, 2) = T(99000);
-  mRGB2XYZ /= T(17697);
-  const SimpleMatrix<T> mXYZ2RGB(mRGB2XYZ.inverse());
-  assert(xyz.size() == 3);
-  assert(xyz[0].rows() == xyz[1].rows() && xyz[1].rows() == xyz[2].rows());
-  assert(xyz[0].cols() == xyz[1].cols() && xyz[1].cols() == xyz[2].cols());
-  vector<SimpleMatrix<T> > rgb(xyz);
-  rgb[0] = xyz[0] * mXYZ2RGB(0, 0) + xyz[1] * mXYZ2RGB(0, 1) + xyz[2] * mXYZ2RGB(0, 2);
-  rgb[1] = xyz[0] * mXYZ2RGB(1, 0) + xyz[1] * mXYZ2RGB(1, 1) + xyz[2] * mXYZ2RGB(1, 2);
-  rgb[2] = xyz[0] * mXYZ2RGB(2, 0) + xyz[1] * mXYZ2RGB(2, 1) + xyz[2] * mXYZ2RGB(2, 2);
-  assert(rgb.size() == 3);
-  assert(rgb[0].rows() == rgb[1].rows() && rgb[1].rows() == rgb[2].rows());
-  assert(rgb[0].cols() == rgb[1].cols() && rgb[1].cols() == rgb[2].cols());
-  return rgb;
-}
-
-static const vector<int>& pnTinySingle(const int& upper = 1) {
-  static vector<int> pn;
-  if(! pn.size()) pn.emplace_back(2);
-  pn.reserve(upper);
-  for(int i = pn.size(); i < upper; i ++) {
-    for(int j = pn[pn.size() - 1] + 1; 0 <= j; j ++) {
-      for(int k = 0; k < pn.size(); k ++)
-        if(! (j % pn[k])) goto next_pn;
-      pn.emplace_back(j);
-      break;
-     next_pn:
-      ;
-    }
-  }
-  return pn;
 }
 
 // N.B. start isolate
@@ -6691,6 +6677,59 @@ template <typename T> static inline vector<vector<int> > catImage(const vector<S
   return res;
 }
 
+template <typename T> static inline vector<SimpleMatrix<T> > rgb2xyz(const vector<SimpleMatrix<T> >& rgb) {
+  // CIE 1931 XYZ from wikipedia.org
+  SimpleMatrix<T> mRGB2XYZ(3, 3);
+  mRGB2XYZ(0, 0) = T(49000);
+  mRGB2XYZ(0, 1) = T(31000);
+  mRGB2XYZ(0, 2) = T(20000);
+  mRGB2XYZ(1, 0) = T(17697);
+  mRGB2XYZ(1, 1) = T(81240);
+  mRGB2XYZ(1, 2) = T( 1063);
+  mRGB2XYZ(2, 0) = T(0);
+  mRGB2XYZ(2, 1) = T( 1000);
+  mRGB2XYZ(2, 2) = T(99000);
+  mRGB2XYZ /= T(17697);
+  assert(rgb.size() == 3);
+  assert(rgb[0].rows() == rgb[1].rows() && rgb[1].rows() == rgb[2].rows());
+  assert(rgb[0].cols() == rgb[1].cols() && rgb[1].cols() == rgb[2].cols());
+  vector<SimpleMatrix<T> > xyz(rgb);
+  xyz[0] = rgb[0] * mRGB2XYZ(0, 0) + rgb[1] * mRGB2XYZ(0, 1) + rgb[2] * mRGB2XYZ(0, 2);
+  xyz[1] = rgb[0] * mRGB2XYZ(1, 0) + rgb[1] * mRGB2XYZ(1, 1) + rgb[2] * mRGB2XYZ(1, 2);
+  xyz[2] = rgb[0] * mRGB2XYZ(2, 0) + rgb[1] * mRGB2XYZ(2, 1) + rgb[2] * mRGB2XYZ(2, 2);
+  assert(xyz.size() == 3);
+  assert(xyz[0].rows() == xyz[1].rows() && xyz[1].rows() == xyz[2].rows());
+  assert(xyz[0].cols() == xyz[1].cols() && xyz[1].cols() == xyz[2].cols());
+  return xyz;
+}
+
+template <typename T> static inline vector<SimpleMatrix<T> > xyz2rgb(const vector<SimpleMatrix<T> >& xyz) {
+  // CIE 1931 XYZ from wikipedia.org
+  SimpleMatrix<T> mRGB2XYZ(3, 3);
+  mRGB2XYZ(0, 0) = T(49000);
+  mRGB2XYZ(0, 1) = T(31000);
+  mRGB2XYZ(0, 2) = T(20000);
+  mRGB2XYZ(1, 0) = T(17697);
+  mRGB2XYZ(1, 1) = T(81240);
+  mRGB2XYZ(1, 2) = T( 1063);
+  mRGB2XYZ(2, 0) = T(0);
+  mRGB2XYZ(2, 1) = T( 1000);
+  mRGB2XYZ(2, 2) = T(99000);
+  mRGB2XYZ /= T(17697);
+  const SimpleMatrix<T> mXYZ2RGB(mRGB2XYZ.inverse());
+  assert(xyz.size() == 3);
+  assert(xyz[0].rows() == xyz[1].rows() && xyz[1].rows() == xyz[2].rows());
+  assert(xyz[0].cols() == xyz[1].cols() && xyz[1].cols() == xyz[2].cols());
+  vector<SimpleMatrix<T> > rgb(xyz);
+  rgb[0] = xyz[0] * mXYZ2RGB(0, 0) + xyz[1] * mXYZ2RGB(0, 1) + xyz[2] * mXYZ2RGB(0, 2);
+  rgb[1] = xyz[0] * mXYZ2RGB(1, 0) + xyz[1] * mXYZ2RGB(1, 1) + xyz[2] * mXYZ2RGB(1, 2);
+  rgb[2] = xyz[0] * mXYZ2RGB(2, 0) + xyz[1] * mXYZ2RGB(2, 1) + xyz[2] * mXYZ2RGB(2, 2);
+  assert(rgb.size() == 3);
+  assert(rgb[0].rows() == rgb[1].rows() && rgb[1].rows() == rgb[2].rows());
+  assert(rgb[0].cols() == rgb[1].cols() && rgb[1].cols() == rgb[2].cols());
+  return rgb;
+}
+
 template <typename T> static inline SimpleMatrix<T> rgb2d(const vector<SimpleMatrix<T> > rgb) {
   vector<SimpleMatrix<T> > xyz(rgb2xyz<T>(rgb));
   SimpleMatrix<T> result(rgb[0].rows(), rgb[0].cols());
@@ -7383,7 +7422,7 @@ template <typename T, typename U> U corpus<T, U>::serializeSub(const vector<int>
           if(const_cast<const Tensor&>(corpust)[idxs[i]][idxs[j]][idxs[k]] != T(0))
             lscore ++;
       }
-    // XXX: middle data ignored.
+    // N.B. middle data ignored.
     score.emplace_back(make_pair(lscore, idxs[i]));
   }
   sort(score.begin(), score.end());
@@ -7470,8 +7509,7 @@ template <typename T, typename U> corpus<T, U> corpus<T, U>::withDetail(const U&
     return *this;
   cerr << "withDetail : " << word << endl;
   corpus<T, U> result(*this);
-  // XXX:
-  // corpus<T, U> result(*this + other);
+  // XXX: corpus<T, U> result(*this + other);
   const T x0(const_cast<const Tensor&>(corpust)[eeidx][eeidx][eeidx]);
   const map<int, SimpleSparseVector<SimpleSparseVector<T> > >& ci0(
     other.corpust.iter());
@@ -7545,8 +7583,7 @@ template <typename T, typename U> corpus<T, U> corpus<T, U>::abbrev(const U& wor
     return *this;
   cerr << "abbrev: " << word << " : fixme ratio." << endl;
   corpus<T, U> result(*this);
-  // XXX:
-  //corpus<T, U> result((*this * td - work * tn) / td);
+  // XXX: corpus<T, U> result((*this * td - work * tn) / td);
   const int widx(distance(words.begin(), lower_bound(words.begin(), words.end(), word)));
   assert(0 <= widx && widx < words.size() && words[widx] == word);
   result.corpust[widx][widx][widx] += (tn < T(0) ? - T(1) : T(1)) * sqrt(abs(tn));
@@ -7959,7 +7996,7 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
   }
   os << input;
   corpus<T, U> pstats;
-  vector<SimpleSparseTensor(T) > p(predSTen<T>(in, idx));
+  vector<SimpleSparseTensor(T) > p(predSTen<T, true>(in, idx));
   pstats.corpust = move(p[0]);
   getAbbreved<T>(pstats, detailtitle, detail, delimiter);
   os << endl << " --- " << pstats.simpleThresh(threshin / T(int(4))).serialize();
@@ -8090,6 +8127,9 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      jammers' strategy can select *any* function.
 // (04) p2next: the p012next, p01next, p0...next integrator.
 //      it's verbose, we should target *thin-layered* ones they can grip stable.
+// (05) (comment move from predMat): before and after to applying DFT concern
+//      prediction isn't get better result because they gets non 100% result
+//      causes whole data affected noises. so we eliminated them.
 
 #define _SIMPLELIN_
 #endif
