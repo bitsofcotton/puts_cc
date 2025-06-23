@@ -4965,10 +4965,12 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   for(int i0 = 0; i0 < pnt.size(); i0 ++) {
     const int i(i0 - 1);
     if(skipx && 0 < i0) {
-      in.resize(in.size() - (pnt[i] - (i ? pnt[i - 1] : i)) + 1);
+      in.resize(in.size() - (pnt[i] - (i ? pnt[i - 1] - 1 : i)) + 1);
       assert(in.size() + pnt[i] == in0size + 1);
     }
     vector<SimpleVector<T> > sx(skipx && 0 < i0 ? skipX<SimpleVector<T> >(in, pnt[i]) : in);
+    if(sx.size() < 13) break;
+    sx = p(sx, string(", loop:") + to_string(i0) + strloop);
     res.resize(res.size() + sx.size());
     for(int i = 0; i < sx.size(); i ++)
       res[i - sx.size() + res.size()] = move(sx[i]);
@@ -5073,7 +5075,7 @@ template <typename T, bool skipx = false> vector<vector<SimpleVector<T> > > pred
   vector<vector<SimpleVector<T> > > res;
   vector<SimpleVector<T> > pres(
     pskipp<T, pgoshigoshi<T, predv<T, predvp<T, 20>, 0>,
-      predv<T, predvq<T, 20>, 0> >, skipx>(in, string("")));
+      predv<T, predvq<T, 20>, 0> >, skipx>(in, string("predVec")));
   res.resize(pres.size());
   assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++) {
@@ -5110,7 +5112,7 @@ template <typename T, bool skipx = false> vector<vector<SimpleMatrix<T> > > pred
   in0.resize(0);
   vector<SimpleVector<T> > pres(
     pskipp<T, pgoshigoshi<T, predv<T, predvp<T, 20>, 0>,
-      predv<T, predvq<T, 20>, 0> >, skipx>(in, string("")));
+      predv<T, predvq<T, 20>, 0> >, skipx>(in, string("predMat")));
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
   assert(res.size() == pres.size());
@@ -5164,7 +5166,7 @@ template <typename T, bool skipx = false> vector<SimpleSparseTensor(T) > predSTe
   vector<SimpleSparseTensor(T) > res;
   vector<SimpleVector<T> > pres(
     pskipp<T, pgoshigoshi<T, predv<T, predvp<T, 20>, 0>,
-      predv<T, predvq<T, 20>, 0> >, skipx>(in, string("")));
+      predv<T, predvq<T, 20>, 0> >, skipx>(in, string("predSTen")));
   res.resize(pres.size());
   assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++)
