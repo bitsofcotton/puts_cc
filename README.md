@@ -141,4 +141,5 @@ This repository is archived, so without bug report, will no change.
 2025/06/19 merge latest ddpmopt fix.
 2025/06/22 merge latest ddpmopt result.
 2025/06/23 code clean, flush.
+2025/06/25 merge latest ddpmopt result. also need to implant readme.md into lieonn.hh.
 
