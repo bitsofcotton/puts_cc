@@ -4990,7 +4990,7 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
     for(int j = hist.size() - 1; 0 < j; j --) {
       SimpleVector<T>& temp(hist[j][i >> (hist.size() - j)]);
       for(int k = 0; k < temp.size(); k ++)
-        res[i][k] += temp[k] * abs(res[i][k] - temp[k]);
+        res[i][k] += temp[k] * abs(unOffsetHalf<T>(res[i][k] - temp[k]));
     }
     res[i] /= T(hist.size());
   }
@@ -5096,14 +5096,17 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //       | num_t::bit operation        | 16 | 1 | in         |
 // (1)   | divide by program invariant | 3  | w | in         |
 //       | recursive                   | 4+ | w | in * recur |
-//       | linearInvariant             | 5+ | s | in         |
-//       | makeProgramInvariant        | 6+ | p | in         |
-//       | num_t::operator *,/         | 7+ | 1 | in         |
-//       | num_t::operator +,-         | 8+ | 1 | in         |
-//       | num_t::bit operation        | 9+ | 1 | in         |
-// N.B. so total layer is {16, 17, 8+recur} from logical boolean operation
+//       | makeProgramInvariant        | 5+ | p | in         |
+//       | linearInvariant             | -  | - | -          |
+//       |   - QR decomposition        | 6+ | s | > in * 4   |
+//       |   - orthogonalization       | 7+ | p | > in * 4   |
+//       |   - solve                   | 8+ | p | > (4 * 4)  |
+//       | num_t::operator *,/         | 9+ | 1 | in         |
+//       | num_t::operator +,-         | 10+ | 1 | in         |
+//       | num_t::bit operation        | 11+ | 1 | in         |
+// N.B. so total layer is {16, 17, 11+recur} from logical boolean operation
 //      explicitly stacked including if-them operation. also the data amount
-//      is: (p^-1(in) * PRNG) * in + {2*3+10, 8+recur} * in
+//      is: (p^-1(in) * PRNG) * in + {2*3+10, 13+recur} * in
 // N.B. the data amount used as internal calculation copied 3*in for 2nd order
 //      saturation, 6 layers for multiple layer algebraic copying structure
 //      saturation, 9 layers for enough to decompose inverse of them.
@@ -5111,10 +5114,10 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //      first input stream has worse high complexity or some of the tanglement
 //      number based accuracy reason exists case.
 // N.B. the #f counting maximum compressed f(in,out,states,unobserved) has
-//      12~16 bit entropy, so recur == 4 causes layer# exceeds the structure
-//      in the best case. in the worst case, we need each for recur == 8
-//      so we need recur == {4,8} to get best result but this needs >> 512
-//      inputs in general at best.
+//      12~16 bit entropy, so recur == 1 causes layer# exceeds the structure
+//      in the best case. in the worst case, we need each for recur == 5
+//      to get best result but this needs >> 3k inputs in the worst case.
+//      on the other hand, the best case we only needs 12 + alpha inputs whole.
 // N.B. there's also the chase predictor vs. dynamic jammer even in the raw
 //      datastream itself as a cultivated entropy they have.
 //      so our function in another words some measureable condition is targetted
