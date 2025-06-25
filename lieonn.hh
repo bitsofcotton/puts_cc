@@ -1534,6 +1534,15 @@ template <typename T> static inline T ccot(const T& s) {
     typedef int64_t  myint;
     // XXX: typedef long double myfloat;
     typedef double myfloat;
+    
+    static inline myfloat absfloor(const myfloat& x) {
+      if(myfloat(0) <= x) return floor(x);
+      return - floor(- x);
+    }
+    static inline myfloat absceil(const myfloat& x) {
+      if(myfloat(0) <= x) return ceil(x);
+      return - ceil(- x);
+    }
 #  endif
 # elif _FLOAT_BITS_ == 8
     typedef uint8_t myuint;
@@ -3880,10 +3889,9 @@ template <typename T> T p0maxNext(const SimpleVector<T>& in) {
   // N.B. we only handle lebesgue measurable and R(finite)-valued functions.
   //      so worse structures are handled by p01next.
   // N.B. this is o-minimal
-  //      (https://ja.wikipedia.org/wiki/%E5%AE%9F%E9%96%)
+  //      (https://ja.wikipedia.org/wiki/%E5%AE%9F%E9%96%89%E4%BD%93 (2022/03/19))
   //      continuous structure causes dim K == 1,2,4,8 real closed field
   //      if they're semi-ordered one.
-89%E4%BD%93 (2022/03/19)
   return sumCNext<T, true, sumCNext<T, false, northPoleNext<T, p0max0next<T> > > >(in);
   // N.B. plain complex form.
   // return sumCNext<T, true, sumCNext<T, false, logCNext<T, logCNext<T, northPoleNext<T, p0max0next<T> > > > > >(in);
@@ -8381,9 +8389,14 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      we cannot avoid this other than verifying after the phenomenon
 //      also having a verifiability of low of excluded middle based on
 //      our calculation based on our conscious uniqueness.
+// (05) however, the predictor vs jammer chase is also the which side
+//      bore first chase. if both side is enthusiastic not to bore first,
+//      the input stream will be saturated to whole of the stream isn't
+//      have unique function generation, so this is analogy to the manually
+//      manipulate function switching.
 //
 // N.B. another variants of the predictors fight with 2*3*2 pattern of #f
-//      fixation. (however, we don't use internal states, it's only 2*2).
+//      fixation. (however, we don't use initial internal states, it's only 4).
 //      (00), (01), (02) is already implemented p01?2?next.
 // (10) with taking multiplication invariant on f,
 //      S f(x) dx = S det(J((1,g0,...)/(1,x0,...)) dx0 ...
