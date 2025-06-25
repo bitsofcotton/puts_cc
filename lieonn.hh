@@ -549,7 +549,7 @@ public:
     return ensureFlag();
   }
   inline SimpleFloat<T,W,bits,U>  operator %  (const SimpleFloat<T,W,bits,U>& src) const {
-    return *this - (*this / src).floor() * src;
+    return *this - (*this / src).absfloor() * src;
   }
   inline SimpleFloat<T,W,bits,U>& operator %= (const SimpleFloat<T,W,bits,U>& src) {
     return *this = *this % src;
@@ -644,8 +644,7 @@ public:
     else if(uzero() < deci.e) deci.m <<=   int(deci.e);
     return s & (1 << SIGN) ? - deci.m : deci.m;
   }
-  // XXX: absfloor, absceil implementation.
-  inline SimpleFloat<T,W,bits,U>  floor() const {
+  inline SimpleFloat<T,W,bits,U>  absfloor() const {
     if(uzero() <= e) return *this;
     if(e <= - U(bits)) return zero();
     SimpleFloat<T,W,bits,U> deci(*this);
@@ -653,8 +652,8 @@ public:
     deci.m <<= - int(deci.e);
     return deci;
   }
-  inline SimpleFloat<T,W,bits,U>  ceil() const {
-    const SimpleFloat<T,W,bits,U> fl(this->floor());
+  inline SimpleFloat<T,W,bits,U>  absceil() const {
+    const SimpleFloat<T,W,bits,U> fl(this->absfloor());
     if(*this - fl) {
       SimpleFloat<T,W,bits,U> pmone(one());
       pmone.s |= s & (1 << SIGN);
@@ -957,14 +956,14 @@ template <typename T, typename W, int bits, typename U> SimpleFloat<T,W,bits,U> 
   static const vector<SimpleFloat<T,W,bits,U> >& ien(invexparray());
   SimpleFloat<T,W,bits,U> work(this->abs());
   SimpleFloat<T,W,bits,U> result(one());
-  for(int i = 1; 0 <= i && i < min(en.size(), ien.size()) && work.floor(); i ++, work >>= U(1))
+  for(int i = 1; 0 <= i && i < min(en.size(), ien.size()) && work.absfloor(); i ++, work >>= U(1))
     if(work.residue2())
       result *= s & (1 << SIGN) ? ien[i] : en[i];
-  if(work.floor()) {
+  if(work.absfloor()) {
     work.s |= 1 << INF;
     return work;
   }
-  const SimpleFloat<T,W,bits,U> residue(*this - this->floor());
+  const SimpleFloat<T,W,bits,U> residue(*this - this->absfloor());
   assert(residue.abs() <= one());
   return result *= residue.exp();
 }
@@ -1154,12 +1153,12 @@ template <typename T, typename W, int bits, typename U> static inline bool isfin
   return ! (src.s & ((1 << src.INF) | (1 << src.NaN)));
 }
 
-template <typename T, typename W, int bits, typename U> static inline SimpleFloat<T,W,bits,U> floor(const SimpleFloat<T,W,bits,U>& src) {
-  return src.floor();
+template <typename T, typename W, int bits, typename U> static inline SimpleFloat<T,W,bits,U> absfloor(const SimpleFloat<T,W,bits,U>& src) {
+  return src.absfloor();
 }
 
-template <typename T, typename W, int bits, typename U> static inline SimpleFloat<T,W,bits,U> ceil(const SimpleFloat<T,W,bits,U>& src) {
-  return src.ceil();
+template <typename T, typename W, int bits, typename U> static inline SimpleFloat<T,W,bits,U> absceil(const SimpleFloat<T,W,bits,U>& src) {
+  return src.absceil();
 }
 
 template <typename T, typename W, int bits, typename U> static inline SimpleFloat<T,W,bits,U> abs(const SimpleFloat<T,W,bits,U>& src) {
@@ -2449,7 +2448,7 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVDleft1d() const 
   Left  /= sqrt(norm2M(Left));
   Right /= sqrt(norm2M(Right));
   // N.B. now we have B = Left * B * Right.
-  static const int p(ceil(sqrt(- log(epsilon()))));
+  static const int p(absceil(sqrt(- log(epsilon()))));
   for(int i = 0; i < p; i ++) {
     Left  *= Left;
     Right *= Right;
@@ -2699,8 +2698,8 @@ template <typename T> static inline SimpleMatrix<T> exp01(const SimpleMatrix<T>&
 }
 
 template <typename T> static inline SimpleMatrix<T> exp(const SimpleMatrix<T>& m) {
-  const T p0(ceil(sqrt(norm2M(m))));
-#if defined(_FLOAT_BITS_)
+  const T p0(absceil(sqrt(norm2M(m))));
+#if defined(_FLOAT_BITS_) || defined(_PERSISTENT_)
   // XXX: myuint p(p0.operator myint());
   myuint p(p0);
 #else
@@ -2805,6 +2804,7 @@ template <typename T> static inline SimpleMatrix<complex(T) > dft(const int& siz
   return size0 < 0 ? eidft : edft;
 }
 
+// N.B. integrate(diff) isn't get original but is reasonable on IDFT*DFT meaning.
 template <typename T> static inline SimpleMatrix<T> diff(const int& size0) {
   const int size(abs(size0));
   if(! size) {
@@ -2876,7 +2876,7 @@ template <typename T> static inline SimpleMatrix<T> diff(const int& size0) {
 }
 
 template <typename T> static inline SimpleVector<complex(T) > taylorc(const int& size, const T& step, const T& stepw) {
-  const int step00(max(int(0), min(size - 1, int(floor(step)))));
+  const int step00(max(int(0), min(size - 1, int(absfloor(step)))));
   const T   residue0(step - T(step00));
   const int step0(step00 == size - 1 || abs(residue0) <= T(int(1)) / T(int(2)) ? step00 : step00 + 1);
   const T   residue(step - T(step0));
@@ -3220,7 +3220,7 @@ template <typename T> static inline pair<SimpleVector<T>, T> makeProgramInvarian
 template <typename T> static inline T revertProgramInvariant(const pair<T, T>& in) {
   const T r0(in.second == T(0) ?
     sgn<T>(in.second) / SimpleMatrix<T>().epsilon() : in.first / in.second);
-  const T r1(T(0) < r0 ? r0 - floor(r0) : ceil(- r0) + r0);
+  const T r1(T(0) < r0 ? r0 - absfloor(r0) : absceil(- r0) + r0);
   return T(0) == r1 ? T(1) : r1;
 }
 
@@ -3388,6 +3388,10 @@ template <typename T> static inline vector<vector<SimpleVector<T> > > delta(cons
 
 // N.B. F_2 case #f fixation on R^indim into R^result fixation.
 //      if we object F_3 or more accuracy, we need to increase the result.
+// N.B. there's also analogy to this as {0,1}^m*n operator orthogonalization
+//      invariant maximum dimensions.
+// N.B. also the binary 2 operand opereator is described in R^4 vector
+//      as a invariant.
 static inline int ind2vd(const int& indim) {
   const int y(indim / 2 * (indim / 2 - 1));
         int varlen(4);
@@ -3497,6 +3501,8 @@ public:
   T   origin;
 };
 
+// N.B. if there's f(x) g(x) == 0, they're not separable by this.
+// N.B. we treat all input dimension as meaningful.
 template <typename T> inline CatG<T>::CatG(const int& size0, const vector<SimpleVector<T> >& in) {
   const int size(abs(size0));
   SimpleMatrix<T> A(in.size(), size + 1);
@@ -3692,6 +3698,8 @@ template <typename T> static inline vector<pair<vector<SimpleVector<T> >, vector
   return crushWithOrder<T>(v, cs, max(int(2), int(sqrt(T(v.size())))));
 }
 
+// N.B. if there's creation/destruction on the dimension targetted,
+//      we slip with this predictor corrector.
 template <typename T> static inline T p012next(const SimpleVector<T>& d) {
   static const int step(1);
   static const T zero(int(0));
@@ -3751,6 +3759,44 @@ template <typename T> static inline T p012next(const SimpleVector<T>& d) {
   return sscore == zero ? sscore : res / sscore;
 }
 
+// N.B. f in C1 case, F(z,theta) := complex(f(z+~z),f(z-~z))*tan(theta) in C1,
+//      z in C. For each theta, exists F: holomorphic function at some axis
+//      that real axis is same as f. so |theta-pi/4|<=epsilon case,
+//      we have a area, with guzmer's inequation and edit integrate path.
+//
+//      f have laurent series and as a upper bound of coefficinets, we can cut
+//      of them with some error. if there's no essential singular point around
+//      {x | |x-a|<1}, the correct result might be gained.
+//
+//      also we use weak differential taylor series on them.
+//
+// N.B. we can calculate real F as
+//   exp(Sum log(z-|z|cis(pi/4+t_k)))*
+//     (Sum((f(z+~z)+i*f(z-~z)*tan(pi/4+t_k))/(z-|z|cis(pi/4+t_k))
+//   =: f(z+~z)*g(z)+f(z-~z)*h(z)
+//   so replace on (1+i)t, F(x):=(f(x)*real(g(x))-f(x)*imag(h(x))) + imaginary
+//   F is holomorphic on some small range (f in C0) and
+//   real(F)=f(x)*some G(x,f). so we can apply this condition with cauchy's
+//   integrate theorem on ja.wikipedi.org link:
+//   doi:10.1090/S0002-9947-1900-1500519-7 C1 condition to C0 condition with
+//   some small area.
+// N.B. we can add some of the conditions on x_next := integrate^x f(x_now)
+//   form with x'_next := integrate^x (f_x'now - alpha) + beta transforms.
+// N.B. also this is left differential one and periodical right differentia one
+//   average.
+// N.B. there can be 0 invariant chain, so they can be caused by move average
+//   they caused return to average works very well.
+//   this is because <x,a> == 0, <[x,x+],[a,0]+[0,a]> == 0 chain in rough.
+// N.B. the jammer to us breaks Riemann measureable condition in the discrete
+//   stream. in the case, we can produce 2~3 or the candidates
+//   literally in f(x,f(x)) form with the continuous condition hypothesis.
+// N.B. if there exists f/(linear transform) =: g is reasonable, g have a
+//   structure x+=Ax. with A.cols==n or n-markov.
+// N.B. also with 2^x:=[1,x0,...,xn,x0&x1,...,x(n-1)&xn,...,x0&...&xn] form,
+//   the operation '&' and '~' can be described as each taylor series also
+//   2^y:=A*(2^x) A in R^(N*N), 2^x in {0,1}^N.
+//   this concludes the recursive structure as:
+//     Sum A_k*cosh(a_k x)+B_k*sinh(b_k x) because A^n calculation.
 template <typename T> T p0next(const SimpleVector<T>& in) {
   static const int step(1);
   return pnextcacher<T>(in.size(), ((step - 1) % in.size()) + 1).dot(in);
@@ -3767,6 +3813,7 @@ template <typename T, T (*f)(const SimpleVector<T>&)> static inline T invNext(co
   return one / pn;
 }
 
+// N.B. some of the essential point hack.
 template <typename T, T (*f)(const SimpleVector<T>&)> T northPoleNext(const SimpleVector<T>& in) {
   static const T zero(int(0));
   static const T one(int(1));
@@ -3800,6 +3847,8 @@ template <typename T, bool avg, T (*f)(const SimpleVector<T>&)> T sumCNext(const
   return f(ff) + A;
 }
 
+// N.B. Sum(d_k)/Sum(d_(k-1)) - 1 with i-axis plotted Sum f'/f goes to near
+//      log(f), once goes log(f) + i pi/2, the series can be arg(z) depend one.
 template <typename T, T (*f)(const SimpleVector<T>&)> static inline T logCNext(const SimpleVector<T>& in) {
   static const T zero(int(0));
   static const T one(int(1));
@@ -3830,17 +3879,30 @@ template <typename T> T p0max0next(const SimpleVector<T>& in) {
 template <typename T> T p0maxNext(const SimpleVector<T>& in) {
   // N.B. we only handle lebesgue measurable and R(finite)-valued functions.
   //      so worse structures are handled by p01next.
+  // N.B. this is o-minimal
+  //      (https://ja.wikipedia.org/wiki/%E5%AE%9F%E9%96%)
+  //      continuous structure causes dim K == 1,2,4,8 real closed field
+  //      if they're semi-ordered one.
+89%E4%BD%93 (2022/03/19)
   return sumCNext<T, true, sumCNext<T, false, northPoleNext<T, p0max0next<T> > > >(in);
   // N.B. plain complex form.
   // return sumCNext<T, true, sumCNext<T, false, logCNext<T, logCNext<T, northPoleNext<T, p0max0next<T> > > > > >(in);
   // N.B. we need only once P0DFT in general because associative condition
   //      is necessary for input ordering even we work with sedenion.
+  // N.B. however, with linear prediction, P0DFT's moving coefficient prediction
+  //      is equivalent to original one.
   // N.B. we eliminated them. we're better to handle their structures than here.
   // N.B. on any R to R into reasonable C^omega.
   // N.B. we treat periodical part as non aligned complex arg part.
   // N.B. we make the prediction on (delta) summation.
   // N.B. we take average as origin of input.
   // N.B. this needs huge memory to run.
+  // N.B. either there's plenty of a space to extend this with
+  //      uparrow, downarrow operations they causes the result in H\C if second
+  //      operand is in C\R, also they causes 3-variable function causes
+  //      f(x,f(x),states) handled but states isn't continuous enough in general.
+  //      however, they can cause only symmetric matrices P0DFT prediction
+  //      variant.
   // return sumCNext<T, true, sumCNext<T, false, logCNext<T, logCNext<T, P0DFT<T, p0max0next<T> > > > > >(in);
 }
 
@@ -3857,6 +3919,22 @@ template <typename T> T p0maxNext(const SimpleVector<T>& in) {
 //      we need is far larger than this. this condition can be eliminated with
 //      in/output (de)?compression ask shirks the result of algorithms to some
 //      of the upper cardinals.
+// N.B. if the original tream doesn't have Lebesgue measureable condition in
+//      discrete, the description f(x):=<a,x> mod p has the hyperbolic
+//      triangular function complemented region.
+// N.B. this is the analogy to toeplitz matrix inveresion with singular one.
+// N.B. if the unction has internal states variable that to be projected into
+//      series, they're looked as <a,x>+<b,y>==<a,x>==0, y is internal states.
+//      so this causes A*x==B*y, so increasing dimension causes ok result.
+//      however, we're in invariant condition (de)?compression destroys,
+//      so {x,y} in R^varlen is upper bound of variables however they causes
+//      some matrix timing attacks.
+// N.B. there's also trivial invariant : if((forall k, x_k==a_0k) or ...)
+//      return 1; program. this is also in the condition but the dimension
+//      easily vanished. so when we met them we use:
+//      ||Ax-1*x'||<epsilon condition.
+// N.B. the worse structures are handled by skipX concerns or long enough p012
+//      preprocess.
 template <typename T, const bool cultivated, const bool nonlinear> T p01next(const SimpleVector<T>& in) {
   static const int step(1);
   static const T zero(0);
@@ -4293,7 +4371,7 @@ public:
         SimpleMatrix<T> AA(size, size);
         for(int j = 0; j < AA.rows(); j ++) {
           const T jj(T(j) * T(i + 2) / T(size + 1));
-          AA.row(j) = taylor<T>(AA.cols(), (jj - floor(jj)) * T(size - 1));
+          AA.row(j) = taylor<T>(AA.cols(), (jj - absfloor(jj)) * T(size - 1));
         }
         mA[size].emplace_back(move(AA));
       }
@@ -4714,7 +4792,7 @@ template <typename T> static inline SimpleMatrix<T> rotate(const SimpleMatrix<T>
   const T offy(h0 < d.rows() ? abs(int(s * T(d.cols()))) : 0);
   const T offx(w0 < d.cols() ? abs(int(s * T(d.rows()))) : 0);
   res.O();
-  const int diag(ceil(sqrt(T(res.rows() * res.rows() +
+  const int diag(absceil(sqrt(T(res.rows() * res.rows() +
                              res.cols() * res.cols()) )) );
   for(int j = - diag; j < diag; j ++)
     for(int k = - diag; k < diag; k ++) {
@@ -6187,7 +6265,7 @@ template <typename T> static inline void drawMatchLine(SimpleMatrix<T>& map, con
   const T dlt(abs(lref0[idxM] - lref1[idxM]));
   if(dlt == T(0)) return;
   const T denom(T(1) / dlt);
-  for(int i = 0; i <= int(ceil(dlt)); i ++) {
+  for(int i = 0; i <= int(absceil(dlt)); i ++) {
     const SimpleVector<T> gidx(lref0 + d10 * T(i) * denom);
     map(max(int(0), min(int(gidx[0]), int(map.rows() - 1))),
         max(int(0), min(int(gidx[1]), int(map.cols() - 1)))) = c;
@@ -6495,17 +6573,17 @@ template <typename T> static inline vector<triangles_t(T) > triangles(const Simp
     }
     for(int j = 0; j < 2; j ++) {
       if(work.first(0, j) <= work.first(1, j) && work.first(0, j) <= work.first(2, j))
-        work.first(0, j) = floor(work.first(0, j));
+        work.first(0, j) = absfloor(work.first(0, j));
       else if(work.first(1, j) <= work.first(0, j) && work.first(1, j) <= work.first(2, j))
-        work.first(1, j) = floor(work.first(1, j));
+        work.first(1, j) = absfloor(work.first(1, j));
       else if(work.first(2, j) <= work.first(0, j) && work.first(2, j) <= work.first(1, j))
-        work.first(2, j) = floor(work.first(2, j));
+        work.first(2, j) = absfloor(work.first(2, j));
       if(work.first(1, j) <= work.first(0, j) && work.first(2, j) <= work.first(0, j))
-        work.first(0, j) = ceil(work.first(0, j));
+        work.first(0, j) = absceil(work.first(0, j));
       else if(work.first(0, j) <= work.first(1, j) && work.first(2, j) <= work.first(1, j))
-        work.first(1, j) = ceil(work.first(1, j));
+        work.first(1, j) = absceil(work.first(1, j));
       else if(work.first(0, j) <= work.first(2, j) && work.first(1, j) <= work.first(2, j))
-        work.first(2, j) = ceil(work.first(2, j));
+        work.first(2, j) = absceil(work.first(2, j));
     }
     if(T(0) <= points[facets[i][0]][0] && points[facets[i][0]][0] < T(in.rows()) &&
        T(0) <= points[facets[i][0]][1] && points[facets[i][0]][1] < T(in.cols()))
@@ -7638,7 +7716,6 @@ template <typename T, typename U> corpus<T, U> corpus<T, U>::withDetail(const U&
     return *this;
   cerr << "withDetail : " << word << endl;
   corpus<T, U> result(*this);
-  // XXX: corpus<T, U> result(*this + other);
   const T x0(const_cast<const Tensor&>(corpust)[eeidx][eeidx][eeidx]);
   const map<int, SimpleSparseVector<SimpleSparseVector<T> > >& ci0(
     other.corpust.iter());
@@ -8282,6 +8359,49 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      on the input delta stream, once we got them better result, now isn't.
 //      either, the move average stream have some of the offsetted delta stream
 //      in general, but isn't on some stream.
+// (08) recursion on same function based functions.
+//      this depends on the first prediction is continuous or not causes
+//      the prediction stream's quality. also they depends on the first
+//      hypothesis is satisfied or not.
+//
+// N.B. something XXX result descripton
+// (00) there might exist non Lebesgue measureable condition discrete stream.
+//      this is: there's no unique function on the range but AFTER all the
+//      data is treated (observed), this condition never satisfied.
+//      so this is the which is the latter chase.
+// (01) the prediction fail is come from first continuity hypothesis
+//      satisfied or not. AFTER the whole stream is given context,
+//      we can avoid such of the conditions with certain error.
+// (02) attack to the invariant causes invariant size chases
+//      this can be skipped by skipX concerns.
+// (03) any of the predictor they have a jammer to them.
+//      so if we're targetted, we should output at least 2 series of them to
+//      avoid gulfs.
+// (04) (de)?compression concerns can jam out on N calculation matters.
+//      we cannot avoid this other than verifying after the phenomenon
+//      also having a verifiability of low of excluded middle based on
+//      our calculation based on our conscious uniqueness.
+//
+// N.B. another variants of the predictors fight with 2*3*2 pattern of #f
+//      fixation. (however, we don't use internal states, it's only 2*2).
+//      (00), (01), (02) is already implemented p01?2?next.
+// (10) with taking multiplication invariant on f,
+//      S f(x) dx = S det(J((1,g0,...)/(1,x0,...)) dx0 ...
+//      retaking their addition invariant as det(...) == 0, the given function
+//      g0 ... should fit them also they describes much of continuities.
+//      this can flatten N when our N is something infected.
+//      also this is the analogy {1,x,x^2,...} on p0next meaning.
+// (11) saturating F_2^4 #f, the bra, ket condition indirect access.
+// (12) untangle by DFT or Wavelet triple. this is because R^R untangle
+//      one by one causes Wavelet(Wavelet(Fourier+Discrete)+Discrete)+Discrete
+//      causes only a combination ordinal.
+// (13) (de)?compress after/before to out/input some of the range.
+// (14) brute orce (de)?compressed out/input into internal states/output
+//      function number. this needs 19,683*19,683 table size we cannot treat
+//      on our machine. this shirks F_2^4 #f all of the generic i/o table
+//      then we brute force function listing.
+// (15) echo input as one step before flip or return to average.
+//      this is id. transform but orthogonal to former p01?2?next..
 
 #define _SIMPLELIN_
 #endif
