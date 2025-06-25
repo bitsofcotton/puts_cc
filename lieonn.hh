@@ -4021,7 +4021,7 @@ public:
   vector<int> nshf;
 };
 
-// N.B. persistent attack to jammer in deep p0maxNext short 3 layermeaning.
+// N.B. persistent attack to jammer in deep p0maxNext short 3 layer meaning.
 //      this often efffects output streams' prediction gulf result
 //      to be shifted ones.
 template <typename T> static inline T pSlipGulf0short(const SimpleVector<T>& in, pslip_t<T>& slip, const int& t) {
@@ -5098,15 +5098,15 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //       | recursive                   | 4+ | w | in * recur |
 //       | makeProgramInvariant        | 5+ | p | in         |
 //       | linearInvariant             | -  | - | -          |
-//       |   - QR decomposition        | 6+ | s | > in * 4   |
-//       |   - orthogonalization       | 7+ | p | > in * 4   |
-//       |   - solve                   | 8+ | p | > (4 * 4)  |
-//       | num_t::operator *,/         | 9+ | 1 | in         |
-//       | num_t::operator +,-         | 10+ | 1 | in         |
-//       | num_t::bit operation        | 11+ | 1 | in         |
-// N.B. so total layer is {16, 17, 11+recur} from logical boolean operation
+//       |   - QR decomposition        | 8+* | s | > in * 4   |
+//       |   - orthogonalization       | 11+*| p | > in*4*3/2 |
+//       |   - solve                   | 14+*| p | > (4 * 4)  |
+//       | num_t::operator *,/         | 15+ | 1 | in         |
+//       | num_t::operator +,-         | 16+ | 1 | in         |
+//       | num_t::bit operation        | 17+ | 1 | in         |
+// N.B. so total layer is {16, 17, > 17+recur} from logical boolean operation
 //      explicitly stacked including if-them operation. also the data amount
-//      is: (p^-1(in) * PRNG) * in + {2*3+10, 13+recur} * in
+//      is: (p^-1(in) * PRNG) * in + {2*3+10, > 15+recur} * in
 // N.B. the data amount used as internal calculation copied 3*in for 2nd order
 //      saturation, 6 layers for multiple layer algebraic copying structure
 //      saturation, 9 layers for enough to decompose inverse of them.
@@ -5115,9 +5115,12 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //      number based accuracy reason exists case.
 // N.B. the #f counting maximum compressed f(in,out,states,unobserved) has
 //      12~16 bit entropy, so recur == 1 causes layer# exceeds the structure
-//      in the best case. in the worst case, we need each for recur == 5
-//      to get best result but this needs >> 3k inputs in the worst case.
-//      on the other hand, the best case we only needs 12 + alpha inputs whole.
+//      so we only needs 12*{1,2,4} + alpha inputs whole in the case.
+//      (recount done, orthogonalization needs non O(1) layer also non O(n)
+//       data amount. (*): we calculate matrix operation layer as O(n^2) to be
+//       a unit and lineary plain counting. this is because 2nd order of vector
+//       operation counting. overall this is counting (2^p)^(n*n) layers.
+//       so they causes f-fixation layer counting.)
 // N.B. there's also the chase predictor vs. dynamic jammer even in the raw
 //      datastream itself as a cultivated entropy they have.
 //      so our function in another words some measureable condition is targetted
@@ -5146,7 +5149,14 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //      so jammers can attack our predictors' any of the layer, so we should
 //      output each layer apply/not apply cases but this causes combination
 //      explode.
-// N.B. so we close all of the entropy is from input stream itself condition
+//      this is also be able to verified by x+ := A x mod 2, x in {0,1}^n,
+//      A in (2^p)^(n*n) operation runs any of the input causes sign bit result
+//      can be {1/3,1/3,1/3} in the best.
+// N.B. so the input stream has the meaning payload to the datastream.
+//      ongoing neural networks mimics them as plausible one formatter so they
+//      stands on the first intension as tunable ones.
+//      our predictor stands on measureable condition satisfied or not.
+// N.B. also we close all of the entropy is from input stream itself condition
 //      predictor with this but there might be many another concepts nor
 //      implementations. so we should fight with computation speed matter next.
 //      the masp2catg or goki_check_cc:test.py [PQ]redg doing one of this but
@@ -8246,6 +8256,13 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      either, with d^e/dx^e == dx condition, f^-1(f(x)) == x 's some of the
 //      combination untanglement of them.
 //      cf. (arctan(logscale))-n times chain causes y=x into sigmoid-like graph.
+// (07) once we got moving average goes very well result.
+//      this is because {D0 := sum_0,K d_k, D1 = sum_1,(K+1) d_k, ...} stream,
+//      the middle parts isn't moved serial stream one by one.
+//      so we can mimic this condition with multiplying some monotone function
+//      on the input delta stream, once we got them better result, now isn't.
+//      either, the move average stream have some of the offsetted delta stream
+//      in general, but isn't on some stream.
 
 #define _SIMPLELIN_
 #endif
