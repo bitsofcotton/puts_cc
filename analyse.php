@@ -1,5 +1,15 @@
 <?php
 
+// Usage:
+//  move *.php prep.py puts into the directory.
+//  mkdir data directory and configure permissions.
+//  we might need python-mysql environments.
+//
+//  prep.py needs legacy _mysql with python2.7, if we need, please rewrite them.
+//
+//  we need mediawiki and xml2sql softwared to import wiktionary database (GFDL).
+//  however dictating wiktionary needs huge amounts of memory and very slow.
+
 $dont_pdict = 1;
 
 $dameji = array("!", '"', "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", "/", ":", ";", "<", "=", ">", "?", "@", "[", "\\", "]", "^", "_", "`", "{", "|", "}", "~", " ");

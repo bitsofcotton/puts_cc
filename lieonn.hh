@@ -32,6 +32,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 */
 
+// N.B. there exists jemalloc/mimalloc or so.
+//      if some of the performance regression occures, we can use them as
+//      a vast performance increase.
 #if !defined(_SIMPLELIN_)
 
 // N.B. external linkage.
@@ -7095,12 +7098,25 @@ template <typename T, typename U> vector<gram_t<U> > lword<T, U>::compute(const 
   return result;
 }
 
+// N.B. this only sees what is said in the input, not the not said.
+// XXX: these algorithms are *not carefully confirmed*.
+// undone: we can use {category,relation,region} dimensions for this corpus
+//   class. however this also needs uniqueness of the descriptor condition.
+//   we need materials and tables to make brand-new data from input.
+//   this needs entity space and glues other than dictating.
+// undone: we can focus K^{4x4} (as aa symbol) :=
+//   { {A|#A<infty},N,R,{f|f in 2^$}}^4 as a description base.
+//   this leads {K^{4x4},K^{4x4},f,t}^n for series of input.
+//   there'a a analogy {category,relation,geometry} ~
+//   {intention start/end, binary op on intention to intention,
+//     geometry ~ invariant ~ algorithm}
 template <typename T, typename U> class corpus {
 public:
   typedef SimpleSparseVector<T> Vec;
   typedef SimpleSparseMatrix(T) Mat;
   typedef SimpleSparseTensor(T) Tensor;
 
+  // N.B. to get clear edge, we should use this with morphological analysis ones.
   corpus(const U& input, const vector<U>& delimiter);
   inline corpus() { ; }
   inline corpus(const corpus<T, U>& other) { *this = other; }
@@ -7322,16 +7338,19 @@ public:
     corpus<T, U> result;
     return result;
   }
+  // N.B. should be inverse of corpus() constructor, but not so.
   inline U             serialize() const {
     cerr << "s" << flush;
     corpus<T, U> plus(*this);
     return plus.absfy().serializeSub(plus.countIdx(T(int(0))));
   }
   corpus<T, U>  withDetail(const U& word, const corpus<T, U>& other, const T& thresh = T(0)) const;
+  // N.B. should be inverse of withDetail but not so.
   corpus<T, U>  abbrev(const U& word, const corpus<T, U>& work, const T& thresh = T(0)) const;
   pair<T, T>    compareStructure(const corpus<T, U>& src, const T& thresh = T(1e-4), const T& thresh2 = T(.125)) const;
   corpus<T, U>& absfy();
 
+  // N.B. this should not be dense, if dense, they say nothing without dictation.
   Tensor corpust;
 private:
   SimpleVector<T> singularValues() const;
