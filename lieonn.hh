@@ -3938,7 +3938,7 @@ template <typename T> T p0maxNext(const SimpleVector<T>& in) {
 //      ||Ax-1*x'||<epsilon condition.
 // N.B. the worse structures are handled by skipX concerns or long enough p012
 //      preprocess.
-template <typename T, const bool nonlinear> T p01next(const SimpleVector<T>& in, const int& cultivated = 1) {
+template <typename T, const bool nonlinear, const bool insurance> T p01next(const SimpleVector<T>& in) {
   static const int step(1);
   static const T zero(0);
   static const T one(1);
@@ -3948,7 +3948,7 @@ template <typename T, const bool nonlinear> T p01next(const SimpleVector<T>& in,
   if(! isfinite(nin) || nin == zero) return zero;
   const int varlen(ind2vd(in.size()));
   // N.B. we use whole data information size on each single layer's size.
-  SimpleMatrix<T> invariants(cultivated ?
+  SimpleMatrix<T> invariants(insurance ?
       (in.size() / (varlen + 1) < 8 + step ? 1 : in.size() / (varlen + 1)) : 1,
       nonlinear ? varlen + 2 : varlen);
   invariants.O();
@@ -3969,7 +3969,7 @@ template <typename T, const bool nonlinear> T p01next(const SimpleVector<T>& in,
   else {
     invariant.O();
     for(int i = 0; i < invariants.cols(); i ++)
-      invariant[i] = p01next<T, nonlinear>(invariants.col(i), cultivated - 1);
+      invariant[i] = p01next<T, nonlinear, false>(invariants.col(i));
   }
   if(invariant[varlen - 1] == zero)
     return in[in.size() - 1];
@@ -4853,12 +4853,12 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv00(const
   for(int j = 0; j < intran.size(); j ++) {
     if(nprogress && ! (j % max(int(1), int(intran.size() / nprogress))) )
       cerr << j << " / " << intran.size() << ", " << strloop << endl;
-    p[j] = p01next<T, true>(intran[j].subVector(0, sz));
+    p[j] = p01next<T, true, true>(intran[j].subVector(0, sz));
   }
   const T nseconds(sqrt(seconds.dot(seconds)));
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(p)).first,
-      p01next<T, true>(seconds / nseconds) * nseconds) );
+      p01next<T, true, true>(seconds / nseconds) * nseconds) );
 }
 
 template <typename T, int nprogress> static inline SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
@@ -5152,7 +5152,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
   }
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(res)).first,
-      p01next<T, true>(nwork / nseconds) * nseconds));
+      p01next<T, true, true>(nwork / nseconds) * nseconds));
 }
 
 // N.B. *** layers ***
@@ -5178,19 +5178,20 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //       | num_t::operator *,/         | 14 | 1 | in         |
 //       | num_t::operator +,-         | 15 | 1 | in         |
 //       | num_t::bit operation        | 16 | 1 | in         |
-// (1)   | divide by program invariant | 3  | w | in         |
-//       | recursive                   | 4+ | w | in * recur |
-//       | makeProgramInvariant        | 5+ | p | in         |
+// (1)   | after burn with p0next      | 3  | w | in         |
+//       | divide by program invariant | 4  | w | in         |
+//       | recursive                   | 6  | w | <= in * 2  |
+//       | makeProgramInvariant        | 7  | p | in         |
 //       | linearInvariant             | -  | - | -          |
-//       |   - QR decomposition        | 8+* | s | > in * 4   |
-//       |   - orthogonalization       | 11+*| p | > in*4*3/2 |
-//       |   - solve                   | 14+*| p | > (4 * 4)  |
-//       | num_t::operator *,/         | 15+ | 1 | in         |
-//       | num_t::operator +,-         | 16+ | 1 | in         |
-//       | num_t::bit operation        | 17+ | 1 | in         |
-// N.B. so total layer is {16, 17, > 17+recur} from logical boolean operation
+//       |   - QR decomposition        | 9* | s | > in * 4!  |
+//       |   - orthogonalization       | 11*| p | > in * 4!  |
+//       |   - solve                   | 13*| p | > (4 * 4)  |
+//       | num_t::operator *,/         | 14 | 1 | in         |
+//       | num_t::operator +,-         | 15 | 1 | in         |
+//       | num_t::bit operation        | 16 | 1 | in         |
+// N.B. so total layer is 16~17 from logical boolean operation
 //      explicitly stacked including if-them operation. also the data amount
-//      is: (p^-1(in) * PRNG) * in + {2*3+10, > 15+recur} * in
+//      is: (p^-1(in) * PRNG) * {2*3+10, > 8+4!*2} * in.
 // N.B. the data amount used as internal calculation copied 3*in for 2nd order
 //      saturation, 6 layers for multiple layer algebraic copying structure
 //      saturation, 9 layers for enough to decompose inverse of them.
@@ -5198,10 +5199,9 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //      first input stream has worse high complexity or some of the tanglement
 //      number based accuracy reason exists case.
 // N.B. the #f counting maximum compressed f(in,out,states,unobserved) has
-//      12~16 bit entropy, so recur == 1 causes layer# exceeds the structure
-//      so we only needs 12*{1,2,4} + alpha inputs whole in the case.
-//      (recount done, orthogonalization needs non O(1) layer also non O(n)
-//       data amount. (*): we calculate matrix operation layer as O(n^2) to be
+//      12~16 bit entropy, they causes layer# exceeds the structure
+//      so we only needs 26 inputs whole in the case.
+//      (recount twice, (*): we calculate matrix operation layer as O(mn) to be
 //       a unit and lineary plain counting. this is because 2nd order of vector
 //       operation counting. overall this is counting (2^p)^(n*n) layers.
 //       so they causes f-fixation layer counting.)
