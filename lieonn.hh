@@ -2651,7 +2651,6 @@ template <typename T> static inline SimpleMatrix<T> log(const SimpleMatrix<T>& m
 }
 
 template <typename T> static inline SimpleMatrix<T> logSym(const SimpleMatrix<T>& x, const SimpleMatrix<T>& b) {
-  // XXX stub.
   assert(x.rows() == x.cols() && b.rows() == b.cols());
   assert(! (x.rows() % b.rows()) && ! (x.cols() % b.cols()));
   for(int i = 0; i < x.rows(); i ++)
@@ -2689,7 +2688,6 @@ template <typename T> static inline SimpleMatrix<T> logSym(const SimpleMatrix<T>
   Ux  = Ub.inverse()  * Ux;
   Uxt = Ubt.inverse() * Uxt;
   // N.B. Ux == Ua sqrt(diag(Lawork)) and same on right side.
-  // XXX stub:
     assert(0 && "log (symmetric matrix A, symmetric matrix B) : stub");
   return x;
 }
@@ -3768,7 +3766,7 @@ template <typename T> static inline T p012next(const SimpleVector<T>& d) {
   return sscore == zero ? sscore : res / sscore;
 }
 
-// N.B. f in C1 case, F(z,theta) := complex(f(z+~z),f(z-~z))*tan(theta) in C1,
+// N.B. f in C1 case, F(z,theta) := complex(f(z+~z),f(z-~z)*tan(theta)) in C1,
 //      z in C. For each theta, exists F: holomorphic function at some axis
 //      that real axis is same as f. so |theta-pi/4|<=epsilon case,
 //      we have a area, with guzmer's inequation and edit integrate path.
@@ -3780,8 +3778,8 @@ template <typename T> static inline T p012next(const SimpleVector<T>& d) {
 //      also we use weak differential taylor series on them.
 //
 // N.B. we can calculate real F as
-//   exp(Sum log(z-|z|cis(pi/4+t_k)))*
-//     (Sum((f(z+~z)+i*f(z-~z)*tan(pi/4+t_k))/(z-|z|cis(pi/4+t_k))
+//   exp(Sum log(z-|z|cis(pi/4+t_k)))
+//     Sum((f(z+~z)+i*f(z-~z)*tan(pi/4+t_k))/(z-|z|cis(pi/4+t_k)))
 //   =: f(z+~z)*g(z)+f(z-~z)*h(z)
 //   so replace on (1+i)t, F(x):=(f(x)*real(g(x))-f(x)*imag(h(x))) + imaginary
 //   F is holomorphic on some small range (f in C0) and
@@ -3791,7 +3789,7 @@ template <typename T> static inline T p012next(const SimpleVector<T>& d) {
 //   some small area.
 // N.B. we can add some of the conditions on x_next := integrate^x f(x_now)
 //   form with x'_next := integrate^x (f_x'now - alpha) + beta transforms.
-// N.B. also this is left differential one and periodical right differentia one
+// N.B. also this is left differential one and periodical right differential one
 //   average.
 // N.B. there can be 0 invariant chain, so they can be caused by move average
 //   they caused return to average works very well.
@@ -3893,24 +3891,20 @@ template <typename T> T p0maxNext(const SimpleVector<T>& in) {
   //      continuous structure causes dim K == 1,2,4,8 real closed field
   //      if they're semi-ordered one.
   return sumCNext<T, true, sumCNext<T, false, northPoleNext<T, p0max0next<T> > > >(in);
-  // N.B. plain complex form.
+  // N.B. plain complex form doesn't improve enough result.
   // return sumCNext<T, true, sumCNext<T, false, logCNext<T, logCNext<T, northPoleNext<T, p0max0next<T> > > > > >(in);
   // N.B. we need only once P0DFT in general because associative condition
   //      is necessary for input ordering even we work with sedenion.
-  // N.B. however, with linear prediction, P0DFT's moving coefficient prediction
-  //      is equivalent to original one.
-  // N.B. we eliminated them. we're better to handle their structures than here.
+  //      also this eliminates one dimension per each of complex-formed input
+  //      on f as a continuous thing.
   // N.B. on any R to R into reasonable C^omega.
   // N.B. we treat periodical part as non aligned complex arg part.
-  // N.B. we make the prediction on (delta) summation.
-  // N.B. we take average as origin of input.
-  // N.B. this needs huge memory to run.
+  // N.B. we make the prediction on (delta) summation also take average as
+  //      origin of input.
   // N.B. either there's plenty of a space to extend this with
   //      uparrow, downarrow operations they causes the result in H\C if second
-  //      operand is in C\R, also they causes 3-variable function causes
-  //      f(x,f(x),states) handled but states isn't continuous enough in general.
-  //      however, they can cause only symmetric matrices P0DFT prediction
-  //      variant.
+  //      operand is in C\R.
+  // N.B. this needs huge memory to run.
   // return sumCNext<T, true, sumCNext<T, false, logCNext<T, logCNext<T, P0DFT<T, p0max0next<T> > > > > >(in);
 }
 
@@ -3919,19 +3913,20 @@ template <typename T> T p0maxNext(const SimpleVector<T>& in) {
 // cf. bitsofcotton/randtools .
 // N.B. with cultivated == true condition, we feed root of the description
 //      we can use to id. data amount. we need at most 3 depth in normal.
-// N.B. we select deep enough one because of the timing related attack jammer
-//      exists they can select arbitrary timing also such of the stream exists.
-//      this isn't avoid completely the condition, so it's only to ease
-//      our mind with much of input stream size in probable.
+//      without timing attack things we sentry for the opposite side also
+//      have same structured one case. such of the attack isn't avoidable
+//      by this p01next. so we abandoned infinite cultivated loop.
+//      either we normally do p0next after this, so counting cardinal causes
+//      2 depth on whole.
 // N.B. if input stream is something sparse with jammer generated, the varlen
 //      we need is far larger than this. this condition can be eliminated with
 //      in/output (de)?compression ask shirks the result of algorithms to some
 //      of the upper cardinals.
-// N.B. if the original tream doesn't have Lebesgue measureable condition in
+// N.B. if the original stream doesn't have Lebesgue measureable condition in
 //      discrete, the description f(x):=<a,x> mod p has the hyperbolic
 //      triangular function complemented region.
 // N.B. this is the analogy to toeplitz matrix inveresion with singular one.
-// N.B. if the unction has internal states variable that to be projected into
+// N.B. if the function has internal states variable that to be projected into
 //      series, they're looked as <a,x>+<b,y>==<a,x>==0, y is internal states.
 //      so this causes A*x==B*y, so increasing dimension causes ok result.
 //      however, we're in invariant condition (de)?compression destroys,
@@ -3943,7 +3938,7 @@ template <typename T> T p0maxNext(const SimpleVector<T>& in) {
 //      ||Ax-1*x'||<epsilon condition.
 // N.B. the worse structures are handled by skipX concerns or long enough p012
 //      preprocess.
-template <typename T, const bool cultivated, const bool nonlinear> T p01next(const SimpleVector<T>& in) {
+template <typename T, const bool nonlinear> T p01next(const SimpleVector<T>& in, const int& cultivated = 1) {
   static const int step(1);
   static const T zero(0);
   static const T one(1);
@@ -3974,7 +3969,7 @@ template <typename T, const bool cultivated, const bool nonlinear> T p01next(con
   else {
     invariant.O();
     for(int i = 0; i < invariants.cols(); i ++)
-      invariant[i] = p01next<T, cultivated, nonlinear>(invariants.col(i));
+      invariant[i] = p01next<T, nonlinear>(invariants.col(i), cultivated - 1);
   }
   if(invariant[varlen - 1] == zero)
     return in[in.size() - 1];
@@ -4858,12 +4853,12 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv00(const
   for(int j = 0; j < intran.size(); j ++) {
     if(nprogress && ! (j % max(int(1), int(intran.size() / nprogress))) )
       cerr << j << " / " << intran.size() << ", " << strloop << endl;
-    p[j] = p01next<T, true, true>(intran[j].subVector(0, sz));
+    p[j] = p01next<T, true>(intran[j].subVector(0, sz));
   }
   const T nseconds(sqrt(seconds.dot(seconds)));
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(p)).first,
-      p01next<T, true, true>(seconds / nseconds) * nseconds) );
+      p01next<T, true>(seconds / nseconds) * nseconds) );
 }
 
 template <typename T, int nprogress> static inline SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
@@ -5087,7 +5082,7 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
 }
 
 // N.B. for given static input stream with the unique one function recursion
-//      hypothesis, also if there's timint-related attacks, we intend to shuffle
+//      hypothesis, also if there's timing-related attacks, we intend to shuffle
 //      the structure by skipping p-steps to reorder some structures they might
 //      have the intension to attack our predictor.
 // N.B. for n-markov generated input, n*n < in.size() works better with us.
@@ -5157,7 +5152,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
   }
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(res)).first,
-      p01next<T, true, true>(nwork / nseconds) * nseconds));
+      p01next<T, true>(nwork / nseconds) * nseconds));
 }
 
 // N.B. *** layers ***
@@ -5215,9 +5210,10 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //      so our function in another words some measureable condition is targetted
 //      in discrete condition, the best result we can get through this predictor
 //      is 2/3 probability.
-// N.B. otherwise, the static input stream can have 1 a.e. output as some of the//      shrinked output theirselves.
+// N.B. otherwise, the static input stream can have 1 a.e. output as some of the
+//      shrinked output theirselves.
 // N.B. we need to shirk internal states upper bound size into graphics size
-//      before to compute. we're doing this with goki_check_cc:test.py pred+?+?
+//      before to compute. we're doing this with goki_check_cc:test.py pred
 //      command before to calculate. this is to omit what bitstream next in
 //      surface.
 // N.B. after of all, the dynamic jammer can be avoided if the predictor entropy
@@ -5238,20 +5234,19 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //      so jammers can attack our predictors' any of the layer, so we should
 //      output each layer apply/not apply cases but this causes combination
 //      explode.
-//      this is also be able to verified by x+ := A x mod 2, x in {0,1}^n,
-//      A in (2^p)^(n*n) operation runs any of the input causes sign bit result
-//      can be {1/3,1/3,1/3} in the best.
+//      this is also be able to verified by x+ := A x (first binary digit),
+//      x in {0,1}^n, A in (2^p)^(n*n) operation runs any of the input causes 
+//      sign bit result can be {1/3,1/3,1/3} in the best.
 // N.B. so the input stream has the meaning payload to the datastream.
 //      ongoing neural networks mimics them as plausible one formatter so they
 //      stands on the first intension as tunable ones.
 //      our predictor stands on measureable condition satisfied or not.
 // N.B. also we close all of the entropy is from input stream itself condition
 //      predictor with this but there might be many another concepts nor
-//      implementations. so we should fight with computation speed matter next.
+//      implementations.
 //      the masp2catg or goki_check_cc:test.py [PQ]redg doing one of this but
-//      not optimal ones.
-// N.B. we want to backport bitsofcotton/specific into here, but implementation
-//      isn't now.
+//      not optimal ones. also we want to backport bitsofcotton/specific into
+//      here, but implementation isn't now.
 
 template <typename T, bool skipx = false> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
@@ -7546,7 +7541,6 @@ template <typename T, typename U> corpus<T,U>::corpus(const U& input, const vect
       for(typename vector<int>::const_iterator itr2(itr1); itr2 != uptrs.end(); ++ itr2) {
         const int k(*itr2);
         if(!ptrs[k].size()) continue;
-        // XXX checkme:
         if(words[i] == U("$") || words[j] == U("$") || words[k] == U("$") ||
            words[i] == U("^") || words[j] == U("^") || words[k] == U("^"))
           continue;
@@ -8395,9 +8389,24 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      have unique function generation, so this is analogy to the manually
 //      manipulate function switching.
 //
+// N.B. some of the ideal prediction candidates.
+//      so the ideal prediction without transforming input into meanings
+//      with the condition no initial or calculated internal states have
+//      the 4 of the candidates for f_k. either the attack to such of f_k,
+//      the payload range shift effectively causes better result
+//      (which move the gulf position before/after the first f_k met.)
+//      we face this condition surface with p2 j+ command, so we close them
+//      with this condition. so in another words, the pred(Vec|Mat|STen) needs
+//      one more layer they effects p2 j+ like effects also this doubles the
+//      output number, we can do this instead of skipX concerns they avoid
+//      the original predictors' jammer condition in some another way.
+//      we select deterministic one not with PRNG thing.
+//
 // N.B. another variants of the predictors fight with 2*3*2 pattern of #f
 //      fixation. (however, we don't use initial internal states, it's only 4).
 //      (00), (01), (02) is already implemented p01?2?next.
+//      either, pred(Vec|Mat|STen) prediction untangles twice by two candidates
+//      so we perhaps don't need them.
 // (10) with taking multiplication invariant on f,
 //      S f(x) dx = S det(J((1,g0,...)/(1,x0,...)) dx0 ...
 //      retaking their addition invariant as det(...) == 0, the given function
