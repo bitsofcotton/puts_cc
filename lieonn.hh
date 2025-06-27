@@ -3218,9 +3218,21 @@ template <typename T> static inline pair<SimpleVector<T>, T> makeProgramInvarian
   T ratio(0);
   for(int i = 0; i < res.size(); i ++)
     ratio += log(res[i] = binMargin<T>(res[i]));
+#if defined(_PINVARIANT_SYMMETRIC_LINEAR_)
+  // N.B. _PINVARIANT_SYMMETRIC_LINEAR_ makes invariant as a linear one
+  //      if binary input. this makes y=Ax (first digit) condition strictly.
+  //      to select this with binary input is to avoid nonlinear handling
+  //      on this.
+  for(int i = 0; i < res.size(); i ++)
+    ratio += log(T(int(1)) - res[i]);
+#endif
   // N.B. x_1 ... x_n == 1.
   // <=> x_1 / (x_1 ... x_n)^(1/n) ... == 1.
+#if defined(_PINVARIANT_SYMMETRIC_LINEAR_)
+  ratio = isfinite(ratio) ? exp(- ratio / T(2 * res.size())) : T(int(1));
+#else
   ratio = isfinite(ratio) ? exp(- ratio / T(res.size())) : T(int(1));
+#endif
   return make_pair(res *= ratio, ratio);
 }
 
@@ -3911,20 +3923,19 @@ template <typename T> T p0maxNext(const SimpleVector<T>& in) {
 // Get invariant structure that
 // R-register computer with deterministic calculation with nonlinear == true.
 // cf. bitsofcotton/randtools .
-// N.B. with cultivated == true condition, we feed root of the description
-//      we can use to id. data amount. we need at most 3 depth in normal.
-//      without timing attack things we sentry for the opposite side also
-//      have same structured one case. such of the attack isn't avoidable
-//      by this p01next. so we abandoned infinite cultivated loop.
-//      either we normally do p0next after this, so counting cardinal causes
-//      2 depth on whole.
+// N.B. with persistent == true condition, we feed root of the description
+//      we can use to id. data amount. if the stream is cultivated enough
+//      we sentry with this option but this can slips because we decompose
+//      each by R^4 invariant, so they'll result clustered eigen vectors.
+//      with digging depth enough, we try to avoid them but not so if the
+//      input stream isn't have structural continuity.
 // N.B. if input stream is something sparse with jammer generated, the varlen
 //      we need is far larger than this. this condition can be eliminated with
 //      in/output (de)?compression ask shirks the result of algorithms to some
 //      of the upper cardinals.
 // N.B. if the original stream doesn't have Lebesgue measureable condition in
-//      discrete, the description f(x):=<a,x> mod p has the hyperbolic
-//      triangular function complemented region.
+//      discrete, the description f(x):=<a,x> first p-adic digit has the
+//      hyperboblic triangular function complemented region.
 // N.B. this is the analogy to toeplitz matrix inveresion with singular one.
 // N.B. if the function has internal states variable that to be projected into
 //      series, they're looked as <a,x>+<b,y>==<a,x>==0, y is internal states.
@@ -3938,7 +3949,7 @@ template <typename T> T p0maxNext(const SimpleVector<T>& in) {
 //      ||Ax-1*x'||<epsilon condition.
 // N.B. the worse structures are handled by skipX concerns or long enough p012
 //      preprocess.
-template <typename T, const bool nonlinear, const bool insurance> T p01next(const SimpleVector<T>& in) {
+template <typename T, const bool nonlinear, const bool persistent> T p01next(const SimpleVector<T>& in) {
   static const int step(1);
   static const T zero(0);
   static const T one(1);
@@ -3946,9 +3957,9 @@ template <typename T, const bool nonlinear, const bool insurance> T p01next(cons
   // N.B. division accuracy glitch.
   const T nin(sqrt(in.dot(in) * (one + SimpleMatrix<T>().epsilon())));
   if(! isfinite(nin) || nin == zero) return zero;
-  const int varlen(ind2vd(in.size()));
+  const int varlen(nonlinear ? ind2vd(in.size()) : ind2vd(in.size()) * 2);
   // N.B. we use whole data information size on each single layer's size.
-  SimpleMatrix<T> invariants(insurance ?
+  SimpleMatrix<T> invariants(persistent ?
       (in.size() / (varlen + 1) < 8 + step ? 1 : in.size() / (varlen + 1)) : 1,
       nonlinear ? varlen + 2 : varlen);
   invariants.O();
@@ -3961,6 +3972,10 @@ template <typename T, const bool nonlinear, const bool insurance> T p01next(cons
       toeplitz.row(i - i0) = nonlinear ? makeProgramInvariant<T>(R2bin<T>(work),
         T(i + 1) / T(toeplitz.rows() + i0 + 1) ).first : binMargin<T>(work);
     }
+    // N.B. this untangles input stream into invariant but the accuracy
+    //      we make the hypothesis:
+    //      ||invariant made stream||_sup <~ ||f||_sup / varlen!.
+    //      this is because it's toeplitz made stream.
     invariants.row(i0) = linearInvariant<T>(toeplitz);
   }
   SimpleVector<T> invariant(invariants.cols());
@@ -3969,7 +3984,7 @@ template <typename T, const bool nonlinear, const bool insurance> T p01next(cons
   else {
     invariant.O();
     for(int i = 0; i < invariants.cols(); i ++)
-      invariant[i] = p01next<T, nonlinear, false>(invariants.col(i));
+      invariant[i] = p01next<T, true, persistent>(invariants.col(i));
   }
   if(invariant[varlen - 1] == zero)
     return in[in.size() - 1];
@@ -4871,7 +4886,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv0(const 
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < sz; i ++)  {
-    pair<SimpleVector<T>, T>  work(makeProgramInvariant<T>(in[i]));
+    pair<SimpleVector<T>, T> work(makeProgramInvariant<T>(in[i]));
     dupin.emplace_back(work.first.subVector(0, in[i].size()));
     seconds[i] = work.second;
   }
@@ -4918,7 +4933,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > predvq(const vecto
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int i = 0; i < seconds.size(); i ++)  {
+  for(int i = 0; i < in.size(); i ++)  {
     pair<SimpleVector<T>, T> work(makeProgramInvariant<T>(in[i]));
     intran.emplace_back(work.first.subVector(0, in[i].size()));
     seconds[i] = work.second;
@@ -4928,12 +4943,11 @@ template <typename T, int nprogress> vector<SimpleVector<T> > predvq(const vecto
   res.resize(in.size() - (start + step), SimpleVector<T>(in[0].size()).O());
   SimpleVector<SimpleVector<T> > p;
   p.entity.reserve(in.size());
-  vector<SimpleVector<T> > intranbuf(pFeedTranspose<T>(intran));
-  intran = move(intranbuf);
+  intran = pFeedTranspose<T>(intran);
   for(int i = 1; i < start; i ++)
     p.entity.emplace_back(SimpleVector<T>(in[0].size()).O());
   for(int i = start; i <= in.size(); i ++)
-    p.entity.emplace_back(predv00<T, nprogress>(intran, i, seconds, to_string(i) + string(" / ") + to_string(in.size()) + strloop));
+    p.entity.emplace_back(predv00<T, nprogress>(intran, i, seconds, to_string(i) + string(" / ") + to_string(in.size()) + strloop) );
   SimpleMatrix<T> ip(res[0].size(), p.size());
   intran.resize(0);
   ip.O();
@@ -5126,7 +5140,6 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
     inw.emplace_back(move(inww.first));
     nwork[i] = inww.second;
   }
-  const T nseconds(sqrt(nwork.dot(nwork)));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -5150,6 +5163,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
     res[i] = revertByProgramInvariant<T, true>(work,
       linearInvariant<T>(toeplitz), 4);
   }
+  T nseconds(sqrt(nwork.dot(nwork)));
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(res)).first,
       p01next<T, true, true>(nwork / nseconds) * nseconds));
@@ -8387,20 +8401,23 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      bore first chase. if both side is enthusiastic not to bore first,
 //      the input stream will be saturated to whole of the stream isn't
 //      have unique function generation, so this is analogy to the manually
-//      manipulate function switching.
+//      manipulate function switching. however, we can increase n-markov's
+//      n variable in such of a case.
 //
-// N.B. some of the ideal prediction candidates.
-//      so the ideal prediction without transforming input into meanings
-//      with the condition no initial or calculated internal states have
-//      the 4 of the candidates for f_k. either the attack to such of f_k,
-//      the payload range shift effectively causes better result
-//      (which move the gulf position before/after the first f_k met.)
-//      we face this condition surface with p2 j+ command, so we close them
-//      with this condition. so in another words, the pred(Vec|Mat|STen) needs
-//      one more layer they effects p2 j+ like effects also this doubles the
-//      output number, we can do this instead of skipX concerns they avoid
-//      the original predictors' jammer condition in some another way.
-//      we select deterministic one not with PRNG thing.
+// N.B. first condition of the prediction structure we should have to have.
+//      we should make hypothesis on some of the continuity on some layer
+//      because we calculate prediction stream from input stream only
+//      also to have some of the reosnance, we should calculate them also
+//      the same way. so pred(Vec|Mat|STen) uses such of the measureablity
+//      condition.
+// N.B. the saturated condition.
+//      we should increase the prediction dimension also remake worse large
+//      n for n-markov for input stream also we should decompose them as
+//      eigen decomposition. so the most of the first digit concerns concludes
+//      eigen vector matrix (usually m*n formed) fixation.
+//      this is also to make dynamic dictionary to the input stream on such
+//      of a layer. so ddpmopt [+-] also the masp + is intended to make this but
+//      this is obscure.
 //
 // N.B. another variants of the predictors fight with 2*3*2 pattern of #f
 //      fixation. (however, we don't use initial internal states, it's only 4).
@@ -8418,7 +8435,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      one by one causes Wavelet(Wavelet(Fourier+Discrete)+Discrete)+Discrete
 //      causes only a combination ordinal.
 // (13) (de)?compress after/before to out/input some of the range.
-// (14) brute orce (de)?compressed out/input into internal states/output
+// (14) brute force (de)?compressed out/input into internal states/output
 //      function number. this needs 19,683*19,683 table size we cannot treat
 //      on our machine. this shirks F_2^4 #f all of the generic i/o table
 //      then we brute force function listing.
