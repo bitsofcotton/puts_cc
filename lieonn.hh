@@ -3727,8 +3727,10 @@ template <typename T> static inline vector<pair<vector<SimpleVector<T> >, vector
 }
 
 // N.B. if the long enough varlen-range bitstream saturated stream is input,
-//      this say *nothing*.
-template <typename T> static inline T p012next(const SimpleVector<T>& d) {
+//      this say *nothing*. this is because both a+:=tan<a,x> and a+:=tan<-a,x> 
+//      is appeares as the crushed stream. in the case, we should increase
+//      base dimension.
+template <typename T> static inline T p012next(const SimpleVector<T>& d, const int& base_dim = 0) {
   static const int step(1);
   static const T zero(int(0));
                T M(zero);
@@ -3737,7 +3739,7 @@ template <typename T> static inline T p012next(const SimpleVector<T>& d) {
     M = max(M, abs(d[i]));
   }
   if(M <= zero) return zero;
-  const int varlen(ind2vd(d.size()));
+  const int varlen(base_dim ? base_dim : ind2vd(d.size()));
   vector<SimpleVector<T> > cache;
   if(d.size() - varlen + 2 < 0) return zero;
   cache.reserve(d.size() - varlen + 2);
@@ -3932,12 +3934,9 @@ template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
 // Get invariant structure that
 // R-register computer with deterministic calculation with nonlinear == true.
 // cf. bitsofcotton/randtools .
-// N.B. with persistent == true condition, we feed root of the description
-//      we can use to id. data amount. if the stream is cultivated enough
-//      we sentry with this option but this can slips because we decompose
-//      each by R^4 invariant, so they'll result clustered eigen vectors.
-//      with digging depth enough, we try to avoid them but not so if the
-//      input stream isn't have structural continuity.
+// N.B. with cont == true condition, we make hypothesis the invariant
+//      coefficients are continuous or periodical. this is valid if original
+//      stream have varlen-markov's Riemann-Stieljes measureable condition.
 // N.B. if input stream is something sparse with jammer generated, the varlen
 //      we need is far larger than this. this condition can be eliminated with
 //      in/output (de)?compression ask shirks the result of algorithms to some
@@ -3958,7 +3957,7 @@ template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
 //      ||Ax-1*x'||<epsilon condition.
 // N.B. the worse structures are handled by skipX concerns or long enough p012
 //      preprocess.
-template <typename T, const bool nonlinear, const bool persistent> T p01next(const SimpleVector<T>& in) {
+template <typename T, const bool nonlinear> T p01next(const SimpleVector<T>& in) {
   static const int step(1);
   static const T zero(0);
   static const T one(1);
@@ -3968,9 +3967,9 @@ template <typename T, const bool nonlinear, const bool persistent> T p01next(con
   if(! isfinite(nin) || nin == zero) return zero;
   const int varlen(nonlinear ? ind2vd(in.size()) : ind2vd(in.size()) * 2);
   // N.B. we use whole data information size on each single layer's size.
-  SimpleMatrix<T> invariants(persistent ?
-      (in.size() / (varlen + 1) < 8 + step ? 1 : in.size() / (varlen + 1)) : 1,
-      nonlinear ? varlen + 2 : varlen);
+  SimpleMatrix<T> invariants(
+    in.size() / (varlen + 1) < 8 + step ? 1 : in.size() / (varlen + 1),
+    nonlinear ? varlen + 2 : varlen);
   invariants.O();
   for(int i0 = 0; i0 < invariants.rows(); i0 ++) {
     SimpleMatrix<T> toeplitz(in.size() - varlen - step + 2
@@ -3991,12 +3990,14 @@ template <typename T, const bool nonlinear, const bool persistent> T p01next(con
   if(invariants.rows() <= 1)
     invariant = move(invariants.row(0));
   else {
+    // N.B. we make the hypothesis continuous invariant change.
+    //      this is equivalent to entropy feed on input stream is
+    //      enough stable or invariant is periodical case.
+    //      in normally, bored input stream's invariant is periodical.
     invariant.O();
     for(int i = 0; i < invariants.cols(); i ++)
-      invariant[i] = p01next<T, true, persistent>(invariants.col(i));
+      invariant[i] = p0maxNext<T>(invariants.col(i));
   }
-  if(invariant[varlen - 1] == zero)
-    return in[in.size() - 1];
   SimpleVector<T> work(varlen);
   for(int i = 1; i < work.size(); i ++)
     work[i - 1] = in[i - work.size() + in.size()];
@@ -4867,25 +4868,27 @@ template <typename T> static inline vector<SimpleVector<T> > static inline pFeed
   return in;
 }
 
-template <typename T, bool persistent, int nprogress> static inline SimpleVector<T> predv00(const vector<SimpleVector<T> >& intran, const int& sz, const SimpleVector<T>& seconds, const string& strloop = string("")) {
+template <typename T, int nprogress> static inline SimpleVector<T> predv00(const vector<SimpleVector<T> >& intran, const int& sz, const SimpleVector<T>& seconds, const string& strloop = string("")) {
   assert(0 < sz && sz <= intran[0].size());
   SimpleVector<T> p(intran.size());
   p.O();
+  // N.B. p01next calls p0maxNext implicitly, this needs to be cached single
+  //      threaded process on first call.
+  p[0] = p01next<T, true>(intran[0].subVector(0, sz));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int j = 0; j < intran.size(); j ++) {
+  for(int j = 1; j < intran.size(); j ++) {
     if(nprogress && ! (j % max(int(1), int(intran.size() / nprogress))) )
       cerr << j << " / " << intran.size() << ", " << strloop << endl;
-    p[j] = p01next<T, true, persistent>(intran[j].subVector(0, sz));
+    p[j] = p01next<T, true>(intran[j].subVector(0, sz));
   }
-  const T nseconds(sqrt(seconds.dot(seconds)));
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(p)).first,
-      p01next<T, true, true>(seconds / nseconds) * nseconds) );
+      p01next<T, true>(seconds) ));
 }
 
-template <typename T, bool persistent, int nprogress> static inline SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
+template <typename T, int nprogress> static inline SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
   assert(0 < sz && sz <= in.size());
   vector<SimpleVector<T> > dupin;
   SimpleVector<T> seconds(sz);
@@ -4899,7 +4902,7 @@ template <typename T, bool persistent, int nprogress> static inline SimpleVector
     dupin.emplace_back(work.first.subVector(0, in[i].size()));
     seconds[i] = work.second;
   }
-  return predv00<T, persistent, nprogress>(pFeedTranspose<T>(dupin), sz, seconds, strloop);
+  return predv00<T, nprogress>(pFeedTranspose<T>(dupin), sz, seconds, strloop);
 }
 
 template <typename T, int nprogress> vector<SimpleVector<T> > predvp(const vector<SimpleVector<T> >& in0, const string& strloop) {
@@ -4990,15 +4993,9 @@ template <typename T, int nprogress> vector<SimpleVector<T> > predvq(const vecto
 // N.B. we apply PRNGs before to predict each of prediction in general.
 //      this is needed if original streams' entropy feeding is not stable
 //      case, the implicit recursive functions' average can be stable with
-//      this hack. also we might need p012next before each p.
-//      this is the condition: non Lebesgure measurable condition can feed
-//      each function entropy can be pred success or failure entropy they
-//      can slice some amount of prediction bit.
-//      however, this method either only slices some amount of the original
-//      structure and their internal states by PRNGs.
-//      so the output will be obscure enough if we cannot slice original
-//      structure enough with ours.
-//      in the most of the cases, we don't need them with better PRNGs.
+//      this hack. this method either only slices some amount of the original
+//      structure and their internal states by PRNGs. so the output will be
+//      obscure enough if we cannot slice original structure enough with ours.
 //      we suppose phase period doesn't connected to the original structures.
 // N.B. we can avoid such of the PRNG condition with goki_check_cc:test.py
 //      [Qq]red command they shirks continuity auto tuned ones.
@@ -5172,26 +5169,11 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
     res[i] = revertByProgramInvariant<T, true, true>(work,
       linearInvariant<T>(toeplitz));
   }
-  const T nseconds(sqrt(nwork.dot(nwork)));
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(res)).first,
-      p01next<T, true, true>(nwork / nseconds) * nseconds));
+      p01next<T, true>(nwork) ));
 }
 
-// N.B. we're in front of the selection of algorithms:
-//      (i) pskipp(pgoshigoshi([predvp,predvq]))
-//        ongoing implementation, this makes deterministic many much of output.
-//        also if original stream has something natural continuity,
-//        we don't need skipp wrapper.
-//      (ii) pgoshigoshi([predv(predvp,predvq)](id, pSlipGulf0short)))
-//        PRNG-powered double of 4output, they fixes id. as first,
-//        the complement of them can shift the gulf place so pSlipGul0short.
-//      (iii) p012nextVariant(pgoshigoshi([predvp,predvq]))
-//        instead of (i) timing-specific attack counter measure,
-//        we feed the p012next's n-markov specific pattern to counter measure
-//        non unique functions. this makes the least candidates also
-//        deterministic. this might be ideal but needs huge of calculation
-//        time/resource.
 // N.B. *** ongoing layers ***
 //       | function      | layer# | [wsp1] | data amount *     |
 //       | pskipp        | 0      | w      | in * pi^-1(in)    |
@@ -5281,9 +5263,6 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 // N.B. also we close all of the entropy is from input stream itself condition
 //      predictor with this but there might be many another concepts nor
 //      implementations.
-//      the masp2catg or goki_check_cc:test.py [PQ]redg doing one of this but
-//      not optimal ones. also we want to backport bitsofcotton/specific into
-//      here, but implementation isn't now.
 
 template <typename T, bool skipx> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
@@ -8398,6 +8377,11 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      ones. this is equivalent to skipx concerns but with maybe random timing.
 //      we already have fixed range skipx also pSubesube jammer condition,
 //      so it's pseudo one of the condition.
+// (10) p012next before or after to pgoshigoshi call.
+//      it's equivalent if the varlen on p01next and on p012next are the same
+//      length. however, if the input stream is saturated, both of them cannot
+//      decide proper next step condition because input stream's n-length have
+//      both meanings.
 //
 // N.B. something XXX result descripton
 // (00) there might exist non Lebesgue measureable condition discrete stream.
