@@ -1534,6 +1534,7 @@ template <typename T> static inline T ccot(const T& s) {
     typedef int64_t  myint;
     // XXX: typedef long double myfloat;
     typedef double myfloat;
+#  endif
     
     static inline myfloat absfloor(const myfloat& x) {
       if(myfloat(0) <= x) return floor(x);
@@ -1543,7 +1544,6 @@ template <typename T> static inline T ccot(const T& s) {
       if(myfloat(0) <= x) return ceil(x);
       return - ceil(- x);
     }
-#  endif
 # elif _FLOAT_BITS_ == 8
     typedef uint8_t myuint;
     typedef int8_t  myint;
@@ -3110,7 +3110,11 @@ template <typename T> static inline SimpleVector<T> bin2R(const SimpleVector<T>&
   return res;
 }
 
+#if defined(_OLDCPP_)
+template <typename T> T sgn(const T& x) {
+#else
 template <typename T> const T& sgn(const T& x) {
+#endif
   static const T zero(0);
   static const T one(1);
   static const T mone(- T(int(1)));
@@ -3250,23 +3254,28 @@ template <typename T> static inline SimpleVector<T> revertProgramInvariant(const
   return res;
 }
 
-template <typename T, bool r2bin> static inline T revertByProgramInvariant(SimpleVector<T> work, const SimpleVector<T>& invariant, const int& idx) {
+template <typename T, bool r2bin, bool nonlinear> static inline T revertByProgramInvariant(SimpleVector<T> work, const SimpleVector<T>& invariant) {
   static const T one(int(1));
   static const T two(int(2));
+  const int idx(work.size() - 1);
   T last(sqrt(work.dot(work)));
   if(invariant[idx] == T(int(0))) return work[idx - 1];
-  for(int ii = 0;
-          ii < 2 * int(- log(SimpleMatrix<T>().epsilon()) / log(two) )
-          && sqrt(work.dot(work) * SimpleMatrix<T>().epsilon()) <
-               abs(work[work.size() - 1] - last); ii ++) {
-    last = work[idx];
-    const pair<SimpleVector<T>, T> work2(makeProgramInvariant<T>(r2bin ? R2bin<T>(work) : work, one));
-    work[idx] = r2bin ? bin2R<T>(revertProgramInvariant<T>(make_pair(
-      - (invariant.dot(work2.first) - invariant[idx] * work2.first[idx]) /
-        invariant[idx], work2.second)) ) :
-      revertProgramInvariant<T>(make_pair(
+  if(nonlinear) {
+    for(int ii = 0;
+            ii < 2 * int(- log(SimpleMatrix<T>().epsilon()) / log(two) )
+            && sqrt(work.dot(work) * SimpleMatrix<T>().epsilon()) <
+                 abs(work[idx] - last); ii ++) {
+      last = work[idx];
+      const pair<SimpleVector<T>, T> work2(makeProgramInvariant<T>(r2bin ? R2bin<T>(work) : work, one));
+      work[idx] = revertProgramInvariant<T>(make_pair(
         - (invariant.dot(work2.first) - invariant[idx] * work2.first[idx]) /
           invariant[idx], work2.second));
+      if(r2bin) work[idx] = R2bin<T>(work[idx]);
+    }
+  } else {
+    work[idx] = - (invariant.dot(work) -
+      invariant[idx] * work[idx]) / invariant[idx];
+    if(r2bin) work[idx] = R2bin<T>(work[idx]);
   }
   return work[idx];
 }
@@ -3408,7 +3417,7 @@ template <typename T> static inline vector<vector<SimpleVector<T> > > delta(cons
 // N.B. F_2 case #f fixation on R^indim into R^result fixation.
 //      if we object F_3 or more accuracy, we need to increase the result.
 // N.B. there's also analogy to this as {0,1}^m*n operator orthogonalization
-//      invariant maximum dimensions.
+//      invariant residue maximum dimensions. (sqrt(3!) <~ (#{0,1})^2).
 // N.B. also the binary 2 operand opereator is described in R^4 vector
 //      as a invariant.
 static inline int ind2vd(const int& indim) {
@@ -3816,7 +3825,7 @@ template <typename T> static inline T p012next(const SimpleVector<T>& d) {
 //   2^y:=A*(2^x) A in R^(N*N), 2^x in {0,1}^N.
 //   this concludes the recursive structure as:
 //     Sum A_k*cosh(a_k x)+B_k*sinh(b_k x) because A^n calculation.
-template <typename T> T p0next(const SimpleVector<T>& in) {
+template <typename T> static inline T p0next(const SimpleVector<T>& in) {
   static const int step(1);
   return pnextcacher<T>(in.size(), ((step - 1) % in.size()) + 1).dot(in);
 }
@@ -3833,7 +3842,7 @@ template <typename T, T (*f)(const SimpleVector<T>&)> static inline T invNext(co
 }
 
 // N.B. some of the essential point hack.
-template <typename T, T (*f)(const SimpleVector<T>&)> T northPoleNext(const SimpleVector<T>& in) {
+template <typename T, T (*f)(const SimpleVector<T>&)> static inline T northPoleNext(const SimpleVector<T>& in) {
   static const T zero(int(0));
   static const T one(int(1));
   static const T M(atan(one / sqrt(SimpleMatrix<T>().epsilon())));
@@ -3855,7 +3864,7 @@ template <typename T, T (*f)(const SimpleVector<T>&)> T northPoleNext(const Simp
   return in[in.size() - 1];
 }
 
-template <typename T, bool avg, T (*f)(const SimpleVector<T>&)> T sumCNext(const SimpleVector<T>& in) {
+template <typename T, bool avg, T (*f)(const SimpleVector<T>&)> static inline T sumCNext(const SimpleVector<T>& in) {
   SimpleVector<T> ff(in);
   for(int i = 1; i < ff.size(); i ++)
     ff[i] += ff[i - 1];
@@ -3882,7 +3891,7 @@ template <typename T, T (*f)(const SimpleVector<T>&)> static inline T logCNext(c
   return f(gg) * ff[ff.size() - 1];
 }
 
-template <typename T> T p0max0next(const SimpleVector<T>& in) {
+template <typename T> static inline T p0max0next(const SimpleVector<T>& in) {
   // N.B. on existing taylor series.
   //      if the sampling frequency is not enough, middle range of the original
   //      function frequency (enough large bands) will effect prediction fail.
@@ -3895,7 +3904,7 @@ template <typename T> T p0max0next(const SimpleVector<T>& in) {
     invNext<T, sumCNext<T, true, p0next<T> > >(in)) / T(int(2));
 }
 
-template <typename T> T p0maxNext(const SimpleVector<T>& in) {
+template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
   // N.B. we only handle lebesgue measurable and R(finite)-valued functions.
   //      so worse structures are handled by p01next.
   // N.B. this is o-minimal
@@ -3992,9 +4001,7 @@ template <typename T, const bool nonlinear, const bool persistent> T p01next(con
   for(int i = 1; i < work.size(); i ++)
     work[i - 1] = in[i - work.size() + in.size()];
   work[work.size() - 1] = zero;
-  if(nonlinear)
-    return revertByProgramInvariant<T, true>(work, invariant, work.size() - 1);
-  return - invariant.dot(work) / invariant[varlen - 1];
+  return revertByProgramInvariant<T, nonlinear, nonlinear>(work, invariant);
 }
 
 // N.B. class-capsules for serial stream.
@@ -4549,7 +4556,7 @@ template <typename T> static inline bool loadstub(istream& input, const int& nma
   return true;
 }
 
-template <typename T> bool loadp2or3(vector<SimpleMatrix<T> >& data, istream& input) {
+template <typename T> static inline bool loadp2or3(vector<SimpleMatrix<T> >& data, istream& input) {
   string line;
   string line2;
   string line3;
@@ -4596,7 +4603,7 @@ template <typename T> bool loadp2or3(vector<SimpleMatrix<T> >& data, istream& in
   return true;
 }
 
-template <typename T> bool loadp2or3(vector<SimpleMatrix<T> >& data, const char* filename) {
+template <typename T> static inline bool loadp2or3(vector<SimpleMatrix<T> >& data, const char* filename) {
   ifstream input;
   input.open(filename);
   if(input.is_open()) {
@@ -4612,7 +4619,7 @@ template <typename T> bool loadp2or3(vector<SimpleMatrix<T> >& data, const char*
   return true;
 }
 
-template <typename T> bool savep2or3(const char* filename, const vector<SimpleMatrix<T> >& data, const int& depth = 65535) {
+template <typename T> static inline bool savep2or3(const char* filename, const vector<SimpleMatrix<T> >& data, const int& depth = 65535) {
   ofstream output;
   output.open(filename);
   if(output.is_open()) {
@@ -4846,7 +4853,9 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
 //      additional states on given input range.
 // N.B. if we're in result is in control condition, we need to output at least
 //      a 3 on the prediction.
-template <typename T> static inline vector<SimpleVector<T> > pFeedTranspose(const vector<SimpleVector<T> >& in0) {
+
+// for speed purpose.
+template <typename T> static inline vector<SimpleVector<T> > static inline pFeedTranspose(const vector<SimpleVector<T> >& in0) {
   assert(in0.size());
   vector<SimpleVector<T> > in;
   in.resize(in0[0].size());
@@ -5154,16 +5163,16 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
       vw.setVector(0, inw[j * 2].subVector(0, 4));
       vw[4] = inw[j * 2 + 1][i];
       toeplitz.row(j) =
-        makeProgramInvariant<T>(R2bin<T>(vw), T(j) / T(int(toeplitz.rows() + 1)) ).first;
+        makeProgramInvariant<T>(R2bin<T>(vw), T(j + 1) / T(int(toeplitz.rows() + 1)) ).first;
     }
     SimpleVector<T> work(5);
     work.O();
     work.setVector(0, inw[inw.size() - 1].subVector(0, 4));
     work[work.size() - 1] = zero;
-    res[i] = revertByProgramInvariant<T, true>(work,
-      linearInvariant<T>(toeplitz), 4);
+    res[i] = revertByProgramInvariant<T, true, true>(work,
+      linearInvariant<T>(toeplitz));
   }
-  T nseconds(sqrt(nwork.dot(nwork)));
+  const T nseconds(sqrt(nwork.dot(nwork)));
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(res)).first,
       p01next<T, true, true>(nwork / nseconds) * nseconds));
@@ -5194,7 +5203,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //       | num_t::bit operation        | 16 | 1 | in         |
 // (1)   | after burn with p0next      | 3  | w | in         |
 //       | divide by program invariant | 4  | w | in         |
-//       | recursive                   | 6  | w | <= in * 2  |
+//       | recursive                   | 6  | w | in * recur |
 //       | makeProgramInvariant        | 7  | p | in         |
 //       | linearInvariant             | -  | - | -          |
 //       |   - QR decomposition        | 9* | s | > in * 4!  |
@@ -5205,7 +5214,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //       | num_t::bit operation        | 16 | 1 | in         |
 // N.B. so total layer is 16~17 from logical boolean operation
 //      explicitly stacked including if-them operation. also the data amount
-//      is: (p^-1(in) * PRNG) * {2*3+10, > 8+4!*2} * in.
+//      is: (p^-1(in) * PRNG) * 2 * {2*3+10, > 7+recur+4!*2} * in.
 // N.B. the data amount used as internal calculation copied 3*in for 2nd order
 //      saturation, 6 layers for multiple layer algebraic copying structure
 //      saturation, 9 layers for enough to decompose inverse of them.
@@ -5262,7 +5271,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //      not optimal ones. also we want to backport bitsofcotton/specific into
 //      here, but implementation isn't now.
 
-template <typename T, bool skipx = false> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
+template <typename T, bool skipx> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -5292,12 +5301,12 @@ template <typename T, bool skipx = false> vector<vector<SimpleVector<T> > > pred
   return move(res);
 }
 
-template <typename T> static inline vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
+template <typename T, bool skipx> static inline vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   vector<vector<SimpleVector<T> > > res(in0);
-  return predVec<T>(res);
+  return predVec<T, skipx>(res);
 }
 
-template <typename T, bool skipx = false> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0) {
+template <typename T, bool skipx> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -5334,12 +5343,12 @@ template <typename T, bool skipx = false> vector<vector<SimpleMatrix<T> > > pred
   return move(res);
 }
 
-template <typename T> static inline vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
+template <typename T, bool skipx> static inline vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
   vector<vector<SimpleMatrix<T> > > res(in0);
-  return predMat<T>(res);
+  return predMat<T, skipx>(res);
 }
 
-template <typename T, bool skipx = false> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx) {
+template <typename T, bool skipx> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx) {
   assert(idx.size() && in0.size());
   // N.B. we don't do input scaling.
   // N.B. we should use each bit extended input stream but not now.
@@ -5495,7 +5504,7 @@ template <typename T> bool saveobj(const vector<SimpleVector<T> >& data, const T
   return true;
 }
 
-template <typename T> bool loadobj(vector<SimpleVector<T> >& data, vector<SimpleVector<int> >& polys, const char* filename) {
+template <typename T> static inline bool loadobj(vector<SimpleVector<T> >& data, vector<SimpleVector<int> >& polys, const char* filename) {
   ifstream input;
   input.open(filename);
   if(input.is_open()) {
@@ -7199,8 +7208,8 @@ template <typename T, typename U> vector<gram_t<U> > lword<T, U>::compute(const 
 //   class. however this also needs uniqueness of the descriptor condition.
 //   we need materials and tables to make brand-new data from input.
 //   this needs entity space and glues other than dictating.
-// undone: we can focus K^{4x4} (as aa symbol) :=
-//   { {A|#A<infty},N,R,{f|f in 2^$}}^4 as a description base.
+// undone: we can focus K^{4x4} (as a symbol) :=
+//   { {A|#A<infty},N,R,{f|f in 2^R}}^4 as a description base.
 //   this leads {K^{4x4},K^{4x4},f,t}^n for series of input.
 //   there'a a analogy {category,relation,geometry} ~
 //   {intention start/end, binary op on intention to intention,
@@ -7303,7 +7312,7 @@ public:
   inline bool          operator != (const corpus<T, U>& other) const {
     return corpust != other.corpust;
   }
-  T             cdot(const corpus<T, U>& other) const {
+  inline T cdot(const corpus<T, U>& other) const {
     T res(0);
     const map<int, SimpleSparseVector<SimpleSparseVector<T> > >& oi0(
       other.corpust.iter());
@@ -7322,7 +7331,7 @@ public:
     }
     return res;
   }
-  T             absmax() const {
+  inline T absmax() const {
     T res(0);
     const map<int, SimpleSparseVector<SimpleSparseVector<T> > >& ci0(
       corpust.iter());
@@ -7338,7 +7347,7 @@ public:
     }
     return res;
   }
-  corpus<T, U>& reDig(const T& ratio) {
+  inline corpus<T, U>& reDig(const T& ratio) {
     map<int, SimpleSparseVector<SimpleSparseVector<T> > >& ci0(corpust.iter());
     for(typename map<int, SimpleSparseVector<SimpleSparseVector<T> > >::iterator
           itr0(ci0.begin()); itr0 != ci0.end(); ++ itr0) {
@@ -7352,7 +7361,7 @@ public:
     }
     return *this;
   }
-  corpus<T, U> simpleThresh(const T& ratio) const {
+  inline corpus<T, U> simpleThresh(const T& ratio) const {
     assert(T(int(0)) <= ratio);
     const T thisabsmax(absmax());
     const vector<int> okidx(countIdx(ratio * thisabsmax));
@@ -7380,7 +7389,7 @@ public:
       w[i] = sqrt(SV.row(i).dot(SV.row(i)));
     return w;
   }
-  vector<int>  countIdx(const T& thresh = T(0)) const {
+  inline vector<int> countIdx(const T& thresh = T(0)) const {
     vector<int> okidx;
     const map<int, SimpleSparseVector<SimpleSparseVector<T> > >& ci0(
       corpust.iter());
@@ -7439,17 +7448,132 @@ public:
     corpus<T, U> plus(*this);
     return plus.absfy().serializeSub(plus.countIdx(T(int(0))));
   }
+  inline corpus<T, U>& absfy() {
+    const map<int, SimpleSparseVector<SimpleSparseVector<T> > >& pi0(
+      corpust.iter());
+    for(typename map<int, SimpleSparseVector<SimpleSparseVector<T> > >::const_iterator
+          itr0(pi0.begin()); itr0 != pi0.end(); ++ itr0) {
+      const map<int, SimpleSparseVector<T> >& pi1(itr0->second.iter());
+      for(typename map<int, SimpleSparseVector<T> >::const_iterator itr1(pi1.begin());
+          itr1 != pi1.end(); ++ itr1) {
+        const map<int, T>& pi2(itr1->second.iter());
+        for(typename map<int, T>::const_iterator itr2(pi2.begin()); itr2 != pi2.end(); ++ itr2)
+          if(itr2->second < T(0)) {
+            // N.B. we estimate minus sign on the tensor as to be reverse order.
+            corpust[itr1->first][itr0->first][itr2->first] -= itr2->second;
+            corpust[itr0->first][itr1->first][itr2->first]  = T(int(0));
+          }
+      }
+    }
+    return *this = simpleThresh(T(int(0)));
+  }
+  inline pair<T, T> compareStructure(const corpus<T, U>& src, const T& thresh = T(1e-4), const T& thresh2 = T(.125)) const {
+    // get H-SVD singular values for each of them and sort:
+    const SimpleVector<T> s0(singularValues()), s1(src.singularValues());
+    // get compared.
+    pair<T, T> result;
+    result.first = result.second = T(0);
+    SimpleMatrix<T> S0(s0.size(), s0.size());
+    SimpleMatrix<T> S1(s1.size(), s1.size());
+    for(int i = 0; i < S0.rows(); i ++)
+      for(int j = 0; j < S0.cols(); j ++) {
+        S0(i, j) = s0[i] / s0[j];
+        if(!isfinite(S0(i, j)) || T(1) / thresh < abs(S0(i, j)))
+          S0(i, j) = T(0);
+      }
+    for(int i = 0; i < S1.rows(); i ++)
+      for(int j = 0; j < S1.cols(); j ++) {
+        S1(i, j) = s1[i] / s1[j];
+        if(!isfinite(S1(i, j)) || T(1) / thresh < abs(S1(i, j)))
+          S1(i, j) = T(0);
+      }
+    const SimpleVector<T> ss0(singularValues(S0));
+    const SimpleVector<T> ss1(singularValues(S1));
+    int i(0), j(0);
+    for( ; i < ss0.size() && j < ss1.size(); )
+      if(abs(ss0[i] - ss1[j]) / max(abs(ss0[i]), abs(ss1[i])) < thresh2) {
+        result.first  += ss0[i] * ss0[i] + ss1[j] * ss1[j];
+        i ++, j ++;
+      } else {
+        result.second += ss0[i] * ss0[i] + ss1[j] * ss1[j];
+        if(ss0[i] > ss1[j])
+          i ++;
+        else
+          j ++;
+      }
+    for( ; i < ss0.size(); i ++)
+      result.second += ss0[i] * ss0[i];
+    for( ; j < ss1.size(); j ++)
+      result.second += ss1[j] * ss1[j];
+    return result;
+  }
   corpus<T, U>  withDetail(const U& word, const corpus<T, U>& other, const T& thresh = T(0)) const;
   // N.B. should be inverse of withDetail but not so.
   corpus<T, U>  abbrev(const U& word, const corpus<T, U>& work, const T& thresh = T(0)) const;
-  pair<T, T>    compareStructure(const corpus<T, U>& src, const T& thresh = T(1e-4), const T& thresh2 = T(.125)) const;
-  corpus<T, U>& absfy();
 
   // N.B. this should not be dense, if dense, they say nothing without dictation.
   Tensor corpust;
 private:
-  SimpleVector<T> singularValues() const;
-  U     serializeSub(const vector<int>& idxs) const;
+  inline SimpleVector<T> singularValues() const {
+    SimpleMatrix<T> planes(words.size(), words.size());
+    for(int i = 0; i < words.size(); i ++) {
+      SimpleMatrix<T> buf(words.size(), words.size());
+      for(int j = 0; j < words.size(); j ++) {
+        for(int k = 0; k < words.size(); k ++)
+          if(isfinite((const_cast<const Tensor&>(corpust))[i][j][k]))
+            buf(k, j) = (const_cast<const Tensor&>(corpust))[i][j][k];
+          else {
+            cerr << "nan" << flush;
+            buf(k, j) = T(0);
+          }
+        for(int k = words.size(); k < buf.rows(); k ++)
+          buf(k, j) = T(0);
+      }
+      planes.col(i) = singularValues(buf);
+    }
+    return singularValues(planes);
+  }
+  inline U serializeSub(const vector<int>& idxs) const {
+    cerr << "." << flush;
+    if(idxs.size() <= 1) {
+      if(idxs.size())
+        return words[idxs[0]];
+      return U();
+    }
+    vector<pair<int, int> > score;
+    score.reserve(idxs.size());
+    // N.B. i0 - i1 - i2 is stored in corpust[i0][i2][i1].
+    for(int i = 0; i < idxs.size(); i ++) {
+      int lscore(0);
+      for(int j = 0; j < idxs.size(); j ++)
+        if(const_cast<const Tensor&>(corpust)[idxs[j]].iter().size()) {
+          for(int k = 0; k < idxs.size(); k ++)
+            if(const_cast<const Tensor&>(corpust)[idxs[j]][idxs[i]][idxs[k]] != T(0))
+              lscore --;
+        }
+      const map<int, SimpleSparseVector<T> >& ii(
+        const_cast<const Tensor&>(corpust)[idxs[i]].iter());
+      if(ii.size()) for(int j = 0; j < idxs.size(); j ++)
+        if(const_cast<const Tensor&>(corpust)[idxs[i]][idxs[j]].iter().size()) {
+          for(int k = 0; k < idxs.size(); k ++)
+            if(const_cast<const Tensor&>(corpust)[idxs[i]][idxs[j]][idxs[k]] != T(0))
+              lscore ++;
+        }
+      // N.B. middle data ignored.
+      score.emplace_back(make_pair(lscore, idxs[i]));
+    }
+    sort(score.begin(), score.end());
+    vector<int> left, right;
+    left.reserve(idxs.size());
+    right.reserve(idxs.size());
+    int i(0);
+    // N.B.: we only focus orders itself.
+    for( ; i < score.size() / 2; i ++)
+      left.emplace_back(score[i].second);
+    for( ; i < score.size(); i ++)
+      right.emplace_back(score[i].second);
+    return serializeSub(left) + serializeSub(right);
+  }
   inline void  merge5(Tensor& d, const int& i, const int& ki, const int& kk, const int& kj, const int& j, const T& intensity) const {
     if(intensity == T(0)) return;
     d[ i][kk][ki] += intensity;
@@ -7464,7 +7588,7 @@ private:
     d[kk][ j][kj] += intensity;
     return;
   }
-  U     orig;
+  U orig;
 };
 
 template <typename T, typename U> corpus<T,U>::corpus(const U& input, const vector<U>& delimiter) {
@@ -7597,129 +7721,6 @@ template <typename T, typename U> corpus<T,U>::corpus(const U& input, const vect
       }
     }
   }
-}
-
-template <typename T, typename U> corpus<T, U>& corpus<T, U>::absfy() {
-  const map<int, SimpleSparseVector<SimpleSparseVector<T> > >& pi0(
-    corpust.iter());
-  for(typename map<int, SimpleSparseVector<SimpleSparseVector<T> > >::const_iterator
-        itr0(pi0.begin()); itr0 != pi0.end(); ++ itr0) {
-    const map<int, SimpleSparseVector<T> >& pi1(itr0->second.iter());
-    for(typename map<int, SimpleSparseVector<T> >::const_iterator itr1(pi1.begin());
-        itr1 != pi1.end(); ++ itr1) {
-      const map<int, T>& pi2(itr1->second.iter());
-      for(typename map<int, T>::const_iterator itr2(pi2.begin()); itr2 != pi2.end(); ++ itr2)
-        if(itr2->second < T(0)) {
-          // N.B. we estimate minus sign on the tensor as to be reverse order.
-          corpust[itr1->first][itr0->first][itr2->first] -= itr2->second;
-          corpust[itr0->first][itr1->first][itr2->first]  = T(int(0));
-        }
-    }
-  }
-  return *this = simpleThresh(T(int(0)));
-}
-
-template <typename T, typename U> U corpus<T, U>::serializeSub(const vector<int>& idxs) const {
-  cerr << "." << flush;
-  if(idxs.size() <= 1) {
-    if(idxs.size())
-      return words[idxs[0]];
-    return U();
-  }
-  vector<pair<int, int> > score;
-  score.reserve(idxs.size());
-  // N.B. i0 - i1 - i2 is stored in corpust[i0][i2][i1].
-  for(int i = 0; i < idxs.size(); i ++) {
-    int lscore(0);
-    for(int j = 0; j < idxs.size(); j ++)
-      if(const_cast<const Tensor&>(corpust)[idxs[j]].iter().size()) {
-        for(int k = 0; k < idxs.size(); k ++)
-          if(const_cast<const Tensor&>(corpust)[idxs[j]][idxs[i]][idxs[k]] != T(0))
-            lscore --;
-      }
-    const map<int, SimpleSparseVector<T> >& ii(
-      const_cast<const Tensor&>(corpust)[idxs[i]].iter());
-    if(ii.size()) for(int j = 0; j < idxs.size(); j ++)
-      if(const_cast<const Tensor&>(corpust)[idxs[i]][idxs[j]].iter().size()) {
-        for(int k = 0; k < idxs.size(); k ++)
-          if(const_cast<const Tensor&>(corpust)[idxs[i]][idxs[j]][idxs[k]] != T(0))
-            lscore ++;
-      }
-    // N.B. middle data ignored.
-    score.emplace_back(make_pair(lscore, idxs[i]));
-  }
-  sort(score.begin(), score.end());
-  vector<int> left, right;
-  left.reserve(idxs.size());
-  right.reserve(idxs.size());
-  int i(0);
-  // N.B.: we only focus orders itself.
-  for( ; i < score.size() / 2; i ++)
-    left.emplace_back(score[i].second);
-  for( ; i < score.size(); i ++)
-    right.emplace_back(score[i].second);
-  return serializeSub(left) + serializeSub(right);
-}
-
-template <typename T, typename U> pair<T, T> corpus<T, U>::compareStructure(const corpus<T, U>& src, const T& thresh, const T& thresh2) const {
-  // get H-SVD singular values for each of them and sort:
-  const SimpleVector<T> s0(singularValues()), s1(src.singularValues());
-  // get compared.
-  pair<T, T> result;
-  result.first = result.second = T(0);
-  SimpleMatrix<T> S0(s0.size(), s0.size());
-  SimpleMatrix<T> S1(s1.size(), s1.size());
-  for(int i = 0; i < S0.rows(); i ++)
-    for(int j = 0; j < S0.cols(); j ++) {
-      S0(i, j) = s0[i] / s0[j];
-      if(!isfinite(S0(i, j)) || T(1) / thresh < abs(S0(i, j)))
-        S0(i, j) = T(0);
-    }
-  for(int i = 0; i < S1.rows(); i ++)
-    for(int j = 0; j < S1.cols(); j ++) {
-      S1(i, j) = s1[i] / s1[j];
-      if(!isfinite(S1(i, j)) || T(1) / thresh < abs(S1(i, j)))
-        S1(i, j) = T(0);
-    }
-  const SimpleVector<T> ss0(singularValues(S0));
-  const SimpleVector<T> ss1(singularValues(S1));
-  int i(0), j(0);
-  for( ; i < ss0.size() && j < ss1.size(); )
-    if(abs(ss0[i] - ss1[j]) / max(abs(ss0[i]), abs(ss1[i])) < thresh2) {
-      result.first  += ss0[i] * ss0[i] + ss1[j] * ss1[j];
-      i ++, j ++;
-    } else {
-      result.second += ss0[i] * ss0[i] + ss1[j] * ss1[j];
-      if(ss0[i] > ss1[j])
-        i ++;
-      else
-        j ++;
-    }
-  for( ; i < ss0.size(); i ++)
-    result.second += ss0[i] * ss0[i];
-  for( ; j < ss1.size(); j ++)
-    result.second += ss1[j] * ss1[j];
-  return result;
-}
-
-template <typename T, typename U> SimpleVector<T> corpus<T, U>::singularValues() const {
-  SimpleMatrix<T> planes(words.size(), words.size());
-  for(int i = 0; i < words.size(); i ++) {
-    SimpleMatrix<T> buf(words.size(), words.size());
-    for(int j = 0; j < words.size(); j ++) {
-      for(int k = 0; k < words.size(); k ++)
-        if(isfinite((const_cast<const Tensor&>(corpust))[i][j][k]))
-          buf(k, j) = (const_cast<const Tensor&>(corpust))[i][j][k];
-        else {
-          cerr << "nan" << flush;
-          buf(k, j) = T(0);
-        }
-      for(int k = words.size(); k < buf.rows(); k ++)
-        buf(k, j) = T(0);
-    }
-    planes.col(i) = singularValues(buf);
-  }
-  return singularValues(planes);
 }
 
 template <typename T, typename U> corpus<T, U> corpus<T, U>::withDetail(const U& word, const corpus<T, U>& other, const T& thresh) const {
