@@ -3726,8 +3726,8 @@ template <typename T> static inline vector<pair<vector<SimpleVector<T> >, vector
   return crushWithOrder<T>(v, cs, max(int(2), int(sqrt(T(v.size())))));
 }
 
-// N.B. if there's creation/destruction on the dimension targetted,
-//      we slip with this predictor corrector.
+// N.B. if the long enough varlen-range bitstream saturated stream is input,
+//      this say *nothing*.
 template <typename T> static inline T p012next(const SimpleVector<T>& d) {
   static const int step(1);
   static const T zero(int(0));
@@ -4867,7 +4867,7 @@ template <typename T> static inline vector<SimpleVector<T> > static inline pFeed
   return in;
 }
 
-template <typename T, int nprogress> static inline SimpleVector<T> predv00(const vector<SimpleVector<T> >& intran, const int& sz, const SimpleVector<T>& seconds, const string& strloop = string("")) {
+template <typename T, bool persistent, int nprogress> static inline SimpleVector<T> predv00(const vector<SimpleVector<T> >& intran, const int& sz, const SimpleVector<T>& seconds, const string& strloop = string("")) {
   assert(0 < sz && sz <= intran[0].size());
   SimpleVector<T> p(intran.size());
   p.O();
@@ -4877,7 +4877,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv00(const
   for(int j = 0; j < intran.size(); j ++) {
     if(nprogress && ! (j % max(int(1), int(intran.size() / nprogress))) )
       cerr << j << " / " << intran.size() << ", " << strloop << endl;
-    p[j] = p01next<T, true, true>(intran[j].subVector(0, sz));
+    p[j] = p01next<T, true, persistent>(intran[j].subVector(0, sz));
   }
   const T nseconds(sqrt(seconds.dot(seconds)));
   return revertProgramInvariant<T>(make_pair(
@@ -4885,7 +4885,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv00(const
       p01next<T, true, true>(seconds / nseconds) * nseconds) );
 }
 
-template <typename T, int nprogress> static inline SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
+template <typename T, bool persistent, int nprogress> static inline SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
   assert(0 < sz && sz <= in.size());
   vector<SimpleVector<T> > dupin;
   SimpleVector<T> seconds(sz);
@@ -4899,7 +4899,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv0(const 
     dupin.emplace_back(work.first.subVector(0, in[i].size()));
     seconds[i] = work.second;
   }
-  return predv00<T, nprogress>(pFeedTranspose<T>(dupin), sz, seconds, strloop);
+  return predv00<T, persistent, nprogress>(pFeedTranspose<T>(dupin), sz, seconds, strloop);
 }
 
 template <typename T, int nprogress> vector<SimpleVector<T> > predvp(const vector<SimpleVector<T> >& in0, const string& strloop) {
@@ -5005,7 +5005,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > predvq(const vecto
 // N.B. practically, nrecur == 0 works well with ddpmopt T cmd, we use this.
 //      we don't select better nrecur == 11 * 11 we need huge computation time.
 template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), int nrecur> vector<SimpleVector<T> > static inline predv(const vector<SimpleVector<T> >& in, const string& strloop) {
-  if(! nrecur) return p(in, string(", 0 / 1") + strloop);
+  if(! nrecur) return p(in, string(", id.") + strloop);
   vector<SimpleVector<T> > res;
   for(int i0 = 0; i0 < nrecur; i0 ++) {
     vector<SimpleVector<T> > rin(in);
@@ -5178,7 +5178,21 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
       p01next<T, true, true>(nwork / nseconds) * nseconds));
 }
 
-// N.B. *** layers ***
+// N.B. we're in front of the selection of algorithms:
+//      (i) pskipp(pgoshigoshi([predvp,predvq]))
+//        ongoing implementation, this makes deterministic many much of output.
+//        also if original stream has something natural continuity,
+//        we don't need skipp wrapper.
+//      (ii) pgoshigoshi([predv(predvp,predvq)](id, pSlipGulf0short)))
+//        PRNG-powered double of 4output, they fixes id. as first,
+//        the complement of them can shift the gulf place so pSlipGul0short.
+//      (iii) p012nextVariant(pgoshigoshi([predvp,predvq]))
+//        instead of (i) timing-specific attack counter measure,
+//        we feed the p012next's n-markov specific pattern to counter measure
+//        non unique functions. this makes the least candidates also
+//        deterministic. this might be ideal but needs huge of calculation
+//        time/resource.
+// N.B. *** ongoing layers ***
 //       | function      | layer# | [wsp1] | data amount *     |
 //       | pskipp        | 0      | w      | in * pi^-1(in)    |
 //       | pgoshigoshi   | 1      | w      | in * 2            |
@@ -8380,6 +8394,10 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      this depends on the first prediction is continuous or not causes
 //      the prediction stream's quality. also they depends on the first
 //      hypothesis is satisfied or not.
+// (09) make input stream transformed by xor-filter by patternized fixed
+//      ones. this is equivalent to skipx concerns but with maybe random timing.
+//      we already have fixed range skipx also pSubesube jammer condition,
+//      so it's pseudo one of the condition.
 //
 // N.B. something XXX result descripton
 // (00) there might exist non Lebesgue measureable condition discrete stream.
@@ -8408,17 +8426,22 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 // N.B. first condition of the prediction structure we should have to have.
 //      we should make hypothesis on some of the continuity on some layer
 //      because we calculate prediction stream from input stream only
-//      also to have some of the reosnance, we should calculate them also
+//      also to have some of the resonance, we should calculate them also
 //      the same way. so pred(Vec|Mat|STen) uses such of the measureablity
 //      condition.
+//      to make hidden +2 dimension from input stream only: could be done by
+//      expscale, logscale, multiplication inverse for p-adic, but it's only id.
+//      either if we make [1, ..., 1] orthogonalization, it's only the negate
+//      for binary coded stream. either patternized xor gate is (09) case.
+//      so if we're treating input stream as bit stream, it's culs-de-sac again.
 // N.B. the saturated condition.
-//      we should increase the prediction dimension also remake worse large
+//      we should increase the prediction dimension also increase worse large
 //      n for n-markov for input stream also we should decompose them as
 //      eigen decomposition. so the most of the first digit concerns concludes
 //      eigen vector matrix (usually m*n formed) fixation.
 //      this is also to make dynamic dictionary to the input stream on such
-//      of a layer. so ddpmopt [+-] also the masp + is intended to make this but
-//      this is obscure.
+//      of a layer. so ddpmopt [+-] also the masp + is intended to make this
+//      however they should have many much of the input stream size.
 //
 // N.B. another variants of the predictors fight with 2*3*2 pattern of #f
 //      fixation. (however, we don't use initial internal states, it's only 4).
