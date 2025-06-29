@@ -2592,7 +2592,7 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::zeroFix(const Simp
     const SimpleVector<T> on(projectionPt(one));
     if(sqrt(on.dot(on)) < sqrt(one.dot(one)) * epsilon()) *this = move(Pb);
   }
-  // N.B. now we have fix indices that to be P R [x 1] * t == 0.
+  // N.B. now we have fix indices to be P R [x 1] * t == 0.
   return R.solve((*this) * one);
 }
 
@@ -3541,8 +3541,6 @@ template <typename T> inline CatG<T>::CatG(const int& size0, const vector<Simple
 #endif
   for(int i = 0; i < in.size(); i ++)
     A.row(i) = makeProgramInvariant(R2bin<T>(tayl(size, in[i].size()) * in[i])).first;
-    // N.B. test for linear ones:
-    // A.row(i).setVector(0, tayl(size, in[i].size()) * in[i]);
         SimpleMatrix<T> Pt(A.QR());
         SimpleMatrix<T> Ptb(Pt);
   const SimpleMatrix<T> R(Pt * A);
@@ -3947,7 +3945,7 @@ template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
 //      discrete, the description f(x):=<a,x> first p-adic digit has the
 //      hyperboblic triangular function complemented region.
 // N.B. this is the analogy to toeplitz matrix inveresion with singular one.
-// N.B. if the function has internal states variable that to be projected into
+// N.B. if the function has internal states variable to be projected into
 //      series, they're looked as <a,x>+<b,y>==<a,x>==0, y is internal states.
 //      so this causes A*x==B*y, so increasing dimension causes ok result.
 //      however, we're in invariant condition (de)?compression destroys,
@@ -3968,10 +3966,9 @@ template <typename T, const bool nonlinear> T p01next(const SimpleVector<T>& in)
   const T nin(sqrt(in.dot(in) * (one + SimpleMatrix<T>().epsilon())));
   if(! isfinite(nin) || nin == zero) return zero;
   const int varlen(nonlinear ? ind2vd(in.size()) : ind2vd(in.size()) * 2);
-  // N.B. we use whole data information size on each single layer's size.
+  // N.B. we conclude making whole range invariants.
   SimpleMatrix<T> invariants(max(int(1), int(in.size()) -
     int(varlen * 2 + step)), nonlinear ? varlen + 2 : varlen);
-  // N.B. we conclude making whole range invariants.
   invariants.O();
   for(int i0 = varlen * 2 + step; i0 < invariants.rows(); i0 ++) {
     SimpleMatrix<T> toeplitz(i0, invariants.cols());
@@ -5102,7 +5099,8 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
       prngin[j] = T(random() % 0x20000) / T(0x20000 - 1) / T(int(2));
 #endif
     {
-      const vector<SimpleVector<T> > rintrans(pFeedTranspose<T>(rin));
+      const vector<SimpleVector<T> > rintrans(unOffsetHalf<T>(pFeedTranspose<T>(rin)));
+      rin = unOffsetHalf<T>(rin);
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static,1)
 #endif
@@ -5115,12 +5113,13 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
         pslip_t<T> ps(0);
         prngin[j] *= pSlipGulf0short<T>(rintrans[j], ps, rintrans[j].size());
       }
+      rin = offsetHalf<T>(rin);
     }
     // N.B. PRNG parts going to gray + small noise with large enough nrecur.
-    vector<SimpleVector<T> > work(p(rin, string(", ") + to_string(i0) + string(" / ") + to_string(nrecur) + strloop));
+    vector<SimpleVector<T> > work(unOffsetHalf<T>(p(rin, string(", ") + to_string(i0) + string(" / ") + to_string(nrecur) + strloop)));
     for(int j = 0; j < work.size() - 1; j ++)
       for(int k = 0; k < work[j].size(); k ++)
-        work[j][k] -= rin[j - (work.size() - 1) + rin.size()][k];
+        work[j][k] -= unOffsetHalf<T>(rin[j - (work.size() - 1) + rin.size()][k]);
     {
       const int j(work.size() - 1);
       for(int k = 0; k < work[j].size(); k ++)
@@ -5136,7 +5135,7 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   for(int i = 0; i < res.size(); i ++) {
     res[i] *= T(int(2)) / T(nrecur);
     for(int j = 0; j < res[i].size(); j ++)
-      res[i][j] = max(T(int(0)), min(T(int(1)), res[i][j]));
+      res[i][j] = max(T(int(0)), min(T(int(1)), offsetHalf<T>(res[i][j])));
   }
   return move(res);
 }
@@ -5158,7 +5157,6 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   for(int i = 0; i < in[0].size(); i ++) midx.emplace_back(i);
   const int nloop(countMSB(in.size()) * 2);
   for(int i = 0; i < nloop; i ++) {
-    cerr << "pAbsentMajority#" << i << " : " << midx.size() << endl;
     vector<SimpleVector<T> > pres(unOffsetHalf<T>(p(work, string(", ") + to_string(i) + string(" / ") + to_string(nloop) + string(" (p)") + strloop) ));
     vector<SimpleVector<T> > qres(unOffsetHalf<T>(q(work, string(", ") + to_string(i) + string(" / ") + to_string(nloop) + string(" (q)") + strloop) ));
     assert(pres.size() == qres.size());
@@ -5249,24 +5247,24 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 }
 
 // N.B. we make the first hypothesis as the stream is:
-//      {unique function generated, has continuous structure,
+// (00) {unique function generated, has continuous structure,
 //       no jammer condition to our discrete measureable condition}.
-// N.B. first condition is always satisfied by axiom of choice one but
+// (01) first condition is always satisfied by axiom of choice one but
 //      we shall need to increase n-markov's n (base dimension, varlen) as
 //      to guarantee in input stream is not saturated.
-// N.B. 3rd condition is avoidable with PRNG blending as predv appendant
+// (02) 3rd condition is avoidable with PRNG blending as predv appendant
 //      prediction with non-unique probablistic output condition.
-// N.B. we cannot avoid 2nd condition because the prediction algorithms
+// (03) we cannot avoid 2nd condition because the prediction algorithms
 //      must need to make the hypothesis of them if we stand on low of
 //      the excluded middle strongly.
-// N.B. we close measurement condition based prediction with this state.
-// N.B. *** ongoing layers ***
+// (04) we close measurement condition based prediction with this state.
+// N.B. our measureable condition predictor layers
 //       | function      | layer# | [wsp1] | data amount *     |
 //       | pAbbsentMajority | -1  | w      | in * 2 * lg(in)   |
 //       | predv         | 0      | w      | in * PRNG         |
 //       | pgoshigoshi   | 1      | w      | in * 2            |
 //       | (0) + (1)     | 1      | w      | (0) + (1)         |
-// (0)   | deep          | 2      | w      | ~ in * 3          |
+// (0)   | deep          | 2      | s      | ~ in * 3          |
 //       | sumCNext      | 3      | s      | in                |
 //       | sumCNext      | 4      | s      | in                |
 //       | northPoleNext | 5      | s      | in                |
@@ -5284,62 +5282,32 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //       | num_t::operator +,-         | 14  | 1 | in         |
 //       | num_t::bit operation        | 15  | 1 | in         |
 // (1)   | after burn with p0next      | 2+  | w | in         |
-//       | divide by program invariant | 3+  | w | in         |
-//       | burn invariant by p0next    | 4++ | w | in*varlen  |
+//       | divide by program invariant | 3+  | s | in         |
+//       | burn invariant by p0next    | 4++ | s | ~in*varlen |
 //       | makeProgramInvariant        | 5+  | p | in         |
 //       | linearInvariant             | -   | - | -          |
 //       |   - QR decomposition        | 7+* | s | > in * 4!  |
 //       |   - orthogonalization       | 9+* | p | > in * 4!  |
-//       |   - solve                   | 11*| p | > (4 * 4)  |
+//       |   - solve                   | 11* | p | > (4 * 4)  |
 //       | num_t::operator *,/         | 12+ | 1 | in         |
 //       | num_t::operator +,-         | 13+ | 1 | in         |
 //       | num_t::bit operation        | 14+ | 1 | in         |
-// N.B. so total layer is 14+~16 from logical boolean operation
+// N.B. number of layers and ratio on copied data amounts.
+// (00) so total layer is 14+~16 from logical boolean operation
 //      explicitly stacked including if-them operation. also the data amount
 //      is: PRNG * 2 * {2*3+10, > 7+varlen+4!*2} * in.
-// N.B. the data amount used as internal calculation copied 3*in for 2nd order
+// (01) the data amount used as internal calculation copied 3*in for 2nd order
 //      saturation, 6 layers for multiple layer algebraic copying structure
 //      saturation, 9 layers for enough to decompose inverse of them.
-// N.B. more number of the internal calculation copy works when some of the
+// (02) more number of the internal calculation copy works when some of the
 //      tanglement number based accuracy reason exists case.
-// N.B. the #f counting maximum compressed f(in,out,states,unobserved) has
+// (03) the #f counting maximum compressed f(in,out,states,unobserved) has
 //      12~16 bit entropy, they causes layer# exceeds the structure
 //      so we only need 26 inputs whole in the case.
 //      (recount twice, (*): we calculate matrix operation layer as O(mn) to be
 //       a unit and lineary plain counting. this is because 2nd order of vector
 //       operation counting. overall this is counting (2^(2p*n))^(n*n) layers.
 //       so they causes f-fixation layer counting.)
-// N.B. if we're lucky enough, the static input stream can have 1 a.e. output
-//      as some of the shrinked output theirselves.
-// N.B. we need to shirk internal states upper bound size into graphics size
-//      before to compute. we're doing this with goki_check_cc:test.py pred
-//      command before to calculate. this is to omit what bitstream next in
-//      surface.
-// N.B. after of all, the dynamic jammer can be avoided if the predictor entropy
-//      exceeds jammers one, so some of the first short range, the predictor
-//      exceeds the jammer somehow.
-// N.B. however, the predictor entropy can be counted by program binary size
-//      in some of the layer, so graphics predictor seems to have the quantity
-//      so. either, once algorithm is coded as exist, they have upper entropy
-//      size n bit-input, n bit-output, n^3 bit as a optimization result.
-//      instead of the fixation of code optimization, we use optimization result
-//      to get orthogonal to input stream condition or pivot to get high
-//      frequency result.
-// N.B. if there's both jammer and predictor, the versus condition concludes
-//      {1/3,1/3,1/3} ideally because we can output {ok,ng,invariant} condition
-//      either jammer can attack AFTER the predictor is determined also this
-//      condition is predictor can predict AFTER the jammer is determined
-//      condition. so it's which side have the greater internal states chase.
-//      so jammers can attack our predictors' any of the layer, so we should
-//      output each layer apply/not apply cases but this causes combination
-//      explode.
-//      this is also be able to be verified by x+ := Ax (first binary digit),
-//      x in {0,1}^n, A in (2^p)^(n*n) operation runs any of the input causes 
-//      sign bit result can be {1/3,1/3,1/3} in the best.
-// N.B. so the input stream has the meaning payload to the datastream.
-//      ongoing neural networks mimics them as plausible one formatter so they
-//      stands on the first intension as tunable ones.
-//      our predictor stands on measureable condition satisfied or not.
 #if !defined(_PRNG_RECUR_)
 #define _PRNG_RECUR_ 11
 #endif
@@ -8489,31 +8457,61 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      n variable in such of a case.
 //
 // N.B. first condition of the prediction structure we should have to have.
-//      we should make hypothesis on some of the continuity on some layer
+// (00) we should make hypothesis on some of the continuity on some layer
 //      because we calculate prediction stream from input stream only
 //      also to have some of the resonance, we should calculate them also
 //      the same way. so pred(Vec|Mat|STen) uses such of the measureablity
 //      condition.
-//      to make hidden +2 dimension from input stream only: could be done by
+// (01) to make hidden +2 dimension from input stream only: could be done by
 //      expscale, logscale, multiplication inverse for p-adic, but it's only id.
 //      either if we make [1, ..., 1] orthogonalization, it's only the negate
 //      for binary coded stream. either patternized xor gate is (09) case.
 //      so if we're treating input stream as bit stream, it's culs-de-sac again.
-//      there's plenty of the room to make them to separate 1 a.e. part and
+// (02) there's plenty of the room to make them to separate 1 a.e. part and
 //      absent part only, however, if there's jammer condition nor input stream
 //      is much cultivated, we cannot get the result in low of excluded middle.
 // N.B. the saturated condition.
-//      we should increase the prediction dimension also increase worse large
+// (00) we should increase the prediction dimension also increase worse large
 //      n for n-markov for input stream also we should decompose them as
 //      eigen decomposition. so the most of the first digit concerns concludes
 //      eigen vector matrix (usually m*n formed) fixation.
-//      this is also to make dynamic dictionary to the input stream on such
+// (01) this is also to make dynamic dictionary to the input stream on such
 //      of a layer. so ddpmopt [+-] also the masp + is intended to make this
 //      however they should have many much of the input stream size.
-//      so to extend them needs the much better problem information and to get
+// (02) so to extend them needs the much better problem information and to get
 //      better form to the stream. either, if the saturated result we get,
 //      we should reform the transformation structure for preprocess
 //      as to separate something.
+// N.B. tips around jammer.
+// (00) after of all, the dynamic jammer can be avoided if the predictor entropy
+//      exceeds jammers one, so some of the first short range, the predictor
+//      exceeds the jammer somehow.
+// (01) however, the predictor entropy can be counted by program binary size
+//      in some of the layer, so graphics predictor seems to have the quantity
+//      so. either, once algorithm is coded as exist, they have upper entropy
+//      size n bit-input, n bit-output, n^3 bit as a optimization result.
+//      instead of the fixation of code optimization, we use optimization result
+//      to get orthogonal to input stream condition or pivot to get high
+//      frequency result.
+// (02) if there's both jammer and predictor, the versus condition concludes
+//      {1/3,1/3,1/3} ideally because we can output {ok,ng,invariant} condition
+//      either jammer can attack AFTER the predictor is determined also this
+//      condition is predictor can predict AFTER the jammer is determined
+//      condition. so it's which side have the greater internal states chase.
+//      so jammers can attack our predictors' any of the layer, so we should
+//      output each layer apply/not apply cases but this causes combination
+//      explode.
+// (03) this is also be able to be verified by x+ := Ax (first binary digit),
+//      x in {0,1}^n, A in (2^p)^(n*n) operation runs any of the input causes 
+//      sign bit result can be {1/3,1/3,1/3} in the best.
+// (04) so the input stream has the meaning payload to the datastream.
+//      ongoing neural networks mimics them as plausible one formatter so they
+//      stands on the first intension as tunable ones.
+//      our predictor stands on measureable condition satisfied or not.
+// (05) if we're lucky enough, the static input stream can have 1 a.e. output
+//      as some of the shrinked output theirselves.
+// (06) we need to shirk internal states upper bound size into graphics size
+//      before to compute. this is to omit what bitstream next in surface.
 //
 // N.B. another variants of the predictors fight with 2*3*2 pattern of #f
 //      fixation. (however, we don't use initial internal states, it's only 4).
