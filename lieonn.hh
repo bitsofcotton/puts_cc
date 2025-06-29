@@ -3728,8 +3728,8 @@ template <typename T> static inline vector<pair<vector<SimpleVector<T> >, vector
 
 // N.B. if the long enough varlen-range bitstream saturated stream is input,
 //      this say *nothing*. this is because both a+:=tan<a,x> and a+:=tan<-a,x> 
-//      is appeares as the crushed stream. in the case, we should increase
-//      base dimension.
+//      appeares as the crushed stream. in the case, we should increase base
+//      dimension.
 template <typename T> static inline T p012next(const SimpleVector<T>& d, const int& base_dim = 0) {
   static const int step(1);
   static const T zero(int(0));
@@ -3908,18 +3908,21 @@ template <typename T> static inline T p0max0next(const SimpleVector<T>& in) {
 
 template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
   // N.B. we only handle lebesgue measurable and R(finite)-valued functions.
-  //      so worse structures are handled by p01next.
+  //      so worse structures are handled by p01next or p012next.
   // N.B. this is o-minimal
   //      (https://ja.wikipedia.org/wiki/%E5%AE%9F%E9%96%89%E4%BD%93 (2022/03/19))
   //      continuous structure causes dim K == 1,2,4,8 real closed field
   //      if they're semi-ordered one.
   return sumCNext<T, true, sumCNext<T, false, northPoleNext<T, p0max0next<T> > > >(in);
-  // N.B. plain complex form doesn't improve enough result.
+  // N.B. plain complex form doesn't improve enough result either this shorten
+  //      input range.
   // return sumCNext<T, true, sumCNext<T, false, logCNext<T, logCNext<T, northPoleNext<T, p0max0next<T> > > > > >(in);
   // N.B. we need only once P0DFT in general because associative condition
   //      is necessary for input ordering even we work with sedenion.
   //      also this eliminates one dimension per each of complex-formed input
-  //      on f as a continuous thing.
+  //      on f as a continuous thing but this needs huge memory to run also
+  //      if the original predictor is linear, they're only transparent id.
+  //      transformation.
   // N.B. on any R to R into reasonable C^omega.
   // N.B. we treat periodical part as non aligned complex arg part.
   // N.B. we make the prediction on (delta) summation also take average as
@@ -3927,16 +3930,15 @@ template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
   // N.B. either there's plenty of a space to extend this with
   //      uparrow, downarrow operations they causes the result in H\C if second
   //      operand is in C\R.
-  // N.B. this needs huge memory to run.
   // return sumCNext<T, true, sumCNext<T, false, logCNext<T, logCNext<T, P0DFT<T, p0max0next<T> > > > > >(in);
 }
 
 // Get invariant structure that
 // R-register computer with deterministic calculation with nonlinear == true.
 // cf. bitsofcotton/randtools .
-// N.B. with cont == true condition, we make hypothesis the invariant
-//      coefficients are continuous or periodical. this is valid if original
-//      stream have varlen-markov's Riemann-Stieljes measureable condition.
+// N.B. we make the hypothesis the invariant coefficients are continuous or
+//      periodical. this is valid if original stream have less or equal to
+//      varlen-markov's Riemann-Stieljes measureable condition.
 // N.B. if input stream is something sparse with jammer generated, the varlen
 //      we need is far larger than this. this condition can be eliminated with
 //      in/output (de)?compression ask shirks the result of algorithms to some
@@ -3955,8 +3957,8 @@ template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
 //      return 1; program. this is also in the condition but the dimension
 //      easily vanished. so when we met them we use:
 //      ||Ax-1*x'||<epsilon condition.
-// N.B. the worse structures are handled by skipX concerns or long enough p012
-//      preprocess.
+// N.B. the worse structures are handled by long enough p012 preprocess with
+//      long enough varlen (base dimension).
 template <typename T, const bool nonlinear> T p01next(const SimpleVector<T>& in) {
   static const int step(1);
   static const T zero(0);
@@ -3967,24 +3969,28 @@ template <typename T, const bool nonlinear> T p01next(const SimpleVector<T>& in)
   if(! isfinite(nin) || nin == zero) return zero;
   const int varlen(nonlinear ? ind2vd(in.size()) : ind2vd(in.size()) * 2);
   // N.B. we use whole data information size on each single layer's size.
-  SimpleMatrix<T> invariants(
-    in.size() / (varlen + 1) < 8 + step ? 1 : in.size() / (varlen + 1),
-    nonlinear ? varlen + 2 : varlen);
+  SimpleMatrix<T> invariants(max(int(1), int(in.size()) -
+    int(varlen * 2 + step)), nonlinear ? varlen + 2 : varlen);
+  // N.B. we conclude making whole range invariants.
   invariants.O();
-  for(int i0 = 0; i0 < invariants.rows(); i0 ++) {
-    SimpleMatrix<T> toeplitz(in.size() - varlen - step + 2
-                             - invariants.rows() + 1, invariants.cols());
-    for(int i = i0; i < toeplitz.rows() + i0; i ++) {
+  for(int i0 = varlen * 2 + step; i0 < invariants.rows(); i0 ++) {
+    SimpleMatrix<T> toeplitz(i0, invariants.cols());
+    for(int i = 0; i < toeplitz.rows(); i ++) {
       SimpleVector<T> work(in.subVector(i, varlen));
       work[work.size() - 1] = in[i + varlen + step - 2];
-      toeplitz.row(i - i0) = nonlinear ? makeProgramInvariant<T>(R2bin<T>(work),
-        T(i + 1) / T(toeplitz.rows() + i0 + 1) ).first : binMargin<T>(work);
+      toeplitz.row(i) = nonlinear ? makeProgramInvariant<T>(R2bin<T>(work),
+        T(i + 1) / T(toeplitz.rows() + 1) ).first : binMargin<T>(work);
     }
     // N.B. this untangles input stream into invariant but the accuracy
     //      we make the hypothesis:
     //      ||invariant made stream||_sup <~ ||f||_sup / varlen!.
     //      this is because it's toeplitz made stream.
-    invariants.row(i0) = linearInvariant<T>(toeplitz);
+    const int ii0(i0 - (varlen * 2 + step));
+    invariants.row(ii0) = linearInvariant<T>(toeplitz);
+    
+    // N.B. we only need cosine value on invariant, so normalize them into S^n.
+    const T norminv(invariants.row(ii0).dot(invariants.row(ii0)));
+    if(norminv != T(int(0))) invariants.row(ii0) /= sqrt(norminv);
   }
   SimpleVector<T> invariant(invariants.cols());
   if(invariants.rows() <= 1)
@@ -4130,7 +4136,8 @@ public:
 
 // N.B. persistent attack to jammer in deep p0maxNext short 3 layer meaning.
 //      this often efffects output streams' prediction gulf result
-//      to be shifted ones.
+//      to be shifted ones. we select predictor for jammer shallow one because
+//      of the performance issues.
 template <typename T> static inline T pSlipGulf0short(const SimpleVector<T>& in, pslip_t<T>& slip, const int& t) {
   SimpleVector<T> apb;
   vector<pair<T, T> > aq;
@@ -4851,9 +4858,7 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
 
 // N.B. start ddpmopt
 // N.B. we are targetting the structure they appears additional states after
-//      additional states on given input range.
-// N.B. if we're in result is in control condition, we need to output at least
-//      a 3 on the prediction.
+//      additional states on given input range in stable or bored input stream.
 
 // for speed purpose.
 template <typename T> static inline vector<SimpleVector<T> > static inline pFeedTranspose(const vector<SimpleVector<T> >& in0) {
@@ -4990,52 +4995,16 @@ template <typename T, int nprogress> vector<SimpleVector<T> > predvq(const vecto
   return move(res);
 }
 
-// N.B. we apply PRNGs before to predict each of prediction in general.
-//      this is needed if original streams' entropy feeding is not stable
-//      case, the implicit recursive functions' average can be stable with
-//      this hack. this method either only slices some amount of the original
-//      structure and their internal states by PRNGs. so the output will be
-//      obscure enough if we cannot slice original structure enough with ours.
-//      we suppose phase period doesn't connected to the original structures.
-// N.B. we can avoid such of the PRNG condition with goki_check_cc:test.py
-//      [Qq]red command they shirks continuity auto tuned ones.
-// N.B. practically, nrecur == 0 works well with ddpmopt T cmd, we use this.
-//      we don't select better nrecur == 11 * 11 we need huge computation time.
-template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), int nrecur> vector<SimpleVector<T> > static inline predv(const vector<SimpleVector<T> >& in, const string& strloop) {
-  if(! nrecur) return p(in, string(", id.") + strloop);
-  vector<SimpleVector<T> > res;
-  for(int i0 = 0; i0 < nrecur; i0 ++) {
-    vector<SimpleVector<T> > rin(in);
-    for(int i = 0; i < rin.size(); i ++)
-      for(int j = 0; j < rin[i].size(); j ++)
-#if defined(_ARCFOUR_)
-        rin[i][j] = (rin[i][j] + T(arc4random_uniform(0x20001)) / T(0x20000)) / T(int(2));
-#else
-        rin[i][j] = (rin[i][j] + T(random() % 0x20000) / T(0x20000 - 1)) / T(int(2));
-#endif
-    // N.B. PRNG parts going to gray + small noise with large enough nrecur.
-    vector<SimpleVector<T> > work(p(rin, string(", ") + to_string(i0) + string(" / ") + to_string(nrecur) + strloop));
-    if(res.size()) {
-      assert(res.size() == work.size());
-      for(int j = 0; j < work.size(); j ++)
-        res[j] += work[j];
-    } else
-      res = move(work);
-  }
-  for(int i = 0; i < res.size(); i ++) res[i] /= T(nrecur);
-  return move(res);
-}
-
 // N.B. however, we often get predv result as differ <~ abs(p - 1/2) * 2 result.
 //      if we're lucky enough, we face them in 1 bit on abs(p - 1/2) prediction.
 // N.B. we get 4 of the candidates in each bit from p and q normally as
 //      1x force insert Riemann measurable condition and 1x insert
-//      Riemann-Stieljes measureable condition.
+//      possible Riemann-Stieljes measureable condition.
 //      we need each input 3 candidates in fact, however we exclude invariant
 //      condition also we adopt low of excluded middle, so we select
 //      binary output on each input.
 //      after loop == 2, we get 4 of candidates they saturates #f on root
-//      in binary function meaning.
+//      in binary function meaning with no internal states condition.
 template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), vector<SimpleVector<T> > (*q)(const vector<SimpleVector<T> >&, const string&) > vector<SimpleVector<T> > static inline pgoshigoshi(const vector<SimpleVector<T> >& in, const string& strloop) {
   vector<vector<SimpleVector<T> > > hist;
   vector<vector<SimpleVector<T> > > work;
@@ -5101,35 +5070,76 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   return move(res);
 }
 
-// N.B. for given static input stream with the unique one function recursion
-//      hypothesis, also if there's timing-related attacks, we intend to shuffle
-//      the structure by skipping p-steps to reorder some structures they might
-//      have the intension to attack our predictor.
-// N.B. for n-markov generated input, n*n < in.size() works better with us.
-// cf.  there exists Ito's equation.
-template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), bool skipx> vector<SimpleVector<T> > static inline pskipp(vector<SimpleVector<T> >& in, const string& strloop) {
-  const vector<int>& pnt(pnTinySingle(int(in.size() / 2)));
-  const int in0size(in.size());
+// N.B. we apply PRNGs before to predict each of prediction in general.
+//      this is needed if original streams' entropy feeding is not stable
+//      case, the implicit recursive functions' average can be stable with
+//      this hack. we suppose phase period doesn't connected to the original
+//      structures.
+// N.B. we can avoid such of the PRNG condition with goki_check_cc:test.py
+//      [Qq]red command they shirks continuity auto tuned ones.
+// N.B. practically, nrecur == 0 works well with ddpmopt T cmd, we use this.
+//      we don't select better nrecur == 11 * 11 we need huge computation time.
+template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), int nrecur> vector<SimpleVector<T> > static inline predv(const vector<SimpleVector<T> >& in, const string& strloop) {
+  if(! nrecur) return p(in, string(", id.") + strloop);
   vector<SimpleVector<T> > res;
-  for(int i0 = 0; i0 < pnt.size(); i0 ++) {
-    const int i(i0 - 1);
-    if(skipx && 0 < i0) {
-      in.resize(in.size() - (pnt[i] - (i ? pnt[i - 1] - 1 : i)) + 1);
-      assert(in.size() + pnt[i] == in0size + 1);
+  for(int i0 = 0; i0 < nrecur; i0 ++) {
+    vector<SimpleVector<T> > rin(in);
+    SimpleVector<T> prngin(in[0].size());
+    prngin.O();
+    for(int i = 0; i < rin.size(); i ++)
+      for(int j = 0; j < rin[i].size(); j ++)
+#if defined(_ARCFOUR_)
+        rin[i][j] = (rin[i][j] + T(arc4random_uniform(0x20001)) / T(0x20000)) / T(int(2));
+#else
+        rin[i][j] = (rin[i][j] + T(random() % 0x20000) / T(0x20000 - 1)) / T(int(2));
+#endif
+    for(int j = 0; j < prngin.size(); j ++)
+#if defined(_ARCFOUR_)
+      prngin[j] = T(arc4random_uniform(0x20001)) / T(0x20000) / T(int(2));
+#else
+      prngin[j] = T(random() % 0x20000) / T(0x20000 - 1) / T(int(2));
+#endif
+    {
+      const vector<SimpleVector<T> > rintrans(pFeedTranspose<T>(rin));
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static,1)
+#endif
+      for(int j = 0; j < rintrans.size(); j ++) {
+        rin[0][j] = T(int(0));
+        for(int i = 1; i < rintrans[j].size(); i ++) {
+          pslip_t<T> ps(0);
+          rin[i][j] *= pSlipGulf0short<T>(rintrans[j].subVector(0, i), ps, i);
+        }
+        pslip_t<T> ps(0);
+        prngin[j] *= pSlipGulf0short<T>(rintrans[j], ps, rintrans[j].size());
+      }
     }
-    vector<SimpleVector<T> > sx(skipx && 0 < i0 ? skipX<SimpleVector<T> >(in, pnt[i]) : in);
-    if(sx.size() < 13) break;
-    sx = p(sx, string(", loop:") + to_string(i0) + strloop);
-    res.resize(res.size() + sx.size());
-    for(int i = 0; i < sx.size(); i ++)
-      res[i - sx.size() + res.size()] = move(sx[i]);
-    if(! skipx) break;
+    // N.B. PRNG parts going to gray + small noise with large enough nrecur.
+    vector<SimpleVector<T> > work(p(rin, string(", ") + to_string(i0) + string(" / ") + to_string(nrecur) + strloop));
+    for(int j = 0; j < work.size() - 1; j ++)
+      for(int k = 0; k < work[j].size(); k ++)
+        work[j][k] -= rin[j - (work.size() - 1) + rin.size()][k];
+    {
+      const int j(work.size() - 1);
+      for(int k = 0; k < work[j].size(); k ++)
+        work[j][k] -= prngin[k];
+    }
+    if(res.size()) {
+      assert(res.size() == work.size());
+      for(int j = 0; j < work.size(); j ++)
+        res[j] += work[j];
+    } else
+      res = move(work);
   }
-  return res;
+  for(int i = 0; i < res.size(); i ++) {
+    res[i] *= T(int(2)) / T(nrecur);
+    for(int j = 0; j < res[i].size(); j ++)
+      res[i][j] = max(T(int(0)), min(T(int(1)), res[i][j]));
+  }
+  return move(res);
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
-//      mostly with slight speed hacks.
 template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector<SimpleVector<T> >& in) {
   assert(1 < in.size() && (in[in.size() - 1].size() == 4 ||
                            in[in.size() - 1].size() == 12) );
@@ -5152,7 +5162,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
   for(int i = 0; i < res.size(); i ++) {
     if(nprogress && ! (i % max(int(1), int(res.size() / nprogress))) )
       cerr << i << " / " << res.size() << endl;
-    // N.B. imported from P01 class.
+    // N.B. imported from p01next.
     SimpleMatrix<T> toeplitz(in.size() / 2, 7);
     for(int j = 0; j < toeplitz.rows(); j ++) {
       SimpleVector<T> vw(5);
@@ -5174,63 +5184,68 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
       p01next<T, true>(nwork) ));
 }
 
+// N.B. we make the first hypothesis as the stream is:
+//      {unique function generated, has continuous structure,
+//       no jammer condition to our discrete measureable condition}.
+// N.B. first condition is always satisfied by axiom of choice one but
+//      we shall need to increase n-markov's n (base dimension, varlen) as
+//      to guarantee in input stream is not saturated.
+// N.B. 3rd condition is avoidable with PRNG blending as predv appendant
+//      prediction with non-unique probablistic output condition.
+// N.B. we cannot avoid 2nd condition because the prediction algorithms
+//      must need to make the hypothesis of them if we stand on low of
+//      the excluded middle strongly.
+// N.B. we close measurement condition based prediction with this state.
 // N.B. *** ongoing layers ***
 //       | function      | layer# | [wsp1] | data amount *     |
-//       | pskipp        | 0      | w      | in * pi^-1(in)    |
+//       | predv         | 0      | w      | in * PRNG         |
 //       | pgoshigoshi   | 1      | w      | in * 2            |
-//       | predv         | 2      | w      | in * PRNG         |
-//       | (0) + (1)     | 2      | w      | (0) + (1)         |
-// (0)   | deep          | 3      | w      | ~ in * 3          |
+//       | (0) + (1)     | 1      | w      | (0) + (1)         |
+// (0)   | deep          | 2      | w      | ~ in * 3          |
+//       | sumCNext      | 3      | s      | in                |
 //       | sumCNext      | 4      | s      | in                |
-//       | sumCNext      | 5      | s      | in                |
-//       | northPoleNext | 6      | s      | in                |
-//       | p0max0next    | 7      | s      | in                |
-//       | (0-0) + (0-1) | 7      | s      | (0-0) + (0-1)     |
-// (0-0) | invNext       | 8      | s      | in                |
-//       | (0-1)         | 9+     | s      | (0-1)             |
-// (0-1) | sumCNext      | 8      | s      | in                |
-//       | pnext         | 9      | s      | in + once(dft(6)) |
-//       | integrate-diff in taylorc   | 10 | p | once(dft(6 * 2)) |
-//       | exp to shift   in taylorc   | 11 | p | once(dft(6 * 2)) |
-//       | dft                         | 12 | p | once(dft(6 * 2)) |
-//       | exp-log complex operation   | 13 | 1 | once(taylor(1))  |
-//       | num_t::operator *,/         | 14 | 1 | in         |
-//       | num_t::operator +,-         | 15 | 1 | in         |
-//       | num_t::bit operation        | 16 | 1 | in         |
-// (1)   | after burn with p0next      | 3  | w | in         |
-//       | divide by program invariant | 4  | w | in         |
-//       | recursive                   | 6  | w | in * recur |
-//       | makeProgramInvariant        | 7  | p | in         |
-//       | linearInvariant             | -  | - | -          |
-//       |   - QR decomposition        | 9* | s | > in * 4!  |
-//       |   - orthogonalization       | 11*| p | > in * 4!  |
-//       |   - solve                   | 13*| p | > (4 * 4)  |
-//       | num_t::operator *,/         | 14 | 1 | in         |
-//       | num_t::operator +,-         | 15 | 1 | in         |
-//       | num_t::bit operation        | 16 | 1 | in         |
-// N.B. so total layer is 16~17 from logical boolean operation
+//       | northPoleNext | 5      | s      | in                |
+//       | p0max0next    | 6      | s      | in                |
+//       | (0-0) + (0-1) | 6      | s      | (0-0) + (0-1)     |
+// (0-0) | invNext       | 7      | s      | in                |
+//       | (0-1)         | 8+     | s      | (0-1)             |
+// (0-1) | sumCNext      | 7      | s      | in                |
+//       | pnext         | 8      | s      | in + once(dft(6)) |
+//       | integrate-diff in taylorc   | 9   | p | once(dft(6 * 2)) |
+//       | exp to shift   in taylorc   | 10  | p | once(dft(6 * 2)) |
+//       | dft                         | 11  | p | once(dft(6 * 2)) |
+//       | exp-log complex operation   | 12  | 1 | once(taylor(1))  |
+//       | num_t::operator *,/         | 13  | 1 | in         |
+//       | num_t::operator +,-         | 14  | 1 | in         |
+//       | num_t::bit operation        | 15  | 1 | in         |
+// (1)   | after burn with p0next      | 2+  | w | in         |
+//       | divide by program invariant | 3+  | w | in         |
+//       | burn invariant by p0next    | 4++ | w | in*varlen  |
+//       | makeProgramInvariant        | 5+  | p | in         |
+//       | linearInvariant             | -   | - | -          |
+//       |   - QR decomposition        | 7+* | s | > in * 4!  |
+//       |   - orthogonalization       | 9+* | p | > in * 4!  |
+//       |   - solve                   | 11*| p | > (4 * 4)  |
+//       | num_t::operator *,/         | 12+ | 1 | in         |
+//       | num_t::operator +,-         | 13+ | 1 | in         |
+//       | num_t::bit operation        | 14+ | 1 | in         |
+// N.B. so total layer is 14+~16 from logical boolean operation
 //      explicitly stacked including if-them operation. also the data amount
-//      is: (p^-1(in) * PRNG) * 2 * {2*3+10, > 7+recur+4!*2} * in.
+//      is: PRNG * 2 * {2*3+10, > 7+varlen+4!*2} * in.
 // N.B. the data amount used as internal calculation copied 3*in for 2nd order
 //      saturation, 6 layers for multiple layer algebraic copying structure
 //      saturation, 9 layers for enough to decompose inverse of them.
-// N.B. more number of the internal calculation copy works when the complexity
-//      first input stream has worse high complexity or some of the tanglement
-//      number based accuracy reason exists case.
+// N.B. more number of the internal calculation copy works when some of the
+//      tanglement number based accuracy reason exists case.
 // N.B. the #f counting maximum compressed f(in,out,states,unobserved) has
 //      12~16 bit entropy, they causes layer# exceeds the structure
-//      so we only needs 26 inputs whole in the case.
+//      so we only need 26 inputs whole in the case.
 //      (recount twice, (*): we calculate matrix operation layer as O(mn) to be
 //       a unit and lineary plain counting. this is because 2nd order of vector
-//       operation counting. overall this is counting (2^p)^(n*n) layers.
+//       operation counting. overall this is counting (2^(2p*n))^(n*n) layers.
 //       so they causes f-fixation layer counting.)
-// N.B. there's also the chase predictor vs. dynamic jammer even in the raw
-//      datastream itself as a cultivated entropy they have.
-//      so our function in another words some measureable condition is targetted
-//      in discrete condition, the best result we can get through this predictor
-//      is 2/3 probability.
-// N.B. otherwise, the static input stream can have 1 a.e. output as some of the
-//      shrinked output theirselves.
+// N.B. if we're lucky enough, the static input stream can have 1 a.e. output
+//      as some of the shrinked output theirselves.
 // N.B. we need to shirk internal states upper bound size into graphics size
 //      before to compute. we're doing this with goki_check_cc:test.py pred
 //      command before to calculate. this is to omit what bitstream next in
@@ -5253,18 +5268,15 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //      so jammers can attack our predictors' any of the layer, so we should
 //      output each layer apply/not apply cases but this causes combination
 //      explode.
-//      this is also be able to verified by x+ := A x (first binary digit),
+//      this is also be able to be verified by x+ := Ax (first binary digit),
 //      x in {0,1}^n, A in (2^p)^(n*n) operation runs any of the input causes 
 //      sign bit result can be {1/3,1/3,1/3} in the best.
 // N.B. so the input stream has the meaning payload to the datastream.
 //      ongoing neural networks mimics them as plausible one formatter so they
 //      stands on the first intension as tunable ones.
 //      our predictor stands on measureable condition satisfied or not.
-// N.B. also we close all of the entropy is from input stream itself condition
-//      predictor with this but there might be many another concepts nor
-//      implementations.
 
-template <typename T, bool skipx> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
+template <typename T, int recur> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -5282,8 +5294,8 @@ template <typename T, bool skipx> vector<vector<SimpleVector<T> > > predVec(vect
   in0.resize(0);
   vector<vector<SimpleVector<T> > > res;
   vector<SimpleVector<T> > pres(
-    pskipp<T, pgoshigoshi<T, predv<T, predvp<T, 20>, 0>,
-      predv<T, predvq<T, 20>, 0> >, skipx>(in, string(" (predVec)")));
+    predv<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >, recur>
+      (in, string(" (predVec)")));
   res.resize(pres.size());
   assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++) {
@@ -5294,12 +5306,12 @@ template <typename T, bool skipx> vector<vector<SimpleVector<T> > > predVec(vect
   return move(res);
 }
 
-template <typename T, bool skipx> static inline vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
+template <typename T, int recur> static inline vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   vector<vector<SimpleVector<T> > > res(in0);
-  return predVec<T, skipx>(res);
+  return predVec<T, recur>(res);
 }
 
-template <typename T, bool skipx> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0) {
+template <typename T, int recur> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -5319,8 +5331,8 @@ template <typename T, bool skipx> vector<vector<SimpleMatrix<T> > > predMat(vect
   const int cols(in0[0][0].cols());
   in0.resize(0);
   vector<SimpleVector<T> > pres(
-    pskipp<T, pgoshigoshi<T, predv<T, predvp<T, 20>, 0>,
-      predv<T, predvq<T, 20>, 0> >, skipx>(in, string(" (predMat)")));
+    predv<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >, recur>
+      (in, string(" (predMat)")));
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
   assert(res.size() == pres.size());
@@ -5336,12 +5348,12 @@ template <typename T, bool skipx> vector<vector<SimpleMatrix<T> > > predMat(vect
   return move(res);
 }
 
-template <typename T, bool skipx> static inline vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
+template <typename T, int recur> static inline vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
   vector<vector<SimpleMatrix<T> > > res(in0);
-  return predMat<T, skipx>(res);
+  return predMat<T, recur>(res);
 }
 
-template <typename T, bool skipx> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx) {
+template <typename T, int recur> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx) {
   assert(idx.size() && in0.size());
   // N.B. we don't do input scaling.
   // N.B. we should use each bit extended input stream but not now.
@@ -5373,8 +5385,8 @@ template <typename T, bool skipx> vector<SimpleSparseTensor(T) > predSTen(vector
   in0.resize(0);
   vector<SimpleSparseTensor(T) > res;
   vector<SimpleVector<T> > pres(
-    pskipp<T, pgoshigoshi<T, predv<T, predvp<T, 20>, 0>,
-      predv<T, predvq<T, 20>, 0> >, skipx>(in, string(" (predSTen)")));
+    predv<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >, recur>
+      (in, string(" (predSTen)")));
   res.resize(pres.size());
   assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++)
@@ -8212,16 +8224,16 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
   }
   os << input;
   corpus<T, U> pstats;
-  vector<SimpleSparseTensor(T) > p(predSTen<T, true>(in, idx));
-  pstats.corpust = move(p[0]);
-  getAbbreved<T>(pstats, detailtitle, detail, delimiter);
-  os << endl << " --- " << pstats.simpleThresh(threshin / T(int(4))).serialize();
-  pstats.corpust = move(p[1]);
-  getAbbreved<T>(pstats, detailtitle, detail, delimiter);
-  os << endl << " --- " << pstats.simpleThresh(threshin / T(int(4))).serialize();
-  pstats.corpust = move(p[2]);
-  getAbbreved<T>(pstats, detailtitle, detail, delimiter);
-  os << endl << " --- " << pstats.simpleThresh(threshin / T(int(4))).serialize();
+  vector<SimpleSparseTensor(T) > inw(in);
+  vector<SimpleSparseTensor(T) > p(predSTen<T, 0>(inw, idx));
+  vector<SimpleSparseTensor(T) > q(predSTen<T, 11>(inw, idx));
+  p.reserve(p.size() + q.size());
+  for(int i = 0; i < q.size(); i ++) p.emplace_back(move(q[i]));
+  for(int i = 0; i < p.size(); i ++) {
+    pstats.corpust = move(p[i]);
+    getAbbreved<T>(pstats, detailtitle, detail, delimiter);
+    os << endl << " --- " << pstats.simpleThresh(threshin / T(int(4))).serialize();
+  }
   return os;
 }
 
@@ -8331,10 +8343,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      eg. PdeltaOnce, Ppersistent, Pprogression, (P0DFT).
 //      they goes well because timing-related concerns A_0 ... A_k B x_0
 //      made initial entropy and A'^k B' x_0 -> x_k structures.
-// (01) however, our predictor either being attacked,
-//      predv only returns last one picture on some of our tests with real
-//      data, but is effective returns better results with PRNG tests.
-//      so with real data, we only apply P0maxRank to each pixel.
+// (01) (absent)
 // (02) we eliminated predvall, we don't need them with whole internal states
 //      awared predictors they have a better prediction concerned with some
 //      series of a PRNG tests.
@@ -8372,16 +8381,19 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 // (08) recursion on same function based functions.
 //      this depends on the first prediction is continuous or not causes
 //      the prediction stream's quality. also they depends on the first
-//      hypothesis is satisfied or not.
+//      hypothesis is satisfied or not. so they returns clear edge of them.
 // (09) make input stream transformed by xor-filter by patternized fixed
 //      ones. this is equivalent to skipx concerns but with maybe random timing.
 //      we already have fixed range skipx also pSubesube jammer condition,
 //      so it's pseudo one of the condition.
 // (10) p012next before or after to pgoshigoshi call.
-//      it's equivalent if the varlen on p01next and on p012next are the same
+//      it's equivalent if the varlen on p01next and on p012next have the same
 //      length. however, if the input stream is saturated, both of them cannot
 //      decide proper next step condition because input stream's n-length have
-//      both meanings.
+//      both meanings. however, we can use them as replace to skipx concerns.
+// (11) pskipp to skip input in some steps.
+//      it's a counter measure to the jammer. so any of the predictor has the
+//      jammers, so if the jammer adjust theirs to our algorithms, it's useless.
 //
 // N.B. something XXX result descripton
 // (00) there might exist non Lebesgue measureable condition discrete stream.
