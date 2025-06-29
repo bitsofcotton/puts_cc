@@ -5066,6 +5066,8 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
         res[i][k] += temp[k] * abs(unOffsetHalf<T>(res[i][k] - temp[k]));
     }
     res[i] /= T(hist.size());
+    for(int k = 0; k < res[i].size(); k ++)
+      res[i][k] = max(T(int(0)), min(T(int(1)), res[i][k]));
   }
   return move(res);
 }
@@ -5139,6 +5141,68 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   return move(res);
 }
 
+static inline int countMSB(const int& x) {
+  int res(0);
+  // can be O(lg(sizeof(x)*8)) loop but none for here.
+  for(int i = 0; i < sizeof(x) * 8; i ++) if((i ? x >> i : x) & 1) res = i;
+  return res;
+}
+
+// N.B. we bet half of the pair of the prediction matches.
+//      for insurance, we pretend as 1/4 are matched.
+template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), vector<SimpleVector<T> > (*q)(const vector<SimpleVector<T> >&, const string&) > vector<SimpleVector<T> > static inline pAbsentMajority(const vector<SimpleVector<T> >& in, const string& strloop) {
+  vector<SimpleVector<T> > work(in);
+  vector<SimpleVector<T> > res;
+  vector<int> midx;
+  midx.reserve(in[0].size());
+  for(int i = 0; i < in[0].size(); i ++) midx.emplace_back(i);
+  const int nloop(countMSB(in.size()) * 2);
+  for(int i = 0; i < nloop; i ++) {
+    cerr << "pAbsentMajority#" << i << " : " << midx.size() << endl;
+    vector<SimpleVector<T> > pres(unOffsetHalf<T>(p(work, string(", ") + to_string(i) + string(" / ") + to_string(nloop) + string(" (p)") + strloop) ));
+    vector<SimpleVector<T> > qres(unOffsetHalf<T>(q(work, string(", ") + to_string(i) + string(" / ") + to_string(nloop) + string(" (q)") + strloop) ));
+    assert(pres.size() == qres.size());
+    if(! i) {
+      res.resize(pres.size());
+      for(int j = 0; j < pres.size(); j ++)
+        res[j] = SimpleVector<T>(pres[j].size()).O();
+    } else if(i ==  nloop - 1) {
+      for(int j = 0; j < pres.size(); j ++)
+        for(int k = 0; k < pres[j].size(); k ++)
+          res[j][midx[k]] = max(T(int(0)), min(T(int(1)),
+            offsetHalf<T>((pres[j][k] + qres[j][k]) / T(int(2))) ));
+      break;
+    }
+    work.resize(0);
+    work.resize(in.size());
+    vector<int> mmidx;
+    mmidx.resize(in[0].size(), - 1);
+    for(int j = 0; j < pres.size(); j ++) {
+      assert(pres[j].size() == qres[j].size());
+      int cnt(0);
+      for(int k = 0; k < midx.size(); k ++)
+        if(T(int(0)) < pres[j][k] * qres[j][k])
+          res[j][midx[k]] = max(T(int(0)), min(T(int(1)),
+            offsetHalf<T>((pres[j][k] + qres[j][k]) / T(int(2))) ));
+        else mmidx[k] = 1;
+    }
+    int cnt(0);
+    for(int k = 0; k < mmidx.size(); k ++) if(0 <= mmidx[k]) cnt ++;
+    if(cnt < 2 || midx.size() <= cnt) break;
+    midx.resize(0);
+    midx.resize(cnt, - 1);
+    for(int k = 0, ctr = 0; k < mmidx.size(); k ++)
+      if(0 <= mmidx[k]) midx[ctr ++] = k;
+    work.resize(in.size());
+    for(int j = 0; j < work.size(); j ++) {
+      work[j].resize(midx.size());
+      work[j].O();
+      for(int k = 0; k < midx.size(); k ++) work[j][k] = in[j][midx[k]];
+    }
+  }
+  return move(res);
+}
+
 // N.B. predv4 is for masp generated -4.ppm predictors.
 template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector<SimpleVector<T> >& in) {
   assert(1 < in.size() && (in[in.size() - 1].size() == 4 ||
@@ -5198,6 +5262,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 // N.B. we close measurement condition based prediction with this state.
 // N.B. *** ongoing layers ***
 //       | function      | layer# | [wsp1] | data amount *     |
+//       | pAbbsentMajority | -1  | w      | in * 2 * lg(in)   |
 //       | predv         | 0      | w      | in * PRNG         |
 //       | pgoshigoshi   | 1      | w      | in * 2            |
 //       | (0) + (1)     | 1      | w      | (0) + (1)         |
@@ -5275,8 +5340,11 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //      ongoing neural networks mimics them as plausible one formatter so they
 //      stands on the first intension as tunable ones.
 //      our predictor stands on measureable condition satisfied or not.
+#if !defined(_PRNG_RECUR_)
+#define _PRNG_RECUR_ 11
+#endif
 
-template <typename T, int recur> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
+template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -5294,8 +5362,9 @@ template <typename T, int recur> vector<vector<SimpleVector<T> > > predVec(vecto
   in0.resize(0);
   vector<vector<SimpleVector<T> > > res;
   vector<SimpleVector<T> > pres(
-    predv<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >, recur>
-      (in, string(" (predVec)")));
+    pAbsentMajority<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >,
+      predv<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >, _PRNG_RECUR_> >
+        (in, string(" (predVec)")));
   res.resize(pres.size());
   assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++) {
@@ -5306,12 +5375,12 @@ template <typename T, int recur> vector<vector<SimpleVector<T> > > predVec(vecto
   return move(res);
 }
 
-template <typename T, int recur> static inline vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
+template <typename T> static inline vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   vector<vector<SimpleVector<T> > > res(in0);
-  return predVec<T, recur>(res);
+  return predVec<T>(res);
 }
 
-template <typename T, int recur> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0) {
+template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<SimpleMatrix<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -5331,8 +5400,9 @@ template <typename T, int recur> vector<vector<SimpleMatrix<T> > > predMat(vecto
   const int cols(in0[0][0].cols());
   in0.resize(0);
   vector<SimpleVector<T> > pres(
-    predv<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >, recur>
-      (in, string(" (predMat)")));
+    pAbsentMajority<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >,
+      predv<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >, _PRNG_RECUR_> >
+        (in, string(" (predMat)")));
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
   assert(res.size() == pres.size());
@@ -5348,12 +5418,12 @@ template <typename T, int recur> vector<vector<SimpleMatrix<T> > > predMat(vecto
   return move(res);
 }
 
-template <typename T, int recur> static inline vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
+template <typename T> static inline vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
   vector<vector<SimpleMatrix<T> > > res(in0);
-  return predMat<T, recur>(res);
+  return predMat<T>(res);
 }
 
-template <typename T, int recur> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx) {
+template <typename T> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx) {
   assert(idx.size() && in0.size());
   // N.B. we don't do input scaling.
   // N.B. we should use each bit extended input stream but not now.
@@ -5385,8 +5455,9 @@ template <typename T, int recur> vector<SimpleSparseTensor(T) > predSTen(vector<
   in0.resize(0);
   vector<SimpleSparseTensor(T) > res;
   vector<SimpleVector<T> > pres(
-    predv<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >, recur>
-      (in, string(" (predSTen)")));
+    pAbsentMajority<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >,
+      predv<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >, _PRNG_RECUR_> >
+        (in, string(" (predSTen)")));
   res.resize(pres.size());
   assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++)
@@ -5398,6 +5469,8 @@ template <typename T, int recur> vector<SimpleSparseTensor(T) > predSTen(vector<
             res[i][idx[j]][idx[k]][idx[m]] = pres[i][cnt ++];
   return move(res);
 }
+
+#undef _PRNG_RECUR_
 
 // N.B. start isolate
 template <typename T> static inline SimpleMatrix<T> harmlessSymmetrizeSquare(const SimpleMatrix<T>& m) {
@@ -8224,11 +8297,7 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
   }
   os << input;
   corpus<T, U> pstats;
-  vector<SimpleSparseTensor(T) > inw(in);
-  vector<SimpleSparseTensor(T) > p(predSTen<T, 0>(inw, idx));
-  vector<SimpleSparseTensor(T) > q(predSTen<T, 11>(inw, idx));
-  p.reserve(p.size() + q.size());
-  for(int i = 0; i < q.size(); i ++) p.emplace_back(move(q[i]));
+  vector<SimpleSparseTensor(T) > p(predSTen<T>(in, idx));
   for(int i = 0; i < p.size(); i ++) {
     pstats.corpust = move(p[i]);
     getAbbreved<T>(pstats, detailtitle, detail, delimiter);
@@ -8430,6 +8499,9 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      either if we make [1, ..., 1] orthogonalization, it's only the negate
 //      for binary coded stream. either patternized xor gate is (09) case.
 //      so if we're treating input stream as bit stream, it's culs-de-sac again.
+//      there's plenty of the room to make them to separate 1 a.e. part and
+//      absent part only, however, if there's jammer condition nor input stream
+//      is much cultivated, we cannot get the result in low of excluded middle.
 // N.B. the saturated condition.
 //      we should increase the prediction dimension also increase worse large
 //      n for n-markov for input stream also we should decompose them as
@@ -8438,6 +8510,10 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      this is also to make dynamic dictionary to the input stream on such
 //      of a layer. so ddpmopt [+-] also the masp + is intended to make this
 //      however they should have many much of the input stream size.
+//      so to extend them needs the much better problem information and to get
+//      better form to the stream. either, if the saturated result we get,
+//      we should reform the transformation structure for preprocess
+//      as to separate something.
 //
 // N.B. another variants of the predictors fight with 2*3*2 pattern of #f
 //      fixation. (however, we don't use initial internal states, it's only 4).

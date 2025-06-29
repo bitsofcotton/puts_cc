@@ -96,4 +96,5 @@ This repository is archived, so without bug report, will no change.
 2025/06/25 merge latest ddpmopt result. also need to implant readme.md into lieonn.hh.
 2025/06/25 readme.md cleaning and implant into lieonn.hh, analyse.php comment.
 2025/06/28 refactor and fix around lieonn, re-compat with gcc2953.
+2025/06/29-30 merge latest ddpmopt result causes pred change.
 
