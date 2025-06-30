@@ -5068,8 +5068,6 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
         res[i][k] += temp[k] * abs(unOffsetHalf<T>(res[i][k] - temp[k]));
     }
     res[i] /= T(hist.size());
-    for(int k = 0; k < res[i].size(); k ++)
-      res[i][k] = max(T(int(0)), min(T(int(1)), res[i][k]));
   }
   return move(res);
 }
@@ -5101,7 +5099,7 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   for(int i = 0; i < pres.size(); i ++)
     for(int j = 0; j < pres[i].size(); j ++)
       pres[i][j] *= presidue[j];
-  return move(pres);
+  return offsetHalf<T>(pres);
 }
 
 // N.B. we apply PRNGs before to predict each of prediction in general.
@@ -5142,21 +5140,20 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
 #endif
     }
     {
-      const vector<SimpleVector<T> > rintrans(unOffsetHalf<T>(pFeedTranspose<T>(rin)));
       rin = unOffsetHalf<T>(rin);
+      const vector<SimpleVector<T> > rintrans(pFeedTranspose<T>(rin));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static,1)
 #endif
       for(int j = 0; j < rintrans.size(); j ++) {
         rin[0][j] = T(int(0));
+        pslip_t<T> ps(0);
         for(int i = 1; i < rintrans[j].size(); i ++) {
-          pslip_t<T> ps(0);
           const T work(pSlipGulf0short<T>(rintrans[j].subVector(0, i), ps, i));
           rin[i][j]   *= work;
           prngr[i][j] *= work;
           sign[i][j]   = work < T(int(0));
         }
-        pslip_t<T> ps(0);
         const T work(pSlipGulf0short<T>(rintrans[j], ps, rintrans[j].size()));
         prngr[in.size()][j] *= work;
         sign[in.size()][j]   = work < T(int(0));
@@ -5176,12 +5173,9 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
     } else
       res = move(work);
   }
-  for(int i = 0; i < res.size(); i ++) {
+  for(int i = 0; i < res.size(); i ++)
     res[i] *= T(int(2)) / T(nrecur);
-    for(int j = 0; j < res[i].size(); j ++)
-      res[i][j] = max(T(int(0)), min(T(int(1)), offsetHalf<T>(res[i][j])));
-  }
-  return move(res);
+  return offsetHalf<T>(res);
 }
 
 static inline int countMSB(const int& x) {
@@ -5207,7 +5201,7 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
     if(! i) {
       res.resize(pres.size());
       for(int j = 0; j < pres.size(); j ++)
-        res[j] = SimpleVector<T>(pres[j].size()).O();
+        res[j] = SimpleVector<T>(pres[j].size()).O(T(int(1)) / T(int(2)));
     } else if(i ==  nloop - 1) {
       for(int j = 0; j < pres.size(); j ++)
         for(int k = 0; k < pres[j].size(); k ++)
@@ -5243,6 +5237,40 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
     }
   }
   return move(res);
+}
+
+// N.B. from tiny experiments they improves the prediction on last stage.
+template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&)> vector<SimpleVector<T> > static inline pGatherExp(const vector<SimpleVector<T> >& in, const string& strloop) {
+  if(in.size() < 14 + 4) return p(in, string(", id.") + strloop);
+  vector<SimpleVector<T> > inw(in);
+  vector<SimpleVector<T> > pbuf;
+  pbuf.resize(4);
+  for(int i = 0; i < 4; i ++) {
+    vector<SimpleVector<T> > pwork(p(inw, string(", ") + to_string(i) + string(" / 4") + strloop));
+    pbuf[3 - i] = move(pwork[0]);
+    for(int j = 1; j < pwork.size(); j ++) pbuf[3 - i] += pwork[j];
+    pbuf[3 - i] /= T(pwork.size());
+    inw.resize(inw.size() - 1);
+  }
+  inw.resize(0);
+  vector<SimpleVector<T> > pstage1;
+  pstage1.resize(pbuf.size() - 1);
+  for(int i = 0; i < pstage1.size(); i ++) {
+    pstage1[i]  = pbuf[i + 1];
+    pstage1[i] -= pbuf[i];
+    pstage1[i] /= T(int(2));
+    if(i < pstage1.size() - 1)
+      pstage1[i] = in[i - (pstage1.size() - 1) + in.size()] - pstage1[i];
+  }
+  pbuf.resize(0);
+  vector<SimpleVector<T> > res;
+  res.emplace_back(pstage1[pstage1.size() - 1]);
+  for(int i = 0; i < res[0].size(); i ++) {
+    SimpleVector<T> work(pstage1.size() - 1);
+    for(int j = 0; j < work.size(); j ++) work[j] = pstage1[j][i];
+    res[0][i] += p0maxNext<T>(work);
+  }
+  return offsetHalf<T>(res);
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
@@ -5303,22 +5331,23 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //      the excluded middle strongly.
 // (04) we close measurement condition based prediction with this state.
 // N.B. our measureable condition predictor layers
-//       | function      | layer# | [wsp1] | data amount *     |
-//       | pAbbsentMajority | -1  | w      | in * 2 * lg(in)   |
-//       | predv         | 0      | w      | in * PRNG         |
-//       | pFeedLargeMarkov | *   | w      | in * sqrt(in)     |
-//       | pgoshigoshi   | 1      | w      | in * 2            |
-//       | (0) + (1)     | 1      | w      | (0) + (1)         |
-// (0)   | deep          | 2      | s      | ~ in * 3          |
-//       | sumCNext      | 3      | s      | in                |
-//       | sumCNext      | 4      | s      | in                |
-//       | northPoleNext | 5      | s      | in                |
-//       | p0max0next    | 6      | s      | in                |
-//       | (0-0) + (0-1) | 6      | s      | (0-0) + (0-1)     |
-// (0-0) | invNext       | 7      | s      | in                |
-//       | (0-1)         | 8+     | s      | (0-1)             |
-// (0-1) | sumCNext      | 7      | s      | in                |
-//       | pnext         | 8      | s      | in + once(dft(6)) |
+//       | function         | layer# | [wsp1] | data amount ratio |
+//       | pGatherExp       | -2     | w      | in * 4            |
+//       | pAbsentMajority  | -1     | w      | in * 2 * lg(in)   |
+//       | predv            | 0      | w      | in * PRNG         |
+//       | pFeedLargeMarkov | *      | w      | in * sqrt(in)     |
+//       | pgoshigoshi      | 1      | w      | in * 2            |
+//       | (0) + (1)        | 1      | w      | (0) + (1)         |
+// (0)   | deep             | 2      | s      | ~ in * 3          |
+//       | sumCNext         | 3      | s      | in                |
+//       | sumCNext         | 4      | s      | in                |
+//       | northPoleNext    | 5      | s      | in                |
+//       | p0max0next       | 6      | s      | in                |
+//       | (0-0) + (0-1)    | 6      | s      | (0-0) + (0-1)     |
+// (0-0) | invNext          | 7      | s      | in                |
+//       | (0-1)            | 8+     | s      | (0-1)             |
+// (0-1) | sumCNext         | 7      | s      | in                |
+//       | pnext            | 8      | s      | in + once(dft(6)) |
 //       | integrate-diff in taylorc   | 9   | p | once(dft(6 * 2)) |
 //       | exp to shift   in taylorc   | 10  | p | once(dft(6 * 2)) |
 //       | dft                         | 11  | p | once(dft(6 * 2)) |
@@ -5374,10 +5403,10 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<Si
   const int size1(in0[0][0].size());
   in0.resize(0);
   vector<vector<SimpleVector<T> > > res;
-  vector<SimpleVector<T> > pres(
+  vector<SimpleVector<T> > pres(pGatherExp<T, 
     pAbsentMajority<T, pFeedLargeMarkov<T, pgoshigoshi<T, predvp<T, 20>,
       predvq<T, 20> >, 25, 20>, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T,
-        predvp<T, 20>, predvq<T, 20> >, 25, 20>, _PRNG_RECUR_> >
+        predvp<T, 20>, predvq<T, 20> >, 25, 20>, _PRNG_RECUR_> > >
           (in, string(" (predVec)")));
   res.resize(pres.size());
   assert(res.size() == pres.size());
@@ -5413,10 +5442,10 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<Si
   const int rows(in0[0][0].rows());
   const int cols(in0[0][0].cols());
   in0.resize(0);
-  vector<SimpleVector<T> > pres(
+  vector<SimpleVector<T> > pres(pGatherExp<T, 
     pAbsentMajority<T, pFeedLargeMarkov<T, pgoshigoshi<T, predvp<T, 20>,
       predvq<T, 20> >, 25, 20>, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T,
-        predvp<T, 20>, predvq<T, 20> >, 25, 20>, _PRNG_RECUR_> >
+        predvp<T, 20>, predvq<T, 20> >, 25, 20>, _PRNG_RECUR_> > >
           (in, string(" (predMat)")));
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
@@ -5469,10 +5498,10 @@ template <typename T> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSpars
   }
   in0.resize(0);
   vector<SimpleSparseTensor(T) > res;
-  vector<SimpleVector<T> > pres(
+  vector<SimpleVector<T> > pres(pGatherExp<T, 
     pAbsentMajority<T, pFeedLargeMarkov<T, pgoshigoshi<T, predvp<T, 20>,
       predvq<T, 20> >, 25, 20>, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T,
-        predvp<T, 20>, predvq<T, 20> >, 25, 20>, _PRNG_RECUR_> >
+        predvp<T, 20>, predvq<T, 20> >, 25, 20>, _PRNG_RECUR_> > >
           (in, string(" (predSTen)")));
   res.resize(pres.size());
   assert(res.size() == pres.size());
