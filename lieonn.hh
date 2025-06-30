@@ -3737,7 +3737,7 @@ template <typename T> static inline T p012next(const SimpleVector<T>& d, const i
     M = max(M, abs(d[i]));
   }
   if(M <= zero) return zero;
-  const int varlen(base_dim ? base_dim : ind2vd(d.size()));
+  const int varlen(max(base_dim, ind2vd(d.size())));
   vector<SimpleVector<T> > cache;
   if(d.size() - varlen + 2 < 0) return zero;
   cache.reserve(d.size() - varlen + 2);
@@ -3756,33 +3756,38 @@ template <typename T> static inline T p012next(const SimpleVector<T>& d, const i
   T sscore(zero);
   for(int i = 0; i < cat.size(); i ++) {
     if(! cat[i].first.size()) continue;
-    SimpleVector<T> avg(cat[i].first[0].size() + 1);
-    avg.O();
-    for(int j = 0; j < cat[i].first.size(); j ++)
-      avg += makeProgramInvariant<T>(R2bin<T>(cat[i].first[j])).first;
-    work[work.size() - 1] = T(int(0));
-    const SimpleVector<T> avg0(avg);
-          T last(sqrt(work.dot(work)));
-    const T navg(avg.dot(avg));
-    if(! isfinite(navg) || navg == zero) continue;
-    for(int ii = 0;
-            ii < 2 * int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) )
-            && sqrt(work.dot(work) * SimpleMatrix<T>().epsilon()) <
-                 abs(work[work.size() - 1] - last); ii ++) {
-      last  = work[work.size() - 1];
+    vector<SimpleVector<T> > invariants;
+    if(cat[i].first[0].size() < cat[i].first.size()) {
+      SimpleMatrix<T> work(cat[i].first.size(), cat[i].first[0].size());
+      work.entity = move(cat[i].first);
+      invariants.emplace_back(linearInvariant<T>(work));
+    } else
+      invariants = move(cat[i].first);
+    for(int k = 0; k < invariants.size(); k ++) {
+      work[work.size() - 1] = T(int(0));
+      const SimpleVector<T> inv0(invariants[k]);
+            T last(sqrt(work.dot(work)));
+      const T ninv(inv0.dot(inv0));
+      if(! isfinite(ninv) || ninv == zero) continue;
+      for(int ii = 0;
+              ii < 2 * int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) )
+              && sqrt(work.dot(work) * SimpleMatrix<T>().epsilon()) <
+                   abs(work[work.size() - 1] - last); ii ++) {
+        last  = work[work.size() - 1];
+        const pair<SimpleVector<T>, T> vdp(makeProgramInvariant<T>(R2bin<T>(work)));
+        invariants[k] = inv0 * sqrt(vdp.first.dot(vdp.first) / inv0.dot(inv0));
+        work[work.size() - 1] =
+          bin2R<T>(revertProgramInvariant<T>(make_pair(invariants[k][varlen - 1] /
+               T(int(invariants[k].size())), vdp.second)) );
+      }
       const pair<SimpleVector<T>, T> vdp(makeProgramInvariant<T>(R2bin<T>(work)));
-      avg  = avg0 * sqrt(vdp.first.dot(vdp.first) / avg0.dot(avg0));
-      work[work.size() - 1] =
-        bin2R<T>(revertProgramInvariant<T>(make_pair(avg[varlen - 1] /
-             T(int(avg.size())), vdp.second)) );
+      T score(int(0));
+      for(int j = 0; j < work.size(); j ++)
+        score += work[j] *
+          bin2R<T>(revertProgramInvariant<T>(make_pair(invariants[k][j], vdp.second)));
+      res += score * work[work.size() - 1];
+      sscore += abs(score * sqrt(work.dot(work)));
     }
-    const pair<SimpleVector<T>, T> vdp(makeProgramInvariant<T>(R2bin<T>(work)));
-    T score(int(0));
-    for(int j = 0; j < work.size(); j ++)
-      score += work[j] *
-        bin2R<T>(revertProgramInvariant<T>(make_pair(avg[j], vdp.second)));
-    res += score * work[work.size() - 1];
-    sscore += abs(score * sqrt(work.dot(work)));
   }
   return sscore == zero ? sscore : res / sscore;
 }
@@ -5007,11 +5012,11 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   vector<vector<SimpleVector<T> > > work;
   work.emplace_back(in);
   // N.B. 1 bit for margin, 1 bit for sign, 1 bit per loop we made hypothesis.
-  const int loop(max(int(1), min(int(in.size() / 13), int(2))));
+  const int loop(in.size() < 25 ? 1 : 2);
   if(loop < 2) {
     static bool shown = false;
     if(! shown) {
-      cerr << "pgoshigoshi needs at least 26 input size to get better result." << endl;
+      cerr << "pgoshigoshi needs at least 25 input size to get better result." << endl;
       shown = true;
     }
   }
@@ -5069,6 +5074,36 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   return move(res);
 }
 
+// N.B. we want to feed large markov into prediction stream.
+template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), int markov, int nprogress> static inline vector<SimpleVector<T> > pFeedLargeMarkov(const vector<SimpleVector<T> >& in, const string& strloop) {
+  if(in.size() <= markov + 6) return p(in, string(", id.") + strloop);
+  vector<SimpleVector<T> > pass_next;
+  pass_next.resize(markov, SimpleVector<T>(in[0].size()).O());
+  SimpleVector<T> presidue(in[0].size());
+  presidue.O();
+  {
+    const vector<SimpleVector<T> > intrans(unOffsetHalf<T>(pFeedTranspose<T>(in)));
+    for(int i = in.size() - markov - 1; i < in.size() - 1; i ++) {
+      for(int j = 0; j < in[0].size(); j ++) {
+        if(nprogress && ! (((i - in.size() + markov + 1) * in[0].size() + j) %
+          max(int(1), int(markov * in[0].size() / nprogress))) )
+            cerr << ((i - in.size() + markov + 1) * in[0].size() + j) << " / "
+              << markov * in[0].size() << "@feedLargeMarkov" << strloop << endl;
+        pass_next[i - (in.size() - markov - 1)][j] =
+          p012next<T>(intrans[j].subVector(0, i + 1),
+            int(sqrt(T(i + 1))) );
+      }
+    }
+    for(int j = 0; j < in[0].size(); j ++)
+      presidue[j] = p012next<T>(intrans[j], int(sqrt(T(in.size()))) );
+  }
+  vector<SimpleVector<T> > pres(unOffsetHalf<T>(p(offsetHalf<T>(pass_next), string(", feedMarkov") + strloop)) );
+  for(int i = 0; i < pres.size(); i ++)
+    for(int j = 0; j < pres[i].size(); j ++)
+      pres[i][j] *= presidue[j];
+  return move(pres);
+}
+
 // N.B. we apply PRNGs before to predict each of prediction in general.
 //      this is needed if original streams' entropy feeding is not stable
 //      case, the implicit recursive functions' average can be stable with
@@ -5083,21 +5118,29 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   vector<SimpleVector<T> > res;
   for(int i0 = 0; i0 < nrecur; i0 ++) {
     vector<SimpleVector<T> > rin(in);
-    SimpleVector<T> prngin(in[0].size());
-    prngin.O();
-    for(int i = 0; i < rin.size(); i ++)
-      for(int j = 0; j < rin[i].size(); j ++)
+    vector<SimpleVector<T> > prngr;
+    vector<vector<bool> > sign;
+    prngr.resize(rin.size() + 1, SimpleVector<T>(in[0].size()).O());
+    {
+      vector<bool> signv;
+      signv.resize(in[0].size(), false);
+      sign.resize(rin.size() + 1, signv);
+    }
+    if(1 < nrecur) {
+      for(int i = 0; i < rin.size(); i ++)
+        for(int j = 0; j < rin[i].size(); j ++)
 #if defined(_ARCFOUR_)
-        rin[i][j] = (rin[i][j] + T(arc4random_uniform(0x20001)) / T(0x20000)) / T(int(2));
+          rin[i][j] = (rin[i][j] + (prngr[i][j] = T(arc4random_uniform(0x20001)) / T(0x20000)) / T(int(2)));
 #else
-        rin[i][j] = (rin[i][j] + T(random() % 0x20000) / T(0x20000 - 1)) / T(int(2));
+          rin[i][j] = (rin[i][j] + (prngr[i][j] = T(random() % 0x20000) / T(0x20000 - 1)) / T(int(2)));
 #endif
-    for(int j = 0; j < prngin.size(); j ++)
+      for(int j = 0; j < rin[0].size(); j ++)
 #if defined(_ARCFOUR_)
-      prngin[j] = T(arc4random_uniform(0x20001)) / T(0x20000) / T(int(2));
+        prngr[prngr.size() - 1][j] = T(arc4random_uniform(0x20001)) / T(0x20000) / T(int(2));
 #else
-      prngin[j] = T(random() % 0x20000) / T(0x20000 - 1) / T(int(2));
+        prngr[prngr.size() - 1][j] = T(random() % 0x20000) / T(0x20000 - 1) / T(int(2));
 #endif
+    }
     {
       const vector<SimpleVector<T> > rintrans(unOffsetHalf<T>(pFeedTranspose<T>(rin)));
       rin = unOffsetHalf<T>(rin);
@@ -5108,23 +5151,24 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
         rin[0][j] = T(int(0));
         for(int i = 1; i < rintrans[j].size(); i ++) {
           pslip_t<T> ps(0);
-          rin[i][j] *= pSlipGulf0short<T>(rintrans[j].subVector(0, i), ps, i);
+          const T work(pSlipGulf0short<T>(rintrans[j].subVector(0, i), ps, i));
+          rin[i][j]   *= work;
+          prngr[i][j] *= work;
+          sign[i][j]   = work < T(int(0));
         }
         pslip_t<T> ps(0);
-        prngin[j] *= pSlipGulf0short<T>(rintrans[j], ps, rintrans[j].size());
+        const T work(pSlipGulf0short<T>(rintrans[j], ps, rintrans[j].size()));
+        prngr[in.size()][j] *= work;
+        sign[in.size()][j]   = work < T(int(0));
       }
-      rin = offsetHalf<T>(rin);
     }
     // N.B. PRNG parts going to gray + small noise with large enough nrecur.
-    vector<SimpleVector<T> > work(unOffsetHalf<T>(p(rin, string(", ") + to_string(i0) + string(" / ") + to_string(nrecur) + strloop)));
-    for(int j = 0; j < work.size() - 1; j ++)
-      for(int k = 0; k < work[j].size(); k ++)
-        work[j][k] -= unOffsetHalf<T>(rin[j - (work.size() - 1) + rin.size()][k]);
-    {
-      const int j(work.size() - 1);
-      for(int k = 0; k < work[j].size(); k ++)
-        work[j][k] -= prngin[k];
-    }
+    vector<SimpleVector<T> > work(unOffsetHalf<T>(p(offsetHalf<T>(rin), string(", ") + to_string(i0) + string(" / ") + to_string(nrecur) + strloop)));
+    for(int j = 0; j < work.size(); j ++)
+      for(int k = 0; k < work[j].size(); k ++) {
+        work[j][k] -= prngr[j - work.size() + prngr.size()][k];
+        if(sign[j][k]) work[j][k] = - work[j][k];
+      }
     if(res.size()) {
       assert(res.size() == work.size());
       for(int j = 0; j < work.size(); j ++)
@@ -5262,6 +5306,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //       | function      | layer# | [wsp1] | data amount *     |
 //       | pAbbsentMajority | -1  | w      | in * 2 * lg(in)   |
 //       | predv         | 0      | w      | in * PRNG         |
+//       | pFeedLargeMarkov | *   | w      | in * sqrt(in)     |
 //       | pgoshigoshi   | 1      | w      | in * 2            |
 //       | (0) + (1)     | 1      | w      | (0) + (1)         |
 // (0)   | deep          | 2      | s      | ~ in * 3          |
@@ -5309,7 +5354,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 //       operation counting. overall this is counting (2^(2p*n))^(n*n) layers.
 //       so they causes f-fixation layer counting.)
 #if !defined(_PRNG_RECUR_)
-#define _PRNG_RECUR_ 11
+#define _PRNG_RECUR_ 1
 #endif
 
 template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
@@ -5330,9 +5375,10 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<Si
   in0.resize(0);
   vector<vector<SimpleVector<T> > > res;
   vector<SimpleVector<T> > pres(
-    pAbsentMajority<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >,
-      predv<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >, _PRNG_RECUR_> >
-        (in, string(" (predVec)")));
+    pAbsentMajority<T, pFeedLargeMarkov<T, pgoshigoshi<T, predvp<T, 20>,
+      predvq<T, 20> >, 25, 20>, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T,
+        predvp<T, 20>, predvq<T, 20> >, 25, 20>, _PRNG_RECUR_> >
+          (in, string(" (predVec)")));
   res.resize(pres.size());
   assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++) {
@@ -5368,9 +5414,10 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<Si
   const int cols(in0[0][0].cols());
   in0.resize(0);
   vector<SimpleVector<T> > pres(
-    pAbsentMajority<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >,
-      predv<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >, _PRNG_RECUR_> >
-        (in, string(" (predMat)")));
+    pAbsentMajority<T, pFeedLargeMarkov<T, pgoshigoshi<T, predvp<T, 20>,
+      predvq<T, 20> >, 25, 20>, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T,
+        predvp<T, 20>, predvq<T, 20> >, 25, 20>, _PRNG_RECUR_> >
+          (in, string(" (predMat)")));
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
   assert(res.size() == pres.size());
@@ -5423,9 +5470,10 @@ template <typename T> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSpars
   in0.resize(0);
   vector<SimpleSparseTensor(T) > res;
   vector<SimpleVector<T> > pres(
-    pAbsentMajority<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >,
-      predv<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >, _PRNG_RECUR_> >
-        (in, string(" (predSTen)")));
+    pAbsentMajority<T, pFeedLargeMarkov<T, pgoshigoshi<T, predvp<T, 20>,
+      predvq<T, 20> >, 25, 20>, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T,
+        predvp<T, 20>, predvq<T, 20> >, 25, 20>, _PRNG_RECUR_> >
+          (in, string(" (predSTen)")));
   res.resize(pres.size());
   assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++)
