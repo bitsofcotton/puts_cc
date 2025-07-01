@@ -5195,38 +5195,31 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   for(int i = 0; i < in[0].size(); i ++) midx.emplace_back(i);
   const int nloop(countMSB(in.size()) * 2);
   for(int i = 0; i < nloop; i ++) {
+    vector<int> mmidx;
+    vector<int> nmidx;
+    int cnt;
     vector<SimpleVector<T> > pres(unOffsetHalf<T>(p(work, string(", ") + to_string(i) + string(" / ") + to_string(nloop) + string(" (p)") + strloop) ));
     vector<SimpleVector<T> > qres(unOffsetHalf<T>(q(work, string(", ") + to_string(i) + string(" / ") + to_string(nloop) + string(" (q)") + strloop) ));
     assert(pres.size() == qres.size() && midx.size() == pres[0].size());
     if(! i) {
       res.resize(pres.size());
       for(int j = 0; j < pres.size(); j ++)
-        res[j] = SimpleVector<T>(pres[j].size()).O(T(int(1)) / T(int(2)));
-    } else if(i ==  nloop - 1) {
-      for(int j = 0; j < pres.size(); j ++)
-        for(int k = 0; k < pres[j].size(); k ++)
-          res[j][midx[k]] =
-            offsetHalf<T>((pres[j][k] + qres[j][k]) / T(int(2)));
-      break;
-    }
+        res[j] = (pres[j] + qres[j]) / T(int(2));
+    } else if(i ==  nloop - 1) goto fixnext;
     work.resize(0);
     work.resize(in.size());
-    vector<int> mmidx;
-    mmidx.resize(in[0].size(), - 1);
+    mmidx.resize(midx.size(), - 1);
     for(int j = 0; j < pres.size(); j ++) {
       assert(pres[j].size() == qres[j].size());
       int cnt(0);
       for(int k = 0; k < midx.size(); k ++)
         if(T(int(0)) < pres[j][k] * qres[j][k])
-          res[j][midx[k]] =
-            offsetHalf<T>((pres[j][k] + qres[j][k]) / T(int(2)));
+          res[j][midx[k]] = (pres[j][k] + qres[j][k]) / T(int(2));
         else mmidx[k] = 1;
     }
-    int cnt(0);
+    cnt = 0;
     for(int k = 0; k < mmidx.size(); k ++) if(0 <= mmidx[k]) cnt ++;
-    if(cnt < 2 || midx.size() <= cnt) break;
-    midx.resize(0);
-    vector<int> nmidx;
+    if(cnt < 2 || midx.size() <= cnt) goto fixnext;
     nmidx.resize(cnt, - 1);
     for(int k = 0, ctr = 0; k < mmidx.size(); k ++)
       if(0 <= mmidx[k]) nmidx[ctr ++] = midx[k];
@@ -5237,13 +5230,25 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
       work[j].O();
       for(int k = 0; k < midx.size(); k ++) work[j][k] = in[j][midx[k]];
     }
+    continue;
+   fixnext:
+    for(int j = 0; j < pres.size(); j ++)
+      for(int k = 0; k < pres[j].size(); k ++)
+        res[j][midx[k]] = (pres[j][k] + qres[j][k]) / T(int(2));
+    break;
   }
-  return move(res);
+  return offsetHalf<T>(res);
 }
 
 // N.B. from tiny experiments they improves the prediction on last stage.
 template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&)> vector<SimpleVector<T> > static inline pGatherExp(const vector<SimpleVector<T> >& in, const string& strloop) {
-  if(in.size() < 14 + 4) return p(in, string(", id.") + strloop);
+  if(in.size() < 14 + 4) {
+    vector<SimpleVector<T> > pwork(p(in, string(", id.") + strloop));
+    for(int i = 1; i < pwork.size(); i ++) pwork[0] += pwork[i];
+    pwork[0] /= T(pwork.size());
+    pwork.resize(1);
+    return move(pwork);
+  }
   vector<SimpleVector<T> > inw(in);
   vector<SimpleVector<T> > pbuf;
   pbuf.resize(4);
@@ -5266,11 +5271,11 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   }
   pbuf.resize(0);
   vector<SimpleVector<T> > res;
-  res.emplace_back(pstage1[pstage1.size() - 1]);
+  res.emplace_back(move(pstage1[pstage1.size() - 1]));
   for(int i = 0; i < res[0].size(); i ++) {
     SimpleVector<T> work(pstage1.size() - 1);
-    for(int j = 0; j < work.size(); j ++) work[j] = pstage1[j][i];
-    res[0][i] += p0maxNext<T>(work);
+    for(int j = 0; j < work.size(); j ++) work[j] = move(pstage1[j][i]);
+    res[0][i] += p0maxNext<T>(move(work));
   }
   return move(res);
 }
@@ -5284,10 +5289,7 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   vector<SimpleVector<T> > res(p(in, string(":(+)") + strloop));
   for(int i = 0; i < res.size(); i ++)
     for(int j = 0; j < res[i].size(); j ++)
-      res[i][j] = T(int(1)) / T(int(2)) < res[i][j] ? res[i][j] :
-        (T(int(1)) / T(int(2)) < resm[i][j] ?
-          offsetHalf<T>(- unOffsetHalf<T>(resm[i][j])) :
-            T(int(1)) / T(int(2)) );
+      res[i][j] = offsetHalf<T>((res[i][j] - resm[i][j]) / T(int(2)) );
   return move(res);
 }
 
