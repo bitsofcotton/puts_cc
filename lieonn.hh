@@ -5029,20 +5029,8 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
     vector<vector<SimpleVector<T> > > nwork;
     nwork.reserve(1 << (loop + 1));
     for(int j = 0; j < work.size(); j ++) {
-      {
-        vector<SimpleVector<T> > tempp(p(work[j], string(", ") + to_string(j) + " / " + to_string(work.size()) + string(", ") + to_string(i) + string(" / ") + to_string(loop) + strloop));
-        SimpleVector<SimpleVector<T> > tworkp;
-        tworkp.entity = move(tempp);
-        const int sizep(min(tworkp.size(), max(int(in.size()) * (loop - 1 - i) / loop, int(2))) );
-        nwork.emplace_back(tworkp.subVector(tworkp.size() - sizep, sizep).entity);
-      }
-      {
-        vector<SimpleVector<T> > tempq(q(work[j], string(", ") + to_string(j) + " / " + to_string(work.size()) + string(", ") + to_string(i) + string(" / ") + to_string(loop) + strloop));
-        SimpleVector<SimpleVector<T> > tworkq;
-        tworkq.entity = move(tempq);
-        const int sizeq(min(tworkq.size(), max(int(in.size()) * (loop - 1 - i) / loop, int(2))) );
-        nwork.emplace_back(tworkq.subVector(tworkq.size() - sizeq, sizeq).entity);
-      }
+      nwork.emplace_back(p(work[j], string(", ") + to_string(j) + " / " + to_string(work.size()) + string(", ") + to_string(i) + string(" / ") + to_string(loop) + strloop));
+      nwork.emplace_back(q(work[j], string(", ") + to_string(j) + " / " + to_string(work.size()) + string(", ") + to_string(i) + string(" / ") + to_string(loop) + strloop));
     }
     for(int j = 0; j < nwork.size(); j ++)
       for(int ii = 0; ii < nwork[j].size(); ii ++)
@@ -5183,13 +5171,10 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
       }
     if(res.size()) {
       assert(res.size() == work.size());
-      for(int j = 0; j < work.size(); j ++)
-        res[j] += work[j];
-    } else
-      res = move(work);
+      for(int j = 0; j < work.size(); j ++) res[j] += work[j];
+    } else res = move(work);
   }
-  for(int i = 0; i < res.size(); i ++)
-    res[i] *= T(int(2)) / T(nrecur);
+  for(int i = 0; i < res.size(); i ++) res[i] /= T(nrecur);
   return offsetHalf<T>(res);
 }
 
@@ -5212,7 +5197,7 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   for(int i = 0; i < nloop; i ++) {
     vector<SimpleVector<T> > pres(unOffsetHalf<T>(p(work, string(", ") + to_string(i) + string(" / ") + to_string(nloop) + string(" (p)") + strloop) ));
     vector<SimpleVector<T> > qres(unOffsetHalf<T>(q(work, string(", ") + to_string(i) + string(" / ") + to_string(nloop) + string(" (q)") + strloop) ));
-    assert(pres.size() == qres.size());
+    assert(pres.size() == qres.size() && midx.size() == pres[0].size());
     if(! i) {
       res.resize(pres.size());
       for(int j = 0; j < pres.size(); j ++)
@@ -5241,9 +5226,11 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
     for(int k = 0; k < mmidx.size(); k ++) if(0 <= mmidx[k]) cnt ++;
     if(cnt < 2 || midx.size() <= cnt) break;
     midx.resize(0);
-    midx.resize(cnt, - 1);
+    vector<int> nmidx;
+    nmidx.resize(cnt, - 1);
     for(int k = 0, ctr = 0; k < mmidx.size(); k ++)
-      if(0 <= mmidx[k]) midx[ctr ++] = k;
+      if(0 <= mmidx[k]) nmidx[ctr ++] = midx[k];
+    midx = move(nmidx);
     work.resize(in.size());
     for(int j = 0; j < work.size(); j ++) {
       work[j].resize(midx.size());
@@ -5285,7 +5272,23 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
     for(int j = 0; j < work.size(); j ++) work[j] = pstage1[j][i];
     res[0][i] += p0maxNext<T>(work);
   }
-  return offsetHalf<T>(res);
+  return move(res);
+}
+
+template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&)> vector<SimpleVector<T> > static inline pPositiveSel(const vector<SimpleVector<T> >& in, const string& strloop) {
+  vector<SimpleVector<T> > inm(in);
+  for(int i = 0; i < inm.size(); i ++)
+    inm[i] = offsetHalf<T>(- unOffsetHalf<T>(inm[i]));
+  vector<SimpleVector<T> > resm(p(inm, string(":(-)") + strloop));
+  inm.resize(0);
+  vector<SimpleVector<T> > res(p(in, string(":(+)") + strloop));
+  for(int i = 0; i < res.size(); i ++)
+    for(int j = 0; j < res[i].size(); j ++)
+      res[i][j] = T(int(1)) / T(int(2)) < res[i][j] ? res[i][j] :
+        (T(int(1)) / T(int(2)) < resm[i][j] ?
+          offsetHalf<T>(- unOffsetHalf<T>(resm[i][j])) :
+            T(int(1)) / T(int(2)) );
+  return move(res);
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
@@ -5347,6 +5350,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv4(vector
 // (04) we close measurement condition based prediction with this state.
 // N.B. our measureable condition predictor layers
 //       | function         | layer# | [wsp1] | data amount ratio |
+//       | pPositiveSel     | -4     | w      | in * 2            |
 //       | pGatherExp       | -3     | w      | in * 4            |
 //       | pAbsentMajority  | -2     | w      | in * 2 * lg(in)   |
 //       | predv            | -1     | w      | in * PRNG         |
@@ -5420,10 +5424,10 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<Si
   const int size1(in0[0][0].size());
   in0.resize(0);
   vector<vector<SimpleVector<T> > > res;
-  vector<SimpleVector<T> > pres(clipBin<T>(pGatherExp<T, 
+  vector<SimpleVector<T> > pres(clipBin<T>(pPositiveSel<T, pGatherExp<T, 
     pAbsentMajority<T, pFeedLargeMarkov<T, pgoshigoshi<T, predvp<T, 20>,
       predvq<T, 20> >, 25, 20>, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T,
-        predvp<T, 20>, predvq<T, 20> >, 25, 20>, _PRNG_RECUR_> > >
+        predvp<T, 20>, predvq<T, 20> >, 25, 20>, _PRNG_RECUR_> > > >
           (in, string(" (predVec)"))));
   res.resize(pres.size());
   assert(res.size() == pres.size());
@@ -5459,10 +5463,10 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<Si
   const int rows(in0[0][0].rows());
   const int cols(in0[0][0].cols());
   in0.resize(0);
-  vector<SimpleVector<T> > pres(clipBin<T>(pGatherExp<T, 
+  vector<SimpleVector<T> > pres(clipBin<T>(pPositiveSel<T, pGatherExp<T, 
     pAbsentMajority<T, pFeedLargeMarkov<T, pgoshigoshi<T, predvp<T, 20>,
       predvq<T, 20> >, 25, 20>, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T,
-        predvp<T, 20>, predvq<T, 20> >, 25, 20>, _PRNG_RECUR_> > >
+        predvp<T, 20>, predvq<T, 20> >, 25, 20>, _PRNG_RECUR_> > > >
           (in, string(" (predMat)"))));
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
@@ -5515,10 +5519,10 @@ template <typename T> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSpars
   }
   in0.resize(0);
   vector<SimpleSparseTensor(T) > res;
-  vector<SimpleVector<T> > pres(clipBin<T>(pGatherExp<T, 
+  vector<SimpleVector<T> > pres(clipBin<T>(pPositiveSel<T, pGatherExp<T, 
     pAbsentMajority<T, pFeedLargeMarkov<T, pgoshigoshi<T, predvp<T, 20>,
       predvq<T, 20> >, 25, 20>, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T,
-        predvp<T, 20>, predvq<T, 20> >, 25, 20>, _PRNG_RECUR_> > >
+        predvp<T, 20>, predvq<T, 20> >, 25, 20>, _PRNG_RECUR_> > > >
           (in, string(" (predSTen)"))));
   res.resize(pres.size());
   assert(res.size() == pres.size());
