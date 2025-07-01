@@ -5110,8 +5110,6 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
 //      case, the implicit recursive functions' average can be stable with
 //      this hack. we suppose phase period doesn't connected to the original
 //      structures.
-// N.B. we can avoid such of the PRNG condition with goki_check_cc:test.py
-//      [Qq]red command they shirks continuity auto tuned ones.
 // N.B. practically, nrecur == 0 works well with ddpmopt T cmd, we use this.
 //      we don't select better nrecur == 11 * 11 we need huge computation time.
 template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), int nrecur> vector<SimpleVector<T> > static inline predv(const vector<SimpleVector<T> >& in, const string& strloop) {
@@ -8531,6 +8529,11 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 // (11) pskipp to skip input in some steps.
 //      it's a counter measure to the jammer. so any of the predictor has the
 //      jammers, so if the jammer adjust theirs to our algorithms, it's useless.
+// (12) goki_check_cc:test.py [qQ]red auto continuity tuner.
+//      we dropped them because they also make the hypothesis input stream
+//      to have some of the continuity, so instead of them, we use pgoshigoshi
+//      with predv function, so to fight with them, we can do predv for both
+//      template parameter to pAbsentMajority.
 //
 // N.B. something XXX result descripton
 // (00) there might exist non Lebesgue measureable condition discrete stream.
@@ -8635,6 +8638,13 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      then we brute force function listing.
 // (15) echo input as one step before flip or return to average.
 //      this is id. transform but orthogonal to former p01?2?next..
+// (16) to make the hypotheis the input stream is only payload to known
+//      structures. this is to make the hypothesis n-markov's n as a input
+//      stream size, the invariant is come from another pre-trained inputs.
+//      mimicing ongoing machine learnings doing them.
+//      this might have dimension upper bound as 19,683 if they shirks
+//      generic i/o/(de)compression into externals but his can soon get
+//      saturated.
 
 #define _SIMPLELIN_
 #endif
