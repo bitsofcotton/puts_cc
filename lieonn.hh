@@ -4994,7 +4994,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pFeedLargeMarkov(c
   vector<SimpleVector<T> > pass_next;
   SimpleVector<T> presidue(in[0].size());
   presidue.O(T(int(1)));
-  if(in.size() - slen < 13) pass_next = pFeedTranspose<T>(in);
+  if(in.size() - slen < 14) pass_next = pFeedTranspose<T>(in);
   else {
     pass_next.resize(in[0].size(), SimpleVector<T>(in.size() - 1 - slen).O());
     const vector<SimpleVector<T> > intrans(unOffsetHalf<T>(pFeedTranspose<T>(in)));
@@ -5130,8 +5130,8 @@ template <typename T, int nprogress> SimpleVector<T> pAbsentMajority(const vecto
   return offsetHalf<T>(res[0] /= T(res.size()));
 }
 
-template <typename T, int horizontal, int nprogress> SimpleVector<T> pFeedLebesgue(const vector<SimpleVector<T> >& in, const string& strloop) {
-  if(in.size() - 13 < horizontal * horizontal)
+template <typename T, int nprogress> SimpleVector<T> pFeedLebesgue(const vector<SimpleVector<T> >& in, const int& horizontal, const string& strloop) {
+  if(in.size() < horizontal * horizontal * 14)
     return pAbsentMajority<T, nprogress>(in, string("id.") + strloop);
   vector<vector<SimpleVector<T> > > reform;
   reform.resize(horizontal);
@@ -5147,9 +5147,11 @@ template <typename T, int horizontal, int nprogress> SimpleVector<T> pFeedLebesg
     }
     const int start((i - (in.size() / horizontal / horizontal)) *
       horizontal * horizontal + in.size() +
-        ((horizontal * horizontal) - in.size() % (horizontal * horizontal)));
-    for(int j = start; j < min(start + horizontal, int(in.size())); j ++)
-      for(int k = 0; k < les[0].size(); k ++) {
+        (horizontal * horizontal - (in.size() % (horizontal * horizontal))) %
+          (horizontal * horizontal));
+    for(int j = start; j < min(start + horizontal * horizontal,
+        int(in.size())); j ++)
+      for(int k = 0; k < les.size(); k ++) {
         int idx(offsetHalf<T>(in[j][k]) * T(horizontal));
         idx = max(int(0), min(horizontal - 1, int(idx)));
         for(int n = 0; n < les[k].size(); n ++)
@@ -5170,19 +5172,27 @@ template <typename T, int horizontal, int nprogress> SimpleVector<T> pFeedLebesg
   for(int i = 0; i < reform.size(); i ++)
     res += pAbsentMajority<T, nprogress>(reform[i],
       string("Lebesgue(") + to_string(i) + string("/") + to_string(reform.size()) + string(")") + strloop);
-  return res /= T(horizontal);
+  return res;
 }
 
-template <typename T, int range, int nprogress> SimpleVector<T> pSectional(const vector<SimpleVector<T> >& in0, const string& strloop) {
+template <typename T, int nprogress> SimpleVector<T> pSectional(const vector<SimpleVector<T> >& in0, const int& range, const string& strloop) {
   const int sectional(range * range);
   if(! in0.size()) return SimpleVector<T>();
-  if(in0.size() - 13 < sectional * 2)
-    return pFeedLebesgue<T, range, nprogress>(in0, string("id.") + strloop);
+  if(in0.size() < sectional * 15)
+    return pFeedLebesgue<T, nprogress>(in0, range, string("id.") + strloop);
   vector<SimpleVector<T> > in(in0);
   in.resize(in.size() - sectional + 1);
-  SimpleVector<T> out(pFeedLebesgue<T, range, nprogress>(in, strloop) * T(sectional));
+  SimpleVector<T> out(pFeedLebesgue<T, nprogress>(in, range, strloop) * T(sectional));
   for(int i = 1; i < sectional; i ++) out -= in0[in0.size() - i];
   return offsetHalf<T>(out);
+}
+
+template <typename T, int nprogress> vector<SimpleVector<T> > pCandidates(const vector<SimpleVector<T> >& in, const string& strloop) {
+  vector<SimpleVector<T> > res;
+  for(int i = 2; i * i * 15 <= in.size(); i ++)
+    res.emplace_back(pSectional<T, nprogress>(in, i,
+      string(" cand(") + to_string(i) + string(")") + strloop));
+  return res;
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
@@ -5249,6 +5259,9 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //      configuration.
 // (06) after of all, large enough input with configuring parameters,
 //      we can avoid jammer condition we think.
+// (07) however, we are in sticky condition, the difference between
+//      prediction and real value are almost constant but not vanished.
+//      this might be our machines' concerns.
 // N.B. our measureable condition predictor layers
 //       | function           | layer# | [wsp1] | data amount ratio |
 //       | pSectional         | 0      | w      | in * range        |
@@ -5298,13 +5311,6 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //      12~16 bit entropy, they causes layer# exceeds the structure
 //      so we only need ## inputs whole in the case.
 
-#if !defined(_P_RECUR_)
-#define _P_SEC_ 2
-#endif
-#if _P_SEC_ < 1
-# error cannot handle _P_SEC_ definitions
-#endif
-
 template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
@@ -5321,13 +5327,13 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<Si
   const int size0(in0[0].size());
   const int size1(in0[0][0].size());
   in0.resize(0);
+  vector<SimpleVector<T> > pres(pCandidates<T, 20>(in, string(" (predVec)")));
   vector<vector<SimpleVector<T> > > res;
-  SimpleVector<T> pres(pSectional<T, 2, 20>(in, string(" (predVec)")));
-  res.resize(1);
+  res.resize(pres.size());
   for(int i = 0; i < res.size(); i ++) {
     res[i].resize(size0);
     for(int j = 0; j < res[0].size(); j ++)
-      res[i][j] = pres.subVector(size1 * j, size1);
+      res[i][j] = pres[i].subVector(size1 * j, size1);
   }
   return res;
 }
@@ -5356,16 +5362,16 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<Si
   const int rows(in0[0][0].rows());
   const int cols(in0[0][0].cols());
   in0.resize(0);
-  SimpleVector<T> pres(pSectional<T, 2, 20>(in, string(" (predMat)")));
+  vector<SimpleVector<T> > pres(pCandidates<T, 20>(in, string(" (predMat)")));
   vector<vector<SimpleMatrix<T> > > res;
-  res.resize(1);
+  res.resize(pres.size());
   for(int i = 0; i < res.size(); i ++) {
     res[i].resize(size);
     for(int j = 0; j < res[0].size(); j ++) {
       res[i][j].resize(rows, cols);
       for(int k = 0; k < rows; k ++)
         res[i][j].row(k) =
-          pres.subVector(j * rows * cols + k * cols, cols);
+          pres[i].subVector(j * rows * cols + k * cols, cols);
     }
   }
   return res;
@@ -5406,16 +5412,16 @@ template <typename T> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSpars
             in[i][cnt ++] = offsetHalf<T>(in0[i][idx[j]][idx[k]][idx[m]]);
   }
   in0.resize(0);
+  vector<SimpleVector<T> > pres(pCandidates<T, 20>(in, string(" (predMat)")));
   vector<SimpleSparseTensor(T) > res;
-  SimpleVector<T> pres(pSectional<T, 2, 20>(in, string(" (predSTen)")));
-  res.resize(1);
+  res.resize(pres.size());
   for(int i = 0; i < res.size(); i ++)
     for(int j = 0, cnt = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
         for(int m = 0; m < idx.size(); m ++)
           if(binary_search(attend.begin(), attend.end(),
                make_pair(j, make_pair(k, m))))
-            res[i][idx[j]][idx[k]][idx[m]] = pres[cnt ++];
+            res[i][idx[j]][idx[k]][idx[m]] = pres[i][cnt ++];
   return res;
 }
 
