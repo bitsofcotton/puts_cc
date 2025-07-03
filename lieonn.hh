@@ -4889,7 +4889,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv00(const
   }
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(p)).first,
-      p01next<T, true>(seconds.subVector(0, sz)) ));
+      p01next<T, true>(seconds.subVector(0, sz)) )).subVector(0, intran.size());
 }
 
 template <typename T, int nprogress> SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
@@ -4957,8 +4957,8 @@ template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleV
   p.entity.reserve(intran0[0].size());
   for(int i = 1; i < start; i ++)
     p.entity.emplace_back(SimpleVector<T>(intran0.size()).O());
-  for(int i = start; i <= intran0.size(); i ++)
-    p.entity.emplace_back(unOffsetHalf<T>(predv00<T, nprogress>(intran, i, seconds, to_string(i) + string(" / ") + to_string(intran0.size()) + strloop) ) );
+  for(int i = start; i <= intran0[0].size(); i ++)
+    p.entity.emplace_back(unOffsetHalf<T>(predv00<T, nprogress>(intran, i, seconds, to_string(i) + string(" / ") + to_string(intran0[0].size()) + strloop) ) );
   intran.resize(0);
   SimpleMatrix<T> ip(res.size(), p.size());
   ip.O();
@@ -4985,59 +4985,46 @@ template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleV
   return clipBin<T>(offsetHalf<T>(res));
 }
 
-// N.B. however, we often get predv result as differ <~ abs(p - 1/2) * 2 result.
-//      if we're lucky enough, we face them in 1 bit on abs(p - 1/2) prediction.
-// N.B. we get 4 of the candidates in each bit from p and q normally as
+// N.B. we want to feed large markov into prediction stream then:
+//      we get 2 of the candidates in each bit from p and q normally as
 //      1x force insert Riemann measurable condition and 1x insert
 //      possible Riemann-Stieljes measureable condition.
-//      we need each input 3 candidates in fact, however we exclude invariant
-//      condition also we adopt low of excluded middle, so we select
-//      binary output on each input.
-//      after loop == 2, we get 4 of candidates they saturates #f on root
-//      in binary function meaning with no internal states condition.
-template <typename T, int nprogress> static inline vector<SimpleVector<T> > pgoshigoshi(const vector<SimpleVector<T> >& in0, const string& strloop) {
-  const vector<SimpleVector<T> > in(pFeedTranspose<T>(in0));
-  vector<SimpleVector<T> > res;
-  res.reserve(2);
-  res.emplace_back(predvp<T, nprogress>(in, string(", (p)") + strloop));
-  res.emplace_back(predvq<T, nprogress>(in, string(", (q)") + strloop));
-  assert(res[0].size() == in.size());
-  assert(res[0].size() == res[1].size());
-  return res;
-}
-
-// N.B. we want to feed large markov into prediction stream.
-template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), int nprogress> vector<SimpleVector<T> > pFeedLargeMarkov(const vector<SimpleVector<T> >& in, const string& strloop) {
+template <typename T, int nprogress> vector<SimpleVector<T> > pFeedLargeMarkov(const vector<SimpleVector<T> >& in, const string& strloop) {
   const int slen(max(int(4), int(exp(log(T(int(in.size()))) / T(int(3)) )) ) );
-  if(in.size() - slen < 13) return p(in, string(", id.") + strloop);
   vector<SimpleVector<T> > pass_next;
-  pass_next.resize(in.size() - 1 - slen, SimpleVector<T>(in[0].size()).O());
   SimpleVector<T> presidue(in[0].size());
-  presidue.O();
-  {
+  presidue.O(T(int(1)));
+  if(in.size() - slen < 13) pass_next = pFeedTranspose<T>(in);
+  else {
+    pass_next.resize(in[0].size(), SimpleVector<T>(in.size() - 1 - slen).O());
     const vector<SimpleVector<T> > intrans(unOffsetHalf<T>(pFeedTranspose<T>(in)));
-    for(int i = slen; i < in.size() - 1; i ++) {
+    for(int i = slen; i < in.size() - 1; i ++)
       for(int j = 0; j < in[0].size(); j ++) {
         if(nprogress && ! (((i - slen) * in[0].size() + j) %
           max(int(1), int((in.size() - 1 - slen) * in[0].size() / nprogress))) )
             cerr << ((i - slen) * in[0].size() + j) << " / "
               << ((in.size() - 1 - slen) * in[0].size())
-                << "@feedLargeMarkov:" << strloop << endl;
-        pass_next[i - slen][j] = p012next<T>(intrans[j].subVector(0, i + 1),
+                << "cuttingDownLargeMarkov: " << strloop << endl;
+        pass_next[j][i - slen] = p012next<T>(intrans[j].subVector(0, i + 1),
           int(exp(log(T(i + 1)) / T(int(3)) )) );
       }
-    }
     for(int j = 0; j < in[0].size(); j ++)
       presidue[j] = p012next<T>(intrans[j],
         int(exp(log(T(in.size())) / T(int(3)) )) );
   }
-  vector<SimpleVector<T> > pres(unOffsetHalf<T>(p(offsetHalf<T>(pass_next), string(", smallMarkov") + strloop)) );
-  for(int i = 0; i < pres.size(); i ++) {
-    assert(presidue.size() == pres[i].size());
-    for(int j = 0; j < pres[i].size(); j ++)
-      pres[i][j] *= presidue[j];
+  pass_next = offsetHalf<T>(pass_next);
+  vector<SimpleVector<T> > res;
+  res.reserve(2);
+  res.emplace_back(offsetHalf<T>(predvp<T, nprogress>(pass_next, string(" feed (p)") + strloop)));
+  res.emplace_back(offsetHalf<T>(predvq<T, nprogress>(pass_next, string(" feed (q)") + strloop)));
+  assert(res[0].size() == in[0].size());
+  assert(res[0].size() == res[1].size());
+  for(int i = 0; i < res.size(); i ++) {
+    assert(presidue.size() == res[i].size());
+    for(int j = 0; j < res[i].size(); j ++)
+      res[i][j] *= presidue[j];
   }
-  return offsetHalf<T>(pres);
+  return offsetHalf<T>(res);
 }
 
 // N.B. we apply PRNGs before to predict each of prediction in general.
@@ -5088,7 +5075,8 @@ static inline int countMSB(const int& x) {
 
 // N.B. we bet half of the pair of the prediction matches.
 //      for insurance, we pretend as 1/4 are matched.
-template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), vector<SimpleVector<T> > (*q)(const vector<SimpleVector<T> >&, const string&), int persistent> SimpleVector<T> pAbsentMajority(const vector<SimpleVector<T> >& in, const string& strloop) {
+template <typename T, int nprogress> SimpleVector<T> pAbsentMajority(const vector<SimpleVector<T> >& in, const string& strloop) {
+  static const int persistent(1);
   vector<SimpleVector<T> > work(in);
   vector<SimpleVector<T> > res;
   vector<int> midx;
@@ -5099,8 +5087,8 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
     vector<int> mmidx;
     vector<int> nmidx;
     int cnt;
-    vector<SimpleVector<T> > pres(unOffsetHalf<T>(p(work, string(", ") + to_string(i) + string(" / ") + to_string(nloop) + string(" (p)") + strloop) ));
-    vector<SimpleVector<T> > qres(unOffsetHalf<T>(q(work, string(", ") + to_string(i) + string(" / ") + to_string(nloop) + string(" (q)") + strloop) ));
+    vector<SimpleVector<T> > pres(unOffsetHalf<T>(predv<T, pFeedLargeMarkov<T, nprogress>, 0>(work, string(", ") + to_string(i) + string(" / ") + to_string(nloop) + string(" (p)") + strloop) ));
+    vector<SimpleVector<T> > qres(unOffsetHalf<T>(predv<T, pFeedLargeMarkov<T, nprogress>, 1>(work, string(", ") + to_string(i) + string(" / ") + to_string(nloop) + string(" (q)") + strloop) ));
     assert(pres.size() == qres.size() && midx.size() == pres[0].size());
     if(! i) {
       res.resize(pres.size());
@@ -5142,9 +5130,9 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   return offsetHalf<T>(res[0] /= T(res.size()));
 }
 
-template <typename T, SimpleVector<T> (*p)(const vector<SimpleVector<T> >&, const string&), int horizontal> SimpleVector<T> pFeedLebesgue(const vector<SimpleVector<T> >& in, const string& strloop) {
+template <typename T, int horizontal, int nprogress> SimpleVector<T> pFeedLebesgue(const vector<SimpleVector<T> >& in, const string& strloop) {
   if(in.size() - 13 < horizontal * horizontal)
-    return p(in, string("id.") + strloop);
+    return pAbsentMajority<T, nprogress>(in, string("id.") + strloop);
   vector<vector<SimpleVector<T> > > reform;
   reform.resize(horizontal);
   for(int i = 0; i < reform.size(); i ++)
@@ -5180,25 +5168,21 @@ template <typename T, SimpleVector<T> (*p)(const vector<SimpleVector<T> >&, cons
   SimpleVector<T> res(in[0].size());
   res.O();
   for(int i = 0; i < reform.size(); i ++)
-    res += p(reform[i], string("Lebesgue(") + to_string(i) + string("/") + to_string(reform.size()) + string(")") + strloop);
+    res += pAbsentMajority<T, nprogress>(reform[i],
+      string("Lebesgue(") + to_string(i) + string("/") + to_string(reform.size()) + string(")") + strloop);
   return res /= T(horizontal);
 }
 
-template <typename T, SimpleVector<T> (*p)(const vector<SimpleVector<T> >&, const string&), int sectional> SimpleVector<T> pSectional(const vector<SimpleVector<T> >& in0, const string& strloop) {
+template <typename T, int range, int nprogress> SimpleVector<T> pSectional(const vector<SimpleVector<T> >& in0, const string& strloop) {
+  const int sectional(range * range);
   if(! in0.size()) return SimpleVector<T>();
-  else if(! in0[0].size()) return in0[0];
   if(in0.size() - 13 < sectional * 2)
-    return p(in0, string("id.") + strloop);
+    return pFeedLebesgue<T, range, nprogress>(in0, string("id.") + strloop);
   vector<SimpleVector<T> > in(in0);
-  vector<SimpleVector<T> > outs;
-  outs.reserve(sectional);
-  for(int i = 0; i < sectional; i ++) {
-    outs.emplace_back(p(in, string(" Sectional(") + to_string(i) + string("/") + to_string(sectional) + string(")") + strloop) );
-    in.resize(in.size() - 1);
-  }
-  for(int i = 1; i < outs.size(); i ++) outs[0] += outs[i];
-  outs.resize(1);
-  return outs[0] /= T(sectional);
+  in.resize(in.size() - sectional + 1);
+  SimpleVector<T> out(pFeedLebesgue<T, range, nprogress>(in, strloop) * T(sectional));
+  for(int i = 1; i < sectional; i ++) out -= in0[in0.size() - i];
+  return offsetHalf<T>(out);
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
@@ -5259,47 +5243,50 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //      the excluded middle strongly.
 // (04) absent
 // (05) we feed pseudo continuous condition by pFeedLebesgue they feeds
-//      statistics-like inputs.
+//      statistics-like inputs. when we met the worse discontinuous
+//      input, we can increase/decrease the parameters. we *bet* this
+//      discontinuous condition shouldn't get on our predictor on default
+//      configuration.
+// (06) after of all, large enough input with configuring parameters,
+//      we can avoid jammer condition we think.
 // N.B. our measureable condition predictor layers
-//       | function         | layer# | [wsp1] | data amount ratio |
-//       | predv            | -1     | w      | in * PRNG         |
-//       | pSectional       | 0      | w      | in * range        |
-//       | pFeedLebesgue    | 0      | w      | in * range^2      |
-//       | pAbsentMajority  | *      | w      | in * 2 * lg(in)   |
-//       | pFeedLargeMarkov | 1      | w      | in * cbrt(in)     |
-//       | (0) + (1)        | 1      | w      | (0) + (1)         |
-// (0)   | deep             | 2      | s      | ~ in * 3          |
-//       | sumCNext         | 3      | s      | in                |
-//       | sumCNext         | 4      | s      | in                |
-//       | northPoleNext    | 5      | s      | in                |
-//       | p0max0next       | 6      | s      | in                |
-//       | (0-0) + (0-1)    | 6      | s      | (0-0) + (0-1)     |
-// (0-0) | invNext          | 7      | s      | in                |
-//       | (0-1)            | 8+     | s      | (0-1)             |
-// (0-1) | sumCNext         | 7      | s      | in                |
-//       | pnext            | 8      | s      | in + once(dft(6)) |
-//       | integrate-diff in taylorc   | 9   | p | once(dft(6 * 2)) |
-//       | exp to shift   in taylorc   | 10  | p | once(dft(6 * 2)) |
-//       | dft                         | 11  | p | once(dft(6 * 2)) |
-//       | exp-log complex operation   | 12  | 1 | once(taylor(1))  |
-//       | num_t::operator *,/         | 13  | 1 | in         |
-//       | num_t::operator +,-         | 14  | 1 | in         |
-//       | num_t::bit operation        | 15  | 1 | in         |
-// (1)   | after burn with p0next      | 2+  | w | in         |
-//       | divide by program invariant | 3+  | s | in         |
-//       | burn invariant by p0next    | 4++ | s | ~in*varlen |
-//       | makeProgramInvariant        | 5+  | p | in         |
+//       | function           | layer# | [wsp1] | data amount ratio |
+//       | pSectional         | 0      | w      | in * range        |
+//       | pFeedLebesgue      | 0      | w      | in * range^2      |
+//       | pAbsentMajority    | *      | w      | in * 2 * lg(in)   |
+//       | predv              | 1      | w      | in * 2            |
+//       | pFeedLargeMarkov   | 1      | w      | in * cbrt(in)     |
+//       | (0) + (1)          | 2      | w      | (0) + (1)         |
+// (0)   | deep               | 3      | s      | ~ in * 3          |
+//       | sumCNext           | 4      | s      | in                |
+//       | sumCNext           | 5      | s      | in                |
+//       | northPoleNext      | 6      | s      | in                |
+//       | p0max0next         | 7      | s      | in                |
+//       | (0-0) + (0-1)      | 8      | s      | (0-0) + (0-1)     |
+// (0-0) | invNext            | 9      | s      | in                |
+//       | (0-1)              | 10+    | s      | (0-1)             |
+// (0-1) | sumCNext           | 10     | s      | in                |
+//       | pnext              | 10     | s      | in + once(dft(6)) |
+//       | integrate-diff in taylorc   | 11  | p | once(dft(6 * 2)) |
+//       | exp to shift   in taylorc   | 12  | p | once(dft(6 * 2)) |
+//       | dft                         | 13  | p | once(dft(6 * 2)) |
+//       | exp-log complex operation   | 14  | 1 | once(taylor(1))  |
+//       | num_t::operator *,/         | 15  | 1 | in         |
+//       | num_t::operator +,-         | 16  | 1 | in         |
+//       | num_t::bit operation        | 17  | 1 | in         |
+// (1)   | after burn with p0next      | 3+  | w | in         |
+//       | divide by program invariant | 4+  | s | in         |
+//       | burn invariant by p0next    | 5++ | s | ~in*varlen |
+//       | makeProgramInvariant        | 6+  | p | in         |
 //       | linearInvariant             | -   | - | -          |
-//       |   - QR decomposition        | 7+* | s | > in * 4!  |
-//       |   - orthogonalization       | 9+* | p | > in * 4!  |
-//       |   - solve                   | 11* | p | > (4 * 4)  |
-//       | num_t::operator *,/         | 12+ | 1 | in         |
-//       | num_t::operator +,-         | 13+ | 1 | in         |
-//       | num_t::bit operation        | 14+ | 1 | in         |
+//       |   - QR decomposition        | 8+* | s | > in * 4!  |
+//       |   - orthogonalization       | 10+*| p | > in * 4!  |
+//       |   - solve                   | 12* | p | > (4 * 4)  |
+//       | num_t::operator *,/         | 13+ | 1 | in         |
+//       | num_t::operator +,-         | 14+ | 1 | in         |
+//       | num_t::bit operation        | 15+ | 1 | in         |
 // N.B. number of layers and ratio on copied data amounts.
-// (-1) the layer# < 0 takes counter measure to the jammer.
-//      if input is continuous enough, we don't need them.
-// (00) so total layer is 14+~16 from logical boolean operation
+// (00) so total layer larger or equal to 16 from logical boolean operation
 //      explicitly stacked including if-them operation. also the data amount
 //      is larger than 3*in on copying shallow with first hypothesis.
 // (01) the data amount used as internal calculation copied 3*in for 2nd order
@@ -5309,17 +5296,13 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //      tanglement number based accuracy reason exists case.
 // (03) the #f counting maximum compressed f(in,out,states,unobserved) has
 //      12~16 bit entropy, they causes layer# exceeds the structure
-//      so we only need 26 inputs whole in the case.
-//      (recount twice, (*): we calculate matrix operation layer as O(mn) to be
-//       a unit and lineary plain counting. this is because 2nd order of vector
-//       operation counting. overall this is counting (2^(2p*n))^(n*n) layers.
-//       so they causes f-fixation layer counting.)
+//      so we only need ## inputs whole in the case.
 
 #if !defined(_P_RECUR_)
-#define _P_RECUR_ 4
+#define _P_SEC_ 2
 #endif
-#if _P_RECUR_ < 0
-# error cannot handle ..._RECUR_ definitions
+#if _P_SEC_ < 1
+# error cannot handle _P_SEC_ definitions
 #endif
 
 template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<SimpleVector<T> > >& in0) {
@@ -5339,13 +5322,8 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<Si
   const int size1(in0[0][0].size());
   in0.resize(0);
   vector<vector<SimpleVector<T> > > res;
-  SimpleVector<T> pres(pSectional<T, pFeedLebesgue<T, 
-    pAbsentMajority<T, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T, 20>, 20>, 0>,
-      predv<T, pFeedLargeMarkov<T, pgoshigoshi<T, 20>, 20>, 1>,
-        _P_RECUR_>, 2>, 4>
-          (in, string(" (predVec)")));
+  SimpleVector<T> pres(pSectional<T, 2, 20>(in, string(" (predVec)")));
   res.resize(1);
-  assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++) {
     res[i].resize(size0);
     for(int j = 0; j < res[0].size(); j ++)
@@ -5378,14 +5356,9 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<Si
   const int rows(in0[0][0].rows());
   const int cols(in0[0][0].cols());
   in0.resize(0);
-  SimpleVector<T> pres(pSectional<T, pFeedLebesgue<T, 
-    pAbsentMajority<T, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T, 20>, 20>, 0>,
-      predv<T, pFeedLargeMarkov<T, pgoshigoshi<T, 20>, 20>, 1>,
-        _P_RECUR_>, 2>, 4>
-          (in, string(" (predMat)")));
+  SimpleVector<T> pres(pSectional<T, 2, 20>(in, string(" (predMat)")));
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(1);
-  assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++) {
     res[i].resize(size);
     for(int j = 0; j < res[0].size(); j ++) {
@@ -5434,13 +5407,8 @@ template <typename T> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSpars
   }
   in0.resize(0);
   vector<SimpleSparseTensor(T) > res;
-  SimpleVector<T> pres(pSectional<T, pFeedLebesgue<T, 
-    pAbsentMajority<T, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T, 20>, 20>, 0>,
-      predv<T, pFeedLargeMarkov<T, pgoshigoshi<T, 20>, 20>, 1>,
-        _P_RECUR_>, 2>, 4>
-          (in, string(" (predSTen)")));
+  SimpleVector<T> pres(pSectional<T, 2, 20>(in, string(" (predSTen)")));
   res.resize(1);
-  assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++)
     for(int j = 0, cnt = 0; j < idx.size(); j ++)
       for(int k = 0; k < idx.size(); k ++)
@@ -8451,6 +8419,8 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      we don't implement pre/after-processing because it's bricks condition
 //      also combination explodes. the jammer can jam out us even in such
 //      cases.
+// (14) pgoshigoshi persistent corrector.
+//      it's near the result same algorithm twice condition.
 //
 // N.B. something XXX result descripton
 // (00) there might exist non Lebesgue measureable condition discrete stream.
