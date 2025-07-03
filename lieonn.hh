@@ -4909,13 +4909,12 @@ template <typename T, int nprogress> SimpleVector<T> predv0(const vector<SimpleV
   return predv00<T, nprogress>(pFeedTranspose<T>(dupin), sz, seconds, strloop);
 }
 
-template <typename T, int nprogress> vector<SimpleVector<T> > predvp(const vector<SimpleVector<T> >& intran, const string& strloop) {
-  vector<SimpleVector<T> > p;
-  p.resize(intran.size());
-  {
-    SimpleVector<T> buf(unOffsetHalf<T>(intran[0]));
-    p[0] = (deep0<T, p0maxNext<T> >(buf) - deep0<T, p0maxNext<T> >(- buf)) / T(int(2));
-  }
+template <typename T, int nprogress> SimpleVector<T> predvp(const vector<SimpleVector<T> >& intran, const string& strloop) {
+  SimpleVector<T> p(intran.size());
+  SimpleVector<T> buf(unOffsetHalf<T>(intran[0]));
+  assert(p.size() == intran.size());
+  assert(buf.size() == intran[0].size());
+  p[0] = (deep<T, p0maxNext<T> >(buf) - deep<T, p0maxNext<T> >(- buf)) / T(int(2));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -4923,12 +4922,12 @@ template <typename T, int nprogress> vector<SimpleVector<T> > predvp(const vecto
     if(nprogress && ! (j % max(int(1), int(intran.size() / nprogress))) )
       cerr << j << " / " << intran.size() << strloop << endl;
     SimpleVector<T> buf(unOffsetHalf<T>(intran[j]));
-    p[j] = (deep0<T, p0maxNext<T> >(buf) - deep0<T, p0maxNext<T> >(- buf)) / T(int(2));
+    p[j] = (deep<T, p0maxNext<T> >(buf) - deep<T, p0maxNext<T> >(- buf)) / T(int(2));
   }
   return clipBin<T>(offsetHalf<T>(p));
 }
 
-template <typename T, int nprogress> vector<SimpleVector<T> > predvq(const vector<SimpleVector<T> >& intran0, const string& strloop) {
+template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleVector<T> >& intran0, const string& strloop) {
   static const int step(1);
   assert(0 < step && 10 + step * 2 <= intran0[0].size() && 1 < intran0.size());
   // N.B. we use whole width to get better result in average.
@@ -4951,38 +4950,37 @@ template <typename T, int nprogress> vector<SimpleVector<T> > predvq(const vecto
     seconds[i] = move(work.second);
   }
   const int start(8 + step);
-  vector<SimpleVector<T> > res;
-  res.resize(intran.size(), SimpleVector<T>(intran[0].size() - (start + step)).O());
+  SimpleVector<T> res;
+  res.resize(intran0.size());
+  res.O();
   SimpleVector<SimpleVector<T> > p;
-  p.entity.reserve(intran[0].size());
+  p.entity.reserve(intran0[0].size());
   for(int i = 1; i < start; i ++)
-    p.entity.emplace_back(SimpleVector<T>(intran.size()).O());
-  for(int i = start; i <= intran[0].size(); i ++)
-    p.entity.emplace_back(unOffsetHalf<T>(predv00<T, nprogress>(intran, i, seconds, to_string(i) + string(" / ") + to_string(intran[0].size()) + strloop) ) );
-  SimpleMatrix<T> ip(res.size(), p.size());
+    p.entity.emplace_back(SimpleVector<T>(intran0.size()).O());
+  for(int i = start; i <= intran0.size(); i ++)
+    p.entity.emplace_back(unOffsetHalf<T>(predv00<T, nprogress>(intran, i, seconds, to_string(i) + string(" / ") + to_string(intran0.size()) + strloop) ) );
   intran.resize(0);
+  SimpleMatrix<T> ip(res.size(), p.size());
   ip.O();
+  assert(ip.rows() == res.size() && ip.cols() == p.size());
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = start + step; i < p.size(); i ++) {
-    for(int j = 0; j < res.size(); j ++)
+    for(int j = 0; j < ip.rows(); j ++)
       ip(j, i) = unOffsetHalf<T>(intran0[j][i - p.size() + intran0[j].size()]) *
         p[i - step][j];
   }
   // N.B. dftcache need to be single thread on first call.
   // N.B. we bet orthogonal function phenomenon causes measurement condition
   //      increase (0 <= vector condition with prediction walk).
-  for(int j = 0; j < res[0].size(); j ++)
-    res[0][j] = p[j - res[0].size() + p.size()][0] * p0maxNext<T>(
-      ip.row(0).subVector(0, j - res[0].size() + ip.cols() + 1));
+  res[0] = p[p.size() - 1][0] * p0maxNext<T>(ip.row(0));
+  assert(res.size() == p[p.size() - 1].size());
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 1; i < res.size(); i ++) {
-    for(int j = 0; j < res[i].size(); j ++)
-      res[i][j] = p[j -res[i].size() + p.size()][i] * p0maxNext<T>(
-        ip.row(i).subVector(0, j - res[i].size() + ip.cols() + 1));
+    res[i] = p[p.size() - 1][i] * p0maxNext<T>(ip.row(i));
   }
   return clipBin<T>(offsetHalf<T>(res));
 }
@@ -4997,71 +4995,14 @@ template <typename T, int nprogress> vector<SimpleVector<T> > predvq(const vecto
 //      binary output on each input.
 //      after loop == 2, we get 4 of candidates they saturates #f on root
 //      in binary function meaning with no internal states condition.
-template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), vector<SimpleVector<T> > (*q)(const vector<SimpleVector<T> >&, const string&) > vector<SimpleVector<T> > pgoshigoshi(const vector<SimpleVector<T> >& in, const string& strloop) {
-  vector<vector<SimpleVector<T> > > hist;
-  vector<vector<SimpleVector<T> > > work;
-  work.emplace_back(pFeedTranspose<T>(in));
-  // N.B. 1 bit for margin, 1 bit for sign, 1 bit per loop we made hypothesis.
-  const int loop(in.size() < 25 ? 1 : 2);
-  hist.reserve(loop);
-  if(loop < 2) {
-    static bool shown = false;
-    if(! shown) {
-      cerr << "pgoshigoshi needs at least 25 input size to get better result." << endl;
-      shown = true;
-    }
-  }
-  for(int i = 0; i < loop; i ++) {
-    vector<vector<SimpleVector<T> > > nwork;
-    nwork.reserve(1 << (loop + 1));
-    for(int j = 0; j < work.size(); j ++) {
-      nwork.emplace_back(p(work[j], string(", ") + to_string(j) + " / " + to_string(work.size()) + string(", ") + to_string(i) + string(" / ") + to_string(loop) + strloop));
-      nwork.emplace_back(q(work[j], string(", ") + to_string(j) + " / " + to_string(work.size()) + string(", ") + to_string(i) + string(" / ") + to_string(loop) + strloop));
-    }
-    for(int j = 0; j < nwork.size(); j ++)
-      for(int ii = 0; ii < nwork[j].size(); ii ++)
-        for(int jj = 0; jj < nwork[j][ii].size() - 1; jj ++) {
-          // 1 bit margin.
-          const T& backward(work[j / 2][ii][jj - nwork[j][ii].size() + 1 + work[j / 2][ii].size()]);
-          T div(abs(unOffsetHalf<T>(backward)));
-          // fixed color depth 16-bit.
-          if(div == T(int(0))) div = T(int(1)) / T(int(65536));
-          // delta offset them with clip.
-          nwork[j][ii][jj] = clipBin<T>(offsetHalf<T>(
-            (backward - nwork[j][ii][jj]) / div));
-        }
-    if(i)
-      for(int j = 0; j < nwork.size(); j ++)
-        for(int k = 0; k < nwork[j].size(); k ++)
-          nwork[j][k].resize(nwork[j][k].size() - 1);
-    else
-      for(int j = 0; j < nwork.size(); j ++)
-        for(int k = 0; k < nwork[j].size(); k ++)
-          nwork[j][k][nwork[j][k].size() - 1] =
-            clipBin<T>(nwork[j][k][nwork[j][k].size() - 1]);
-    hist.emplace_back(vector<SimpleVector<T> >());
-    hist[hist.size() - 1].reserve(work.size());
-    for(int j = 0; j < work.size(); j ++) {
-      hist[hist.size() - 1].emplace_back(SimpleVector<T>(work[j].size()).O());
-      for(int k = 0; k < work[j].size(); k ++)
-        hist[hist.size() - 1][j][k] = move(work[j][k][work[j][k].size() - 1]);
-    }
-    work = move(nwork);
-  }
+template <typename T, int nprogress> static inline vector<SimpleVector<T> > pgoshigoshi(const vector<SimpleVector<T> >& in0, const string& strloop) {
+  const vector<SimpleVector<T> > in(pFeedTranspose<T>(in0));
   vector<SimpleVector<T> > res;
-  res.reserve(work.size());
-  for(int i = 0; i < work.size(); i ++) {
-    assert(work[i].size());
-    res.emplace_back(SimpleVector<T>(work[i].size()).O());
-    for(int j = 0; j < res[i].size(); j ++)
-      res[i][j] = move(work[i][j][work[i][j].size() - 1]);
-    for(int j = hist.size() - 1; 0 < j; j --) {
-      SimpleVector<T>& temp(hist[j][i >> (hist.size() - j)]);
-      for(int k = 0; k < temp.size(); k ++)
-        res[i][k] = temp[k] + res[i][k] *
-          abs(unOffsetHalf<T>(temp[k] - res[i][k]));
-    }
-  }
+  res.reserve(2);
+  res.emplace_back(predvp<T, nprogress>(in, string(", (p)") + strloop));
+  res.emplace_back(predvq<T, nprogress>(in, string(", (q)") + strloop));
+  assert(res[0].size() == in.size());
+  assert(res[0].size() == res[1].size());
   return res;
 }
 
@@ -5091,9 +5032,11 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
         int(exp(log(T(in.size())) / T(int(3)) )) );
   }
   vector<SimpleVector<T> > pres(unOffsetHalf<T>(p(offsetHalf<T>(pass_next), string(", smallMarkov") + strloop)) );
-  for(int i = 0; i < pres.size(); i ++)
+  for(int i = 0; i < pres.size(); i ++) {
+    assert(presidue.size() == pres[i].size());
     for(int j = 0; j < pres[i].size(); j ++)
       pres[i][j] *= presidue[j];
+  }
   return offsetHalf<T>(pres);
 }
 
@@ -5105,81 +5048,35 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
 // N.B. practically, nrecur == 0 works well with ddpmopt T cmd, we use this.
 //      we don't select better nrecur == 11 * 11 we need huge computation time.
 template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), int nrecur> vector<SimpleVector<T> > predv(const vector<SimpleVector<T> >& in, const string& strloop) {
-  if(! nrecur) return p(in, string(", id.") + strloop);
+  assert(0 == nrecur || 1 == nrecur);
+  if(! nrecur) return p(in, string(" (0)") + strloop);
   vector<SimpleVector<T> > res;
   for(int i0 = 0; i0 < abs(nrecur); i0 ++) {
     vector<SimpleVector<T> > rin(in);
-    vector<SimpleVector<T> > work;
-    if(0 < nrecur) {
-      vector<SimpleVector<T> > prngr;
-      vector<vector<bool> > sign;
-      prngr.resize(rin.size() + 1, SimpleVector<T>(in[0].size()).O());
-      {
-        vector<bool> signv;
-        signv.resize(in[0].size(), false);
-        sign.resize(rin.size() + 1, signv);
-      }
-      if(1 < nrecur) {
-        for(int i = 0; i < rin.size(); i ++)
-          for(int j = 0; j < rin[i].size(); j ++)
-#if defined(_ARCFOUR_)
-            rin[i][j] = (rin[i][j] + (prngr[i][j] = T(arc4random_uniform(0x20001)) / T(0x20000)) / T(int(2)));
-#else
-            rin[i][j] = (rin[i][j] + (prngr[i][j] = T(random() % 0x20000) / T(0x20000 - 1)) / T(int(2)));
-#endif
-        for(int j = 0; j < rin[0].size(); j ++)
-#if defined(_ARCFOUR_)
-          prngr[prngr.size() - 1][j] = T(arc4random_uniform(0x20001)) / T(0x20000) / T(int(2));
-#else
-          prngr[prngr.size() - 1][j] = T(random() % 0x20000) / T(0x20000 - 1) / T(int(2));
-#endif
-      }
-      {
-        rin = unOffsetHalf<T>(rin);
-        const vector<SimpleVector<T> > rintrans(pFeedTranspose<T>(rin));
+    vector<bool> sign;
+    sign.resize(in[0].size(), false);
+    rin = unOffsetHalf<T>(rin);
+    const vector<SimpleVector<T> > rintrans(pFeedTranspose<T>(rin));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static,1)
 #endif
-        for(int j = 0; j < rintrans.size(); j ++) {
-          rin[0][j] = T(int(0));
-          pslip_t<T> ps(0);
-          for(int i = 1; i < rintrans[j].size(); i ++) {
-            const T temp(pSlipGulf0short<T>(rintrans[j].subVector(0, i), ps, i));
-            rin[i][j]   *= temp;
-            prngr[i][j] *= temp;
-            sign[i][j]   = temp < T(int(0));
-          }
-          const T temp(pSlipGulf0short<T>(rintrans[j], ps, rintrans[j].size()));
-          prngr[in.size()][j] *= temp;
-          sign[in.size()][j]   = temp < T(int(0));
-        }
+    for(int j = 0; j < rintrans.size(); j ++) {
+      rin[0][j] = T(int(0));
+      pslip_t<T> ps(0);
+      for(int i = 1; i < rintrans[j].size(); i ++) {
+        const T temp(pSlipGulf0short<T>(rintrans[j].subVector(0, i), ps, i));
+        rin[i][j]   *= temp;
       }
-      // N.B. PRNG parts going to gray + small noise with large enough nrecur.
-      work = unOffsetHalf<T>(p(offsetHalf<T>(rin), string(", ") + to_string(i0) + string(" / ") + to_string(nrecur) + strloop));
-      for(int j = 0; j < work.size(); j ++) {
-        for(int k = 0; k < work[j].size(); k ++) {
-          work[j][k] -= prngr[prngr.size() - 1][k];
-          if(sign[sign.size() - 1][k]) work[j][k] = - work[j][k];
-        }
-        work[j] = offsetHalf<T>(work[j]);
-      }
-    } else {
-      for(int i = 0; i < rin.size(); i ++)
-        for(int j = 0; j < rin[i].size(); j ++)
-#if defined(_ARCFOUR_)
-          rin[i][j] = (rin[i][j] + T(arc4random_uniform(0x20001)) / T(0x20000)) / T(int(2));
-#else
-          rin[i][j] = (rin[i][j] + T(random() % 0x20000) / T(0x20000 - 1)) / T(int(2));
-#endif
-      work = p(rin, string(", ") + to_string(i0) + string(" / ") + to_string(nrecur) + strloop);
+      sign[j] =
+        pSlipGulf0short<T>(rintrans[j], ps, rintrans[j].size()) < T(int(0));
     }
-    if(res.size()) {
-      assert(res.size() == work.size());
-      for(int j = 0; j < work.size(); j ++) res[j] += work[j];
-    } else res = move(work);
+    // N.B. PRNG parts going to gray + small noise with large enough nrecur.
+    res = unOffsetHalf<T>(p(offsetHalf<T>(rin), string(" (1)") + strloop));
+    for(int j = 0; j < res.size(); j ++)
+      for(int k = 0; k < res[j].size(); k ++)
+        if(sign[k]) res[j][k] = - res[j][k];
   }
-  for(int i = 0; i < res.size(); i ++) res[i] /= T(abs(nrecur));
-  return move(res);
+  return offsetHalf<T>(res);
 }
 
 static inline int countMSB(const int& x) {
@@ -5191,7 +5088,7 @@ static inline int countMSB(const int& x) {
 
 // N.B. we bet half of the pair of the prediction matches.
 //      for insurance, we pretend as 1/4 are matched.
-template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), vector<SimpleVector<T> > (*q)(const vector<SimpleVector<T> >&, const string&), int persistent> vector<SimpleVector<T> > pAbsentMajority(const vector<SimpleVector<T> >& in, const string& strloop) {
+template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), vector<SimpleVector<T> > (*q)(const vector<SimpleVector<T> >&, const string&), int persistent> SimpleVector<T> pAbsentMajority(const vector<SimpleVector<T> >& in, const string& strloop) {
   vector<SimpleVector<T> > work(in);
   vector<SimpleVector<T> > res;
   vector<int> midx;
@@ -5211,7 +5108,6 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
         res[j] = (pres[j] + qres[j]) / T(int(2));
     } else if(0 < persistent && i ==  nloop - 1) goto fixnext;
     work.resize(0);
-    work.resize(in.size());
     mmidx.resize(midx.size(), - 1);
     for(int j = 0; j < pres.size(); j ++) {
       assert(pres[j].size() == qres[j].size());
@@ -5242,70 +5138,67 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
         res[j][midx[k]] = (pres[j][k] + qres[j][k]) / T(int(2));
     break;
   }
-  return offsetHalf<T>(res);
+  for(int i = 1; i < res.size(); i ++) res[0] += res[i];
+  return offsetHalf<T>(res[0] /= T(res.size()));
 }
 
-// N.B. take majority of the result as sliding window.
-template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&)> vector<SimpleVector<T> > pMajority(const vector<SimpleVector<T> >& in0, const string& strloop) {
-  static const T half(T(int(1)) / T(int(2)) );
-  const int minstates(16);
-  if(int(in0.size()) - minstates < 4)
-    return p(in0, string(", id.") + strloop);
-  vector<vector<SimpleVector<T> > > outs;
-  vector<SimpleVector<T> > in(in0);
-  outs.reserve(in.size() - minstates);
-  for( ; minstates <= in.size(); ) {
-    outs.emplace_back(p(in, string(", (") + to_string(in.size() - minstates) + string(")") + strloop));
-    in.resize(in.size() - 1);
-  }
-  in.resize(0);
-  vector<SimpleVector<int> > tbuf;
-  vector<SimpleVector<int> > obuf;
-  tbuf.reserve(outs.size() - 1);
-  obuf.reserve(outs.size() - 1);
-  for(int i = 0; i < outs.size() - 2; i ++) {
-    tbuf.emplace_back(SimpleVector<int>(outs[i][0].size()));
-    obuf.emplace_back(SimpleVector<int>(outs[i][0].size()));
-    for(int k = 0; k < tbuf[i].size(); k ++) {
-      int plus(0);
-      int plusorig(0);
-      for(int m = 0; m <= i; m ++)
-        for(int j = 0; j < outs[m + 1].size(); j ++)
-          if(half < outs[m + 1][j][k]) plus ++;
-          else if(outs[m + 1][j][k] < half) plus --;
-      for(int m = 0; m <= i; m ++)
-        if(half < in0[m][k]) plusorig ++;
-        else if(in0[m][k] < half) plusorig --;
-      tbuf[i][k] = plus;
-      obuf[i][k] = plusorig;
+template <typename T, SimpleVector<T> (*p)(const vector<SimpleVector<T> >&, const string&), int horizontal> SimpleVector<T> pFeedLebesgue(const vector<SimpleVector<T> >& in, const string& strloop) {
+  if(in.size() - 13 < horizontal * horizontal)
+    return p(in, string("id.") + strloop);
+  vector<vector<SimpleVector<T> > > reform;
+  reform.resize(horizontal);
+  for(int i = 0; i < reform.size(); i ++)
+    reform[i].reserve(in.size() / horizontal / horizontal + 1);
+  for(int i = 0; i < in.size() / (horizontal * horizontal); i ++) {
+    vector<vector<vector<T> > > les;
+    les.resize(in[0].size());
+    for(int j = 0; j < les.size(); j ++) {
+      les[j].resize(horizontal);
+      for(int k = 0; k < les[j].size(); k ++)
+        les[j][k].reserve(horizontal * horizontal);
+    }
+    const int start((i - (in.size() / horizontal / horizontal)) *
+      horizontal * horizontal + in.size() +
+        ((horizontal * horizontal) - in.size() % (horizontal * horizontal)));
+    for(int j = start; j < min(start + horizontal, int(in.size())); j ++)
+      for(int k = 0; k < les[0].size(); k ++) {
+        int idx(offsetHalf<T>(in[j][k]) * T(horizontal));
+        idx = max(int(0), min(horizontal - 1, int(idx)));
+        for(int n = 0; n < les[k].size(); n ++)
+          les[k][n].emplace_back(n == idx ? in[j][k] :
+            (les[k][n].size() ? les[k][n][les[k][n].size() - 1] : T(int(0)) ) );
+      }
+    for(int j = 0; j < horizontal; j ++) {
+      reform[j].emplace_back(SimpleVector<T>(in[0].size()).O());
+      for(int k = 0; k < in[0].size(); k ++) {
+        T sum(int(0));
+        for(int n = 0; n < les[k][j].size(); n ++) sum += les[k][j][n];
+        reform[j][i][k] = sum / T(int(horizontal * horizontal));
+      }
     }
   }
-  SimpleVector<T> res(in0[0].size());
-  for(int i = 0; i < tbuf[0].size(); i ++) {
-    vector<pair<int, int> > work;
-    work.reserve(tbuf.size());
-    for(int k = 0; k < tbuf.size() - 1; k ++)
-      work.emplace_back(make_pair(abs(tbuf[k][i]), k));
-    sort(work.begin(), work.end());
-    const int k(work[0].second);
-    int plus(0);
-    for(int j = 0; j < outs[0].size(); j ++)
-      if(half < outs[0][j][i]) plus ++;
-      else if(outs[0][j][i] < half) plus --;
-    if(plus) {
-      const int pp(tbuf[k][i] * obuf[k + 1][i]);
-      plus = pp == 0 ? plus : pp * plus;
-      res[i] = T(int(0));
-      for(int j = 0; j < outs[0].size(); j ++)
-        if((0 < plus && half < outs[0][j][i]) ||
-           (plus < 0 && outs[0][j][i] < half) )
-          res[i] += outs[0][j][i];
-      res[i] /= T(abs(plus));
-    } else res[i] = half;
+  SimpleVector<T> res(in[0].size());
+  res.O();
+  for(int i = 0; i < reform.size(); i ++)
+    res += p(reform[i], string("Lebesgue(") + to_string(i) + string("/") + to_string(reform.size()) + string(")") + strloop);
+  return res /= T(horizontal);
+}
+
+template <typename T, SimpleVector<T> (*p)(const vector<SimpleVector<T> >&, const string&), int sectional> SimpleVector<T> pSectional(const vector<SimpleVector<T> >& in0, const string& strloop) {
+  if(! in0.size()) return SimpleVector<T>();
+  else if(! in0[0].size()) return in0[0];
+  if(in0.size() - 13 < sectional * 2)
+    return p(in0, string("id.") + strloop);
+  vector<SimpleVector<T> > in(in0);
+  vector<SimpleVector<T> > outs;
+  outs.reserve(sectional);
+  for(int i = 0; i < sectional; i ++) {
+    outs.emplace_back(p(in, string(" Sectional(") + to_string(i) + string("/") + to_string(sectional) + string(")") + strloop) );
+    in.resize(in.size() - 1);
   }
-  vector<SimpleVector<T> > ress;
-  ress.emplace_back(move(res));
-  return ress;
+  for(int i = 1; i < outs.size(); i ++) outs[0] += outs[i];
+  outs.resize(1);
+  return outs[0] /= T(sectional);
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
@@ -5364,15 +5257,16 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 // (03) we cannot avoid 2nd condition because the prediction algorithms
 //      must need to make the hypothesis of them if we stand on low of
 //      the excluded middle strongly.
-// (04) we close measurement condition based prediction with this state.
+// (04) absent
+// (05) we feed pseudo continuous condition by pFeedLebesgue they feeds
+//      statistics-like inputs.
 // N.B. our measureable condition predictor layers
 //       | function         | layer# | [wsp1] | data amount ratio |
-//       | pMajority        | -4     | w      | out               |
-//       | predv            | -3     | w      | in * PRNG         |
-//       | pAbsentMajority  | -2     | w      | in * 2 * lg(in)   |
 //       | predv            | -1     | w      | in * PRNG         |
-//       | pFeedLargeMarkov | 0      | w      | in * cbrt(in)     |
-//       | pgoshigoshi      | 1      | w      | in * 2            |
+//       | pSectional       | 0      | w      | in * range        |
+//       | pFeedLebesgue    | 0      | w      | in * range^2      |
+//       | pAbsentMajority  | *      | w      | in * 2 * lg(in)   |
+//       | pFeedLargeMarkov | 1      | w      | in * cbrt(in)     |
 //       | (0) + (1)        | 1      | w      | (0) + (1)         |
 // (0)   | deep             | 2      | s      | ~ in * 3          |
 //       | sumCNext         | 3      | s      | in                |
@@ -5424,8 +5318,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 #if !defined(_P_RECUR_)
 #define _P_RECUR_ 4
 #endif
-
-#if (defined(_PRNG_RECUR_) && _PRNG_RECUR_ < 0) || (_P_RECUR_ < 0)
+#if _P_RECUR_ < 0
 # error cannot handle ..._RECUR_ definitions
 #endif
 
@@ -5446,26 +5339,17 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(vector<vector<Si
   const int size1(in0[0][0].size());
   in0.resize(0);
   vector<vector<SimpleVector<T> > > res;
-#if defined(_PRNG_RECUR_)
-  vector<SimpleVector<T> > pres(pMajority<T, predv<T,
-    pAbsentMajority<T, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T,
-      predvp<T, 20>, predvq<T, 20> >, 20>, _PRNG_RECUR_>, predv<T,
-        pFeedLargeMarkov<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >,
-          20>, _PRNG_RECUR_>, _P_RECUR_>, - _PRNG_RECUR_> >
-#else
-  vector<SimpleVector<T> > pres(pMajority<T, predv<T, 
-    pAbsentMajority<T, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T,
-      predvp<T, 20>, predvq<T, 20> >, 20>, 0>, predv<T,
-        pFeedLargeMarkov<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >,
-          20>, 1>, _P_RECUR_>, 0> >
-#endif
-            (in, string(" (predVec)")));
-  res.resize(pres.size());
+  SimpleVector<T> pres(pSectional<T, pFeedLebesgue<T, 
+    pAbsentMajority<T, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T, 20>, 20>, 0>,
+      predv<T, pFeedLargeMarkov<T, pgoshigoshi<T, 20>, 20>, 1>,
+        _P_RECUR_>, 2>, 4>
+          (in, string(" (predVec)")));
+  res.resize(1);
   assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++) {
     res[i].resize(size0);
     for(int j = 0; j < res[0].size(); j ++)
-      res[i][j] = pres[i].subVector(size1 * j, size1);
+      res[i][j] = pres.subVector(size1 * j, size1);
   }
   return res;
 }
@@ -5494,22 +5378,13 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<Si
   const int rows(in0[0][0].rows());
   const int cols(in0[0][0].cols());
   in0.resize(0);
-#if defined(_PRNG_RECUR_)
-  vector<SimpleVector<T> > pres(pMajority<T, predv<T,
-    pAbsentMajority<T, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T,
-      predvp<T, 20>, predvq<T, 20> >, 20>, _PRNG_RECUR_>, predv<T,
-        pFeedLargeMarkov<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >,
-          20>, _PRNG_RECUR_>, _P_RECUR_>, - _PRNG_RECUR_> >
-#else
-  vector<SimpleVector<T> > pres(pMajority<T, predv<T, 
-    pAbsentMajority<T, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T,
-      predvp<T, 20>, predvq<T, 20> >, 20>, 0>, predv<T,
-        pFeedLargeMarkov<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >,
-          20>, 1>, _P_RECUR_>, 0> >
-#endif
-            (in, string(" (predMat)")));
+  SimpleVector<T> pres(pSectional<T, pFeedLebesgue<T, 
+    pAbsentMajority<T, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T, 20>, 20>, 0>,
+      predv<T, pFeedLargeMarkov<T, pgoshigoshi<T, 20>, 20>, 1>,
+        _P_RECUR_>, 2>, 4>
+          (in, string(" (predMat)")));
   vector<vector<SimpleMatrix<T> > > res;
-  res.resize(pres.size());
+  res.resize(1);
   assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++) {
     res[i].resize(size);
@@ -5517,7 +5392,7 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(vector<vector<Si
       res[i][j].resize(rows, cols);
       for(int k = 0; k < rows; k ++)
         res[i][j].row(k) =
-          pres[i].subVector(j * rows * cols + k * cols, cols);
+          pres.subVector(j * rows * cols + k * cols, cols);
     }
   }
   return res;
@@ -5559,21 +5434,12 @@ template <typename T> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSpars
   }
   in0.resize(0);
   vector<SimpleSparseTensor(T) > res;
-#if defined(_PRNG_RECUR_)
-  vector<SimpleVector<T> > pres(pMajority<T, predv<T,
-    pAbsentMajority<T, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T,
-      predvp<T, 20>, predvq<T, 20> >, 20>, _PRNG_RECUR_>, predv<T,
-        pFeedLargeMarkov<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >,
-          20>, _PRNG_RECUR_>, _P_RECUR_>, - _PRNG_RECUR_> >
-#else
-  vector<SimpleVector<T> > pres(pMajority<T, predv<T, 
-    pAbsentMajority<T, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T,
-      predvp<T, 20>, predvq<T, 20> >, 20>, 0>, predv<T,
-        pFeedLargeMarkov<T, pgoshigoshi<T, predvp<T, 20>, predvq<T, 20> >,
-          20>, 1>, _P_RECUR_>, 0> >
-#endif
-            (in, string(" (predSTen)")));
-  res.resize(pres.size());
+  SimpleVector<T> pres(pSectional<T, pFeedLebesgue<T, 
+    pAbsentMajority<T, predv<T, pFeedLargeMarkov<T, pgoshigoshi<T, 20>, 20>, 0>,
+      predv<T, pFeedLargeMarkov<T, pgoshigoshi<T, 20>, 20>, 1>,
+        _P_RECUR_>, 2>, 4>
+          (in, string(" (predSTen)")));
+  res.resize(1);
   assert(res.size() == pres.size());
   for(int i = 0; i < res.size(); i ++)
     for(int j = 0, cnt = 0; j < idx.size(); j ++)
@@ -5581,7 +5447,7 @@ template <typename T> vector<SimpleSparseTensor(T) > predSTen(vector<SimpleSpars
         for(int m = 0; m < idx.size(); m ++)
           if(binary_search(attend.begin(), attend.end(),
                make_pair(j, make_pair(k, m))))
-            res[i][idx[j]][idx[k]][idx[m]] = pres[i][cnt ++];
+            res[i][idx[j]][idx[k]][idx[m]] = pres[cnt ++];
   return res;
 }
 
