@@ -4031,14 +4031,14 @@ public:
   }
   SimpleVector<T> res;
   char full;
-private:
   int  t;
 };
  
-template <typename T, T (*p)(const SimpleVector<T>&)> static inline T deep0(T d, vector<idFeeder<T> >& depth, const int& unit = 3) {
+template <typename T, T (*p)(const SimpleVector<T>&)> static inline T deep0(const T& d0, vector<idFeeder<T> >& depth, const int& unit = 3) {
   assert(1 < unit);
   if(! depth.size() || depth[depth.size() - 1].full == 1)
     depth.emplace_back(idFeeder<T>(unit));
+  T d(d0);
   depth[0].next(offsetHalf<T>(d));
   for(int j = 1; j < depth.size() && depth[j - 1].full; j ++)
     if(j & 1) {
@@ -4051,6 +4051,10 @@ template <typename T, T (*p)(const SimpleVector<T>&)> static inline T deep0(T d,
       depth[j].next(offsetHalf<T>(move(q)));
     }
   T M(int(0));
+  if(depth.size() < 2 || ! depth[1].full) {
+    if(! depth.size()) d0;
+    return p(unOffsetHalf<T>(depth[0].res.subVector(0, min(depth[0].t, unit))));
+  }
   for(int j = depth.size() - 1; 0 < j; j --) {
     // N.B. [[a, b], [- b, a]]^-1 == [[a, -b], [b, a]] / f(det(...))
     //      we only stuck on sign of the result, multiply is better to stable.
@@ -4851,8 +4855,6 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv00(const
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int j = 1; j < intran.size(); j ++) {
-    if(nprogress && ! (j % max(int(1), int(intran.size() / nprogress))) )
-      cerr << j << " / " << intran.size() << ", " << strloop << endl;
     p[j] = p01next<T, true>(intran[j].subVector(0, sz));
   }
   return revertProgramInvariant<T>(make_pair(
@@ -4921,8 +4923,12 @@ template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleV
   p.entity.reserve(intran0[0].size());
   for(int i = 1; i < start; i ++)
     p.entity.emplace_back(SimpleVector<T>(intran0.size()).O());
-  for(int i = start; i <= intran0[0].size(); i ++)
-    p.entity.emplace_back(unOffsetHalf<T>(predv00<T, nprogress>(intran, i, seconds, to_string(i) + string(" / ") + to_string(intran0[0].size()) + strloop) ) );
+  for(int i = start; i <= intran0[0].size(); i ++) {
+    if(nprogress && ! (i % max(int(1), int(intran0[0].size() / nprogress))) )
+      cerr << i << " / " << intran0[0].size() << ", " << strloop << endl;
+    p.entity.emplace_back(unOffsetHalf<T>(predv00<T, 0>(intran,
+      i, seconds, string("") )));
+  }
   intran.resize(0);
   SimpleMatrix<T> ip(res.size(), p.size());
   ip.O();
@@ -4998,20 +5004,24 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pFeedLargeMarkov(c
 template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), int jam> vector<SimpleVector<T> > predv(const vector<SimpleVector<T> >& intrans, const string& strloop) {
   assert(0 == jam || 1 == jam);
   if(! jam) return p(intrans, strloop);
-  vector<SimpleVector<T> > rintrans(intrans);
+  vector<SimpleVector<T> > rintrans;
+  rintrans.resize(intrans.size());
   vector<bool> sign;
   sign.resize(intrans.size(), false);
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static,1)
 #endif
   for(int j = 0; j < rintrans.size(); j ++) {
-    rintrans[j][0] = T(int(0));
-    pslip_t<T> ps(0, rintrans[j].size());
-    for(int i = 1; i < rintrans[j].size(); i ++)
-      rintrans[j][i] *= pSlipGulf0short<T>(intrans[j][i - 1], ps, i);
+    rintrans[j].resize(intrans[j].size() - 3);
+    rintrans[j].O();
+    pslip_t<T> ps(0, intrans[j].size());
+    for(int i = 0; i < 3; i ++)
+      pSlipGulf0short<T>(intrans[j][i], ps, i);
+    for(int i = 3; i < intrans[j].size(); i ++)
+      rintrans[j][i - 3] *= pSlipGulf0short<T>(intrans[j][i - 1], ps, i - 1);
     sign[j] =
       pSlipGulf0short<T>(intrans[j][intrans[j].size() - 1], ps,
-        intrans[j].size()) < T(int(0));
+        intrans[j].size() - 1) < T(int(0));
   }
   vector<SimpleVector<T> > res(p(rintrans, strloop));
   for(int j = 0; j < res.size(); j ++)
@@ -5091,7 +5101,7 @@ template <typename T, int nprogress> SimpleVector<T> pAbsentMajority(const vecto
 
 // N.B. we add some Lebesgue part by cutting input horizontal.
 template <typename T, int nprogress> SimpleVector<T> pFeedLebesgue(const vector<SimpleVector<T> >& in, const int& horizontal, const string& strloop) {
-  if(in.size() <= 18 + horizontal * horizontal)
+  if(in.size() <= 21 + horizontal * horizontal)
     return pAbsentMajority<T, nprogress>(in, string("id.") + strloop);
   vector<vector<SimpleVector<T> > > reform;
   reform.resize(horizontal);
@@ -5146,7 +5156,7 @@ template <typename T, int nprogress> SimpleVector<T> pFeedLebesgue(const vector<
 template <typename T, int nprogress> SimpleVector<T> pSectional(const vector<SimpleVector<T> >& in, const int& range, const string& strloop) {
   const int sectional(range * range);
   if(! in.size()) return SimpleVector<T>();
-  if(in.size() <= 18 + sectional * 2 - 1)
+  if(in.size() <= 21 + sectional * 2 - 1)
     return pFeedLebesgue<T, nprogress>(in, range, strloop);
   SimpleVector<T> res(pFeedLebesgue<T, nprogress>(in, range, strloop) *
     T(sectional));
@@ -5155,20 +5165,25 @@ template <typename T, int nprogress> SimpleVector<T> pSectional(const vector<Sim
 }
 
 // N.B. we average all of the candidates on possible much many ranges.
+//      we suppose at least cbrt(size / 2)-markov-made for input stream.
 template <typename T, int nprogress> SimpleVector<T> pMeasureable(const vector<SimpleVector<T> >& in, const string& strloop) {
-  if(in.size() <= 18) 
+  if(in.size() <= 21) 
     return SimpleVector<T>(in[0].size()).O(T(int(1)) / T(int(2)));
 #if defined(_PERSISTENT_) || defined(_FLOAT_BITS_)
-  const int n(absceil(sqrt(T(int((in.size() - 18) / 2)))));
+  const int n(absceil(sqrt(T(int((in.size() - 21) / 2)))));
+  const int m(absceil(sqrt(T(int((in.size() / 2 - 21) / 2)))));
 #else
-  const int n(ceil(sqrt(T(int((in.size() - 18) / 2)))));
+  const int n(ceil(sqrt(T(int((in.size() - 21) / 2)))));
+  const int m(ceil(sqrt(T(int((in.size() / 2 - 21) / 2)))));
 #endif
   vector<SimpleVector<T> > res;
   res.reserve(n);
-  for(int i = 2; i * i * 2 + 18 <= in.size(); i ++)
+  for(int i = 2; i * i * 2 + 21 <= in.size(); i ++) {
     res.emplace_back(pSectional<T, nprogress>(in, i,
       string(", ") + to_string(i - 1) + string("/") +
         to_string(n) + string(")") + strloop));
+    if(m < i) break;
+  }
   if(! res.size())
     return SimpleVector<T>(in[0].size()).O(T(int(1)) / T(int(2)));
   for(int i = 1; i < res.size(); i ++) res[0] += res[i];
@@ -5229,31 +5244,34 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 // (02) we feed pseudo continuous condition by pFeedLebesgue they feeds
 //      statistics-like inputs. this is to avoid 2nd condition.
 // (03) 3rd condition might be avoidable with predv appendant.
-// (04) so if input stream's next one step is input-stream cbrt-markov
-//      generated one also the function is on the input stream condition,
-//      they might converges to the result we bet.
+// (04) so if input stream's next one step is input-stream half-cbrt-markov
+//      generated one also the function is defined from the input stream
+//      condition, they might converges to the result we bet.
 // (05) however, we are in sticky condition, the difference between
 //      prediction and real value are almost constant but not vanished.
-//      this might be our machines' concerns.
 // (06) layers:
-//       | function           | layer# | [wsp1] | data amount ratio |
-//       | pMeasureable       | 0      | w      | in * sqrt(in)     |
-//       | pSectional         | 0      | w      | in * range        |
-//       | pFeedLebesgue      | 0      | w      | in * range^2      |
-//       | pAbsentMajority    | *      | w      | in * 2 * lg(in)   |
-//       | predv              | 1      | w      | in * 2            |
-//       | pFeedLargeMarkov   | 1      | w      | in * cbrt(in)     |
-//       | *(0) + *(1)          | 2      | w      | (0) + (1)         |
-// *(0)  | deep               | 3      | s      | ~ in * 3          |
-//       | sumCNext           | 4      | s      | in                |
-//       | sumCNext           | 5      | s      | in                |
-//       | northPoleNext      | 6      | s      | in                |
-//       | p0max0next         | 7      | s      | in                |
-//       | *(00) + *(01)      | 8      | s      | (0-0) + (0-1)     |
-// *(00) | invNext            | 9      | s      | in                |
-//       | *(01)              | 10+    | s      | (0-1)             |
-// *(01) | sumCNext           | 10     | s      | in                |
-//       | pnext              | 10     | s      | in + once(dft(6)) |
+//       | function           | layer# | [wsp1] | data amount r   | time(***)  |
+//       +--------------------+--------+--------+------------------+----------+
+//       | pMeasureable       | 0      | w      | in * sqrt(in)   | O(L^1/6)   |
+//       | pSectional         | 0      | w      | in * range      | O(1)       |
+//       | pFeedLebesgue      | 0      | w      | in * range^2    | O(range)   |
+//       | pAbsentMajority    | *      | w      | in * 2 * lg(in) | O(lg(G))   |
+//       | predv              | 1      | w      | in * 2          | 2          |
+//       | pFeedLargeMarkov   | 1      | w      | in * cbrt(in)   | O(L^(5/3)  |
+//       | *(0) + *(1)        | 2      | w      | (0) + (1)       | O(G*L^2) + |
+//                                                                |   O(L^3)   |
+//                                                                +------------+
+//                                 | O(G*lg(G)*L^(23/6)) <~ O(mem * sqrt(mem)) |
+// *(0)  | deep               | 3      | s      | ~ in * 3        |
+//       | sumCNext           | 4      | s      | in              |
+//       | sumCNext           | 5      | s      | in              |
+//       | northPoleNext      | 6      | s      | in              |
+//       | p0max0next         | 7      | s      | in              |
+//       | *(00) + *(01)      | 8      | s      | (0-0) + (0-1)   |
+// *(00) | invNext            | 9      | s      | in              |
+//       | *(01)              | 10+    | s      | (0-1)           |
+// *(01) | sumCNext           | 10     | s      | in              |
+//       | pnext              | 10     | s      | in+once(dft(6)) |
 //       | integrate-diff in taylorc   | 11  | p | once(dft(6 * 2)) |
 //       | exp to shift   in taylorc   | 12  | p | once(dft(6 * 2)) |
 //       | dft                         | 13  | p | once(dft(6 * 2)) |
@@ -5272,6 +5290,8 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       | num_t::operator *,/         | 13+ | 1 | in         |
 //       | num_t::operator +,-         | 14+ | 1 | in         |
 //       | num_t::bit operation        | 15+ | 1 | in         |
+// (***) time order, L for input stream length, G for input vector size,
+//       stand from arithmatic operators. ind2varlen isn't considered.
 // (07) so total layer is larger or equal to 16 from logical boolean operation
 //      explicitly stacked including if-then operation. also the data amount
 //      is larger than 3*in on copying shallow with first hypothesis.
