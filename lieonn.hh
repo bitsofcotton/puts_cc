@@ -3265,7 +3265,7 @@ template <typename T> static inline T revertProgramInvariant(const pair<T, T>& i
 template <typename T> static inline SimpleVector<T> revertProgramInvariant(const pair<SimpleVector<T>, T>& in) {
   SimpleVector<T> res(in.first);
   for(int i = 0; i < in.first.size(); i ++)
-    res[i] = revertProgramInvariant<T>(make_pair(in.first[i], in.second));
+    res[i] = revertProgramInvariant<T>(make_pair(res[i], in.second));
   return res;
 }
 
@@ -3281,16 +3281,17 @@ template <typename T, bool r2bin, bool nonlinear> static inline T revertByProgra
             && sqrt(work.dot(work) * SimpleMatrix<T>().epsilon()) <
                  abs(work[idx] - last); ii ++) {
       last = work[idx];
-      const pair<SimpleVector<T>, T> work2(makeProgramInvariant<T>(r2bin ? R2bin<T>(work) : work, one));
+      const pair<SimpleVector<T>, T> work2(
+        makeProgramInvariant<T>(r2bin ? R2bin<T>(work) : work, one) );
       work[idx] = revertProgramInvariant<T>(make_pair(
         - (invariant.dot(work2.first) - invariant[idx] * work2.first[idx]) /
           invariant[idx], work2.second));
-      if(r2bin) work[idx] = R2bin<T>(work[idx]);
+      if(r2bin) work[idx] = bin2R<T>(work[idx]);
     }
   } else {
     work[idx] = - (invariant.dot(work) -
       invariant[idx] * work[idx]) / invariant[idx];
-    if(r2bin) work[idx] = R2bin<T>(work[idx]);
+    if(r2bin) work[idx] = bin2R<T>(work[idx]);
   }
   return work[idx];
 }
@@ -3759,38 +3760,26 @@ template <typename T> static inline T p012next(const SimpleVector<T>& d, const i
   T sscore(zero);
   for(int i = 0; i < cat.size(); i ++) {
     if(! cat[i].first.size()) continue;
-    vector<SimpleVector<T> > invariants;
-    if(cat[i].first[0].size() < cat[i].first.size()) {
-      SimpleMatrix<T> work(cat[i].first.size(), cat[i].first[0].size());
-      work.entity = move(cat[i].first);
-      invariants.emplace_back(linearInvariant<T>(work));
-    } else
-      invariants = move(cat[i].first);
-    for(int k = 0; k < invariants.size(); k ++) {
+    if(cat[i].first[0].size() + 2 < cat[i].first.size()) {
+      SimpleMatrix<T> cwork(cat[i].first.size(), cat[i].first[0].size() + 2);
+      for(int k = 0; k < cat[i].first.size(); k ++)
+        cwork.row(k) = makeProgramInvariant<T>(R2bin<T>(cat[i].first[k]),
+          T(int(k)) / T(int(cat[i].first.size() + 1)) ).first;
+      SimpleVector<T> invariant(linearInvariant<T>(cwork));
       work[work.size() - 1] = T(int(0));
-      const SimpleVector<T> inv0(invariants[k]);
-            T last(sqrt(work.dot(work)));
-      const T ninv(inv0.dot(inv0));
-      if(! isfinite(ninv) || ninv == zero) continue;
-      for(int ii = 0;
-              ii < 2 * int(- log(SimpleMatrix<T>().epsilon()) / log(T(int(2))) )
-              && sqrt(work.dot(work) * SimpleMatrix<T>().epsilon()) <
-                   abs(work[work.size() - 1] - last); ii ++) {
-        last  = work[work.size() - 1];
-        const pair<SimpleVector<T>, T> vdp(makeProgramInvariant<T>(R2bin<T>(work)));
-        invariants[k] = inv0 * sqrt(vdp.first.dot(vdp.first) / inv0.dot(inv0));
-        work[work.size() - 1] =
-          bin2R<T>(revertProgramInvariant<T>(make_pair(invariants[k][varlen - 1] /
-               T(int(invariants[k].size())), vdp.second)) );
-      }
-      const pair<SimpleVector<T>, T> vdp(makeProgramInvariant<T>(R2bin<T>(work)));
-      T score(int(0));
-      for(int j = 0; j < work.size(); j ++)
-        score += work[j] *
-          bin2R<T>(revertProgramInvariant<T>(make_pair(invariants[k][j], vdp.second)));
-      score  /= T(int(invariants.size()));
+      work[work.size() - 1] = revertByProgramInvariant<T,
+        true, true>(work, invariant);
+      const T score(invariant.dot(makeProgramInvariant<T>(R2bin<T>(work),
+        T(int(1))).first));
       res    += score * work[work.size() - 1];
-      sscore += abs(score * sqrt(work.dot(work)));
+      sscore += abs(score * sqrt(work.dot(work)) );
+    } else for(int k = 0; k < cat[i].first.size(); k ++) {
+      work[work.size() - 1] = T(int(0));
+      work[work.size() - 1] = revertByProgramInvariant<T, false, false>(
+        work, cat[i].first[k]);
+      const T score(cat[i].first[k].dot(work));
+      res    += score * work[work.size() - 1];
+      sscore += abs(score * sqrt(work.dot(work)) );
     }
   }
   return sscore == zero ? sscore : res / sscore;
@@ -4980,7 +4969,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pFeedLargeMarkov(c
               << ((intrans[0].size() - 1 - slen) * intrans.size())
                 << " cuttingDown: " << strloop << endl;
         pass_next[j][i - slen] = p012next<T>(intrans[j].subVector(0, i + 1),
-          int(exp(log(T(i + 1)) / T(int(3)) )) );
+            int(exp(log(T(i + 1)) / T(int(3)) )) );
       }
     }
     for(int j = 0; j < intrans.size(); j ++)
@@ -5122,23 +5111,20 @@ template <typename T, int nprogress> SimpleVector<T> pFeedLebesgue(const vector<
         for(int n = 0; n < les[k].size(); n ++)
           if(n == idx) les[k][n].emplace_back(in[j][k]);
       }
+    vector<int> Mtot;
+    Mtot.resize(in[0].size(), 0);
+    for(int k = 0; k < in[0].size(); k ++)
+      for(int j = 0; j < horizontal; j ++)
+        Mtot[k] = max(Mtot[k], int(les[k][j].size()));
     for(int j = 0; j < horizontal; j ++) {
       reform[j].emplace_back(SimpleVector<T>(in[0].size()).O());
       for(int k = 0; k < in[0].size(); k ++) {
         T sum(int(0));
         for(int n = 0; n < les[k][j].size(); n ++) sum += les[k][j][n];
-        reform[j][i][k] = sum;
+        reform[j][i][k] = sum / T(Mtot[k]);;
       }
     }
   }
-  for(int i = 0; i < reform[0].size(); i ++)
-    for(int j = 0; j < reform[0][0].size(); j ++) {
-      int Mtot(0);
-      for(int k = 0; k < reform.size(); k ++) if(reform[k][i][j] != T(int(0)) )
-        Mtot ++;
-      if(Mtot != int(0)) for(int k = 0; k < reform.size(); k ++)
-        reform[k][i][j] /= T(Mtot);
-    }
   SimpleVector<T> res(in[0].size());
   res.O();
   for(int i = 0; i < reform.size(); i ++) {
@@ -5181,7 +5167,7 @@ template <typename T, int nprogress> SimpleVector<T> pMeasureable(const vector<S
   for(int i = 2; i * i * 2 + 21 <= in.size(); i ++) {
     res.emplace_back(pSectional<T, nprogress>(in, i,
       string(", ") + to_string(i - 1) + string("/") +
-        to_string(n) + string(")") + strloop));
+        to_string(m) + string(")") + strloop));
     if(m < i) break;
   }
   if(! res.size())
