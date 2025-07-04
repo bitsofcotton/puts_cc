@@ -3901,14 +3901,7 @@ template <typename T, T (*f)(const SimpleVector<T>&)> static inline T logCNext(c
 }
 
 template <typename T> static inline T p0max0next(const SimpleVector<T>& in) {
-  // N.B. on existing taylor series.
-  //      if the sampling frequency is not enough, middle range of the original
-  //      function frequency (enough large bands) will effect prediction fail.
-  //      this is because we only observes highest and lowest frequency on
-  //      sampling points, so omitted part exists.
-  //      even if the parameter on P0 is large, situation unchange.
-  // N.B. however, sectional measurement can be jammed as normally.
-  //      so cutting by sliding window with statistical one goes better handle.
+  // N.B. on existing taylor series in surface.
   return (sumCNext<T, true, p0next<T> >(in) +
     invNext<T, sumCNext<T, true, p0next<T> > >(in)) / T(int(2));
 }
@@ -5001,42 +4994,29 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pFeedLargeMarkov(c
   return res;
 }
 
-// N.B. we apply PRNGs before to predict each of prediction in general.
-//      this is needed if original streams' entropy feeding is not stable
-//      case, the implicit recursive functions' average can be stable with
-//      this hack. we suppose phase period doesn't connected to the original
-//      structures.
-// N.B. practically, nrecur == 0 works well with ddpmopt T cmd, we use this.
-//      we don't select better nrecur == 11 * 11 we need huge computation time.
-template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), int nrecur> vector<SimpleVector<T> > predv(const vector<SimpleVector<T> >& intrans, const string& strloop) {
-  assert(0 == nrecur || 1 == nrecur);
-  if(! nrecur) return p(intrans, string("p") + strloop);
-  vector<SimpleVector<T> > res;
-  for(int i0 = 0; i0 < abs(nrecur); i0 ++) {
-    vector<SimpleVector<T> > rintrans(intrans);
-    vector<bool> sign;
-    sign.resize(intrans.size(), false);
+// N.B. we intend to shift gulf with jam == true, otherwise transparent result.
+template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), int jam> vector<SimpleVector<T> > predv(const vector<SimpleVector<T> >& intrans, const string& strloop) {
+  assert(0 == jam || 1 == jam);
+  if(! jam) return p(intrans, strloop);
+  vector<SimpleVector<T> > rintrans(intrans);
+  vector<bool> sign;
+  sign.resize(intrans.size(), false);
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static,1)
 #endif
-    for(int j = 0; j < rintrans.size(); j ++) {
-      rintrans[j][0] = T(int(0));
-      pslip_t<T> ps(0, rintrans[j].size());
-      pSlipGulf0short<T>(intrans[j][0], ps, 0);
-      for(int i = 1; i < rintrans[j].size(); i ++) {
-        const T temp(pSlipGulf0short<T>(intrans[j][i], ps, i));
-        rintrans[j][i] *= temp;
-      }
-      sign[j] =
-        pSlipGulf0short<T>(intrans[j][intrans[j].size() - 1], ps,
-          intrans[j].size()) < T(int(0));
-    }
-    // N.B. PRNG parts going to gray + small noise with large enough nrecur.
-    res = p(rintrans, string("q") + strloop);
-    for(int j = 0; j < res.size(); j ++)
-      for(int k = 0; k < res[j].size(); k ++)
-        if(sign[k]) res[j][k] = - res[j][k];
+  for(int j = 0; j < rintrans.size(); j ++) {
+    rintrans[j][0] = T(int(0));
+    pslip_t<T> ps(0, rintrans[j].size());
+    for(int i = 1; i < rintrans[j].size(); i ++)
+      rintrans[j][i] *= pSlipGulf0short<T>(intrans[j][i - 1], ps, i);
+    sign[j] =
+      pSlipGulf0short<T>(intrans[j][intrans[j].size() - 1], ps,
+        intrans[j].size()) < T(int(0));
   }
+  vector<SimpleVector<T> > res(p(rintrans, strloop));
+  for(int j = 0; j < res.size(); j ++)
+    for(int k = 0; k < res[j].size(); k ++)
+      if(sign[k]) res[j][k] = - res[j][k];
   return res;
 }
 
@@ -5047,8 +5027,7 @@ static inline int countMSB(const int& x) {
   return res;
 }
 
-// N.B. we bet half of the pair of the prediction matches.
-//      for insurance, we pretend as 1/4 are matched.
+// N.B. we bet 1/4 of the pair of the prediction matches.
 template <typename T, int nprogress> SimpleVector<T> pAbsentMajority(const vector<SimpleVector<T> >& in, const string& strloop) {
   static const int persistent(1);
   vector<SimpleVector<T> > work(in);
@@ -5110,6 +5089,7 @@ template <typename T, int nprogress> SimpleVector<T> pAbsentMajority(const vecto
   return res[0] /= T(res.size());
 }
 
+// N.B. we add some Lebesgue part by cutting input horizontal.
 template <typename T, int nprogress> SimpleVector<T> pFeedLebesgue(const vector<SimpleVector<T> >& in, const int& horizontal, const string& strloop) {
   if(in.size() <= 18 + horizontal * horizontal)
     return pAbsentMajority<T, nprogress>(in, string("id.") + strloop);
@@ -5127,7 +5107,7 @@ template <typename T, int nprogress> SimpleVector<T> pFeedLebesgue(const vector<
     }
     for(int j = i; j < i + horizontal * horizontal; j ++)
       for(int k = 0; k < les.size(); k ++) {
-        int idx(in[j][k] * T(horizontal));
+        int idx(binMargin<T>(in[j][k]) * T(horizontal));
         idx = max(int(0), min(horizontal - 1, int(idx)));
         for(int n = 0; n < les[k].size(); n ++)
           if(n == idx) les[k][n].emplace_back(in[j][k]);
@@ -5162,16 +5142,19 @@ template <typename T, int nprogress> SimpleVector<T> pFeedLebesgue(const vector<
   return unOffsetHalf<T>(res);
 }
 
+// N.B. add some sectional measurement part.
 template <typename T, int nprogress> SimpleVector<T> pSectional(const vector<SimpleVector<T> >& in, const int& range, const string& strloop) {
   const int sectional(range * range);
   if(! in.size()) return SimpleVector<T>();
   if(in.size() <= 18 + sectional * 2 - 1)
     return pFeedLebesgue<T, nprogress>(in, range, strloop);
-  SimpleVector<T> out(pFeedLebesgue<T, nprogress>(in, range, strloop) * T(sectional));
-  for(int i = 1; i < sectional; i ++) out -= in[in.size() - i];
-  return out;
+  SimpleVector<T> res(pFeedLebesgue<T, nprogress>(in, range, strloop) *
+    T(sectional));
+  for(int i = 1; i < sectional; i ++) res -= in[in.size() - i];
+  return res;
 }
 
+// N.B. we average all of the candidates on possible much many ranges.
 template <typename T, int nprogress> SimpleVector<T> pMeasureable(const vector<SimpleVector<T> >& in, const string& strloop) {
   if(in.size() <= 18) 
     return SimpleVector<T>(in[0].size()).O(T(int(1)) / T(int(2)));
@@ -5242,40 +5225,34 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       no jammer condition to our discrete measureable condition}.
 // (01) first condition is always satisfied by axiom of choice one but
 //      we shall need to increase n-markov's n (base dimension, varlen) as
-//      to guarantee in input stream is not saturated.
-// (02) 3rd condition is avoidable with PRNG blending as predv appendant
-//      prediction with non-unique probablistic output condition.
-// (03) we cannot avoid 2nd condition because the prediction algorithms
-//      must need to make the hypothesis of them if we stand on low of
-//      the excluded middle strongly.
-// (04) absent
-// (05) we feed pseudo continuous condition by pFeedLebesgue they feeds
-//      statistics-like inputs. when we met the worse discontinuous
-//      input, we can increase/decrease the parameters. we *bet* this
-//      discontinuous condition shouldn't get on our predictor on default
-//      configuration.
-// (06) after of all, large enough input with configuring parameters,
-//      we can avoid jammer condition we think.
-// (07) however, we are in sticky condition, the difference between
+//      to guarantee we're in the condition with input stream is not saturated.
+// (02) we feed pseudo continuous condition by pFeedLebesgue they feeds
+//      statistics-like inputs. this is to avoid 2nd condition.
+// (03) 3rd condition might be avoidable with predv appendant.
+// (04) so if input stream's next one step is input-stream cbrt-markov
+//      generated one also the function is on the input stream condition,
+//      they might converges to the result we bet.
+// (05) however, we are in sticky condition, the difference between
 //      prediction and real value are almost constant but not vanished.
 //      this might be our machines' concerns.
-// N.B. our measureable condition predictor layers
+// (06) layers:
 //       | function           | layer# | [wsp1] | data amount ratio |
+//       | pMeasureable       | 0      | w      | in * sqrt(in)     |
 //       | pSectional         | 0      | w      | in * range        |
 //       | pFeedLebesgue      | 0      | w      | in * range^2      |
 //       | pAbsentMajority    | *      | w      | in * 2 * lg(in)   |
 //       | predv              | 1      | w      | in * 2            |
 //       | pFeedLargeMarkov   | 1      | w      | in * cbrt(in)     |
-//       | (0) + (1)          | 2      | w      | (0) + (1)         |
-// (0)   | deep               | 3      | s      | ~ in * 3          |
+//       | *(0) + *(1)          | 2      | w      | (0) + (1)         |
+// *(0)  | deep               | 3      | s      | ~ in * 3          |
 //       | sumCNext           | 4      | s      | in                |
 //       | sumCNext           | 5      | s      | in                |
 //       | northPoleNext      | 6      | s      | in                |
 //       | p0max0next         | 7      | s      | in                |
-//       | (0-0) + (0-1)      | 8      | s      | (0-0) + (0-1)     |
-// (0-0) | invNext            | 9      | s      | in                |
-//       | (0-1)              | 10+    | s      | (0-1)             |
-// (0-1) | sumCNext           | 10     | s      | in                |
+//       | *(00) + *(01)      | 8      | s      | (0-0) + (0-1)     |
+// *(00) | invNext            | 9      | s      | in                |
+//       | *(01)              | 10+    | s      | (0-1)             |
+// *(01) | sumCNext           | 10     | s      | in                |
 //       | pnext              | 10     | s      | in + once(dft(6)) |
 //       | integrate-diff in taylorc   | 11  | p | once(dft(6 * 2)) |
 //       | exp to shift   in taylorc   | 12  | p | once(dft(6 * 2)) |
@@ -5284,7 +5261,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       | num_t::operator *,/         | 15  | 1 | in         |
 //       | num_t::operator +,-         | 16  | 1 | in         |
 //       | num_t::bit operation        | 17  | 1 | in         |
-// (1)   | after burn with p0next      | 3+  | w | in         |
+// *(1)  | after burn with p0next      | 3+  | w | in         |
 //       | divide by program invariant | 4+  | s | in         |
 //       | burn invariant by p0next    | 5++ | s | ~in*varlen |
 //       | makeProgramInvariant        | 6+  | p | in         |
@@ -5295,18 +5272,22 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       | num_t::operator *,/         | 13+ | 1 | in         |
 //       | num_t::operator +,-         | 14+ | 1 | in         |
 //       | num_t::bit operation        | 15+ | 1 | in         |
-// N.B. number of layers and ratio on copied data amounts.
-// (00) so total layer larger or equal to 16 from logical boolean operation
-//      explicitly stacked including if-them operation. also the data amount
+// (07) so total layer is larger or equal to 16 from logical boolean operation
+//      explicitly stacked including if-then operation. also the data amount
 //      is larger than 3*in on copying shallow with first hypothesis.
-// (01) the data amount used as internal calculation copied 3*in for 2nd order
+// (08) the data amount used as internal calculation copied 3*in for 2nd order
 //      saturation, 6 layers for multiple layer algebraic copying structure
 //      saturation, 9 layers for enough to decompose inverse of them.
-// (02) more number of the internal calculation copy works when some of the
-//      tanglement number based accuracy reason exists case.
-// (03) the #f counting maximum compressed f(in,out,states,unobserved) has
+// (09) number of the internal calculation copy depends on the
+//      tanglement number based accuracy reason.
+// (10) the #f counting maximum compressed f(in,out,states,unobserved) has
 //      12~16 bit entropy, they causes layer# exceeds the structure
-//      so we only need ## inputs whole in the case.
+//      so we only need 25 inputs whole in the case.
+// (11) to make hidden +2 dimension from input stream only: could be done by
+//      expscale, logscale, multiplication inverse for p-adic, but it's only id.
+//      either if we make [1, ..., 1] orthogonalization, it's only the negate
+//      for binary coded stream. either patternized xor gate is (09) case.
+//      so if we're treating input stream as bit stream, it's culs-de-sac again.
 
 template <typename T> vector<SimpleVector<T> > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
@@ -8363,13 +8344,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      either, with d^e/dx^e == dx condition, f^-1(f(x)) == x 's some of the
 //      combination untanglement of them.
 //      cf. (arctan(logscale))-n times chain causes y=x into sigmoid-like graph.
-// (07) once we got moving average goes very well result.
-//      this is because {D0 := sum_0,K d_k, D1 = sum_1,(K+1) d_k, ...} stream,
-//      the middle parts isn't moved serial stream one by one.
-//      so we can mimic this condition with multiplying some monotone function
-//      on the input delta stream, once we got them better result, now isn't.
-//      either, the move average stream have some of the offsetted delta stream
-//      in general, but isn't on some stream.
+// (07) (absent)
 // (08) recursion on same function based functions.
 //      this depends on the first prediction is continuous or not causes
 //      the prediction stream's quality. also they depends on the first
@@ -8378,11 +8353,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      ones. this is equivalent to skipx concerns but with maybe random timing.
 //      we already have fixed range skipx also pSubesube jammer condition,
 //      so it's pseudo one of the condition.
-// (10) p012next before or after to pgoshigoshi call.
-//      it's equivalent if the varlen on p01next and on p012next have the same
-//      length. however, if the input stream is saturated, both of them cannot
-//      decide proper next step condition because input stream's n-length have
-//      both meanings. however, we can use them as replace to skipx concerns.
+// (10) (absent)
 // (11) pskipp to skip input in some steps.
 //      it's a counter measure to the jammer. so any of the predictor has the
 //      jammers, so if the jammer adjust theirs to our algorithms, it's useless.
@@ -8409,8 +8380,6 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 // (02) attack to the invariant causes invariant size chases
 //      this can be skipped by skipX concerns.
 // (03) any of the predictor they have a jammer to them.
-//      so if we're targetted, we should output at least 2 series of them to
-//      avoid gulfs.
 // (04) (de)?compression concerns can jam out on N calculation matters.
 //      we cannot avoid this other than verifying after the phenomenon
 //      also having a verifiability of low of excluded middle based on
@@ -8421,33 +8390,6 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      have unique function generation, so this is analogy to the manually
 //      manipulate function switching. however, we can increase n-markov's
 //      n variable in such of a case.
-//
-// N.B. first condition of the prediction structure we should have to have.
-// (00) we should make hypothesis on some of the continuity on some layer
-//      because we calculate prediction stream from input stream only
-//      also to have some of the resonance, we should calculate them also
-//      the same way. so pred(Vec|Mat|STen) uses such of the measureablity
-//      condition.
-// (01) to make hidden +2 dimension from input stream only: could be done by
-//      expscale, logscale, multiplication inverse for p-adic, but it's only id.
-//      either if we make [1, ..., 1] orthogonalization, it's only the negate
-//      for binary coded stream. either patternized xor gate is (09) case.
-//      so if we're treating input stream as bit stream, it's culs-de-sac again.
-// (02) there's plenty of the room to make them to separate 1 a.e. part and
-//      absent part only, however, if there's jammer condition nor input stream
-//      is much cultivated, we cannot get the result in low of excluded middle.
-// N.B. the saturated condition.
-// (00) we should increase the prediction dimension also increase worse large
-//      n for n-markov for input stream also we should decompose them as
-//      eigen decomposition. so the most of the first digit concerns concludes
-//      eigen vector matrix (usually m*n formed) fixation.
-// (01) this is also to make dynamic dictionary to the input stream on such
-//      of a layer. so ddpmopt [+-] also the masp + is intended to make this
-//      however they should have many much of the input stream size.
-// (02) so to extend them needs the much better problem information and to get
-//      better form to the stream. either, if the saturated result we get,
-//      we should reform the transformation structure for preprocess
-//      as to separate something.
 // N.B. tips around jammer.
 // (00) after of all, the dynamic jammer can be avoided if the predictor entropy
 //      exceeds jammers one, so some of the first short range, the predictor
@@ -8478,6 +8420,15 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      as some of the shrinked output theirselves.
 // (06) we need to shirk internal states upper bound size into graphics size
 //      before to compute. this is to omit what bitstream next in surface.
+// (07) the predictor vs. jammer made stream concludes the saturated input
+//      stream, the case is also to make dynamic dictionary to the input
+//      stream on such of a layer. so ddpmopt [+-] also the masp + is intended
+//      to make this, however they should have many much of the input stream
+//      size.
+// (08) so to extend them needs the much better problem information and to get
+//      better form to the stream. either, if the saturated result we get,
+//      we should reform the transformation structure for preprocess
+//      as to separate something.
 //
 // N.B. another variants of the predictors fight with 2*3*2 pattern of #f
 //      fixation. (however, we don't use initial internal states, it's only 4).
