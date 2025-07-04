@@ -4042,50 +4042,43 @@ private:
   int  t;
 };
  
-template <typename T, T (*p)(const SimpleVector<T>&)> static inline SimpleVector<T> deep0(const SimpleVector<T>& in, const int& unit = 3) {
+template <typename T, T (*p)(const SimpleVector<T>&)> static inline T deep0(T d, vector<idFeeder<T> >& depth, const int& unit = 3) {
   assert(1 < unit);
-  SimpleVector<T> res;
-  res.entity.reserve(max(int(0), int(in.size()) - unit + int(1)));
-  vector<idFeeder<T> > depth;
-  depth.resize(in.size() / unit + 1, idFeeder<T>(unit));
-  for(int i = 0; i < min(unit - 1, in.size()); i ++)
-    depth[0].next(offsetHalf<T>(in[i]));
-  for(int i = unit - 1; i < in.size(); i ++) {
-    T d(in[i]);
-    depth[0].next(offsetHalf<T>(d));
-    assert(depth[0].full);
-    for(int j = 1; j < depth.size() && depth[j - 1].full; j ++)
-      if(j & 1) {
-        T q(p(depth[j - 1].res));
-        d *= q;
-        depth[j].next(unOffsetHalf<T>(move(q)));
-      } else {
-        T q(p(depth[j - 1].res));
-        d = - (d -= q);
-        depth[j].next(offsetHalf<T>(move(q)));
-      }
-    T M(int(0));
-    for(int j = depth.size() - 1; 0 < j; j --) {
-      // N.B. [[a, b], [- b, a]]^-1 == [[a, -b], [b, a]] / f(det(...))
-      //      we only stuck on sign of the result, multiply is better to stable.
-      //      (chain of the matrix multiplication causes weighted multiplication)
-      if(! depth[j].full) continue;
-      if(j & 1)
-        M *= offsetHalf<T>(depth[j].res[depth[j].res.size() - 1]);
-      else
-        (M = - M) += unOffsetHalf<T>(depth[j].res[depth[j].res.size() - 1]);
+  if(! depth.size() || depth[depth.size() - 1].full == 1)
+    depth.emplace_back(idFeeder<T>(unit));
+  depth[0].next(offsetHalf<T>(d));
+  for(int j = 1; j < depth.size() && depth[j - 1].full; j ++)
+    if(j & 1) {
+      T q(p(depth[j - 1].res));
+      d *= q;
+      depth[j].next(unOffsetHalf<T>(move(q)));
+    } else {
+      T q(p(depth[j - 1].res));
+      d = - (d -= q);
+      depth[j].next(offsetHalf<T>(move(q)));
     }
-    res.entity.emplace_back(move(M));
+  T M(int(0));
+  for(int j = depth.size() - 1; 0 < j; j --) {
+    // N.B. [[a, b], [- b, a]]^-1 == [[a, -b], [b, a]] / f(det(...))
+    //      we only stuck on sign of the result, multiply is better to stable.
+    //      (chain of the matrix multiplication causes weighted multiplication)
+    if(! depth[j].full) continue;
+    if(j & 1)
+      M *= offsetHalf<T>(depth[j].res[depth[j].res.size() - 1]);
+    else
+      (M = - M) += unOffsetHalf<T>(depth[j].res[depth[j].res.size() - 1]);
   }
   // N.B. once we have incomplete offset reverse chain better than this.
   //      however, we test now isn't. so we trust logical one.
   //      so our numerical test isn't reliable any which on our environment.
-  return res;
+  return M;
 }
 
 template <typename T, T (*p)(const SimpleVector<T>&)> static inline T deep(const SimpleVector<T>& in, const int& unit = 3) {
-  SimpleVector<T> res(deep0<T, p>(in, unit));
-  return res.size() ? res[res.size() - 1] : T(int(0));
+  vector<idFeeder<T> > stat;
+  stat.resize(in.size() / unit + 1, idFeeder<T>(unit));
+  for(int i = 0; i < in.size() - 1; i ++) deep0<T, p>(in[i], stat, unit);
+  return deep0<T, p>(in[in.size() - 1], stat, unit);
 }
 
 // N.B. jammer to the predictor to make grip or lose grip.
@@ -4115,8 +4108,13 @@ template <typename T> static inline pair<T, T> pSubesube(const T& d0, const pair
 
 template <typename T> class pslip_t {
 public:
-  inline pslip_t(const int& len = 0) {
-    pipe.resize(3 * 3 * 3 - 1, idFeeder<T>(len));
+  inline pslip_t(const int& len = 0, const int& reserve = 0, const int& unit = 3) {
+    stat.reserve(3 * 3 * 3 * 2);
+    for(int i = 0; i < 3 * 3 * 3 * 2; i ++) {
+      vector<idFeeder<T> > lstat;
+      lstat.resize(reserve / unit + 1, idFeeder<T>(unit));
+      stat.emplace_back(move(lstat));
+    }
     M.resize(27 * 2);
     M.O();
     shf.resize(2, 0);
@@ -4127,7 +4125,7 @@ public:
 #endif
     nshf = shf;
   }
-  vector<idFeeder<T> > pipe;
+  vector<vector<idFeeder<T> > > stat;
   SimpleVector<T> M;
   vector<int> shf;
   vector<int> nshf;
@@ -4137,7 +4135,7 @@ public:
 //      this often efffects output streams' prediction gulf result
 //      to be shifted ones. we select predictor for jammer shallow one because
 //      of the performance issues.
-template <typename T> static inline T pSlipGulf0short(const SimpleVector<T>& in, pslip_t<T>& slip, const int& t) {
+template <typename T> static inline T pSlipGulf0short(const T& in, pslip_t<T>& slip, const int& t) {
   SimpleVector<T> apb;
   vector<pair<T, T> > aq;
   aq.reserve(3 * 3 * 3);
@@ -4146,42 +4144,34 @@ template <typename T> static inline T pSlipGulf0short(const SimpleVector<T>& in,
 
   int t0(t);
 #define UPDPSJQ3(inp,qinp,sec,i) \
-  apb[(i) * 2]     =   deep<T, p0maxNext<T> >(  (inp), 3) * (sec); \
-  apb[(i) * 2 + 1] = - deep<T, p0maxNext<T> >(- (inp), 3) * (sec); \
+  apb[(i) * 2]     =   deep0<T, p0maxNext<T> >(  (inp), \
+    slip.stat[(i) * 2], 3) * (sec); \
+  apb[(i) * 2 + 1] = - deep0<T, p0maxNext<T> >(- (inp), \
+    slip.stat[(i) * 2 + 1], 3) * (sec); \
   aq.emplace_back(pSubesube<T>((qinp), \
     make_pair(slip.M.subVector((i) * 2, 2).entity, \
       apb.subVector((i) * 2, 2).entity), t0 = t));
 
-  UPDPSJQ3(in,in[in.size()-1],T(int(1)),0);
+  UPDPSJQ3(in,in,T(int(1)),0);
   
-  slip.pipe[0].next(aq[0].first);
-  UPDPSJQ3(slip.pipe[0].res,aq[0].first,aq[0].second,1);
+  UPDPSJQ3(aq[0].first,aq[0].first,aq[0].second,1);
   aq[1].second *= aq[0].second;
   
-  slip.pipe[1].next(aq[1].first);
-  UPDPSJQ3(slip.pipe[1].res,in[in.size()-1],aq[1].second,2);
-  
-  slip.pipe[2].next(aq[2].first);
-  UPDPSJQ3(slip.pipe[2].res,aq[2].first,aq[2].second,3);
+  UPDPSJQ3(aq[1].first,in,aq[1].second,2);
+  UPDPSJQ3(aq[2].first,aq[2].first,aq[2].second,3);
   aq[3].second *= aq[2].second;
   
-  slip.pipe[3].next(aq[3].first);
-  UPDPSJQ3(slip.pipe[3].res,aq[3].first,aq[3].second,4);
+  UPDPSJQ3(aq[3].first,aq[3].first,aq[3].second,4);
   aq[4].second *= aq[3].second;
   
-  slip.pipe[4].next(aq[4].first);
-  UPDPSJQ3(slip.pipe[4].res,in[in.size()-1],aq[4].second,5);
-  
-  slip.pipe[5].next(aq[5].first);
-  UPDPSJQ3(slip.pipe[5].res,aq[5].first,aq[5].second,6);
+  UPDPSJQ3(aq[4].first,in,aq[4].second,5);
+  UPDPSJQ3(aq[5].first,aq[5].first,aq[5].second,6);
   aq[6].second *= aq[5].second;
   
-  slip.pipe[6].next(aq[6].first);
-  UPDPSJQ3(slip.pipe[6].res,aq[6].first,aq[6].second,7);
+  UPDPSJQ3(aq[6].first,aq[6].first,aq[6].second,7);
   aq[7].second *= aq[6].second;
 
-  slip.pipe[7].next(aq[7].first);
-  UPDPSJQ3(slip.pipe[7].res,in[in.size()-1],aq[7].second,8);
+  UPDPSJQ3(aq[7].first,in,aq[7].second,8);
   
 #if defined(_ARCFOUR_)
   const int tridx(arc4random() & 1);
@@ -4190,50 +4180,42 @@ template <typename T> static inline T pSlipGulf0short(const SimpleVector<T>& in,
 #endif
 #undef UPDPSJQ3
 #define UPDPSJQ3(inp,qinp,sec,i) \
-  apb[(i) * 2]     =   deep<T, p0maxNext<T> >(  (inp), 3) * (sec); \
-  apb[(i) * 2 + 1] = - deep<T, p0maxNext<T> >(- (inp), 3) * (sec); \
+  apb[(i) * 2]     =   deep0<T, p0maxNext<T> >(  (inp), \
+    slip.stat[(i) * 2], 3) * (sec); \
+  apb[(i) * 2 + 1] = - deep0<T, p0maxNext<T> >(- (inp), \
+    slip.stat[(i) * 2 + 1], 3) * (sec); \
   aq.emplace_back(pSubesube<T>((qinp), \
     make_pair(slip.M.subVector((i) * 2, 2).entity, \
       apb.subVector((i) * 2, 2).entity), tridx));
 
-  slip.pipe[8].next(aq[8].first);
-  UPDPSJQ3(slip.pipe[8].res,aq[8].first,aq[8].second,9);
+  UPDPSJQ3(aq[8].first,aq[8].first,aq[8].second,9);
   aq[9].second *= aq[8].second;
 
-  slip.pipe[9].next(aq[9].first);
-  UPDPSJQ3(slip.pipe[9].res,aq[9].first,aq[9].second,10);
+  UPDPSJQ3(aq[9].first,aq[9].first,aq[9].second,10);
   aq[10].second *= aq[9].second;
 
-  slip.pipe[10].next(aq[10].first);
-  UPDPSJQ3(slip.pipe[10].res,aq[8].first,aq[10].second,11);
+  UPDPSJQ3(aq[10].first,aq[8].first,aq[10].second,11);
   aq[11].second *= aq[8].second;
 
   
-  slip.pipe[11].next(aq[11].first);
-  UPDPSJQ3(slip.pipe[11].res,aq[11].first,aq[11].second,12);
+  UPDPSJQ3(aq[11].first,aq[11].first,aq[11].second,12);
   aq[12].second *= aq[11].second;
 
-  slip.pipe[12].next(aq[12].first);
-  UPDPSJQ3(slip.pipe[12].res,aq[12].first,aq[12].second,13);
+  UPDPSJQ3(aq[12].first,aq[12].first,aq[12].second,13);
   aq[13].second *= aq[12].second;
 
-  slip.pipe[13].next(aq[13].first);
-  UPDPSJQ3(slip.pipe[13].res,aq[8].first,aq[13].second,14);
+  UPDPSJQ3(aq[13].first,aq[8].first,aq[13].second,14);
   aq[14].second *= aq[8].second;
 
-
-  slip.pipe[14].next(aq[14].first);
-  UPDPSJQ3(slip.pipe[14].res,aq[14].first,aq[14].second,15);
+  UPDPSJQ3(aq[14].first,aq[14].first,aq[14].second,15);
   aq[15].second *= aq[14].second;
 
-  slip.pipe[15].next(aq[15].first);
-  UPDPSJQ3(slip.pipe[15].res,aq[15].first,aq[15].second,16);
+  UPDPSJQ3(aq[15].first,aq[15].first,aq[15].second,16);
   aq[16].second *= aq[15].second;
 
-  slip.pipe[16].next(aq[16].first);
-//  UPDPSJQ3(slip.pipe[16].res,aq[8].first,aq[16].second,17);
+//  UPDPSJQ3(aq[16].first,aq[8].first,aq[16].second,17);
 //  aq[17].second *= aq[8].second;
-  UPDPSJQ3(slip.pipe[16].res,in[in.size() - 1],aq[16].second,17);
+  UPDPSJQ3(aq[16].first,in,aq[16].second,17);
 
    
   slip.shf[(t + 1) % slip.shf.size()] = slip.nshf[(t + 1) % slip.shf.size()];
@@ -4247,50 +4229,43 @@ template <typename T> static inline T pSlipGulf0short(const SimpleVector<T>& in,
   }
 #undef UPDPSJQ3
 #define UPDPSJQ3(inp,qinp,sec,i) \
-  apb[(i) * 2]     =   deep<T, p0maxNext<T> >(  (inp), 3) * (sec); \
-  apb[(i) * 2 + 1] = - deep<T, p0maxNext<T> >(- (inp), 3) * (sec); \
+  apb[(i) * 2]     =   deep0<T, p0maxNext<T> >(  (inp), \
+    slip.stat[(i) * 2], 3) * (sec); \
+  apb[(i) * 2 + 1] = - deep0<T, p0maxNext<T> >(- (inp), \
+    slip.stat[(i) * 2 + 1], 3) * (sec); \
   aq.emplace_back(pSubesube<T>((qinp), \
     make_pair(slip.M.subVector((i) * 2, 2).entity, \
       apb.subVector((i) * 2, 2).entity), t0 = t, slip.shf));
 
-  slip.pipe[17].next(aq[17].first);
-  UPDPSJQ3(slip.pipe[17].res,aq[17].first,aq[17].second,18);
+  UPDPSJQ3(aq[17].first,aq[17].first,aq[17].second,18);
   aq[18].second *= aq[17].second;
 
-  slip.pipe[18].next(aq[18].first);
-  UPDPSJQ3(slip.pipe[18].res,aq[18].first,aq[18].second,19);
+  UPDPSJQ3(aq[18].first,aq[18].first,aq[18].second,19);
   aq[19].second *= aq[18].second;
   
-  slip.pipe[19].next(aq[19].first);
-  UPDPSJQ3(slip.pipe[19].res,aq[17].first,aq[19].second,20);
+  UPDPSJQ3(aq[19].first,aq[17].first,aq[19].second,20);
   aq[20].second *= aq[17].second;
 
 
-  slip.pipe[20].next(aq[20].first);
-  UPDPSJQ3(slip.pipe[20].res,aq[20].first,aq[20].second,21);
+  UPDPSJQ3(aq[20].first,aq[20].first,aq[20].second,21);
   aq[21].second *= aq[20].second;
   
-  slip.pipe[21].next(aq[21].first);
-  UPDPSJQ3(slip.pipe[21].res,aq[21].first,aq[21].second,22);
+  UPDPSJQ3(aq[21].first,aq[21].first,aq[21].second,22);
   aq[22].second *= aq[21].second;
 
-  slip.pipe[22].next(aq[22].first);
-  UPDPSJQ3(slip.pipe[22].res,aq[17].first,aq[22].second,23);
+  UPDPSJQ3(aq[22].first,aq[17].first,aq[22].second,23);
   aq[23].second *= aq[17].second;
 
 
-  slip.pipe[23].next(aq[23].first);
-  UPDPSJQ3(slip.pipe[23].res,aq[23].first,aq[23].second,24);
+  UPDPSJQ3(aq[23].first,aq[23].first,aq[23].second,24);
   aq[24].second *= aq[23].second;
 
-  slip.pipe[24].next(aq[24].first);
-  UPDPSJQ3(slip.pipe[24].res,aq[24].first,aq[24].second,25);
+  UPDPSJQ3(aq[24].first,aq[24].first,aq[24].second,25);
   aq[25].second *= aq[24].second;
 
-  slip.pipe[25].next(aq[25].first);
-//  UPDPSJQ3(slip.pipe[25].res,aq[17].first,aq[25].second,26);
+//  UPDPSJQ3(aq[25].first,aq[17].first,aq[25].second,26);
 //  aq[26].second *= aq[17].second;
-  UPDPSJQ3(slip.pipe[25].res,in[in.size()-1],aq[25].second,26);
+  UPDPSJQ3(aq[25].first,in,aq[25].second,26);
   
 #undef UPDPSJQ3
 
@@ -4911,20 +4886,16 @@ template <typename T, int nprogress> SimpleVector<T> predv0(const vector<SimpleV
 
 template <typename T, int nprogress> SimpleVector<T> predvp(const vector<SimpleVector<T> >& intran, const string& strloop) {
   SimpleVector<T> p(intran.size());
-  SimpleVector<T> buf(unOffsetHalf<T>(intran[0]));
-  assert(p.size() == intran.size());
-  assert(buf.size() == intran[0].size());
-  p[0] = (deep<T, p0maxNext<T> >(buf) - deep<T, p0maxNext<T> >(- buf)) / T(int(2));
+  p[0] = (deep<T, p0maxNext<T> >(intran[0]) - deep<T, p0maxNext<T> >(- intran[0])) / T(int(2));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int j = 1; j < intran.size(); j ++) {
     if(nprogress && ! (j % max(int(1), int(intran.size() / nprogress))) )
       cerr << j << " / " << intran.size() << strloop << endl;
-    SimpleVector<T> buf(unOffsetHalf<T>(intran[j]));
-    p[j] = (deep<T, p0maxNext<T> >(buf) - deep<T, p0maxNext<T> >(- buf)) / T(int(2));
+    p[j] = (deep<T, p0maxNext<T> >(intran[j]) - deep<T, p0maxNext<T> >(- intran[j])) / T(int(2));
   }
-  return clipBin<T>(offsetHalf<T>(p));
+  return p;
 }
 
 template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleVector<T> >& intran0, const string& strloop) {
@@ -4937,13 +4908,13 @@ template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleV
   //      the contexts they can have implementation.
   SimpleVector<T> seconds(intran0[0].size());
   seconds.O();
-  vector<SimpleVector<T> > intran(intran0);
+  vector<SimpleVector<T> > intran(offsetHalf<T>(intran0));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < intran0[0].size(); i ++)  {
     idFeeder<T> work0(intran0.size());
-    for(int j = 0; j < intran0.size(); j ++) work0.next(intran0[j][i]);
+    for(int j = 0; j < intran0.size(); j ++) work0.next(intran[j][i]);
     assert(work0.full);
     pair<SimpleVector<T>, T> work(makeProgramInvariant<T>(work0.res));
     for(int j = 0; j < intran.size(); j ++) intran[j][i] = move(work.first[j]);
@@ -4968,7 +4939,7 @@ template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleV
 #endif
   for(int i = start + step; i < p.size(); i ++) {
     for(int j = 0; j < ip.rows(); j ++)
-      ip(j, i) = unOffsetHalf<T>(intran0[j][i - p.size() + intran0[j].size()]) *
+      ip(j, i) = intran0[j][i - p.size() + intran0[j].size()] *
         p[i - step][j];
   }
   // N.B. dftcache need to be single thread on first call.
@@ -4982,7 +4953,7 @@ template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleV
   for(int i = 1; i < res.size(); i ++) {
     res[i] = p[p.size() - 1][i] * p0maxNext<T>(ip.row(i));
   }
-  return clipBin<T>(offsetHalf<T>(res));
+  return res;
 }
 
 // N.B. we want to feed large markov into prediction stream then:
@@ -4999,33 +4970,35 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pFeedLargeMarkov(c
   else {
     pass_next.resize(intrans.size(),
       SimpleVector<T>(intrans[0].size() - 1 - slen).O());
-    intrans = unOffsetHalf<T>(intrans);
-    for(int i = slen; i < intrans[0].size() - 1; i ++)
+    for(int i = slen; i < intrans[0].size() - 1; i ++) {
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static,1)
+#endif
       for(int j = 0; j < intrans.size(); j ++) {
         if(nprogress && ! (((i - slen) * intrans.size() + j) %
           max(int(1), int((intrans[0].size() - 1 - slen) * intrans.size() / nprogress))) )
             cerr << ((i - slen) * intrans.size() + j) << " / "
               << ((intrans[0].size() - 1 - slen) * intrans.size())
-                << " cuttingDown:" << strloop << endl;
+                << " cuttingDown: " << strloop << endl;
         pass_next[j][i - slen] = p012next<T>(intrans[j].subVector(0, i + 1),
           int(exp(log(T(i + 1)) / T(int(3)) )) );
       }
+    }
     for(int j = 0; j < intrans.size(); j ++)
       presidue[j] = p012next<T>(intrans[j],
         int(exp(log(T(intrans[0].size())) / T(int(3)) )) );
     intrans.resize(0);
-    pass_next = offsetHalf<T>(pass_next);
   }
   vector<SimpleVector<T> > res;
   res.reserve(2);
-  res.emplace_back(offsetHalf<T>(predvp<T, nprogress>(pass_next, string(" feed (p)") + strloop)));
-  res.emplace_back(offsetHalf<T>(predvq<T, nprogress>(pass_next, string(" feed (q)") + strloop)));
+  res.emplace_back(predvp<T, nprogress>(pass_next, string(" feed p") + strloop));
+  res.emplace_back(predvq<T, nprogress>(pass_next, string(" feed q") + strloop));
   assert(res[0].size() == intrans0.size() && res[0].size() == res[1].size());
   for(int i = 0; i < res.size(); i ++) {
     assert(presidue.size() == res[i].size());
     for(int j = 0; j < res[i].size(); j ++) res[i][j] *= presidue[j];
   }
-  return offsetHalf<T>(res);
+  return res;
 }
 
 // N.B. we apply PRNGs before to predict each of prediction in general.
@@ -5037,10 +5010,10 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pFeedLargeMarkov(c
 //      we don't select better nrecur == 11 * 11 we need huge computation time.
 template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T> >&, const string&), int nrecur> vector<SimpleVector<T> > predv(const vector<SimpleVector<T> >& intrans, const string& strloop) {
   assert(0 == nrecur || 1 == nrecur);
-  if(! nrecur) return p(intrans, string(" (0)") + strloop);
+  if(! nrecur) return p(intrans, string("p") + strloop);
   vector<SimpleVector<T> > res;
   for(int i0 = 0; i0 < abs(nrecur); i0 ++) {
-    vector<SimpleVector<T> > rintrans(unOffsetHalf<T>(intrans));
+    vector<SimpleVector<T> > rintrans(intrans);
     vector<bool> sign;
     sign.resize(intrans.size(), false);
 #if defined(_OPENMP)
@@ -5048,21 +5021,23 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
 #endif
     for(int j = 0; j < rintrans.size(); j ++) {
       rintrans[j][0] = T(int(0));
-      pslip_t<T> ps(0);
+      pslip_t<T> ps(0, rintrans[j].size());
+      pSlipGulf0short<T>(intrans[j][0], ps, 0);
       for(int i = 1; i < rintrans[j].size(); i ++) {
-        const T temp(pSlipGulf0short<T>(intrans[j].subVector(0, i), ps, i));
+        const T temp(pSlipGulf0short<T>(intrans[j][i], ps, i));
         rintrans[j][i] *= temp;
       }
       sign[j] =
-        pSlipGulf0short<T>(intrans[j], ps, intrans[j].size()) < T(int(0));
+        pSlipGulf0short<T>(intrans[j][intrans[j].size() - 1], ps,
+          intrans[j].size()) < T(int(0));
     }
     // N.B. PRNG parts going to gray + small noise with large enough nrecur.
-    res = unOffsetHalf<T>(p(offsetHalf<T>(rintrans), string(" (1)") + strloop));
+    res = p(rintrans, string("q") + strloop);
     for(int j = 0; j < res.size(); j ++)
       for(int k = 0; k < res[j].size(); k ++)
         if(sign[k]) res[j][k] = - res[j][k];
   }
-  return offsetHalf<T>(res);
+  return res;
 }
 
 static inline int countMSB(const int& x) {
@@ -5089,9 +5064,10 @@ template <typename T, int nprogress> SimpleVector<T> pAbsentMajority(const vecto
     vector<SimpleVector<T> > pres;
     vector<SimpleVector<T> > qres;
     {
-      vector<SimpleVector<T> > worktrans(pFeedTranspose<T>(work));
-      pres = unOffsetHalf<T>(predv<T, pFeedLargeMarkov<T, nprogress>, 0>(worktrans, string(" p(") + to_string(i) + string(" / ") + to_string(nloop) + string(")") + strloop) );
-      qres = unOffsetHalf<T>(predv<T, pFeedLargeMarkov<T, nprogress>, 1>(worktrans, string(" q(") + to_string(i) + string(" / ") + to_string(nloop) + string(")") + strloop) );
+      vector<SimpleVector<T> > worktrans(
+        pFeedTranspose<T>(unOffsetHalf<T>(work)));
+      pres = predv<T, pFeedLargeMarkov<T, nprogress>, 0>(worktrans, string("p(") + to_string(i) + string("/") + to_string(nloop) + string(")") + strloop);
+      qres = predv<T, pFeedLargeMarkov<T, nprogress>, 1>(worktrans, string("q(") + to_string(i) + string("/") + to_string(nloop) + string(")") + strloop);
     }
     assert(pres.size() == qres.size() && midx.size() == pres[0].size());
     if(! i) {
@@ -5131,7 +5107,7 @@ template <typename T, int nprogress> SimpleVector<T> pAbsentMajority(const vecto
     break;
   }
   for(int i = 1; i < res.size(); i ++) res[0] += res[i];
-  return offsetHalf<T>(res[0] /= T(res.size()));
+  return res[0] /= T(res.size());
 }
 
 template <typename T, int nprogress> SimpleVector<T> pFeedLebesgue(const vector<SimpleVector<T> >& in, const int& horizontal, const string& strloop) {
@@ -5151,7 +5127,7 @@ template <typename T, int nprogress> SimpleVector<T> pFeedLebesgue(const vector<
     }
     for(int j = i; j < i + horizontal * horizontal; j ++)
       for(int k = 0; k < les.size(); k ++) {
-        int idx(offsetHalf<T>(in[j][k]) * T(horizontal));
+        int idx(in[j][k] * T(horizontal));
         idx = max(int(0), min(horizontal - 1, int(idx)));
         for(int n = 0; n < les[k].size(); n ++)
           if(n == idx) les[k][n].emplace_back(in[j][k]);
@@ -5181,9 +5157,9 @@ template <typename T, int nprogress> SimpleVector<T> pFeedLebesgue(const vector<
       n2 += reform[i][j].dot(reform[i][j]);
     if(n2 == T(int(0))) continue;
     res += pAbsentMajority<T, nprogress>(reform[i],
-      string(" Lebesgue(") + to_string(i) + string("/") + to_string(reform.size()) + string(")") + strloop);
+      string(" Lebesgue(") + to_string(i) + string("/") + to_string(reform.size()) + strloop);
   }
-  return res;
+  return unOffsetHalf<T>(res);
 }
 
 template <typename T, int nprogress> SimpleVector<T> pSectional(const vector<SimpleVector<T> >& in, const int& range, const string& strloop) {
@@ -5193,14 +5169,25 @@ template <typename T, int nprogress> SimpleVector<T> pSectional(const vector<Sim
     return pFeedLebesgue<T, nprogress>(in, range, strloop);
   SimpleVector<T> out(pFeedLebesgue<T, nprogress>(in, range, strloop) * T(sectional));
   for(int i = 1; i < sectional; i ++) out -= in[in.size() - i];
-  return offsetHalf<T>(out);
+  return out;
 }
 
 template <typename T, int nprogress> SimpleVector<T> pMeasureable(const vector<SimpleVector<T> >& in, const string& strloop) {
+  if(in.size() <= 18) 
+    return SimpleVector<T>(in[0].size()).O(T(int(1)) / T(int(2)));
+#if defined(_PERSISTENT_) || defined(_FLOAT_BITS_)
+  const int n(absceil(sqrt(T(int((in.size() - 18) / 2)))));
+#else
+  const int n(ceil(sqrt(T(int((in.size() - 18) / 2)))));
+#endif
   vector<SimpleVector<T> > res;
+  res.reserve(n);
   for(int i = 2; i * i * 2 + 18 <= in.size(); i ++)
-    res.emplace_back(unOffsetHalf<T>(pSectional<T, nprogress>(in, i,
-      string(" cand:") + to_string(i - 1) + strloop)));
+    res.emplace_back(pSectional<T, nprogress>(in, i,
+      string(", ") + to_string(i - 1) + string("/") +
+        to_string(n) + string(")") + strloop));
+  if(! res.size())
+    return SimpleVector<T>(in[0].size()).O(T(int(1)) / T(int(2)));
   for(int i = 1; i < res.size(); i ++) res[0] += res[i];
   return offsetHalf<T>(res[0] /= T(res.size()) );
 }
