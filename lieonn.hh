@@ -3080,25 +3080,25 @@ template <typename T> static inline T offsetHalf(const T& in) {
   return (in + T(int(1))) / T(int(2));
 }
 
-template <typename T> static inline T unOffsetHalf(const T& in) {
-  return in * T(int(2)) - T(int(1));
-}
-
 template <typename T> static inline SimpleVector<T> offsetHalf(const SimpleVector<T>& in) {
   SimpleVector<T> res(in);
   for(int i = 0; i < res.size(); i ++) res[i] = offsetHalf<T>(res[i]);
   return res;
 }
 
-template <typename T> static inline SimpleVector<T> unOffsetHalf(const SimpleVector<T>& in) {
-  SimpleVector<T> res(in);
-  for(int i = 0; i < res.size(); i ++) res[i] = unOffsetHalf<T>(res[i]);
-  return res;
-}
-
 template <typename T> static inline vector<SimpleVector<T> > offsetHalf(const vector<SimpleVector<T> >& in) {
   vector<SimpleVector<T> > res(in);
   for(int i = 0; i < res.size(); i ++) res[i] = offsetHalf<T>(res[i]);
+  return res;
+}
+
+template <typename T> static inline T unOffsetHalf(const T& in) {
+  return in * T(int(2)) - T(int(1));
+}
+
+template <typename T> static inline SimpleVector<T> unOffsetHalf(const SimpleVector<T>& in) {
+  SimpleVector<T> res(in);
+  for(int i = 0; i < res.size(); i ++) res[i] = unOffsetHalf<T>(res[i]);
   return res;
 }
 
@@ -3120,6 +3120,12 @@ template <typename T> static inline SimpleVector<T> clipBin(const SimpleVector<T
   return res;;
 }
 
+template <typename T> static inline vector<SimpleVector<T> > clipBin(const vector<SimpleVector<T> >& in) {
+  vector<SimpleVector<T> > res(in);
+  for(int i = 0; i < res.size(); i ++) res[i] = clipBin<T>(res[i]);
+  return in;
+}
+
 template <typename T> static inline T cutBin(const T& in) {
   static const T zero(int(0));
   static const T one(int(1));
@@ -3135,12 +3141,6 @@ template <typename T> static inline SimpleVector<T> cutBin(const SimpleVector<T>
   SimpleVector<T> res(in);
   for(int i = 0; i < res.size(); i ++) res[i] = cutBin<T>(res[i]);
   return res;;
-}
-
-template <typename T> static inline vector<SimpleVector<T> > clipBin(const vector<SimpleVector<T> >& in) {
-  vector<SimpleVector<T> > res(in);
-  for(int i = 0; i < res.size(); i ++) res[i] = clipBin<T>(res[i]);
-  return in;
 }
 
 template <typename T> static inline T R2bin(const T& in) {
@@ -3177,11 +3177,36 @@ template <typename T> const T& sgn(const T& x) {
 }
 
 template <typename T> static inline T expscale(const T& x) {
-  return sgn<T>(x) * (exp(abs(x)) - T(int(1)));
+  return sgn<T>(x) * (exp(abs(x)) - T(int(1))) /
+    (exp(T(int(1))) - T(int(1)));
+}
+
+template <typename T> static inline SimpleVector<T> expscale(const SimpleVector<T>& x) {
+  SimpleVector<T> res(x);
+  for(int i = 0; i < res.size(); i ++) res[i] = expscale<T>(res[i]);
+  return res;
+}
+
+template <typename T> static inline vector<SimpleVector<T> > expscale(const vector<SimpleVector<T> >& x) {
+  vector<SimpleVector<T> > res(x);
+  for(int i = 0; i < res.size(); i ++) res[i] = expscale<T>(res[i]);
+  return res;
 }
 
 template <typename T> static inline T logscale(const T& x) {
-  return sgn<T>(x) * log(abs(x) + T(int(1)));
+  return sgn<T>(x) * log(abs(x) + T(int(1))) / log(T(int(2)));
+}
+
+template <typename T> static inline SimpleVector<T> logscale(const SimpleVector<T>& x) {
+  SimpleVector<T> res(x);
+  for(int i = 0; i < res.size(); i ++) res[i] = logscale<T>(res[i]);
+  return res;
+}
+
+template <typename T> static inline vector<SimpleVector<T> > logscale(const vector<SimpleVector<T> >& x) {
+  vector<SimpleVector<T> > res(x);
+  for(int i = 0; i < res.size(); i ++) res[i] = logscale<T>(res[i]);
+  return res;
 }
 
 template <typename X> static inline vector<X> skipX(const vector<X>& in, const int& step = 1) {
@@ -3323,30 +3348,34 @@ template <typename T, bool nonlinear> static inline T revertByProgramInvariant(S
   if(invariant[idx] == T(int(0))) return work[idx - 1];
   work[idx] = T(int(0));
   if(nonlinear) {
-    for(int ii = 0; ii < 3; ii ++) {
-      const pair<SimpleVector<T>, T> vdp(makeProgramInvariant<T>(work, one));
-      assert(vdp.first[idx] != T(int(0)) && vdp.second != T(int(0)));
-      // N.B. t == revertProgramInvariant<T>(t0 + t, work2.second)).
-      //      t == (t0 + t) / s, s == geometric average on work
-      //      t^((n+1)/n) =  f(t0,s0) := (1 / s0 - 1) * t0 / s0
-      //      t = (t0 / s0 * (1 / s0 - 1))^(n / (n + 1))
-      work[idx] = - (invariant.dot(vdp.first) -
-        invariant[idx] * vdp.first[idx]) / invariant[idx];
-      if(vdp.second != T(int(0)) && vdp.second != T(int(1))) {
-        T s(0);
-        for(int j = 0; j < vdp.first.size(); j ++)
-          if(j != idx) s += log(vdp.first[j]);
-        s = exp(s /= - T(vdp.first.size() - 1)) * vdp.second;
-        const T ss(s * (s - T(int(1)) ));
-        const int cnt(log(abs(work[idx])) / log(abs(ss)));
-        work[idx] *= pow(ss, T(cnt < 0 ? cnt | 1 : (cnt & 1 ? cnt + 1 : cnt)));
-      }
-      if(T(int(0)) <= work[idx] && work[idx] < T(int(1))) break;
-      work[idx] = cutBin<T>(work[idx]);
-    }
-  } else work[idx] = - (invariant.dot(work) -
-    invariant[idx] * work[idx]) / invariant[idx];
-  return work[idx];
+    // N.B. t == revertProgramInvariant<T>(t0 + t, work2.second)).
+    //      t == (t0 + t) / s, s == geometric average on work
+    //      t^((n+1)/n) * s0 - t - t0 = 0.
+    // newton's method with:
+    //       f'(t) == (n+1)/n t^(1/n) - 1.
+    //       f (t) == t^((n+1)/n) * s0 - t - t0
+    // => t_{k+1} == t_k - (t^((n+1)/n)*s0-t-t0)/((n+1)/n*t^(1/n)-1)
+          pair<SimpleVector<T>, T> vdp(makeProgramInvariant<T>(work, T(int(1))));
+    const T nvdp(sqrt(vdp.first.dot(vdp.first)));
+    assert(nvdp != T(int(0)));
+    vdp.first  /= nvdp;
+    vdp.second *= nvdp;
+    const int loop(int(T(int(2)) * sqrt(- log(SimpleMatrix<T>().epsilon()) /
+      log(T(int(2))) )) );
+          T t(int(0));
+    const T t0(invariant.dot(vdp.first));
+          T s0(int(0));
+    for(int i = 0; i < vdp.first.size(); i ++) if(i != idx)
+      s0 += log(binMargin<T>(vdp.first[i]));
+    s0  = exp(s0 /= T(vdp.first.size() - 1));
+    for(int i = 0; i <= loop; i ++)
+      t -= (pow(t, T(int(1)) + T(int(1)) / T(vdp.first.size())) - t - t0) /
+        ((T(int(1)) + T(int(1)) / T(vdp.first.size())) *
+          pow(t, T(int(1)) / T(vdp.first.size())) - T(int(1)) );
+    work[idx] = t / vdp.second;
+  } else work[idx] = - invariant.dot(work) / invariant[idx];
+  work[idx] = cutBin<T>(work[idx]);
+  return isfinite(work[idx]) ? work[idx] : T(int(0));
 }
 
 // N.B. F_2 case #f fixation on R^indim into R^result fixation.
@@ -4887,10 +4916,7 @@ template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleV
   return res;
 }
 
-// N.B. we want to feed large markov into prediction stream then:
-//      we get 2 of the candidates in each bit from p and q normally as
-//      1x force insert Riemann measurable condition and 1x insert
-//      possible Riemann-Stieljes measureable condition.
+// N.B. we want to feed large markov into prediction stream.
 template <typename T, int nprogress> vector<SimpleVector<T> > pCbrtMarkov(const vector<SimpleVector<T> >& intrans0, const string& strloop) {
   const int slen(max(int(4), int(exp(log(T(int(intrans0[0].size()))) / T(int(3)) )) ) );
   vector<SimpleVector<T> > intrans(intrans0);
@@ -4920,13 +4946,30 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pCbrtMarkov(const 
         int(exp(log(T(intrans[0].size())) / T(int(3)) )) ) );
     intrans.resize(0);
   }
-  pass_next = unOffsetHalf<T>(pass_next);
+  // N.B. we take total 3 dimension from input stream then predict with
+  //      1x force insert Riemann measurable condition and 1x insert
+  //      possible Riemann-Stieljes measureable condition.
   vector<SimpleVector<T> > res;
-  res.reserve(2);
-  res.emplace_back(predvp<T, nprogress>(pass_next, string(" feed p") + strloop));
-  res.emplace_back(predvq<T, nprogress>(pass_next, string(" feed q") + strloop));
-  assert(res[0].size() == intrans0.size() && res[0].size() == res[1].size());
+  res.reserve(6);
+  res.emplace_back(predvp<T, nprogress>(unOffsetHalf<T>(pass_next),
+    string(" feed p0") + strloop));
+  res.emplace_back(unOffsetHalf<T>(logscale<T>(offsetHalf<T>(
+    predvp<T, nprogress>(unOffsetHalf<T>(clipBin<T>(expscale<T>(pass_next))),
+      string(" feed p1") + strloop) ))) );
+  res.emplace_back(unOffsetHalf<T>(expscale<T>(offsetHalf<T>(
+    predvp<T, nprogress>(unOffsetHalf<T>(clipBin<T>(logscale<T>(pass_next))),
+      string(" feed p2") + strloop) ))) );
+  res.emplace_back(predvq<T, nprogress>(unOffsetHalf<T>(pass_next),
+    string(" feed q0") + strloop));
+  res.emplace_back(unOffsetHalf<T>(logscale<T>(offsetHalf<T>(
+    predvq<T, nprogress>(unOffsetHalf<T>(clipBin<T>(expscale<T>(pass_next))),
+      string(" feed q1") + strloop) ))) );
+  res.emplace_back(unOffsetHalf<T>(expscale<T>(offsetHalf<T>(
+    predvq<T, nprogress>(unOffsetHalf<T>(clipBin<T>(logscale<T>(pass_next))),
+      string(" feed q2") + strloop) ))) );
+  assert(res[0].size() == intrans0.size());
   for(int i = 0; i < res.size(); i ++) {
+    assert(res[0].size() == res[i].size());
     assert(presidue.size() == res[i].size());
     for(int j = 0; j < res[i].size(); j ++) res[i][j] *= presidue[j];
   }
@@ -5168,11 +5211,6 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 // (10) the #f counting maximum compressed f(in,out,states,unobserved) has
 //      12~16 bit entropy, they causes layer# exceeds the structure
 //      so we only need 25 inputs whole in the case.
-// (11) to make hidden +2 dimension from input stream only: could be done by
-//      expscale, logscale, multiplication inverse for p-adic, but it's only id.
-//      either if we make [1, ..., 1] orthogonalization, it's only the negate
-//      for binary coded stream. either patternized xor gate is (09) case.
-//      so if we're treating input stream as bit stream, it's culs-de-sac again.
 
 template <typename T> vector<SimpleVector<T> > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
@@ -8217,17 +8255,8 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      eigen vector concerns on our prediction.
 // (06) some small number of the nonlinear transformation series.
 //      we target almost linear also some exceptions are handled by
-//      expscale/logscale matter. (they preserves sign bit with the series.)
-//      this is because: we suppose n-markov causes some measureable condition
-//      in linear ones, so worse structures are exceptions of them handled
-//      (might be recursive) by combination untanglement/tanglement ones
-//      in the 3rd order to 2nd order from boolean algebra + some of the noise.
-//      so we have the worse structure but we target {-1,1}^n formed ones.
-//      (however, once we have geometric-arithmetric mean complement of
-//        input stream better predictable ones but not after some of the
-//        test, so none now.)
-//      either, with d^e/dx^e == dx condition, f^-1(f(x)) == x 's some of the
-//      combination untanglement of them.
+//      expscale/logscale matter. with d^e/dx^e == dx condition,
+//      f^-1(f(x)) == x 's some of the combination untangles them.
 //      cf. (arctan(logscale))-n times chain causes y=x into sigmoid-like graph.
 // (07) (absent)
 // (08) recursion on same function based functions.
