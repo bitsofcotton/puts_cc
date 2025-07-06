@@ -3361,8 +3361,8 @@ template <typename T, bool nonlinear> static inline T revertByProgramInvariant(S
     vdp.first  /= nvdp;
     vdp.second /= nvdp;
     static const T one(int(1));
-    const int loop(int(T(int(2)) * sqrt(- log(SimpleMatrix<T>().epsilon()) /
-      log(T(int(2))) )) );
+    const int loop(T(int(2)) * sqrt(- log(SimpleMatrix<T>().epsilon()) /
+      log(T(int(2))) ));
           complex(T) t(T(int(0)));
     const complex(T) t0(invariant.dot(vdp.first));
           complex(T) s0(T(int(0)));
@@ -4779,23 +4779,7 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
   return res;
 }
 
-// N.B. start ddpmopt (closed except for pLebesgue debug)
-// N.B. we are targetting the structure they appears additional states after
-//      additional states on given input range in stable or bored input stream.
-
-// for speed purpose.
-template <typename T> static inline vector<SimpleVector<T> > static inline pFeedTranspose(const vector<SimpleVector<T> >& in0) {
-  assert(in0.size());
-  vector<SimpleVector<T> > in;
-  in.resize(in0[0].size());
-  for(int i = 0; i < in.size(); i ++) {
-    in[i].resize(in0.size());
-    for(int j = 0; j < in[i].size(); j ++)
-      in[i][j] = in0[j][i];
-  }
-  return in;
-}
-
+// N.B. start ddpmopt (closed)
 template <typename T, int nprogress> static inline SimpleVector<T> predv00(const vector<SimpleVector<T> >& intran, const int& sz, const SimpleVector<T>& seconds, const string& strloop = string("")) {
   assert(0 < sz && sz <= intran[0].size());
   SimpleVector<T> p(intran.size());
@@ -4818,24 +4802,33 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv00(const
 
 template <typename T, int nprogress> SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
   assert(0 < sz && sz <= in.size());
-  vector<SimpleVector<T> > dupin;
+  vector<SimpleVector<T> > intran;
+  intran.resize(in[0].size());
+  for(int i = 0; i < intran.size(); i ++) {
+    intran[i].resize(in.size());
+    for(int j = 0; j < intran[i].size(); j ++)
+      intran[i][j] = in[j][i];
+  }
   SimpleVector<T> seconds(sz);
   seconds.O();
-  dupin.reserve(sz);
+  intran.reserve(sz);
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < sz; i ++)  {
-    pair<SimpleVector<T>, T> work(makeProgramInvariant<T>(in[i]));
-    dupin.emplace_back(work.first.subVector(0, in[i].size()));
-    seconds[i] = work.second;
+    idFeeder<T> work0(intran.size());
+    for(int j = 0; j < intran.size(); j ++) work0.next(intran[j][i]);
+    assert(work0.full);
+    pair<SimpleVector<T>, T> work(makeProgramInvariant<T>(work0.res));
+    for(int j = 0; j < intran.size(); j ++) intran[j][i] = move(work.first[j]);
+    seconds[i] = move(work.second);
   }
   T M(int(0));
-  for(int i = 0; i < dupin.size(); i ++)
-    for(int j = 0; j < dupin[i].size(); j ++)
-      M = max(abs(dupin[i][j]), M);
-  for(int i = 0; i < dupin.size(); i ++) dupin[i] /= M;
-  return predv00<T, nprogress>(pFeedTranspose<T>(dupin), sz, seconds *= M, strloop);
+  for(int i = 0; i < intran.size(); i ++)
+    for(int j = 0; j < intran[i].size(); j ++)
+      M = max(abs(intran[i][j]), M);
+  for(int i = 0; i < intran.size(); i ++) intran[i] /= M;
+  return predv00<T, nprogress>(intran, sz, seconds *= M, strloop);
 }
 
 template <typename T, int nprogress> SimpleVector<T> predvp(const vector<SimpleVector<T> >& intran, const string& strloop) {
@@ -5090,11 +5083,10 @@ template <typename T, int nprogress> SimpleVector<T> pMeasureable(const vector<S
   if(in.size() < 1) return SimpleVector<T>(); 
 #if defined(_PERSISTENT_) || defined(_FLOAT_BITS_)
   const int m(in.size() / 2 < 1 ? T(int(0)) : absfloor(sqrt(T(int((in.size() / 2 - 1) / 2)))));
-  const int n(max(int(2), m));
 #else
   const int m(in.size() / 2 < 1 ? T(int(0)) : floor(sqrt(T(int((in.size() / 2 - 1) / 2)))));
-  const int n(max(int(2), m));
 #endif
+  const int n(max(int(2), m));
   {
     static int lastn(0);
     if(lastn != n) {
@@ -5112,15 +5104,17 @@ template <typename T, int nprogress> SimpleVector<T> pMeasureable(const vector<S
   if(! res.size())
     return SimpleVector<T>(in[0].size()).O(T(int(1)) / T(int(2)));
   for(int i = 1; i < res.size(); i ++) res[0] += res[i];
-  return offsetHalf<T>(res[0] /= T(res.size()) );
+  return res[0] /= T(res.size());
 }
 
 template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<SimpleVector<T> >& in, const string& strloop) {
   vector<SimpleVector<T> > inm(in);
   for(int i = 0; i < inm.size(); i ++)
     inm[i] = offsetHalf<T>(- unOffsetHalf<T>(inm[i]));
-  SimpleVector<T> res((pMeasureable<T, nprogress>(in, string("+") + strloop) -
-    pMeasureable<T, nprogress>(inm, string("-") + strloop)) / T(int(2)) );
+  SimpleVector<T> res((
+    offsetHalf<T>(  pMeasureable<T, nprogress>(in,  string("+") + strloop)) +
+    offsetHalf<T>(- pMeasureable<T, nprogress>(inm, string("-") + strloop))) /
+      T(int(2)) );
   for(int i = 0; i < res.size(); i ++)
     if(T(int(1)) <= abs(unOffsetHalf<T>(res[i])) )
       res[i] = offsetHalf<T>(T(int(0)));
