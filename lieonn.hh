@@ -1453,6 +1453,14 @@ template <typename T> static inline Complex<T> log(const Complex<T>& s) {
   return Complex<T>(log(abs(s)), arg(s));
 }
 
+template <typename T> static inline Complex<T> pow(const Complex<T>& s, const Complex<T>& p) {
+  if(abs(s) == T(int(0))) {
+    assert(T(int(0)) < abs(p));
+    return T(int(0));
+  }
+  return exp(log(s) * p);
+}
+
 template <typename T> static inline Complex<T> sqrt(const Complex<T>& s) {
   return exp(log(s) * Complex<T>(T(int(1)) / T(int(2))));
 }
@@ -3134,13 +3142,7 @@ template <typename T> static inline T cutBin(const T& in) {
 #else
   T res(in - (in < zero ? - floor(- in) : floor(in)));
 #endif
-  return res < zero ? res += one : res;
-}
-
-template <typename T> static inline SimpleVector<T> cutBin(const SimpleVector<T>& in) {
-  SimpleVector<T> res(in);
-  for(int i = 0; i < res.size(); i ++) res[i] = cutBin<T>(res[i]);
-  return res;;
+  return res <= zero ? res += one : res;
 }
 
 template <typename T> static inline T R2bin(const T& in) {
@@ -3328,10 +3330,8 @@ template <typename T> static inline pair<SimpleVector<T>, T> makeProgramInvarian
 }
 
 template <typename T> static inline T revertProgramInvariant(const pair<T, T>& in) {
-  const T r0(in.second == T(0) ?
+  return cutBin<T>(in.second == T(0) ?
     sgn<T>(in.second) / SimpleMatrix<T>().epsilon() : in.first / in.second);
-  const T r1(T(0) < r0 ? r0 - absfloor(r0) : absceil(- r0) + r0);
-  return T(0) == r1 ? T(1) : r1;
 }
 
 template <typename T> static inline SimpleVector<T> revertProgramInvariant(const pair<SimpleVector<T>, T>& in) {
@@ -3359,20 +3359,22 @@ template <typename T, bool nonlinear> static inline T revertByProgramInvariant(S
     const T nvdp(sqrt(vdp.first.dot(vdp.first)));
     assert(nvdp != T(int(0)));
     vdp.first  /= nvdp;
-    vdp.second *= nvdp;
+    vdp.second /= nvdp;
+    static const T one(int(1));
     const int loop(int(T(int(2)) * sqrt(- log(SimpleMatrix<T>().epsilon()) /
       log(T(int(2))) )) );
-          T t(int(0));
-    const T t0(invariant.dot(vdp.first));
-          T s0(int(0));
+          complex(T) t(T(int(0)));
+    const complex(T) t0(invariant.dot(vdp.first));
+          complex(T) s0(T(int(0)));
+    const T n(vdp.first.size());
     for(int i = 0; i < vdp.first.size(); i ++) if(i != idx)
-      s0 += log(binMargin<T>(vdp.first[i]));
-    s0  = exp(s0 /= T(vdp.first.size() - 1));
+      s0 += log(complexctor(T)(binMargin<T>(vdp.first[i])));
+    s0  = exp(s0 /= complexctor(T)(T(vdp.first.size() - 1)));
     for(int i = 0; i <= loop; i ++)
-      t -= (pow(t, T(int(1)) + T(int(1)) / T(vdp.first.size())) - t - t0) /
-        ((T(int(1)) + T(int(1)) / T(vdp.first.size())) *
-          pow(t, T(int(1)) / T(vdp.first.size())) - T(int(1)) );
-    work[idx] = t / vdp.second;
+      t -= (pow(t, complexctor(T)((n + one) / n)) * s0 - t - t0) /
+        (complexctor(T)((n + one) / n) * pow(t, complexctor(T)(one / n)) -
+          complexctor(T)(one) );
+    work[idx] = (t.real() /= vdp.second);
   } else work[idx] = - invariant.dot(work) / invariant[idx];
   work[idx] = cutBin<T>(work[idx]);
   return isfinite(work[idx]) ? work[idx] : T(int(0));
@@ -4777,7 +4779,7 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
   return res;
 }
 
-// N.B. start ddpmopt
+// N.B. start ddpmopt (closed except for pLebesgue debug)
 // N.B. we are targetting the structure they appears additional states after
 //      additional states on given input range in stable or bored input stream.
 
@@ -4937,8 +4939,10 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pCbrtMarkov(const 
             cerr << ((i - slen) * intrans.size() + j) << " / "
               << ((intrans[0].size() - 1 - slen) * intrans.size())
                 << " cuttingDown " << strloop << endl;
-        pass_next[j][i - slen] = p012next<T>(intrans[j].subVector(0, i + 1),
-            int(exp(log(T(i + 1)) / T(int(3)) )) );
+        pass_next[j][i - slen] = unOffsetHalf<T>(
+          p012next<T>(intrans[j].subVector(0, i + 1),
+            int(exp(log(T(i + 1)) / T(int(3)) )) ) ) *
+          unOffsetHalf<T>(intrans[j][i + 1]);
       }
     }
     for(int j = 0; j < intrans.size(); j ++)
@@ -4951,22 +4955,26 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pCbrtMarkov(const 
   //      possible Riemann-Stieljes measureable condition.
   vector<SimpleVector<T> > res;
   res.reserve(6);
-  res.emplace_back(predvp<T, nprogress>(unOffsetHalf<T>(pass_next),
+  res.emplace_back(predvp<T, nprogress>(pass_next,
     string(" feed p0") + strloop));
   res.emplace_back(unOffsetHalf<T>(logscale<T>(offsetHalf<T>(
-    predvp<T, nprogress>(unOffsetHalf<T>(clipBin<T>(expscale<T>(pass_next))),
-      string(" feed p1") + strloop) ))) );
+    predvp<T, nprogress>(unOffsetHalf<T>(clipBin<T>(expscale<T>(
+      offsetHalf<T>(pass_next)))),
+        string(" feed p1") + strloop) ))) );
   res.emplace_back(unOffsetHalf<T>(expscale<T>(offsetHalf<T>(
-    predvp<T, nprogress>(unOffsetHalf<T>(clipBin<T>(logscale<T>(pass_next))),
-      string(" feed p2") + strloop) ))) );
-  res.emplace_back(predvq<T, nprogress>(unOffsetHalf<T>(pass_next),
+    predvp<T, nprogress>(unOffsetHalf<T>(clipBin<T>(logscale<T>(
+      offsetHalf<T>(pass_next)))),
+        string(" feed p2") + strloop) ))) );
+  res.emplace_back(predvq<T, nprogress>(pass_next,
     string(" feed q0") + strloop));
   res.emplace_back(unOffsetHalf<T>(logscale<T>(offsetHalf<T>(
-    predvq<T, nprogress>(unOffsetHalf<T>(clipBin<T>(expscale<T>(pass_next))),
-      string(" feed q1") + strloop) ))) );
+    predvq<T, nprogress>(unOffsetHalf<T>(clipBin<T>(expscale<T>(
+      offsetHalf<T>(pass_next)))),
+        string(" feed q1") + strloop) ))) );
   res.emplace_back(unOffsetHalf<T>(expscale<T>(offsetHalf<T>(
-    predvq<T, nprogress>(unOffsetHalf<T>(clipBin<T>(logscale<T>(pass_next))),
-      string(" feed q2") + strloop) ))) );
+    predvq<T, nprogress>(unOffsetHalf<T>(clipBin<T>(logscale<T>(
+      offsetHalf<T>(pass_next)))),
+        string(" feed q2") + strloop) ))) );
   assert(res[0].size() == intrans0.size());
   for(int i = 0; i < res.size(); i ++) {
     assert(res[0].size() == res[i].size());
@@ -5046,7 +5054,10 @@ template <typename T, int nprogress> SimpleVector<T> pLebesgue(const vector<Simp
     T n2(int(0));
     for(int j = 0; j < reform[i].size(); j ++)
       n2 += reform[i][j].dot(reform[i][j]);
-    if(n2 == T(int(0))) continue;
+    if(n2 == T(int(0))) {
+      if(nprogress) cerr << "L(skip:" << i << strloop << endl;
+      continue;
+    }
 #if defined(_P_SHIFT_)
     vector<SimpleVector<T> > p(predv<T, pCbrtMarkov<T, nprogress> >(
 #else
@@ -5102,6 +5113,18 @@ template <typename T, int nprogress> SimpleVector<T> pMeasureable(const vector<S
     return SimpleVector<T>(in[0].size()).O(T(int(1)) / T(int(2)));
   for(int i = 1; i < res.size(); i ++) res[0] += res[i];
   return offsetHalf<T>(res[0] /= T(res.size()) );
+}
+
+template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<SimpleVector<T> >& in, const string& strloop) {
+  vector<SimpleVector<T> > inm(in);
+  for(int i = 0; i < inm.size(); i ++)
+    inm[i] = offsetHalf<T>(- unOffsetHalf<T>(inm[i]));
+  SimpleVector<T> res((pMeasureable<T, nprogress>(in, string("+") + strloop) -
+    pMeasureable<T, nprogress>(inm, string("-") + strloop)) / T(int(2)) );
+  for(int i = 0; i < res.size(); i ++)
+    if(T(int(1)) <= abs(unOffsetHalf<T>(res[i])) )
+      res[i] = offsetHalf<T>(T(int(0)));
+  return res;
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
@@ -5162,7 +5185,8 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //      condition, they might converges to the result we bet.
 // (06) layers:
 //       | function           | layer# | [wsp1] | data amount r   | time(***)  |
-//       +--------------------+--------+--------+------------------+----------+
+//       +--------------------+--------+--------+-----------------+------------+
+//       | pPolish            | 0      | w      | in * 2          | O(1)       |
 //       | pMeasureable       | 0      | w      | in * sqrt(in)   | O(L^1/6)   |
 //       | pSectional         | 0      | w      | in * range      | O(1)       |
 //       | pLebesgue          | 0      | w      | in * range^2    | O(range)   |
@@ -5225,7 +5249,7 @@ template <typename T> vector<SimpleVector<T> > predVec(const vector<vector<Simpl
       in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
-  SimpleVector<T> pres(pMeasureable<T, 20>(in, string(" (predVec)")));
+  SimpleVector<T> pres(pPolish<T, 20>(in, string(" (predVec)")));
   vector<SimpleVector<T> > res;
   res.resize(in0[0].size());
   for(int j = 0; j < res.size(); j ++)
@@ -5248,7 +5272,7 @@ template <typename T> vector<SimpleMatrix<T> > predMat(const vector<vector<Simpl
                          k * in0[i][0].cols(), in0[i][j].row(k));
     }
   }
-  SimpleVector<T> pres(pMeasureable<T, 20>(in, string(" (predMat)")));
+  SimpleVector<T> pres(pPolish<T, 20>(in, string(" (predMat)")));
   vector<SimpleMatrix<T> > res;
   res.resize(in0[0].size());
   for(int j = 0; j < res.size(); j ++) {
@@ -5291,7 +5315,7 @@ template <typename T> SimpleSparseTensor(T) predSTen(vector<SimpleSparseTensor(T
             in[i][cnt ++] = offsetHalf<T>(in0[i][idx[j]][idx[k]][idx[m]]);
   }
   in0.resize(0);
-  SimpleVector<T> pres(pMeasureable<T, 20>(in, string(" (predSTen)")));
+  SimpleVector<T> pres(pPolish<T, 20>(in, string(" (predSTen)")));
   SimpleSparseTensor(T) res;
   for(int j = 0, cnt = 0; j < idx.size(); j ++)
     for(int k = 0; k < idx.size(); k ++)
@@ -8248,8 +8272,8 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      jammers' strategy can select *any* function.
 // (04) p2next: the p012next, p01next, p0...next integrator.
 //      it's verbose, we should target *thin-layered* ones they can grip stable.
-// (05) (comment move from predMat): before and after to applying DFT concern
-//      prediction isn't get better result because they gets non 100% result
+// (05) (comment move from predMat): before and after to apply DFT concerned
+//      prediction isn't get better result because they get non 100% result
 //      causes whole data affected noises. so we eliminated them.
 //      this condition is compatible to any of the orthogonal transform or
 //      eigen vector concerns on our prediction.
@@ -8273,7 +8297,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      jammers, so if the jammer adjust theirs to our algorithms, it's useless.
 // (12) goki_check_cc:test.py [qQ]red auto continuity tuner.
 //      we dropped them because they also make the hypothesis input stream
-//      to have some of the continuity, so instead of them, we use pgoshigoshi
+//      to have some of the continuity, so instead of them, we use -D_P_SHIFT_
 //      with predv function, so to fight with them, we can do predv for both
 //      template parameter to pAbsentMajority.
 // (13) pgatherexp, ppositivesel concerns.
