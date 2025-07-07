@@ -1894,6 +1894,9 @@ public:
   inline ~SimpleMatrix() { ; }
   inline       SimpleMatrix<T>  operator -  () const {
     SimpleMatrix<T> res(entity.size(), ecols);
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
     for(int i = 0; i < entity.size(); i ++)
       res.entity[i] = - entity[i];
     return res;
@@ -1904,6 +1907,9 @@ public:
   }
   inline       SimpleMatrix<T>& operator += (const SimpleMatrix<T>& other) {
     assert(entity.size() == other.entity.size() && ecols == other.ecols);
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
     for(int i = 0; i < entity.size(); i ++)
       entity[i] += other.entity[i];
     return *this;
@@ -1920,6 +1926,9 @@ public:
     return res *= other;
   }
   inline       SimpleMatrix<T>& operator *= (const T& other) {
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
     for(int i = 0; i < entity.size(); i ++)
       entity[i] *= other;
     return *this;
@@ -1928,6 +1937,9 @@ public:
     assert(ecols == other.entity.size() && entity.size() && other.entity.size());
     SimpleMatrix<T> derived(other.transpose());
     SimpleMatrix<T> res(entity.size(), other.ecols);
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
     for(int i = 0; i < entity.size(); i ++) {
             SimpleVector<T>& resi(res.entity[i]);
       const SimpleVector<T>& ei(entity[i]);
@@ -1942,6 +1954,9 @@ public:
   inline       SimpleVector<T>  operator *  (const SimpleVector<T>& other) const {
     assert(ecols == other.size());
     SimpleVector<T> res(entity.size());
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
     for(int i = 0; i < entity.size(); i ++)
       res[i] = entity[i].dot(other);
     return res;
@@ -1951,6 +1966,9 @@ public:
     return res /= other;
   }
   inline       SimpleMatrix<T>& operator /= (const T& other) {
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
     for(int i = 0; i < entity.size(); i ++)
       entity[i] /= other;
     return *this;
@@ -2277,11 +2295,15 @@ template <typename T> inline T SimpleMatrix<T>::determinant(const bool& nonzero)
     const T& eii(ei[i]);
     if(! nonzero || ! i || pow(abs(det), T(int(1)) / T(int(i))) * epsilon() <= abs(eii))
       det *= eii;
-    if(ei.dot(ei) * epsilon() < eii * eii)
+    if(ei.dot(ei) * epsilon() < eii * eii) {
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
       for(int j = i + 1; j < entity.size(); j ++) {
         const T ratio(work.entity[j][i] / eii);
         work.entity[j] -= ei * ratio;
       }
+    }
   }
   return det;
 }
@@ -2298,12 +2320,16 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solve(SimpleVector
     swap(other[i], other[xchg]);
     const SimpleVector<T>& ei(work.entity[i]);
     const T& eii(ei[i]);
-    if(ei.dot(ei) * epsilon() < eii * eii)
+    if(ei.dot(ei) * epsilon() < eii * eii) {
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
       for(int j = i + 1; j < entity.size(); j ++) {
         const T ratio(work.entity[j][i] / eii);
         work.entity[j] -= ei       * ratio;
         other[j]       -= other[i] * ratio;
       }
+    }
   }
   for(int i = entity.size() - 1; 0 <= i; i --) {
     if(work.entity[i][i] == T(int(0))) continue;
@@ -2313,6 +2339,9 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::solve(SimpleVector
       continue;
     }
     other[i] = buf;
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
     for(int j = i - 1; 0 <= j; j --)
       other[j] -= other[i] * work.entity[j][i];
   }
@@ -2330,9 +2359,15 @@ template <typename T> inline SimpleVector<T> SimpleMatrix<T>::projectionPt(const
   assert(0 < entity.size() && 0 < ecols && ecols == other.size());
   // also needs class or this->transpose() * (*this) == I assertion is needed.
   SimpleMatrix<T> work(entity.size(), ecols);
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
   for(int i = 0; i < work.rows(); i ++)
     work.row(i) = entity[i] * entity[i].dot(other);
   SimpleVector<T> res(ecols);
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
   for(int i = 0; i < other.size(); i ++) {
     res[i] = T(int(0));
     for(int j = 0; j < entity.size(); j ++)
@@ -2719,6 +2754,9 @@ template <typename T> static inline SimpleMatrix<complex(T) > dft(const int& siz
     cache.close();
   } else {
     static const T Pi(T(4) * atan2(T(1), T(1)));
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
     for(int i = 0; i < edft.rows(); i ++)
       for(int j = 0; j < edft.cols(); j ++) {
         const T theta(- T(int(2)) * Pi * T(i) * T(j) / T(edft.rows()));
@@ -2769,8 +2807,14 @@ template <typename T> static inline SimpleMatrix<T> diff(const int& size0) {
     // N.B. we should start this loop with i == 1 on integrate(diff) or inverse.
     //      we also should start with i == 0 on taylor series.
     //      we select latter one.
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
     for(int i = 0; i < DD.rows(); i ++)
       DD.row(i) *= complexctor(T)(T(int(0)), - T(int(2)) * Pi * T(i) / T(DD.rows()));
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
     for(int i = 1; i < II.rows(); i ++)
       II.row(i) /= complexctor(T)(T(int(0)), - T(int(2)) * Pi * T(i) / T(DD.rows()));
     // N.B. if we apply DD onto 1 / (1 / f(x)) graph, it's reverse order.
@@ -2815,6 +2859,9 @@ template <typename T> static inline SimpleVector<complex(T) > taylorc(const int&
   //      we multiply is bonded to the transformation.
   static const T Pi(T(4) * atan2(T(1), T(1) ));
   SimpleVector<complex(T) > res(dft<T>(- size).row(step0));
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
   for(int i = 0; i < res.size(); i ++)
     res[i] *= step != stepw ? 
       (i ? exp(complexctor(T)(T(int(0)), - T(int(2)) * Pi * T(i) * residue / T(res.size()) ))
@@ -2834,9 +2881,13 @@ template <typename T> static inline SimpleVector<T> taylor(const int& size, cons
   return taylor<T>(size, step, step);
 }
 
+// N.B. we only need cosine value on invariant, so normalize them into S^n.
 template <typename T> static inline SimpleVector<T> linearInvariant(const SimpleMatrix<T>& in) {
   vector<pair<T, int> > sute;
-  return in.QR().zeroFix(in, sute);
+  SimpleVector<T> res(in.QR().zeroFix(in, sute));
+  const T nres(res.dot(res));
+  return ! isfinite(nres) || nres <= T(int(0)) ? res.O() :
+    res /= sqrt(nres);
 }
 
 template <typename T> class SimpleSparseVector {
@@ -3410,6 +3461,9 @@ template <typename T> inline CatG<T>::CatG(const int& size0, const vector<Simple
   SimpleMatrix<T> A(in.size(), size + 1);
   for(int i = 0; i < in.size(); i ++)
     tayl(size, in[i].size());
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
   for(int i = 0; i < in.size(); i ++)
     A.row(i) = makeProgramInvariant(clipBin<T>(tayl(size, in[i].size()) * in[i])).first;
         SimpleMatrix<T> Pt(A.QR());
@@ -3620,8 +3674,7 @@ template <typename T> static inline T p012next(const SimpleVector<T>& d, const i
   for(int i = 1; i < work.size(); i ++)
     work[i - 1] = d[i - work.size() + d.size()];
   work[work.size() - 1] = zero;
-  const T nwork(sqrt(work.dot(work)));
-  if(nwork <= T(int(0))) {
+  if(work.dot(work) <= T(int(0))) {
     static bool shown(false);
     if(! shown) {
       shown = true;
@@ -3629,6 +3682,9 @@ template <typename T> static inline T p012next(const SimpleVector<T>& d, const i
     }
     return T(int(1)) / T(int(2));
   }
+  const T nwork(sqrt(work.dot(work) + T(int(1)) ));
+  // N.B. makeProgramInvariant normalization is better than 2-norm
+  //      normalization on scoring because we crush them so.
   T res(zero);
   T sscore(zero);
   for(int i = 0; i < cat.size(); i ++) {
@@ -3638,27 +3694,28 @@ template <typename T> static inline T p012next(const SimpleVector<T>& d, const i
       for(int k = 0; k < cat[i].first.size(); k ++)
         cwork.row(k) = makeProgramInvariant<T>(cat[i].first[k],
           T(int(k + 1)) / T(int(cat[i].first.size() + 1)) ).first;
-      SimpleVector<T> invariant(linearInvariant<T>(cwork));
-      const T ninvariant(invariant.dot(invariant));
-      if(ninvariant == T(int(0))) continue;
-      work[work.size() - 1] =
-        revertByProgramInvariant<T, true>(work, invariant /= sqrt(ninvariant));
-      const T score(unOffsetHalf<T>(invariant.dot(makeProgramInvariant<T>(work,
-        T(int(1))).first) ) * T(cat[i].first.size()));
-      res    += score * work[work.size() - 1] / nwork;
+      const SimpleVector<T> invariant(linearInvariant<T>(cwork));
+      work[work.size() - 1] = invariant.dot(invariant) <= T(int(0)) ? T(int(0))
+        : revertByProgramInvariant<T, true>(work, invariant);
+      const T score(unOffsetHalf<T>(invariant.dot(
+        makeProgramInvariant<T>(work, T(int(1))).first) *
+          T(cat[i].first.size()) ));
+      res    += score * unOffsetHalf<T>(work[work.size() - 1]);
       sscore += abs(score);
     } else for(int k = 0; k < cat[i].first.size(); k ++) {
       if(! cat[i].first[k].size()) continue;
       work[work.size() - 1] = revertByProgramInvariant<T, false>(work,
         cat[i].first[k]);
-      const T ncat(sqrt(cat[i].first[k].dot(cat[i].first[k])));
-      if(! isfinite(ncat) || ncat <= T(int(0))) continue;
-      const T score(unOffsetHalf<T>(cat[i].first[k].dot(work) / nwork / ncat));
-      res    += score * work[work.size() - 1] / nwork;
+      const SimpleVector<T> invariant(makeProgramInvariant<T>(cat[i].first[k],
+        T(int(1))).first);
+      const T score(unOffsetHalf<T>(invariant.dot(
+        makeProgramInvariant<T>(work, T(int(1))).first) /
+          sqrt(invariant.dot(invariant)) ));
+      res    += score * unOffsetHalf<T>(work[work.size() - 1]);
       sscore += abs(score);
     }
   }
-  return clipBin<T>(offsetHalf<T>(sscore == zero ? sscore : res / sscore));
+  return offsetHalf<T>(sscore == zero ? sscore : res / nwork / sscore);
 }
 
 // N.B. f in C1 case, F(z,theta) := complex(f(z+~z),f(z-~z)*tan(theta)) in C1,
@@ -3838,10 +3895,6 @@ template <typename T, const bool nonlinear> T p01next(const SimpleVector<T>& in)
     //      this is because it's toeplitz made stream.
     const int ii0(i0 - (varlen * 2 + step));
     invariants.row(ii0) = linearInvariant<T>(toeplitz);
-    
-    // N.B. we only need cosine value on invariant, so normalize them into S^n.
-    const T norminv(invariants.row(ii0).dot(invariants.row(ii0)));
-    if(norminv != T(int(0))) invariants.row(ii0) /= sqrt(norminv);
   }
   SimpleVector<T> invariant(invariants.cols());
   if(invariants.rows() <= 1)
@@ -4316,6 +4369,9 @@ private:
     assert(size && dst.size() == size && src.size() == size);
     const int cnt(v.size() / size);
     assert(0 < cnt);
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
     for(int i = 0; i < size; i ++)
       if(i * cnt + idx < v.size())
         v[i * cnt + idx] += dst[i] - src[i];
@@ -4578,6 +4634,9 @@ template <typename T> static inline vector<SimpleMatrix<T> > autoLevel(const vec
         res.emplace_back(data[k](i, j));
   sort(res.begin(), res.end());
   vector<SimpleMatrix<T> > result(data);
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
   for(int k = 0; k < data.size(); k ++)
     for(int i = 0; i < data[k].rows(); i ++)
       for(int j = 0; j < data[k].cols(); j ++)
@@ -4678,7 +4737,11 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv00(const
   SimpleVector<T> p(intran.size());
   // N.B. p01next calls p0maxNext implicitly, this needs to be cached single
   //      threaded process on first call.
-  for(int j = 0; j < p.size(); j ++)
+  p[0] = p01next<T, true>(intran[0].subVector(0, sz));
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
+  for(int j = 1; j < p.size(); j ++)
     p[j] = p01next<T, true>(intran[j].subVector(0, sz));
   const T nseconds(sqrt(seconds.subVector(0, sz).dot(seconds.subVector(0, sz))));
   return revertProgramInvariant<T>(make_pair(
@@ -4698,7 +4761,9 @@ template <typename T, int nprogress> SimpleVector<T> predv0(const vector<SimpleV
   }
   SimpleVector<T> seconds(sz);
   seconds.O();
-  intran.reserve(sz);
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
   for(int i = 0; i < sz; i ++)  {
     idFeeder<T> work0(intran.size());
     for(int j = 0; j < intran.size(); j ++) work0.next(intran[j][i]);
@@ -4717,7 +4782,11 @@ template <typename T, int nprogress> SimpleVector<T> predv0(const vector<SimpleV
 
 template <typename T, int nprogress> SimpleVector<T> predvp(const vector<SimpleVector<T> >& intran, const string& strloop) {
   SimpleVector<T> p(intran.size());
-  for(int j = 0; j < p.size(); j ++) {
+  p[0] = (deep<T, p0maxNext<T> >(intran[0]) - deep<T, p0maxNext<T> >(- intran[0])) / T(int(2));
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
+  for(int j = 1; j < p.size(); j ++) {
     if(nprogress && ! (j % max(int(1), int(intran.size() / nprogress))) )
       cerr << j << " / " << intran.size() << strloop << endl;
     p[j] = (deep<T, p0maxNext<T> >(intran[j]) - deep<T, p0maxNext<T> >(- intran[j])) / T(int(2));
@@ -4734,7 +4803,10 @@ template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleV
   SimpleVector<T> seconds(intran0[0].size());
   seconds.O();
   vector<SimpleVector<T> > intran(offsetHalf<T>(intran0));
-  for(int i = 0; i < intran0[0].size(); i ++)  {
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
+  for(int i = 0; i < intran0[0].size(); i ++) {
     idFeeder<T> work0(intran0.size());
     for(int j = 0; j < intran0.size(); j ++) work0.next(intran[j][i]);
     assert(work0.full);
@@ -4766,6 +4838,9 @@ template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleV
   SimpleMatrix<T> ip(res.size(), p.size());
   ip.O();
   assert(ip.rows() == res.size() && ip.cols() == p.size());
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
   for(int i = start + step; i < p.size(); i ++)
     for(int j = 0; j < ip.rows(); j ++)
       ip(j, i) = intran0[j][i - p.size() + intran0[j].size()] *
@@ -4773,9 +4848,12 @@ template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleV
   // N.B. we bet orthogonal function phenomenon causes measurement condition
   //      increase (0 <= vector condition with prediction walk).
   assert(res.size() == p[p.size() - 1].size());
-  for(int i = 0; i < res.size(); i ++) {
+  res[0] = p[p.size() - 1][0] * p0maxNext<T>(ip.row(0));
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
+  for(int i = 1; i < res.size(); i ++)
     res[i] = p[p.size() - 1][i] * p0maxNext<T>(ip.row(i));
-  }
   return res;
 }
 
@@ -4790,6 +4868,9 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pCbrtMarkov(const 
   else {
     pass_next.resize(intrans.size(),
       SimpleVector<T>(intrans[0].size() - 1 - slen).O());
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
     for(int i = slen; i < intrans[0].size() - 1; i ++)
       for(int j = 0; j < intrans.size(); j ++) {
         if(nprogress && ! (((i - slen) * intrans.size() + j) %
@@ -4802,6 +4883,9 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pCbrtMarkov(const 
             int(exp(log(T(i + 1)) / T(int(3)) )) ) ) *
           unOffsetHalf<T>(intrans[j][i + 1]);
       }
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
     for(int j = 0; j < intrans.size(); j ++)
       presidue[j] = unOffsetHalf<T>(p012next<T>(intrans[j],
         int(exp(log(T(intrans[0].size())) / T(int(3)) )) ) );
@@ -4815,22 +4899,22 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pCbrtMarkov(const 
   res.emplace_back(predvp<T, nprogress>(pass_next,
     string(" feed p0") + strloop));
   res.emplace_back(unOffsetHalf<T>(logscale<T>(offsetHalf<T>(
-    predvp<T, nprogress>(unOffsetHalf<T>(clipBin<T>(expscale<T>(
-      offsetHalf<T>(pass_next)))),
+    predvp<T, nprogress>(unOffsetHalf<T>(expscale<T>(
+      offsetHalf<T>(pass_next))),
         string(" feed p1") + strloop) ))) );
   res.emplace_back(unOffsetHalf<T>(expscale<T>(offsetHalf<T>(
-    predvp<T, nprogress>(unOffsetHalf<T>(clipBin<T>(logscale<T>(
-      offsetHalf<T>(pass_next)))),
+    predvp<T, nprogress>(unOffsetHalf<T>(logscale<T>(
+      offsetHalf<T>(pass_next))),
         string(" feed p2") + strloop) ))) );
   res.emplace_back(predvq<T, nprogress>(pass_next,
     string(" feed q0") + strloop));
   res.emplace_back(unOffsetHalf<T>(logscale<T>(offsetHalf<T>(
-    predvq<T, nprogress>(unOffsetHalf<T>(clipBin<T>(expscale<T>(
-      offsetHalf<T>(pass_next)))),
+    predvq<T, nprogress>(unOffsetHalf<T>(expscale<T>(
+      offsetHalf<T>(pass_next))),
         string(" feed q1") + strloop) ))) );
   res.emplace_back(unOffsetHalf<T>(expscale<T>(offsetHalf<T>(
-    predvq<T, nprogress>(unOffsetHalf<T>(clipBin<T>(logscale<T>(
-      offsetHalf<T>(pass_next)))),
+    predvq<T, nprogress>(unOffsetHalf<T>(logscale<T>(
+      offsetHalf<T>(pass_next))),
         string(" feed q2") + strloop) ))) );
   assert(res[0].size() == intrans0.size());
   for(int i = 0; i < res.size(); i ++) {
@@ -4848,6 +4932,9 @@ template <typename T, vector<SimpleVector<T> > (*p)(const vector<SimpleVector<T>
   vector<T> sign;
   rintrans.resize(intrans.size());
   sign.resize(intrans.size(), false);
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
   for(int j = 0; j < rintrans.size(); j ++) {
     rintrans[j].resize(intrans[j].size() - 3);
     pslip_t<T> ps(intrans[j].size());
@@ -4903,7 +4990,7 @@ template <typename T, int nprogress> SimpleVector<T> pLebesgue(const vector<Simp
   SimpleVector<T> res(in[0].size());
   res.O();
 #if defined(_OPENMP)
-#pragma omp parallel for schedule(static,1)
+#pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < reform.size(); i ++) {
     T n2(int(0));
@@ -4964,7 +5051,7 @@ template <typename T, int nprogress> SimpleVector<T> pMeasureable(const vector<S
   vector<SimpleVector<T> > res;
   res.resize(n + 1 - 2);
 #if defined(_OPENMP)
-#pragma omp parallel for schedule(static,1)
+#pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 2; i <= n; i ++) {
     SimpleVector<T> p(pSectional<T, nprogress>(in, i,
@@ -4990,26 +5077,23 @@ template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<Simple
   SimpleVector<T> resm;
 #if defined(_OPENMP)
   pnextcacher<T>(in.size(), 1);
-#pragma omp parallel for
+#pragma omp parallel for schedule(static, 1)
   for(int i = 1; i < in.size(); i ++) pnextcacher<T>(i, 1);
-  omp_set_nested(1);
-#pragma omp parallel
+  omp_set_max_active_levels(3);
+#pragma omp parallel sections
   {
-#pragma omp sections
+#pragma omp section
+#endif
     {
-#pragma omp section
-#endif
-      {
-        resp = offsetHalf<T>(  pMeasureable<T, nprogress>(in,  string("+") + strloop));
-      }
-#if defined(_OPENMP)
-#pragma omp section
-#endif
-      {
-        resm = offsetHalf<T>(- pMeasureable<T, nprogress>(inm, string("-") + strloop));
-      }
-#if defined(_OPENMP)
+      resp = offsetHalf<T>(  pMeasureable<T, nprogress>(in,  string("+") + strloop));
     }
+#if defined(_OPENMP)
+#pragma omp section
+#endif
+    {
+      resm = offsetHalf<T>(- pMeasureable<T, nprogress>(inm, string("-") + strloop));
+    }
+#if defined(_OPENMP)
   }
 #endif
   resp += resm;
@@ -5037,6 +5121,12 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
     inw.emplace_back(move(inww.first));
     nwork[i] = inww.second;
   }
+  T M(int(0));
+  for(int i = 0; i < inw.size(); i ++)
+    for(int j = 0; j < inw[i].size(); j ++)
+      M = max(abs(inw[i][j]), M);
+  for(int i = 0; i < inw.size(); i ++) inw[i] /= M;
+  nwork *= M;
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -5051,16 +5141,17 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
       vw.setVector(0, inw[j * 2].subVector(0, 4));
       vw[4] = inw[j * 2 + 1][i];
       toeplitz.row(j) =
-        makeProgramInvariant<T>(clipBin<T>(vw), T(j + 1) / T(int(toeplitz.rows() + 1)) ).first;
+        makeProgramInvariant<T>(vw, T(j + 1) / T(int(toeplitz.rows() + 1)) ).first;
     }
     SimpleVector<T> work(5);
     work.O().setVector(0, inw[inw.size() - 1].subVector(0, 4));
     res[i] = revertByProgramInvariant<T, true>(work,
       linearInvariant<T>(toeplitz));
   }
+  const T nnwork(sqrt(nwork.dot(nwork)));
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(res)).first,
-      p01next<T, true>(nwork) ));
+      p01next<T, true>(nwork / nnwork) * nnwork));
 }
 
 // N.B. we make the first hypothesis as the stream is:
