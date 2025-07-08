@@ -5104,6 +5104,36 @@ template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<Simple
   return resp;
 }
 
+template <typename T, int nprogress> pair<SimpleVector<T>, int> pPersistentP(const vector<SimpleVector<T> >& in, const int& loop0, const string& strloop) {
+  const bool persistent(loop0 < 0);
+  const int  loop(loop0 <= 0 ? pow(T(in.size()), T(int(4)) / T(int(3))) : T(loop0));
+  SimpleVector<T> res(pPolish<T, nprogress>(in, string("0/") + to_string(loop)
+    + strloop));
+  int last(res.size());
+  for(int i = 0; persistent || i < max(int(1), loop); i ++) {
+    vector<int> midx;
+    midx.reserve(res.size());
+    for(int j = 0; j < res.size(); j ++)
+      if(unOffsetHalf<T>(res[j]) == T(int(0))) midx.emplace_back(j);
+    if(last == midx.size() || midx.size() < 2) break;
+    last = midx.size();
+    vector<SimpleVector<T> > work;
+    work.resize(in.size(), SimpleVector<T>(midx.size()).O());
+    for(int j = 0; j < work.size(); j ++)
+      for(int k = 0; k < work[j].size(); k ++)
+        work[j][k] = in[j][midx[k]];
+    SimpleVector<T> wres(pPolish<T, nprogress>(work, string("0/") +
+      to_string(loop) + strloop));
+    assert(wres.size() == midx.size());
+    for(int j = 0; j < midx.size(); j ++) res[midx[j]] = move(wres[j]);
+  }
+  last = 0;
+  for(int j = 0; j < res.size(); j ++)
+    if(unOffsetHalf<T>(res[j]) == T(int(0))) last ++;
+  if(nprogress) cerr << "pPersistent: " << last << "dimension remains." << endl;
+  return make_pair(move(res), last);
+}
+
 // N.B. predv4 is for masp generated -4.ppm predictors.
 template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<T> >& in) {
   assert(1 < in.size() && (in[in.size() - 1].size() == 4 ||
@@ -5233,7 +5263,7 @@ template <typename T> vector<SimpleVector<T> > predVec(const vector<vector<Simpl
       in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
-  SimpleVector<T> pres(pPolish<T, 20>(in, string(" (predVec)")));
+  SimpleVector<T> pres(pPersistentP<T, 20>(in, 0, string(" (predVec)")).first);
   vector<SimpleVector<T> > res;
   res.resize(in0[0].size());
   for(int j = 0; j < res.size(); j ++)
@@ -5256,7 +5286,7 @@ template <typename T> vector<SimpleMatrix<T> > predMat(const vector<vector<Simpl
                          k * in0[i][0].cols(), in0[i][j].row(k));
     }
   }
-  SimpleVector<T> pres(pPolish<T, 20>(in, string(" (predMat)")));
+  SimpleVector<T> pres(pPersistentP<T, 20>(in, 0, string(" (predMat)")).first);
   vector<SimpleMatrix<T> > res;
   res.resize(in0[0].size());
   for(int j = 0; j < res.size(); j ++) {
@@ -5299,7 +5329,7 @@ template <typename T> SimpleSparseTensor(T) predSTen(vector<SimpleSparseTensor(T
             in[i][cnt ++] = offsetHalf<T>(in0[i][idx[j]][idx[k]][idx[m]]);
   }
   in0.resize(0);
-  SimpleVector<T> pres(pPolish<T, 20>(in, string(" (predSTen)")));
+  SimpleVector<T> pres(pPersistentP<T, 20>(in, 0, string(" (predSTen)")).first);
   SimpleSparseTensor(T) res;
   for(int j = 0, cnt = 0; j < idx.size(); j ++)
     for(int k = 0; k < idx.size(); k ++)
