@@ -4743,10 +4743,11 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv00(const
 #endif
   for(int j = 1; j < p.size(); j ++)
     p[j] = p01next<T, true>(intran[j].subVector(0, sz));
-  const T nseconds(sqrt(seconds.subVector(0, sz).dot(seconds.subVector(0, sz))));
+  const SimpleVector<T> secondssub(seconds.subVector(0, sz));
+  const T nseconds(sqrt(secondssub.dot(secondssub)));
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(p)).first,
-      p01next<T, true>(seconds.subVector(0, sz) / nseconds) * nseconds)
+      p01next<T, true>(secondssub / nseconds) * nseconds)
     ).subVector(0, intran.size());
 }
 
@@ -4777,7 +4778,7 @@ template <typename T, int nprogress> SimpleVector<T> predv0(const vector<SimpleV
     for(int j = 0; j < intran[i].size(); j ++)
       M = max(abs(intran[i][j]), M);
   for(int i = 0; i < intran.size(); i ++) intran[i] /= M;
-  return predv00<T, nprogress>(intran, sz, seconds *= M, strloop);
+  return predv00<T, nprogress>(intran, sz, seconds /= M, strloop);
 }
 
 template <typename T, int nprogress> SimpleVector<T> predvp(const vector<SimpleVector<T> >& intran, const string& strloop) {
@@ -4819,7 +4820,7 @@ template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleV
     for(int j = 0; j < intran[i].size(); j ++)
       M = max(abs(intran[i][j]), M);
   for(int i = 0; i < intran.size(); i ++) intran[i] /= M;
-  seconds *= M;
+  seconds /= M;
   const int start(8 + step);
   SimpleVector<T> res;
   res.resize(intran0.size());
@@ -4927,7 +4928,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pCbrtMarkov(const 
 // N.B. we add some Lebesgue part by cutting input horizontal.
 template <typename T, int nprogress> SimpleVector<T> pLebesgue(const vector<SimpleVector<T> >& in, const int& horizontal, const string& strloop) {
   if(in.size() <= horizontal * horizontal)
-    return SimpleVector<T>(in[0].size()).O(T(int(1)) / T(int(2)) );
+    return SimpleVector<T>(in[0].size()).O(T(int(0)));
   vector<vector<SimpleVector<T> > > reform;
   reform.resize(horizontal);
   for(int i = 0; i < reform.size(); i ++) {
@@ -5189,8 +5190,8 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //      to guarantee we're in the condition with input stream is not saturated.
 // (02) we feed pseudo continuous condition by pLebesgue they feeds
 //      statistics-like inputs. this is to avoid 2nd condition.
-// (03) 3rd condition might be avoidable with pPersistentQ, however
-//      this part is done by increasing input size normally (increase n-markov).
+// (03) 3rd condition is n-markov saturated condition, if we're lucky enough,
+//      pPersistentQ predicts opposite side correct one.
 // (04) so if input stream's next one step is input-stream half-cbrt-markov
 //      generated one also the function is defined from the input stream
 //      condition, they might converges to the result we bet.
@@ -8277,8 +8278,9 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
   return;
 }
 
+// N.B. numbering is last renumbered 2025/07/11:
 // N.B. once implemented but abandoned and cleaned from this source code
-//      the reason why:
+//      the reason why
 // (00) predictions via linear sum/diff based some reformation input and revert:
 //      it's all integrated skipX concerns, the jammer either jam out us
 //      even *ANY* reformation and revert them in which way.
@@ -8286,49 +8288,43 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      eg. PdeltaOnce, Ppersistent, Pprogression, (P0DFT).
 //      they goes well because timing-related concerns A_0 ... A_k B x_0
 //      made initial entropy and A'^k B' x_0 -> x_k structures.
-// (01) (absent)
+// (01) make input stream transformed by xor-filter by patternized fixed
+//      ones. this is equivalent to skipx concerns but with maybe random timing.
+//      we already have fixed range skipx also pSubesube jammer condition,
+//      so it's pseudo one of the condition.
+// (02) pskipp to skip input in some steps.
+//      it's a counter measure to the jammer. so any of the predictor has the
+//      jammers, so if the jammer adjust theirs to our algorithms, it's useless.
 // (02) we eliminated predvall, we don't need them with whole internal states
 //      awared predictors they have a better prediction concerned with some
 //      series of a PRNG tests.
 // (03) arctanFeeder concerns intended to avoid some jammers.
 //      we shouldn't completely avoid the jammers by them because of the
 //      jammers' strategy can select *any* function.
-// (04) (absent)
-// (05) (comment move from predMat): before and after to apply DFT concerned
+// (04) (comment move from predMat): before and after to apply DFT concerned
 //      prediction isn't get better result because they get non 100% result
 //      causes whole data affected noises. so we eliminated them.
 //      this condition is compatible to any of the orthogonal transform or
 //      eigen vector concerns on our prediction.
-// (06) some small number of the nonlinear transformation series.
+// (05) some small number of the nonlinear transformation series.
 //      we target almost linear also some exceptions are handled by
 //      expscale/logscale matter. with d^e/dx^e == dx condition,
 //      f^-1(f(x)) == x 's some of the combination untangles them.
 //      cf. (arctan(logscale))-n times chain causes y=x into sigmoid-like graph.
-// (07) (absent)
-// (08) recursion on same function based functions.
+// (06) pgoshigoshi persistent corrector.
+//      it's near the result same algorithm twice condition.
+// (07) recursion on same function based functions.
 //      this depends on the first prediction is continuous or not causes
 //      the prediction stream's quality. also they depends on the first
 //      hypothesis is satisfied or not. so they returns clear edge of them.
-// (09) make input stream transformed by xor-filter by patternized fixed
-//      ones. this is equivalent to skipx concerns but with maybe random timing.
-//      we already have fixed range skipx also pSubesube jammer condition,
-//      so it's pseudo one of the condition.
-// (10) (absent)
-// (11) pskipp to skip input in some steps.
-//      it's a counter measure to the jammer. so any of the predictor has the
-//      jammers, so if the jammer adjust theirs to our algorithms, it's useless.
-// (12) goki_check_cc:test.py [qQ]red auto continuity tuner.
+// (08) goki_check_cc:test.py [qQ]red auto continuity tuner.
 //      we dropped them because they also make the hypothesis input stream
 //      to have some of the continuity, so instead of them, we use pPersistentQ
 //      or increase input number to fight with them.
-// (13) pgatherexp, ppositivesel concerns.
+// (09) pgatherexp, ppositivesel concerns.
 //      we don't implement pre/after-processing because it's bricks condition
 //      also combination explodes. the jammer can jam out us even in such
 //      cases.
-// (14) pgoshigoshi persistent corrector.
-//      it's near the result same algorithm twice condition.
-// (15) (absent)
-// (16) (absent)
 //
 // N.B. something XXX result descripton
 // (00) there might exist non Lebesgue measureable condition discrete stream.
@@ -8340,18 +8336,12 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      we can avoid such of the conditions with certain error.
 // (02) attack to the invariant causes invariant size chases
 //      this can be skipped by skipX concerns.
-// (03) any of the predictor they have a jammer to them.
-// (04) (de)?compression concerns can jam out on N calculation matters.
+// (03) (de)?compression concerns can jam out on N calculation matters.
 //      we cannot avoid this other than verifying after the phenomenon
 //      also having a verifiability of low of excluded middle based on
 //      our calculation based on our conscious uniqueness.
-// (05) however, the predictor vs jammer chase is also the which side
-//      bore first chase. if both side is enthusiastic not to bore first,
-//      the input stream will be saturated to whole of the stream isn't
-//      have unique function generation, so this is analogy to the manually
-//      manipulate function switching. however, we can increase n-markov's
-//      n variable in such of a case.
-// N.B. tips around jammer.
+// N.B. tips around jammer
+// (-1) any of the predictor they have a jammer to them.
 // (00) after of all, the dynamic jammer can be avoided if the predictor entropy
 //      exceeds jammers one, so some of the first short range, the predictor
 //      exceeds the jammer somehow.
@@ -8373,26 +8363,26 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 // (03) this is also be able to be verified by x+ := Ax (first binary digit),
 //      x in {0,1}^n, A in (2^p)^(n*n) operation runs any of the input causes 
 //      sign bit result can be {1/3,1/3,1/3} in the best.
-// (04) so the input stream has the meaning payload to the datastream.
-//      ongoing neural networks mimics them as plausible one formatter so they
-//      stands on the first intension as tunable ones.
-//      our predictor stands on measureable condition satisfied or not.
-// (05) if we're lucky enough, the static input stream can have 1 a.e. output
+// (04) if we're lucky enough, the static input stream can have 1 a.e. output
 //      as some of the shrinked output theirselves.
-// (06) we need to shirk internal states upper bound size into graphics size
-//      before to compute. this is to omit what bitstream next in surface.
-// (07) the predictor vs. jammer made stream concludes the saturated input
+// (05) the predictor vs. jammer made stream concludes the saturated input
 //      stream, the case is also to make dynamic dictionary to the input
 //      stream on such of a layer. so ddpmopt [+-] also the masp + is intended
 //      to make this, however they should have many much of the input stream
 //      size.
-// (08) so to extend them needs the much better problem information and to get
+// (06) so to extend them needs the much better problem information and to get
 //      better form to the stream. either, if the saturated result we get,
 //      we should reform the transformation structure for preprocess
 //      as to separate something.
-// (09) there can be 0 invariant chain, so they can be caused by move average
+// (07) there can be 0 invariant chain, so they can be caused by move average
 //      they caused return to average works very well.
 //      this is because <x,a> == 0, <[x,x+],[a,0]+[0,a]> == 0 chain in rough.
+// (08) the predictor vs jammer chase is also the which side
+//      bore first chase. if both side is enthusiastic not to bore first,
+//      the input stream will be saturated to whole of the stream isn't
+//      have unique function generation, so this is analogy to the manually
+//      manipulate function switching. however, we can increase n-markov's
+//      n variable in such of a case.
 //
 // N.B. another variants of the predictors fight with 2*3*2 pattern of #f
 //      fixation. (however, we don't use initial internal states, it's only 4).
