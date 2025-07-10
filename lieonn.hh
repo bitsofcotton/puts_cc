@@ -4649,7 +4649,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pCbrtMarkov(const 
   //      possible Riemann-Stieljes measureable condition.
   vector<SimpleVector<T> > res;
   res.reserve(3);
-  res.emplace_back(predvq<T, nprogress>(offsetHalf<T>(pass_next),
+  res.emplace_back(predvq<T, nprogress>(pass_next,
       string(" feed0/3") + strloop) );
   res.emplace_back(unOffsetHalf<T>(logscale<T>(offsetHalf<T>(
     predvq<T, nprogress>(unOffsetHalf<T>(expscale<T>(offsetHalf<T>(pass_next))),
