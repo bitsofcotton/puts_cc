@@ -4500,7 +4500,7 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
 }
 
 // N.B. start ddpmopt (freezed)
-template <typename T, int nprogress> static inline SimpleVector<T> predv00(const vector<SimpleVector<T> >& intran, const int& sz, const SimpleVector<T>& seconds, const string& strloop = string("")) {
+template <typename T, int nprogress> static inline SimpleVector<T> pRS00(const vector<SimpleVector<T> >& intran, const int& sz, const SimpleVector<T>& seconds, const string& strloop = string("")) {
   assert(0 < sz && sz <= intran[0].size());
   SimpleVector<T> p(intran.size());
   // N.B. p01next calls p0maxNext implicitly, this needs to be cached single
@@ -4519,7 +4519,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> predv00(const
     ).subVector(0, intran.size());
 }
 
-template <typename T, int nprogress> SimpleVector<T> predv0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
+template <typename T, int nprogress> SimpleVector<T> pRS0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
   assert(0 < sz && sz <= in.size());
   vector<SimpleVector<T> > intran;
   intran.resize(in[0].size());
@@ -4546,10 +4546,10 @@ template <typename T, int nprogress> SimpleVector<T> predv0(const vector<SimpleV
     for(int j = 0; j < intran[i].size(); j ++)
       M = max(abs(intran[i][j]), M);
   for(int i = 0; i < intran.size(); i ++) intran[i] /= M;
-  return predv00<T, nprogress>(intran, sz, seconds /= M, strloop);
+  return pRS00<T, nprogress>(intran, sz, seconds /= M, strloop);
 }
 
-template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleVector<T> >& intran0, const string& strloop) {
+template <typename T, int nprogress> SimpleVector<T> pRS(const vector<SimpleVector<T> >& intran0, const string& strloop) {
   static const int step(1);
   if(intran0[0].size() < 10 + step * 2)
     return SimpleVector<T>(intran0.size()).O();
@@ -4585,8 +4585,8 @@ template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleV
     p.entity.emplace_back(SimpleVector<T>(intran0.size()).O());
   for(int i = start; i <= intran0[0].size(); i ++) {
     if(nprogress && ! (i % max(int(1), int(intran0[0].size() / nprogress))) )
-      cerr << i << " / " << intran0[0].size() << ", " << strloop << endl;
-    p.entity.emplace_back(unOffsetHalf<T>(predv00<T, 0>(intran,
+      cerr << i << " / " << intran0[0].size() << strloop << endl;
+    p.entity.emplace_back(unOffsetHalf<T>(pRS00<T, 0>(intran,
       i, seconds, string("") )));
   }
   intran.resize(0);
@@ -4613,7 +4613,7 @@ template <typename T, int nprogress> SimpleVector<T> predvq(const vector<SimpleV
 }
 
 // N.B. we want to feed large markov into prediction stream.
-template <typename T, int nprogress> vector<SimpleVector<T> > pCbrtMarkov(const vector<SimpleVector<T> >& intrans, const string& strloop) {
+template <typename T, int nprogress> SimpleVector<T> pCbrtMarkov(const vector<SimpleVector<T> >& intrans, const string& strloop) {
   const int slen(max(int(4), int(exp(log(T(int(intrans[0].size()))) / T(int(3)) )) ) );
   vector<SimpleVector<T> > pass_next;
   SimpleVector<T> presidue(intrans.size());
@@ -4647,23 +4647,10 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pCbrtMarkov(const 
   }
   // N.B. we take total 3 dimension from input stream then predict with
   //      possible Riemann-Stieljes measureable condition.
-  vector<SimpleVector<T> > res;
-  res.reserve(3);
-  res.emplace_back(predvq<T, nprogress>(pass_next,
-      string(" feed0/3") + strloop) );
-  res.emplace_back(unOffsetHalf<T>(logscale<T>(offsetHalf<T>(
-    predvq<T, nprogress>(unOffsetHalf<T>(expscale<T>(offsetHalf<T>(pass_next))),
-      string(" feed1/3") + strloop) ))) );
-  res.emplace_back(unOffsetHalf<T>(expscale<T>(offsetHalf<T>(
-    predvq<T, nprogress>(unOffsetHalf<T>(logscale<T>(offsetHalf<T>(pass_next))),
-      string(" feed2/3") + strloop) ))) );
-  assert(res[0].size() == intrans.size());
-  for(int i = 0; i < res.size(); i ++) {
-    assert(res[0].size() == res[i].size());
-    assert(presidue.size() == res[i].size());
-    for(int j = 0; j < res[i].size(); j ++) res[i][j] *= presidue[j];
-  }
-  return res;
+  SimpleVector<T> res(pRS<T, nprogress>(pass_next, string(" feed ") + strloop));
+  assert(res.size() == intrans.size());
+  for(int j = 0; j < res.size(); j ++) res[j] *= presidue[j];
+  return offsetHalf<T>(res);
 }
 
 // N.B. we add some Lebesgue part by cutting input horizontal.
@@ -4713,19 +4700,51 @@ template <typename T, int nprogress> SimpleVector<T> pLebesgue(const vector<Simp
       if(nprogress) cerr << "L(skip:" << i << strloop << endl;
       continue;
     }
-    vector<SimpleVector<T> > p(pCbrtMarkov<T, nprogress>(
-      reform[i], string("L(") + to_string(i) + string("/") +
-        to_string(reform.size()) + strloop) );
-    assert(p[0].size() == in[0].size());
-    for(int i = 1; i < p.size(); i ++) p[0] += p[i];
+    // N.B. try 3 of the context from single input stream possible enough.
+    //      then arithmetic average them.
+    SimpleVector<T> p0;
+    SimpleVector<T> p1;
+    SimpleVector<T> p2;
+#if defined(_OPENMP)
+#pragma omp parallel sections
+    {
+#pragma omp section
+#endif
+      {
+        p0 =pCbrtMarkov<T, nprogress>(
+          reform[i], string("L(0/3, ") + to_string(i) + string("/") +
+            to_string(reform.size()) + strloop);
+      }
+#if defined(_OPENMP)
+#pragma omp section
+#endif
+      {
+        p1 = logscale<T>(pCbrtMarkov<T, nprogress>(
+          expscale<T>(reform[i]), string("L(1/3, ") + to_string(i) +
+            string("/") + to_string(reform.size()) + strloop) );
+      }
+#if defined(_OPENMP)
+#pragma omp section
+#endif
+      {
+        p2 = expscale<T>(pCbrtMarkov<T, nprogress>(
+          logscale<T>(reform[i]), string("L(2/3, ") + to_string(i) +
+            string("/") + to_string(reform.size()) + strloop) );
+      }
+#if defined(_OPENMP)
+    }
+#endif
+    assert(p0.size() == p1.size() && p1.size() == p2.size());
+    p0 += p1;
+    p0 += p2;
 #if defined(_OPENMP)
 #pragma omp critical
 #endif
     {
-      res += (p[0] /= T(int(p.size())));
+      res += p0;
     }
   }
-  return res /= T(int(reform.size()));
+  return unOffsetHalf<T>(res /= T(int(reform.size() * 3)));
 }
 
 // N.B. add some sectional measurement part.
@@ -4789,19 +4808,19 @@ template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<Simple
   pnextcacher<T>(in.size(), 1);
 #pragma omp parallel for schedule(static, 1)
   for(int i = 1; i < in.size(); i ++) pnextcacher<T>(i, 1);
-  omp_set_max_active_levels(3);
+  omp_set_max_active_levels(4);
 #pragma omp parallel sections
   {
 #pragma omp section
 #endif
     {
-      resp = offsetHalf<T>(  pMeasureable<T, nprogress>(in,  string("+") + strloop));
+      resp =   pMeasureable<T, nprogress>(in,  string("+") + strloop);
     }
 #if defined(_OPENMP)
 #pragma omp section
 #endif
     {
-      resm = offsetHalf<T>(- pMeasureable<T, nprogress>(inm, string("-") + strloop));
+      resm = - pMeasureable<T, nprogress>(inm, string("-") + strloop);
     }
 #if defined(_OPENMP)
   }
@@ -4809,8 +4828,8 @@ template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<Simple
   resp += resm;
   resp /= T(int(2));
   for(int i = 0; i < resp.size(); i ++)
-    if(T(int(1)) <= abs(unOffsetHalf<T>(resp[i])) )
-      resp[i] = offsetHalf<T>(T(int(0)));
+    if(T(int(1)) <= abs(resp[i]) )
+      resp[i] = T(int(0));
   return resp;
 }
 
@@ -4825,7 +4844,7 @@ template <typename T, int nprogress> pair<SimpleVector<T>, int> pPersistentP(con
     vector<int> midx;
     midx.reserve(res.size());
     for(int j = 0; j < res.size(); j ++)
-      if(unOffsetHalf<T>(res[j]) == T(int(0))) midx.emplace_back(j);
+      if(res[j] == T(int(0))) midx.emplace_back(j);
     if(last == midx.size() || midx.size() < 2) break;
     last = midx.size();
     vector<SimpleVector<T> > work;
@@ -4840,9 +4859,9 @@ template <typename T, int nprogress> pair<SimpleVector<T>, int> pPersistentP(con
   }
   last = 0;
   for(int j = 0; j < res.size(); j ++)
-    if(unOffsetHalf<T>(res[j]) == T(int(0))) last ++;
+    if(res[j] == T(int(0))) last ++;
   if(nprogress) cerr << "pPersistent: " << last << "dimension remains." << endl;
-  return make_pair(move(res), last);
+  return make_pair(offsetHalf<T>(res), last);
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
