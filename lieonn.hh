@@ -3341,6 +3341,8 @@ template <typename T, bool nonlinear> static inline T revertByProgramInvariant(S
 //      invariant residue maximum dimensions. (sqrt(3!) <~ (#{0,1})^2).
 // N.B. also the binary 2 operand opereator is described in R^4 vector
 //      as a invariant.
+// N.B. this is for output is binary case especially sign bit on the
+//      information amount on any p-adics but in [0, 1[.
 static inline int ind2vd(const int& indim) {
   const int y(indim / 2 * (indim / 2 - 1));
         int varlen(4);
@@ -3868,7 +3870,7 @@ template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
 //      return 1; program. this is also in the condition but the dimension
 //      easily vanished. so when we met them we use:
 //      ||Ax-1*x'||<epsilon condition with increased varlen.
-template <typename T, const bool nonlinear> T p01next(const SimpleVector<T>& in) {
+template <typename T> T p01next(const SimpleVector<T>& in) {
   static const int step(1);
   static const T zero(0);
   static const T one(1);
@@ -3876,18 +3878,18 @@ template <typename T, const bool nonlinear> T p01next(const SimpleVector<T>& in)
   // N.B. division accuracy glitch.
   const T nin(sqrt(in.dot(in) * (one + SimpleMatrix<T>().epsilon())));
   if(! isfinite(nin) || nin == zero) return zero;
-  const int varlen(nonlinear ? ind2vd(in.size()) : ind2vd(in.size()) * 2);
+  const int varlen(ind2vd(in.size()));
   // N.B. we conclude making whole range invariants.
   SimpleMatrix<T> invariants(max(int(1), int(in.size()) -
-    int(varlen * 2 + step)), nonlinear ? varlen + 2 : varlen);
+    int(varlen * 2 + step)), varlen + 2);
   invariants.O();
   for(int i0 = varlen * 2 + step; i0 < invariants.rows(); i0 ++) {
     SimpleMatrix<T> toeplitz(i0, invariants.cols());
     for(int i = 0; i < toeplitz.rows(); i ++) {
       SimpleVector<T> work(in.subVector(i, varlen));
       work[work.size() - 1] = in[i + varlen + step - 2];
-      toeplitz.row(i) = nonlinear ? makeProgramInvariant<T>(work,
-        T(i + 1) / T(toeplitz.rows() + 1) ).first : binMargin<T>(work);
+      toeplitz.row(i) = makeProgramInvariant<T>(work,
+        T(i + 1) / T(toeplitz.rows() + 1) ).first;
     }
     // N.B. this untangles input stream into invariant but the accuracy
     //      we make the hypothesis:
@@ -3911,7 +3913,7 @@ template <typename T, const bool nonlinear> T p01next(const SimpleVector<T>& in)
   SimpleVector<T> work(varlen);
   for(int i = 1; i < work.size(); i ++)
     work[i - 1] = in[i - work.size() + in.size()];
-  return revertByProgramInvariant<T, nonlinear>(work, invariant);
+  return revertByProgramInvariant<T, true>(work, invariant);
 }
 
 // N.B. class-capsules for serial stream.
@@ -4499,28 +4501,28 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
   return res;
 }
 
-// N.B. start ddpmopt (freezed)
+// N.B. start ddpmopt
 template <typename T, int nprogress> static inline SimpleVector<T> pRS00(const vector<SimpleVector<T> >& intran, const int& sz, const SimpleVector<T>& seconds, const string& strloop = string("")) {
   assert(0 < sz && sz <= intran[0].size());
   SimpleVector<T> p(intran.size());
   // N.B. p01next calls p0maxNext implicitly, this needs to be cached single
   //      threaded process on first call.
-  p[0] = p01next<T, true>(intran[0].subVector(0, sz));
+  p[0] = p01next<T>(intran[0].subVector(0, sz));
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
   for(int j = 1; j < p.size(); j ++)
-    p[j] = p01next<T, true>(intran[j].subVector(0, sz));
+    p[j] = p01next<T>(intran[j].subVector(0, sz));
   const SimpleVector<T> secondssub(seconds.subVector(0, sz));
   const T nseconds(sqrt(secondssub.dot(secondssub)));
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(p)).first,
-      p01next<T, true>(secondssub / nseconds) * nseconds)
+      p01next<T>(secondssub / nseconds) * nseconds)
     ).subVector(0, intran.size());
 }
 
-template <typename T, int nprogress> SimpleVector<T> pRS0(const vector<SimpleVector<T> >& in, const int& sz, const string& strloop = string("")) {
-  assert(0 < sz && sz <= in.size());
+// N.B. output combination untangled into continuity prediction.
+template <typename T, int nprogress> SimpleVector<T> pRS0(const vector<SimpleVector<T> >& in, const string& strloop = string("")) {
   vector<SimpleVector<T> > intran;
   intran.resize(in[0].size());
   for(int i = 0; i < intran.size(); i ++) {
@@ -4528,12 +4530,12 @@ template <typename T, int nprogress> SimpleVector<T> pRS0(const vector<SimpleVec
     for(int j = 0; j < intran[i].size(); j ++)
       intran[i][j] = in[j][i];
   }
-  SimpleVector<T> seconds(sz);
+  SimpleVector<T> seconds(in.size());
   seconds.O();
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
-  for(int i = 0; i < sz; i ++)  {
+  for(int i = 0; i < seconds.size(); i ++)  {
     idFeeder<T> work0(intran.size());
     for(int j = 0; j < intran.size(); j ++) work0.next(intran[j][i]);
     assert(work0.full);
@@ -4546,15 +4548,15 @@ template <typename T, int nprogress> SimpleVector<T> pRS0(const vector<SimpleVec
     for(int j = 0; j < intran[i].size(); j ++)
       M = max(abs(intran[i][j]), M);
   for(int i = 0; i < intran.size(); i ++) intran[i] /= M;
-  return pRS00<T, nprogress>(intran, sz, seconds /= M, strloop);
+  return pRS00<T, nprogress>(intran, in.size(), seconds /= M, strloop);
 }
 
+// N.B. we use whole width to get better result in average.
+//      predict with discrete pseudo Riemann-Stieljes condition.
 template <typename T, int nprogress> SimpleVector<T> pRS(const vector<SimpleVector<T> >& intran0, const string& strloop) {
   static const int step(1);
   if(intran0[0].size() < 10 + step * 2)
     return SimpleVector<T>(intran0.size()).O();
-  // N.B. we use whole width to get better result in average.
-  //      this is equivalent to the command: p1 0 | p0 0.
   SimpleVector<T> seconds(intran0[0].size());
   seconds.O();
   vector<SimpleVector<T> > intran(offsetHalf<T>(intran0));
@@ -4600,8 +4602,6 @@ template <typename T, int nprogress> SimpleVector<T> pRS(const vector<SimpleVect
     for(int j = 0; j < ip.rows(); j ++)
       ip(j, i) = intran0[j][i - p.size() + intran0[j].size()] *
         p[i - step][j];
-  // N.B. we bet orthogonal function phenomenon causes measurement condition
-  //      increase (0 <= vector condition with prediction walk).
   assert(res.size() == p[p.size() - 1].size());
   res[0] = p[p.size() - 1][0] * p0maxNext<T>(ip.row(0));
 #if defined(_OPENMP)
@@ -4612,7 +4612,8 @@ template <typename T, int nprogress> SimpleVector<T> pRS(const vector<SimpleVect
   return res;
 }
 
-// N.B. we want to feed large markov into prediction stream.
+// N.B. we feed a large markov into prediction stream as it's on the input
+//      pattern history or not.
 template <typename T, int nprogress> SimpleVector<T> pCbrtMarkov(const vector<SimpleVector<T> >& intrans, const string& strloop) {
   const int slen(max(int(4), int(exp(log(T(int(intrans[0].size()))) / T(int(3)) )) ) );
   vector<SimpleVector<T> > pass_next;
@@ -4645,9 +4646,8 @@ template <typename T, int nprogress> SimpleVector<T> pCbrtMarkov(const vector<Si
       presidue[j] = unOffsetHalf<T>(p012next<T>(intrans[j],
         int(exp(log(T(intrans[0].size())) / T(int(3)) )) ) );
   }
-  // N.B. we take total 3 dimension from input stream then predict with
-  //      possible Riemann-Stieljes measureable condition.
-  SimpleVector<T> res(pRS<T, nprogress>(pass_next, string(" feed ") + strloop));
+  SimpleVector<T> res(pRS<T, nprogress>(pass_next, string(" feeding ") +
+    strloop));
   assert(res.size() == intrans.size());
   for(int j = 0; j < res.size(); j ++) res[j] *= presidue[j];
   return offsetHalf<T>(res);
@@ -4683,7 +4683,8 @@ template <typename T, int nprogress> SimpleVector<T> pLebesgue(const vector<Simp
       for(int j = 0; j < horizontal; j ++) {
         T sum(int(0));
         for(int n = 0; n < les[k][j].size(); n ++) sum += les[k][j][n];
-        reform[j][k].entity.emplace_back(sum / T(Mtot));
+        reform[j][k].entity.emplace_back(sum / T(Mtot) *
+          T(horizontal) / T(j + 1));
       }
     }
   }
@@ -4700,8 +4701,8 @@ template <typename T, int nprogress> SimpleVector<T> pLebesgue(const vector<Simp
       if(nprogress) cerr << "L(skip:" << i << strloop << endl;
       continue;
     }
-    // N.B. try 3 of the context from single input stream possible enough.
-    //      then arithmetic average them.
+    // N.B. try 3 of the context from single input stream possible enough
+    //      then take arithmetic average.
     SimpleVector<T> p0;
     SimpleVector<T> p1;
     SimpleVector<T> p2;
@@ -4711,7 +4712,7 @@ template <typename T, int nprogress> SimpleVector<T> pLebesgue(const vector<Simp
 #pragma omp section
 #endif
       {
-        p0 =pCbrtMarkov<T, nprogress>(
+        p0 = pCbrtMarkov<T, nprogress>(
           reform[i], string("L(0/3, ") + to_string(i) + string("/") +
             to_string(reform.size()) + strloop);
       }
@@ -4737,6 +4738,7 @@ template <typename T, int nprogress> SimpleVector<T> pLebesgue(const vector<Simp
     assert(p0.size() == p1.size() && p1.size() == p2.size());
     p0 += p1;
     p0 += p2;
+    p0 *= T(i + 1) / T(horizontal) / T(int(3));
 #if defined(_OPENMP)
 #pragma omp critical
 #endif
@@ -4744,7 +4746,7 @@ template <typename T, int nprogress> SimpleVector<T> pLebesgue(const vector<Simp
       res += p0;
     }
   }
-  return unOffsetHalf<T>(res /= T(int(reform.size() * 3)));
+  return unOffsetHalf<T>(res /= T(int(reform.size())) );
 }
 
 // N.B. add some sectional measurement part.
@@ -4834,13 +4836,10 @@ template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<Simple
 }
 
 // N.B. persistent retry on the unpredictable places.
-template <typename T, int nprogress> pair<SimpleVector<T>, int> pPersistentP(const vector<SimpleVector<T> >& in, const int& loop0, const string& strloop) {
-  const bool persistent(loop0 < 0);
-  const int  loop(loop0 <= 0 ? pow(T(in.size()), T(int(4)) / T(int(3))) : T(loop0));
-  SimpleVector<T> res(pPolish<T, nprogress>(in, string("0/") + to_string(loop)
-    + strloop));
+template <typename T, int nprogress> pair<SimpleVector<T>, int> pPersistentP(const vector<SimpleVector<T> >& in, const string& strloop) {
+  SimpleVector<T> res(pPolish<T, nprogress>(in, string(" 0") + strloop));
   int last(res.size());
-  for(int i = 0; persistent || i < max(int(1), loop); i ++) {
+  for(int i = 1; ; i ++) {
     vector<int> midx;
     midx.reserve(res.size());
     for(int j = 0; j < res.size(); j ++)
@@ -4852,8 +4851,8 @@ template <typename T, int nprogress> pair<SimpleVector<T>, int> pPersistentP(con
     for(int j = 0; j < work.size(); j ++)
       for(int k = 0; k < work[j].size(); k ++)
         work[j][k] = in[j][midx[k]];
-    SimpleVector<T> wres(pPolish<T, nprogress>(work, string("0/") +
-      to_string(loop) + strloop));
+    SimpleVector<T> wres(pPolish<T, nprogress>(work, string(" ") +
+      to_string(i) + strloop));
     assert(wres.size() == midx.size());
     for(int j = 0; j < midx.size(); j ++) res[midx[j]] = move(wres[j]);
   }
@@ -4886,7 +4885,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
     for(int j = 0; j < inw[i].size(); j ++)
       M = max(abs(inw[i][j]), M);
   for(int i = 0; i < inw.size(); i ++) inw[i] /= M;
-  nwork *= M;
+  nwork /= M;
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -4911,23 +4910,14 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
   const T nnwork(sqrt(nwork.dot(nwork)));
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(res)).first,
-      p01next<T, true>(nwork / nnwork) * nnwork));
+      p01next<T>(nwork / nnwork) * nnwork));
 }
 
-// N.B. we make the first hypothesis as the stream is:
-// (00) {unique function generated, has continuous structure,
-//       no jammer condition to our discrete measureable condition}.
-// (01) first condition is always satisfied by axiom of choice one but
-//      we shall need to increase n-markov's n (base dimension, varlen) as
-//      to guarantee we're in the condition with input stream is not saturated.
-// (02) we feed pseudo continuous condition by pLebesgue they feeds
-//      statistics-like inputs. this is to avoid 2nd condition.
-// (03) 3rd condition is n-markov saturated condition, this is deviate from
-//      first condition.
-// (04) so if input stream's next one step is input-stream half-cbrt-markov
-//      generated one also the function is defined from the input stream
-//      condition, they might converges to the result we bet.
-// (06) layers:
+// N.B. numbering renumbered 2025/07/11.
+// (00) we make the first hypothesis as the stream is input-stream
+//      half-cbrt-markov made also the function is defined from the input
+//      stream itself only also stable to be defined condition.
+// (01) layers:
 //       | function           | layer# | [wsp1] | data amount r   | time*(***) |
 //       +--------------------+--------+--------+-----------------+------------+
 //       | pPersistentP       | 0      | w      | in * 2          | O(G)
@@ -4936,7 +4926,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       | pSectional         | 0      | w      | in * range      | 1
 //       | pLebesgue          | 0      | w      | in * range^2    | range
 //       | pCbrtMarkov        | 1      | w      | in * cbrt(in)   | +O(GL^(5/3)
-// (p01) | after burn with p0next      | 2++ | w | in         | +O(GL+L^3)
+//       | after burn with p0next      | 2++ | w | in         | +O(GL+L^3)
 //       | divide by program invariant | 3+  | s | in         | +O(GL)
 //       | burn invariant by p0next    | 4++ | s | ~in*varlen | +O(GL+L^3)
 //       | makeProgramInvariant        | 5+  | p | in         | +O(GL)
@@ -4960,18 +4950,20 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       | num_t::bit operation        | +7  | 1 | in         |
 // (***) time order ratio, L for input stream length, G for input vector size,
 //       stand from arithmatic operators. ind2varlen isn't considered.
-// (07) so total layer is larger than 14 from logical boolean operation
-//      explicitly stacked including if-then operation. also the data amount
-//      is larger than 3*in on copying shallow with first hypothesis.
-// (08) the data amount used as internal calculation copied 3*in for 2nd order
+// (02) so total layer is larger than 14 from logical boolean operation
+//      explicitly also data amount is larger than 3*in on copying shallow.
+// (03) the data amount used as internal calculation copied 3*in for 2nd order
 //      saturation, 6 layers for multiple layer algebraic copying structure
 //      saturation, 9 layers for enough to decompose inverse of them.
-// (09) number of the internal calculation copy depends on the
+// (04) number of the internal calculation copy depends on the
 //      tanglement number based accuracy reason.
-// (10) the #f counting maximum compressed f(in,out,states,unobserved) has
+// (05) the #f counting maximum compressed f(in,out,states,unobserved) has
 //      12~16 bit entropy, they causes layer# exceeds the structure.
-// (11) there might be natural upper bound of input length size on our meaning,
-//      however, the n-markov hypothesis isn't.
+// (06) there might be natural upper bound of input stream size as 81 pictures
+//      defined by p(contextInvariant(in,out),graphicsInvariant(in,out)) =: out
+//      this is to take input stream as context and graphics are separable
+//      but another conditions are compressionable one. however, the n-markov
+//      hypothesis isn't insist such of the upper bounds.
 
 template <typename T> vector<SimpleVector<T> > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
@@ -4986,7 +4978,7 @@ template <typename T> vector<SimpleVector<T> > predVec(const vector<vector<Simpl
       in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
-  SimpleVector<T> pres(pPersistentP<T, 20>(in, 0, string(" (predVec)")).first);
+  SimpleVector<T> pres(pPersistentP<T, 20>(in, string(" (predVec)")).first);
   vector<SimpleVector<T> > res;
   res.resize(in0[0].size());
   for(int j = 0; j < res.size(); j ++)
@@ -5009,7 +5001,7 @@ template <typename T> vector<SimpleMatrix<T> > predMat(const vector<vector<Simpl
                          k * in0[i][0].cols(), in0[i][j].row(k));
     }
   }
-  SimpleVector<T> pres(pPersistentP<T, 20>(in, 0, string(" (predMat)")).first);
+  SimpleVector<T> pres(pPersistentP<T, 20>(in, string(" (predMat)")).first);
   vector<SimpleMatrix<T> > res;
   res.resize(in0[0].size());
   for(int j = 0; j < res.size(); j ++) {
@@ -5052,7 +5044,7 @@ template <typename T> SimpleSparseTensor(T) predSTen(vector<SimpleSparseTensor(T
             in[i][cnt ++] = offsetHalf<T>(in0[i][idx[j]][idx[k]][idx[m]]);
   }
   in0.resize(0);
-  SimpleVector<T> pres(pPersistentP<T, 20>(in, 0, string(" (predSTen)")).first);
+  SimpleVector<T> pres(pPersistentP<T, 20>(in, string(" (predSTen)")).first);
   SimpleSparseTensor(T) res;
   for(int j = 0, cnt = 0; j < idx.size(); j ++)
     for(int k = 0; k < idx.size(); k ++)
@@ -6670,7 +6662,7 @@ template <typename T> static inline match_t<T> tiltprep(const SimpleMatrix<T>& i
   return m;
 }
 
-// N.B. start corpus without corpus class which frequently updated.
+// N.B. start corpus
 template <typename T> class gram_t {
 public:
   T           str;
@@ -6882,6 +6874,9 @@ template <typename T, typename U> vector<gram_t<U> > lword<T, U>::compute(const 
 //   there'a a analogy {category,relation,geometry} ~
 //   {intention start/end, binary op on intention to intention,
 //     geometry ~ invariant ~ algorithm}
+// undone: there's trivial 729 word sets : 27 * 27 == 3^3 * 3^3 the second
+//   order binary operator saturation upper bound if we take layered
+//   dictionaries.
 template <typename T, typename U> class corpus {
 public:
   typedef SimpleSparseVector<T> Vec;
