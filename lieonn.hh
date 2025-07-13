@@ -3181,7 +3181,8 @@ template <typename X> static inline vector<X> skipX(const vector<X>& in, const i
   return res;
 }
 
-template <typename X> static inline vector<X>& delta(vector<X>& in) {
+template <typename X> static inline vector<X> delta(const vector<X>& in0) {
+  vector<X> in(in0);
   for(int i = 1; i < in.size(); i ++)
     in[i - 1] = in[i] - in[i - 1];
   in.resize(in.size() - 1);
@@ -4424,6 +4425,39 @@ template <typename T> static inline SimpleMatrix<T> center(const SimpleMatrix<T>
   return res;
 }
 
+template <typename T, bool useful> static inline SimpleVector<T> bitsG(const SimpleVector<T>& d, const int& b) {
+  SimpleVector<T> res;
+  if(b < 0) {
+    res.resize(d.size() / abs(b));
+    res.O();
+    for(int i = 0; i < res.size(); i ++)
+      for(int j = 0; j < abs(b); j ++)
+        res[i] += (useful ? offsetHalf<T>(sgn<T>(unOffsetHalf<T>(
+          d[i * abs(b) + j]))) : d[i * abs(b) + j])
+            * pow(T(int(2)), - T(j + 1));
+  } else {
+    res.resize(d.size() * b);
+    res.O();
+    for(int i = 0; i < d.size(); i ++)
+      for(int j = 0; j < b; j ++) {
+        T shift(d[i] * pow(T(int(2)), T(j)));
+#if defined(_FLOAT_BITS_) || defined(_PERSISTENT_)
+        shift -= absfloor(shift);
+#else
+        shift -= floor(shift);
+#endif
+        res[i * b + j] = useful ? shift : T(int(shift * T(int(2)) )) / T(int(2));
+      }
+  }
+  return res;
+}
+
+template <typename T, bool useful> static inline vector<SimpleVector<T> > bitsG(const vector<SimpleVector<T> >& d, const int& b) {
+  vector<SimpleVector<T> > res(d);
+  for(int i = 0; i < res.size(); i ++) res[i] = bitsG<T, useful>(res[i], b);
+  return res;
+}
+
 // N.B. start ddpmopt
 template <typename T, int nprogress> static inline SimpleVector<T> pRS00(const vector<SimpleVector<T> >& intran, const int& sz, const SimpleVector<T>& seconds, const string& strloop = string("")) {
   assert(0 < sz && sz <= intran[0].size());
@@ -4759,10 +4793,10 @@ template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<Simple
 }
 
 // N.B. persistent retry on the unpredictable places.
-template <typename T, int nprogress> pair<SimpleVector<T>, int> pPersistentP(const vector<SimpleVector<T> >& in, const string& strloop) {
+template <typename T, int nprogress> SimpleVector<T> pPersistentP(const vector<SimpleVector<T> >& in, const int& loop, const string& strloop) {
   SimpleVector<T> res(pPolish<T, nprogress>(in, string(" 0") + strloop));
   int last(res.size());
-  for(int i = 1; ; i ++) {
+  for(int i = 1; loop <= 0 || i < loop; i ++) {
     vector<int> midx;
     midx.reserve(res.size());
     for(int j = 0; j < res.size(); j ++)
@@ -4779,11 +4813,43 @@ template <typename T, int nprogress> pair<SimpleVector<T>, int> pPersistentP(con
     assert(wres.size() == midx.size());
     for(int j = 0; j < midx.size(); j ++) res[midx[j]] = move(wres[j]);
   }
-  last = 0;
-  for(int j = 0; j < res.size(); j ++)
-    if(res[j] == T(int(0))) last ++;
-  if(nprogress) cerr << "pPersistent: " << last << "dimension remains." << endl;
-  return make_pair(offsetHalf<T>(res), last);
+  if(nprogress) {
+    last = 0;
+    for(int j = 0; j < res.size(); j ++)
+      if(res[j] == T(int(0))) last ++;
+    cerr << "pPersistentP: " << last << "dimension remains." << endl;
+  }
+  return offsetHalf<T>(res);
+}
+
+// N.B. to guarantee lim S f == S lim f also ||S input|| is in [0,1[-register.
+template <typename T, int nprogress> SimpleVector<T> pGuarantee(const vector<SimpleVector<T> >& in, const int& b, const int& loop, const string& strloop) {
+  assert(0 < b);
+  vector<SimpleVector<T> > work(delta<SimpleVector<T> >(in));
+  for(int i = 0; i < work.size(); i ++)
+    work[i] = offsetHalf<T>(work[i] / T(int(2)));
+  return (bitsG<T, true>(pPersistentP<T, nprogress>(bitsG<T, true>(work, b),
+    loop, strloop), - b) * T(int(2)) + in[in.size() - 1]) / T(int(2));
+}
+
+// N.B. we only need some tails.
+template <typename T, int nprogress> SimpleVector<T> pTail(const vector<SimpleVector<T> >& in, const int& tail, const int& b, const int& loop, const string& strloop) {
+  vector<SimpleVector<T> > work;
+  const int sz(min(int(in.size()), tail));
+  work.reserve(sz);
+  for(int i = 0; i < sz; i ++) work.emplace_back(in[i - sz + in.size()]);
+  return pGuarantee<T, nprogress>(work, b, loop, strloop);
+}
+
+template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const int& tail, const int& b, const int& loop, const string& strloop) {
+  vector<SimpleVector<T> > res;
+  res.emplace_back(pTail<T, nprogress>(in, tail, b, loop, strloop));
+  if(in.size() <= tail) return res;
+  res.reserve(in.size() / tail);
+  for(int i = 2; i <= in.size() / tail; i ++)
+    res.emplace_back(pTail<T, nprogress>(skipX<SimpleVector<T> >(in, i),
+      tail, b, loop, strloop));
+  return res;
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
@@ -4895,7 +4961,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //      but another conditions are compressionable one. however, the n-markov
 //      hypothesis isn't insist such of the upper bounds.
 
-template <typename T> vector<SimpleVector<T> > predVec(const vector<vector<SimpleVector<T> > >& in0) {
+template <typename T> vector<SimpleVector<T> > predVec(const vector<vector<SimpleVector<T> > >& in0, const int& tail, const int& b, const int& loop) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4908,7 +4974,7 @@ template <typename T> vector<SimpleVector<T> > predVec(const vector<vector<Simpl
       in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
-  SimpleVector<T> pres(pPersistentP<T, 20>(in, string(" (predVec)")).first);
+  SimpleVector<T> pres(pTail<T, 20>(in, tail, b, loop, string(" (predVec)")));
   vector<SimpleVector<T> > res;
   res.resize(in0[0].size());
   for(int j = 0; j < res.size(); j ++)
@@ -4916,7 +4982,7 @@ template <typename T> vector<SimpleVector<T> > predVec(const vector<vector<Simpl
   return res;
 }
 
-template <typename T> vector<SimpleMatrix<T> > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
+template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0, const int& tail, const int& b, const int& loop) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4931,20 +4997,24 @@ template <typename T> vector<SimpleMatrix<T> > predMat(const vector<vector<Simpl
                          k * in0[i][0].cols(), in0[i][j].row(k));
     }
   }
-  SimpleVector<T> pres(pPersistentP<T, 20>(in, string(" (predMat)")).first);
-  vector<SimpleMatrix<T> > res;
-  res.resize(in0[0].size());
-  for(int j = 0; j < res.size(); j ++) {
-    res[j].resize(in0[0][0].rows(), in0[0][0].cols());
-    for(int k = 0; k < in0[0][0].rows(); k ++)
-      res[j].row(k) =
-        pres.subVector(j * in0[0][0].rows() * in0[0][0].cols() +
-          k * in0[0][0].cols(), in0[0][0].cols());
+  vector<SimpleVector<T> > pres(
+    pRepeat<T, 20>(in, tail, b, loop, string(" (predMat)")));
+  vector<vector<SimpleMatrix<T> > > res;
+  res.resize(pres.size());
+  for(int i = 0; i < pres.size(); i ++) {
+    res[i].resize(in0[0].size());
+    for(int j = 0; j < res[i].size(); j ++) {
+      res[i][j].resize(in0[0][0].rows(), in0[0][0].cols());
+      for(int k = 0; k < in0[0][0].rows(); k ++)
+        res[i][j].row(k) =
+          pres[i].subVector(j * in0[0][0].rows() * in0[0][0].cols() +
+            k * in0[0][0].cols(), in0[0][0].cols());
+    }
   }
   return res;
 }
 
-template <typename T> SimpleSparseTensor(T) predSTen(vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx) {
+template <typename T> vector<SimpleSparseTensor(T)> predSTen(vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx, const int& tail, const int& b, const int& loop = - 1) {
   assert(idx.size() && in0.size());
   // N.B. we don't do input scaling.
   // N.B. we should use each bit extended input stream but not now.
@@ -4974,14 +5044,17 @@ template <typename T> SimpleSparseTensor(T) predSTen(vector<SimpleSparseTensor(T
             in[i][cnt ++] = offsetHalf<T>(in0[i][idx[j]][idx[k]][idx[m]]);
   }
   in0.resize(0);
-  SimpleVector<T> pres(pPersistentP<T, 20>(in, string(" (predSTen)")).first);
-  SimpleSparseTensor(T) res;
-  for(int j = 0, cnt = 0; j < idx.size(); j ++)
-    for(int k = 0; k < idx.size(); k ++)
-      for(int m = 0; m < idx.size(); m ++)
-        if(binary_search(attend.begin(), attend.end(),
-             make_pair(j, make_pair(k, m))))
-          res[idx[j]][idx[k]][idx[m]] = unOffsetHalf<T>(pres[cnt ++]);
+  vector<SimpleVector<T> > pres(
+    pRepeat<T, 20>(in, tail, b, loop, string(" (predSTen)")));
+  vector<SimpleSparseTensor(T) > res;
+  res.resize(pres.size());
+  for(int i = 0; i < pres.size(); i ++)
+    for(int j = 0, cnt = 0; j < idx.size(); j ++)
+      for(int k = 0; k < idx.size(); k ++)
+        for(int m = 0; m < idx.size(); m ++)
+          if(binary_search(attend.begin(), attend.end(),
+               make_pair(j, make_pair(k, m))))
+            res[i][idx[j]][idx[k]][idx[m]] = unOffsetHalf<T>(pres[i][cnt ++]);
   return res;
 }
 
@@ -7813,9 +7886,13 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
   os << input;
   vector<SimpleSparseTensor(T) > bin(in);
   corpus<T, U> pstats;
-  pstats.corpust = predSTen<T>(in, idx);
-  getAbbreved<T>(pstats, detailtitle, detail, delimiter);
-  os << endl << " --- " << pstats.simpleThresh(threshin / T(int(4))).serialize();
+  // XXX: fixed number
+  vector<SimpleSparseTensor(T)> p(predSTen<T>(in, idx, 18, 3));
+  for(int i = 0; i < p.size(); i ++) {
+    pstats.corpust = move(p[i]);
+    getAbbreved<T>(pstats, detailtitle, detail, delimiter);
+    os << endl << " --- " << pstats.simpleThresh(threshin / T(int(4))).serialize();
+  }
   return os;
 }
 
