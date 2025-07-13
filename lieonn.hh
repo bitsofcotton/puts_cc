@@ -3841,7 +3841,25 @@ template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
 
 // Get invariant structure that
 // [0,1[-register computer with deterministic calculation.
-// cf. bitsofcotton/randtools .
+// cf. bitsofcotton/randtools extract main part:
+//   Xor_k And_m Xor_n x_{k,m,n}*x_n == any operation on {0,1}^(dim x)
+//   because of pattern matching also (a xor b) xor (a and b) == a or b.
+//   so they're Sum_k det diag (X_k x) == det diag (Y x) in first digit.
+//   this is done by counter diagonal method and LDLt:
+//  integrate X_0 and X_1 : det diag x + det diag X' x (max rank is always
+//   artificially created.) == det diag x + det diag (LDL^t x),
+//   det diag L^-t x' + det diag LD x', in the x' =: [x'', 1, x''_reverse]
+//   condition, one dimension down, repeat them causes det diag Y x.
+//  also we can do analytical calculus on them causes det diag (Yx) ==
+//   S d/d(x_1) det diag Yx d(x_1) == ... S...S... <y,x> d(x_1)... .
+//   with repeat, we get <y,x>(x_1...)^m in first digit we get.
+//  also with negated gate, x_1...\bar(x_1)... is constant (usually
+//   x_k := {1,1/2}) so <y,x> in first digit part is what we need.
+//  this context can be applied to p-adics so usually {1,(p-1)/p,...,1/p}
+//   elements.
+//  however, this concludes #f count up collision, so ind2vd makes better
+//   dimension we need when it's observed and fixed.
+//  so the condition might came from external R^3n to R^4n matrices.
 // N.B. we make the hypothesis the invariant coefficients are continuous or
 //      periodical. this is valid if original stream have less or equal to
 //      varlen-markov's Riemann-Stieljes measureable condition.
@@ -4825,11 +4843,10 @@ template <typename T, int nprogress> SimpleVector<T> pPersistentP(const vector<S
 // N.B. to guarantee lim S f == S lim f also ||S input|| is in [0,1[-register.
 template <typename T, int nprogress> SimpleVector<T> pGuarantee(const vector<SimpleVector<T> >& in, const int& b, const int& loop, const string& strloop) {
   assert(0 < b);
-  vector<SimpleVector<T> > work(delta<SimpleVector<T> >(in));
-  for(int i = 0; i < work.size(); i ++)
-    work[i] = offsetHalf<T>(work[i] / T(int(2)));
-  return (bitsG<T, true>(pPersistentP<T, nprogress>(bitsG<T, true>(work, b),
-    loop, strloop), - b) * T(int(2)) + in[in.size() - 1]) / T(int(2));
+  // XXX: clipBin
+  return clipBin<T>(unOffsetHalf<T>(bitsG<T, true>(pPersistentP<T, nprogress>(
+    bitsG<T, true>(offsetHalf<T>(delta<SimpleVector<T> >(in)), b), loop,
+      strloop), - b)) + in[in.size() - 1]);
 }
 
 // N.B. we only need some tails.
@@ -4843,12 +4860,11 @@ template <typename T, int nprogress> SimpleVector<T> pTail(const vector<SimpleVe
 
 template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const int& tail, const int& b, const int& loop, const string& strloop) {
   vector<SimpleVector<T> > res;
-  res.emplace_back(pTail<T, nprogress>(in, tail, b, loop, strloop));
-  if(in.size() <= tail) return res;
   res.reserve(in.size() / tail);
-  for(int i = 2; i <= in.size() / tail; i ++)
+  for(int i = 1; i <= in.size() / tail; i ++)
     res.emplace_back(pTail<T, nprogress>(skipX<SimpleVector<T> >(in, i),
-      tail, b, loop, strloop));
+      tail, b, loop, string(" ") + to_string(i - 1) + string("/") +
+        to_string(in.size() / tail) + strloop));
   return res;
 }
 
@@ -4902,33 +4918,36 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
       p01next<T>(nwork / nnwork) * nnwork));
 }
 
-// N.B. numbering renumbered 2025/07/13.
-// (00) we make the first hypothesis as the stream is input-stream
+// N.B. we make the first hypothesis as the stream is input-stream
 //      half-cbrt-markov made also the function is defined from the input
-//      stream itself only also stable to be defined condition also
-//      the input stream vector is binary formed or some of the information
-//      amount but with the binary output.
-// (01) layers:
+//      stream itself only in stable, we suppose 5 of the measureable condition.
+// N.B. if we copy some structure on the purpose of prediction, the data amount
+//      3 * in (3 layers) for 2nd order saturation, 6 for multiple layer
+//      algebraic copying structure saturation, 9 for enough to decompose
+//      inverse of them. however, number of the internal calculation copy
+//      only depends on the tanglement number based accuracy reason on
+//      calculation surface.
+// N.B. layers:
 //       | function           | layer# | [wsp1] | data amount r   | time*(***) |
 //       +--------------------+--------+--------+-----------------+------------+
-//       | (addOriginalStreamMeasureableCondition) | -1 | w | in  |
-//       | pPersistentP       | 0      | w      | in * 2          | O(G)
-//       | pPolish            | 0      | w      | in * 2          | 2
-//       | pMeasureable       | 0      | w      | in * sqrt(in)   | O(L^1/6)
-//       | pSectional         | 0      | w      | in * range      | 1
-//       | pLebesgue          | 1      | w      | in * range^2    | range
-//       | pCbrtMarkov        | 2      | w      | in * cbrt(in)   | +O(GL^(5/3)
-//       | after burn with p0next      | 3++ | w | in         | +O(GL+L^3)
-//       | divide by program invariant | 4+  | s | in         | +O(GL)
-//       | burn invariant by p0next    | 5++ | s | ~in*varlen | +O(GL+L^3)
-//       | makeProgramInvariant        | 6+  | p | in         | +O(GL)
+//       | pGuarantee         | 0      | w      | in              |
+//       | pPersistentP       | *      | w      | in * 2          | loop
+//       | pPolish            | 1      | w      | in * 2          | 2
+//       | pMeasureable       | 1      | w      | in * sqrt(in)   | O(L^1/6)
+//       | pSectional         | 1      | w      | in * range      | 1
+//       | pLebesgue          | 2      | w      | in * range^2    | range
+//       | pCbrtMarkov        | 3      | w      | in * cbrt(in)   | +O(GL^(5/3))
+//       | after burn with p0next, loop| 4++ | w | in         | O(L)+O(GL+L^3)
+//       | divide by program invariant | 5+  | s | in         | +O(GL)
+//       | burn invariant by p0next    | 6++ | s | ~in*varlen | +O(GL+L^3)
+//       | makeProgramInvariant        | 7+  | p | in         | +O(GL)
 //       | linearInvariant             | -   | - | -          |
-//       |   - QR decomposition        | 8+* | s | > in * 4!  | O(GL)
-//       |   - orthogonalization       | 10+*| p | > in * 4!  | O(4!)
-//       |   - solve                   | 12* | p | > (4 * 4)  | +O(4^3)
-//       | T::operator *,/             | 13+ | 1 | in         |
-//       | T::operator +,-             | 14+ | 1 | in         |
-//       | T::bit operation            | 15+ | 1 | in         |
+//       |   - QR decomposition        | 9+* | s | > in * 4!  | O(GL)
+//       |   - orthogonalization       | 11+*| p | > in * 4!  | O(4!)
+//       |   - solve                   | 13* | p | > (4 * 4)  | +O(4^3)
+//       | T::operator *,/             | 14+ | 1 | in         |
+//       | T::operator +,-             | 15+ | 1 | in         |
+//       | T::bit operation            | 16+ | 1 | in         |
 // *(++) | sumCNext           | +0     | s      | in              |
 //       | sumCNext           | +1     | s      | in              |
 //       | logCNext           | +2     | s      | in              |
@@ -4936,7 +4955,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       | northPoleNext      | +4     | s      | in              |
 //       | invNext            | +5     | s      | in              |
 //       | sumCNext           | +6     | s      | in              |
-//       | pnext              | +7     | s      | in+once(dft(6)) |
+//       | pnext              | +7     | s      | in+once(dft(6)) | O(GL)
 //       | integrate-diff in taylorc   | +8  | p | once(dft(6 * 2)) |
 //       | exp to shift   in taylorc   | +9  | p | once(dft(6 * 2)) |
 //       | dft                         | +10 | p | once(dft(6 * 2)) |
@@ -4946,20 +4965,6 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       | T::bit operation            | +14 | 1 | in         |
 // (***) time order ratio, L for input stream length, G for input vector size,
 //       stand from arithmatic operators. ind2varlen isn't considered.
-// (02) so total layer is larger than 14 from logical boolean operation
-//      explicitly also data amount is larger than 3*in on copying shallow.
-// (03) the data amount used as internal calculation copied 3*in for 2nd order
-//      saturation, 6 layers for multiple layer algebraic copying structure
-//      saturation, 9 layers for enough to decompose inverse of them.
-// (04) number of the internal calculation copy depends on the
-//      tanglement number based accuracy reason.
-// (05) the #f counting maximum compressed f(in,out,states,unobserved) has
-//      12~16 bit entropy, they causes layer# exceeds the structure.
-// (06) there might be natural upper bound of input stream size as 81 pictures
-//      defined by p(contextInvariant(in,out),graphicsInvariant(in,out)) =: out
-//      this is to take input stream as contexts and graphics are separable
-//      but another conditions are compressionable one. however, the n-markov
-//      hypothesis isn't insist such of the upper bounds.
 
 template <typename T> vector<SimpleVector<T> > predVec(const vector<vector<SimpleVector<T> > >& in0, const int& tail, const int& b, const int& loop) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
