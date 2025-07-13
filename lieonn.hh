@@ -3351,23 +3351,6 @@ static inline int ind2vd(const int& indim) {
   return max(-- varlen, int(4));
 }
 
-static inline const vector<int>& pnTinySingle(const int& upper = int(1)) {
-  static vector<int> pn;
-  if(! pn.size()) pn.emplace_back(2);
-  pn.reserve(upper);
-  for(int i = pn.size(); i < upper; i ++) {
-    for(int j = pn[pn.size() - 1] + 1; 0 <= j; j ++) {
-      for(int k = 0; k < pn.size(); k ++)
-        if(! (j % pn[k])) goto next_pn;
-      pn.emplace_back(j);
-      break;
-     next_pn:
-      ;
-    }
-  }
-  return pn;
-}
-
 template <typename T> static inline SimpleVector<T> minsq(const int& size) {
   assert(1 < size);
   const T xsum(size * (size - 1) / 2);
@@ -3849,6 +3832,8 @@ template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
   // N.B. either there's plenty of a space to extend this with
   //      uparrow, downarrow operations they causes the result in H\C if second
   //      operand is in C\R.
+  // N.B. however we don't need this in normal condition because if the
+  //      prediction itself is linear, they doesn't attach the result.
   // return sumCNext<T, true, sumCNext<T, false, logCNext<T, logCNext<T,
   //   P0DFT<T, p0max0next<T> > > > > >(in);
 }
@@ -3859,7 +3844,7 @@ template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
 // N.B. we make the hypothesis the invariant coefficients are continuous or
 //      periodical. this is valid if original stream have less or equal to
 //      varlen-markov's Riemann-Stieljes measureable condition.
-// N.B. this is the analogy to toeplitz matrix inveresion with singular one.
+// N.B. this is the analogy to toeplitz matrix inversion with singular one.
 // N.B. if the function has internal states variable to be projected into
 //      series, they're looked as <a,x>+<b,y>==<a,x>==0, y is internal states.
 //      so this causes A*x==B*y, so increasing dimension causes ok result.
@@ -4395,68 +4380,6 @@ template <typename T> static inline SimpleVector<T> normalize(const SimpleVector
   return normalize<T>(w, upper).row(0);
 }
 
-template <typename T> static inline vector<SimpleMatrix<T> > autoLevel(const vector<SimpleMatrix<T> >& data, const int& count = 0) {
-  vector<T> res;
-  res.reserve(data[0].rows() * data[0].cols() * data.size());
-  for(int k = 0; k < data.size(); k ++)
-    for(int i = 0; i < data[k].rows(); i ++)
-      for(int j = 0; j < data[k].cols(); j ++)
-        res.emplace_back(data[k](i, j));
-  sort(res.begin(), res.end());
-  vector<SimpleMatrix<T> > result(data);
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-  for(int k = 0; k < data.size(); k ++)
-    for(int i = 0; i < data[k].rows(); i ++)
-      for(int j = 0; j < data[k].cols(); j ++)
-        result[k](i, j) = max(min(data[k](i, j), res[res.size() - count - 1]), res[count]);
-  return result;
-}
-
-template <typename T> static inline SimpleVector<T> autoLevel(const SimpleVector<T>& data, const int& count = 0) {
-  vector<SimpleMatrix<T> > b;
-  b.resize(1);
-  b[0].resize(1, data.size());
-  b[0].row(0) = data;
-  return autoLevel<T>(b, count)[0].row(0);
-}
-
-template <typename T> static inline SimpleMatrix<T> autoLevel(const SimpleMatrix<T>& data, const int& count = 0) {
-  vector<SimpleMatrix<T> > work;
-  work.emplace_back(data);
-  return autoLevel(work, count)[0];
-}
-
-template <typename T> static inline vector<SimpleMatrix<T> > autoGamma(const vector<SimpleMatrix<T> >& data, const T& ratio = T(int(1)) / T(int(2)) ) {
-  T r(int(0));
-  for(int k = 0; k < data.size(); k ++)
-    for(int i = 0; i < data[k].rows(); i ++)
-      for(int j = 0; j < data[k].cols(); j ++) {
-        assert(T(int(0)) <= data[k](i, j) && data[k](i, j) <= T(int(1)) );
-        r += log(data[k](i, j) + T(int(1)) / T(int(65536)) );
-      }
-  r /= T(int(data.size() * data[0].rows() * data[0].cols()));
-  r  = log(ratio) / r;
-  vector<SimpleMatrix<T> > result(data);
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-  for(int k = 0; k < data.size(); k ++)
-    for(int i = 0; i < data[k].rows(); i ++)
-      for(int j = 0; j < data[k].cols(); j ++)
-        result[k](i, j) = clipBin<T>(pow(data[k](i, j) + T(int(1)) / T(int(65536)), r) );
-  return result;
-}
-
-template <typename T> static inline SimpleVector<T> autoGamma(const SimpleVector<T>& data, const T& r = T(int(1)) / T(int(2)) ) {
-  vector<SimpleMatrix<T> > b;
-  b.resize(1);
-  b[0].resize(1, data.size());
-  b[0].row(0) = data;
-  return autoGamma<T>(b, r)[0].row(0);
-}
-
 template <typename T> static inline SimpleMatrix<T> rotate(const SimpleMatrix<T>& d, const T& theta) {
   assert(abs(theta) < atan(T(1)));
   const T c(cos(theta));
@@ -4683,8 +4606,8 @@ template <typename T, int nprogress> SimpleVector<T> pLebesgue(const vector<Simp
       for(int j = 0; j < horizontal; j ++) {
         T sum(int(0));
         for(int n = 0; n < les[k][j].size(); n ++) sum += les[k][j][n];
-        reform[j][k].entity.emplace_back(sum / T(Mtot) *
-          T(horizontal) / T(j + 1));
+        reform[j][k].entity.emplace_back(binMargin<T>(sum / T(Mtot) *
+          T(horizontal) / T(j + 1) ) );
       }
     }
   }
@@ -4913,41 +4836,48 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
       p01next<T>(nwork / nnwork) * nnwork));
 }
 
-// N.B. numbering renumbered 2025/07/11.
+// N.B. numbering renumbered 2025/07/13.
 // (00) we make the first hypothesis as the stream is input-stream
 //      half-cbrt-markov made also the function is defined from the input
-//      stream itself only also stable to be defined condition.
+//      stream itself only also stable to be defined condition also
+//      the input stream vector is binary formed or some of the information
+//      amount but with the binary output.
 // (01) layers:
 //       | function           | layer# | [wsp1] | data amount r   | time*(***) |
 //       +--------------------+--------+--------+-----------------+------------+
+//       | (addOriginalStreamMeasureableCondition) | -1 | w | in  |
 //       | pPersistentP       | 0      | w      | in * 2          | O(G)
 //       | pPolish            | 0      | w      | in * 2          | 2
 //       | pMeasureable       | 0      | w      | in * sqrt(in)   | O(L^1/6)
 //       | pSectional         | 0      | w      | in * range      | 1
-//       | pLebesgue          | 0      | w      | in * range^2    | range
-//       | pCbrtMarkov        | 1      | w      | in * cbrt(in)   | +O(GL^(5/3)
-//       | after burn with p0next      | 2++ | w | in         | +O(GL+L^3)
-//       | divide by program invariant | 3+  | s | in         | +O(GL)
-//       | burn invariant by p0next    | 4++ | s | ~in*varlen | +O(GL+L^3)
-//       | makeProgramInvariant        | 5+  | p | in         | +O(GL)
+//       | pLebesgue          | 1      | w      | in * range^2    | range
+//       | pCbrtMarkov        | 2      | w      | in * cbrt(in)   | +O(GL^(5/3)
+//       | after burn with p0next      | 3++ | w | in         | +O(GL+L^3)
+//       | divide by program invariant | 4+  | s | in         | +O(GL)
+//       | burn invariant by p0next    | 5++ | s | ~in*varlen | +O(GL+L^3)
+//       | makeProgramInvariant        | 6+  | p | in         | +O(GL)
 //       | linearInvariant             | -   | - | -          |
-//       |   - QR decomposition        | 7+* | s | > in * 4!  | O(GL)
-//       |   - orthogonalization       | 9+* | p | > in * 4!  | O(4!)
-//       |   - solve                   | 11* | p | > (4 * 4)  | +O(4^3)
-//       | num_t::operator *,/         | 12+ | 1 | in         |
-//       | num_t::operator +,-         | 13+ | 1 | in         |
-//       | num_t::bit operation        | 14+ | 1 | in         |
-// *(++) | invNext            | +0     | s      | in              |
-//       | (00)               | +0+    | s      | (0-1)           |
-// *(00) | sumCNext           | +0     | s      | in              |
-//       | pnext              | +0     | s      | in+once(dft(6)) |
-//       | integrate-diff in taylorc   | +1  | p | once(dft(6 * 2)) |
-//       | exp to shift   in taylorc   | +2  | p | once(dft(6 * 2)) |
-//       | dft                         | +3  | p | once(dft(6 * 2)) |
-//       | exp-log complex operation   | +4  | 1 | once(taylor(1))  |
-//       | num_t::operator *,/         | +5  | 1 | in         |
-//       | num_t::operator +,-         | +6  | 1 | in         |
-//       | num_t::bit operation        | +7  | 1 | in         |
+//       |   - QR decomposition        | 8+* | s | > in * 4!  | O(GL)
+//       |   - orthogonalization       | 10+*| p | > in * 4!  | O(4!)
+//       |   - solve                   | 12* | p | > (4 * 4)  | +O(4^3)
+//       | T::operator *,/             | 13+ | 1 | in         |
+//       | T::operator +,-             | 14+ | 1 | in         |
+//       | T::bit operation            | 15+ | 1 | in         |
+// *(++) | sumCNext           | +0     | s      | in              |
+//       | sumCNext           | +1     | s      | in              |
+//       | logCNext           | +2     | s      | in              |
+//       | logCNext           | +3     | s      | in              |
+//       | northPoleNext      | +4     | s      | in              |
+//       | invNext            | +5     | s      | in              |
+//       | sumCNext           | +6     | s      | in              |
+//       | pnext              | +7     | s      | in+once(dft(6)) |
+//       | integrate-diff in taylorc   | +8  | p | once(dft(6 * 2)) |
+//       | exp to shift   in taylorc   | +9  | p | once(dft(6 * 2)) |
+//       | dft                         | +10 | p | once(dft(6 * 2)) |
+//       | exp-log complex operation   | +11 | 1 | once(taylor(1))  |
+//       | T::operator *,/             | +12 | 1 | in         |
+//       | T::operator +,-             | +13 | 1 | in         |
+//       | T::bit operation            | +14 | 1 | in         |
 // (***) time order ratio, L for input stream length, G for input vector size,
 //       stand from arithmatic operators. ind2varlen isn't considered.
 // (02) so total layer is larger than 14 from logical boolean operation
@@ -4961,7 +4891,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //      12~16 bit entropy, they causes layer# exceeds the structure.
 // (06) there might be natural upper bound of input stream size as 81 pictures
 //      defined by p(contextInvariant(in,out),graphicsInvariant(in,out)) =: out
-//      this is to take input stream as context and graphics are separable
+//      this is to take input stream as contexts and graphics are separable
 //      but another conditions are compressionable one. however, the n-markov
 //      hypothesis isn't insist such of the upper bounds.
 
@@ -8036,6 +7966,8 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      it's verbose and it's out of our target condition.
 //      we should simply increase the input data or separate input or
 //      only to shirk PRNG blending part of them.
+// (11) any of the ad-hoc layer implementations.
+//      it's useless because of adaptic one in generic meaning.
 //
 // N.B. something XXX result descripton
 // (00) there might exist non Lebesgue measureable condition discrete stream.
@@ -8045,9 +7977,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 // (01) the prediction fail is come from first continuity hypothesis
 //      satisfied or not. AFTER the whole stream is given context,
 //      we can avoid such of the conditions with certain error.
-// (02) attack to the invariant causes invariant size chases
-//      this can be skipped by skipX concerns.
-// (03) (de)?compression concerns can jam out on N calculation matters.
+// (02) (de)?compression concerns can jam out on N calculation matters.
 //      we cannot avoid this other than verifying after the phenomenon
 //      also having a verifiability of low of excluded middle based on
 //      our calculation based on our conscious uniqueness.
@@ -8097,9 +8027,9 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //
 // N.B. another variants of the predictors fight with 2*3*2 pattern of #f
 //      fixation. (however, we don't use initial internal states, it's only 4).
-//      (00), (01), (02) is already implemented p01?2?next.
-//      either, pred(Vec|Mat|STen) prediction untangles twice by two candidates
-//      so we perhaps don't need them.
+//      (00), (01), (02) is already implemented p01?2?next also we use 4 of
+//      a measureable condition. either, pred(Vec|Mat|STen) prediction untangles
+//      twice by two candidates so we perhaps don't need them.
 // (10) with taking multiplication invariant on f,
 //      S f(x) dx = S det(J((1,g0,...)/(1,x0,...)) dx0 ...
 //      retaking their addition invariant as det(...) == 0, the given function
