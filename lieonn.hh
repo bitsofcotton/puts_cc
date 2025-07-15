@@ -4920,7 +4920,23 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 
 // N.B. we make the first hypothesis as the stream is input-stream
 //      half-cbrt-markov made also the function is defined from the input
-//      stream itself only in stable, we suppose 5 of the measureable condition.
+//      stream itself only in stable.
+// N.B. we also suppose 5 of the measureable condition.
+//      the measureable condition's complement is null in ideal, since we're
+//      treating continuous objects' Poincare cut path of the points for
+//      the data stream, it's self describing in surface condition.
+//      so each 3,1[1-8] length is valid in such of the meanings.
+// N.B. so markov condition's complement is complexity length is huge cases,
+//      however external of the low of the excluded middle convert to internal
+//      needs 3 variable dimension at all on possible near the root description,
+//      the cardinal condition is also valid in such of the length.
+// N.B. the worse structures always have catharsis bits in their internal states
+//      to make some gulfs into the predictors' continuity when they appear.
+//      however, the stable feeding catharsis bits isn't affects gulf when
+//      they have stable stance for input stream generation, so the conclusion
+//      is 'feeding entropy stability' vs. 'n-markov size hypothesis' chase
+//      in some probability (> 1/2). also the sparse feeding is reduced by
+//      the pLebesgue feeding.
 // N.B. if we copy some structure on the purpose of prediction, the data amount
 //      3 * in (3 layers) for 2nd order saturation, 6 for multiple layer
 //      algebraic copying structure saturation, 9 for enough to decompose
@@ -4931,7 +4947,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       | function           | layer# | [wsp1] | data amount r   | time*(***) |
 //       +--------------------+--------+--------+-----------------+------------+
 //       | pGuarantee         | 0      | w      | in              |
-//       | pPersistentP       | *      | w      | in * 2          | loop
+//       | pPersistentP       | *      | w      | in              | loop
 //       | pPolish            | 1      | w      | in * 2          | 2
 //       | pMeasureable       | 1      | w      | in * sqrt(in)   | O(L^1/6)
 //       | pSectional         | 1      | w      | in * range      | 1
@@ -4966,7 +4982,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 // (***) time order ratio, L for input stream length, G for input vector size,
 //       stand from arithmatic operators. ind2varlen isn't considered.
 
-template <typename T> vector<SimpleVector<T> > predVec(const vector<vector<SimpleVector<T> > >& in0, const int& tail, const int& b, const int& loop) {
+template <typename T> vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0, const int& tail, const int& b, const int& loop) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4979,11 +4995,15 @@ template <typename T> vector<SimpleVector<T> > predVec(const vector<vector<Simpl
       in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
-  SimpleVector<T> pres(pTail<T, 20>(in, tail, b, loop, string(" (predVec)")));
-  vector<SimpleVector<T> > res;
-  res.resize(in0[0].size());
-  for(int j = 0; j < res.size(); j ++)
-    res[j] = pres.subVector(in0[0][0].size() * j, in0[0][0].size());
+  vector<SimpleVector<T> > pres(
+    pRepeat<T, 20>(in, tail, b, loop, string(" (predVec)")));
+  vector<vector<SimpleVector<T> > > res;
+  res.resize(pres.size());
+  for(int i = 0; i < pres.size(); i ++) {
+    res[i].resize(in0[0].size());
+    for(int j = 0; j < res[i].size(); j ++)
+      res[i][j] = pres[i].subVector(in0[0][0].size() * j, in0[0][0].size());
+  }
   return res;
 }
 
