@@ -5007,7 +5007,7 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(const vector<vec
   return res;
 }
 
-template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0, const int& tail, const int& b, const int& loop) {
+template <typename T, int nprogress> vector<vector<SimpleMatrix<T> > > predMat0(const vector<vector<SimpleMatrix<T> > >& in0, const int& tail, const int& b, const int& loop) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -5023,7 +5023,7 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vec
     }
   }
   vector<SimpleVector<T> > pres(
-    pRepeat<T, 20>(in, tail, b, loop, string(" (predMat)")));
+    pRepeat<T, nprogress>(in, tail, b, loop, string(" (predMat)")));
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++) {
@@ -5036,6 +5036,38 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vec
             k * in0[0][0].cols(), in0[0][0].cols());
     }
   }
+  return res;
+}
+
+// N.B. from somehow, per-sub graphics improves T commands by tiny experiments.
+template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0, const int& tail, const int& b, const int& loop) {
+  if(0 <= loop) return predMat0<T, 20>(in0, tail, b, loop);
+  vector<vector<SimpleMatrix<T> > > res;
+  for(int i = 0; i < - loop; i ++)
+    for(int j = 0; j < - loop; j ++) {
+      vector<vector<SimpleMatrix<T> > > in;
+      in.resize(in0.size());
+      for(int k = 0; k < in.size(); k ++) {
+        in[k].resize(in0[k].size());
+        for(int m = 0; m < in[k].size(); m ++)
+          in[k][m] = in0[k][m].subMatrix(- i * loop, - j * loop,
+            min(- (i + 1) * loop, in0[k][m].rows()) + i * loop,
+              min(- (j + 1) * loop, in0[k][m].cols()) + j * loop);
+      }
+      if(! in[0][0].rows() || ! in[0][0].cols()) continue;
+      vector<vector<SimpleMatrix<T> > > pres(predMat0<T, 2>(in, tail, b, - 1));
+      if(res.size() < pres.size()) res.resize(pres.size());
+      for(int k = 0; k < pres.size(); k ++) {
+        if(res[k].size() < pres[k].size()) res[k].resize(pres[k].size());
+        for(int m = 0; m < pres[k].size(); m ++) {
+          if(! res[k][m].rows() || ! res[k][m].cols()) {
+            res[k][m].resize(in0[0][0].rows(), in0[0][0].cols());
+            res[k][m].O();
+          }
+          res[k][m].setMatrix(- i * loop, - j * loop, pres[k][m]);
+        }
+      }
+    }
   return res;
 }
 
@@ -8018,7 +8050,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
   return;
 }
 
-// N.B. numbering is last renumbered 2025/07/11:
+// N.B. numbering is last renumbered 2025/07/15:
 // N.B. once implemented but abandoned and cleaned from this source code
 //      the reason why
 // (00) predictions via linear sum/diff based some reformation input and revert:
@@ -8121,11 +8153,14 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      they caused return to average works very well.
 //      this is because <x,a> == 0, <[x,x+],[a,0]+[0,a]> == 0 chain in rough.
 // (08) the predictor vs jammer chase is also the which side
-//      bore first chase. if both side is enthusiastic not to bore first,
-//      the input stream will be saturated to whole of the stream isn't
-//      have unique function generation, so this is analogy to the manually
-//      manipulate function switching. however, we can increase n-markov's
-//      n variable in such of a case.
+//      bore first chase. after the pRepeat some exp, we conclude it's a
+//      wavy-entropy feeding bore first chase concerned on the catharsis bits
+//      also the internal states they or we have, however in the patternization
+//      meaning, it's selection from the saturated stream vs the stream we have.
+// (09) after some conversation with gemini around 2025/07, the jammers
+//      they have internal optimization calculation to output to saturate
+//      the stream intent condition or so also have the internal made intentions
+//      to jam out the stream.
 //
 // N.B. another variants of the predictors fight with 2*3*2 pattern of #f
 //      fixation. (however, we don't use initial internal states, it's only 4).
@@ -8147,9 +8182,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      function number. this needs 19,683*19,683 table size we cannot treat
 //      on our machine. this shirks F_2^4 #f all of the generic i/o table
 //      then we brute force function listing.
-// (15) echo input as one step before flip or return to average.
-//      this is id. transform but orthogonal to former p01?2?next..
-// (16) to make the hypotheis the input stream is only payload to known
+// (15) to make the hypotheis the input stream is only payload to known
 //      structures. this is to make the hypothesis n-markov's n as a input
 //      stream size, the invariant is come from another pre-trained inputs.
 //      mimicing ongoing machine learnings doing them.
