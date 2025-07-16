@@ -5007,7 +5007,7 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(const vector<vec
   return res;
 }
 
-template <typename T, int nprogress> vector<vector<SimpleMatrix<T> > > predMat0(const vector<vector<SimpleMatrix<T> > >& in0, const int& tail, const int& b, const int& loop) {
+template <typename T, int nprogress> vector<vector<SimpleMatrix<T> > > predMat0(const vector<vector<SimpleMatrix<T> > >& in0, const int& tail, const int& b, const int& loop, const string& strloop = string(")") ) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -5023,7 +5023,7 @@ template <typename T, int nprogress> vector<vector<SimpleMatrix<T> > > predMat0(
     }
   }
   vector<SimpleVector<T> > pres(
-    pRepeat<T, nprogress>(in, tail, b, loop, string(" (predMat)")));
+    pRepeat<T, nprogress>(in, tail, b, loop, string(" (predMat") + strloop));
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++) {
@@ -5041,10 +5041,10 @@ template <typename T, int nprogress> vector<vector<SimpleMatrix<T> > > predMat0(
 
 // N.B. from somehow, per-sub graphics improves T commands by tiny experiments.
 template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0, const int& tail, const int& b, const int& loop) {
-  if(0 <= loop) return predMat0<T, 20>(in0, tail, b, loop);
+  if(0 <= loop) return predMat0<T, 20>(in0, tail, b, loop, string(": id.)") );
   vector<vector<SimpleMatrix<T> > > res;
-  for(int i = 0; i < - loop; i ++)
-    for(int j = 0; j < - loop; j ++) {
+  for(int i = 0; - i * loop < in0[0][0].rows(); i ++)
+    for(int j = 0; - j * loop < in0[0][0].cols(); j ++) {
       vector<vector<SimpleMatrix<T> > > in;
       in.resize(in0.size());
       for(int k = 0; k < in.size(); k ++) {
@@ -5055,7 +5055,10 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vec
               min(- (j + 1) * loop, in0[k][m].cols()) + j * loop);
       }
       if(! in[0][0].rows() || ! in[0][0].cols()) continue;
-      vector<vector<SimpleMatrix<T> > > pres(predMat0<T, 2>(in, tail, b, - 1));
+      vector<vector<SimpleMatrix<T> > > pres(predMat0<T, 2>(in, tail, b, - 1,
+        string(": ") + to_string(- i * in0[0][0].cols() / loop + j) +
+          string("/") + to_string(in0[0][0].rows() * in0[0][0].cols() /
+            loop / loop) + string(")") ));
       if(res.size() < pres.size()) res.resize(pres.size());
       for(int k = 0; k < pres.size(); k ++) {
         if(res[k].size() < pres[k].size()) res[k].resize(pres[k].size());
