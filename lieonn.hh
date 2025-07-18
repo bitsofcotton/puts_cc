@@ -3098,11 +3098,7 @@ template <typename T> static inline vector<SimpleVector<T> > clipBin(const vecto
 template <typename T> static inline T cutBin(const T& in) {
   static const T zero(int(0));
   static const T one(int(1));
-#if defined(_FLOAT_BITS_) || defined(_PERSISTENT_)
   T res(in - absfloor(in));
-#else
-  T res(in - (in < zero ? - floor(- in) : floor(in)));
-#endif
   return res <= zero ? res += one : res;
 }
 
@@ -4459,11 +4455,7 @@ template <typename T, bool useful> static inline SimpleVector<T> bitsG(const Sim
     for(int i = 0; i < d.size(); i ++)
       for(int j = 0; j < b; j ++) {
         T shift(d[i] * pow(T(int(2)), T(j)));
-#if defined(_FLOAT_BITS_) || defined(_PERSISTENT_)
         shift -= absfloor(shift);
-#else
-        shift -= floor(shift);
-#endif
         res[i * b + j] = useful ? shift : T(int(shift * T(int(2)) )) / T(int(2));
       }
   }
@@ -4740,11 +4732,7 @@ template <typename T, int nprogress> SimpleVector<T> pSectional(const vector<Sim
 //      we suppose at least cbrt(size / 2)-markov-made for input stream.
 template <typename T, int nprogress> SimpleVector<T> pMeasureable(const vector<SimpleVector<T> >& in, const string& strloop) {
   if(in.size() < 1) return SimpleVector<T>(); 
-#if defined(_PERSISTENT_) || defined(_FLOAT_BITS_)
   const int m(in.size() / 2 < 1 ? T(int(0)) : absfloor(sqrt(T(int((in.size() / 2 - 1) / 2)))));
-#else
-  const int m(in.size() / 2 < 1 ? T(int(0)) : floor(sqrt(T(int((in.size() / 2 - 1) / 2)))));
-#endif
   const int n(max(int(2), m));
   {
     static int lastn(0);
@@ -4858,12 +4846,48 @@ template <typename T, int nprogress> SimpleVector<T> pTail(const vector<SimpleVe
   return pGuarantee<T, nprogress>(work, b, loop, strloop);
 }
 
+// N.B. blend moderate temperature PRNG and make majority logic on them causes
+//      +1d add some measureable condition.
+template <typename T, int nprogress> SimpleVector<T> pPRandomMajority(const vector<SimpleVector<T> >& in0, const int& tail, const int& b, const int& loop, const string& strloop) {
+  if(b < 0) return pTail<T, nprogress>(in0, tail, - b, loop, strloop);
+  vector<SimpleVector<T> > in;
+  in.resize(in0.size());
+  for(int i = 0; i < in.size(); i ++) {
+    in[i].resize(in0[i].size() * abs(loop));
+    in[i].O();
+    for(int m = 0; m < in0[i].size(); m ++)
+      for(int k = 0; k < abs(loop); k ++)
+#if defined(_ARCFOUR_)
+        in[i][m * abs(loop) + k] = (arc4random() & 1) ?
+#else
+        in[i][m * abs(loop) + k] = (random() & 1) ?
+#endif
+          offsetHalf<T>(- unOffsetHalf<T>(in0[i][m])) : in0[i][m];
+  }
+  SimpleVector<T> pres(pTail<T, nprogress>(in, tail, b, loop, strloop));
+  SimpleVector<T> res;
+  res.resize(in0[0].size());
+  res.O();
+  for(int i = 0; i < res.size(); i ++)
+    for(int k = 0; k < abs(loop); k ++)
+#if defined(_ARCFOUR_)
+      res[i] += (arc4random() & 1) ?
+#else
+      res[i] += (random() & 1) ?
+#endif
+        offsetHalf<T>(- unOffsetHalf<T>(pres[i * abs(loop) + k])) :
+          pres[i * abs(loop) + k];
+  res /= T(abs(loop));
+  return res;
+}
+
+// N.B. repeat possible output whole range.
 template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const int& tail, const int& b, const int& loop, const string& strloop) {
   vector<SimpleVector<T> > res;
   res.reserve(in.size() / tail);
   for(int i = 1; i <= in.size() / tail; i ++)
-    res.emplace_back(pTail<T, nprogress>(skipX<SimpleVector<T> >(in, i),
-      tail, b, loop, string(" ") + to_string(i - 1) + string("/") +
+    res.emplace_back(pPRandomMajority<T, nprogress>(skipX<SimpleVector<T> >(in,
+      i), tail, b, loop, string(" ") + to_string(i - 1) + string("/") +
         to_string(in.size() / tail) + strloop));
   return res;
 }
@@ -4921,11 +4945,11 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 // N.B. we make the first hypothesis as the stream is input-stream
 //      half-cbrt-markov made also the function is defined from the input
 //      stream itself only in stable.
-// N.B. we also suppose 5 of the measureable condition.
+// N.B. we also suppose 6 of the measureable condition.
 //      the measureable condition's complement is null in ideal, since we're
 //      treating continuous objects' Poincare cut path of the points for
 //      the data stream, it's self describing in surface condition.
-//      so each 3,1[1-8] length is valid in such of the meanings.
+//      so each [34],1[1-9] length is valid in such of the meanings.
 // N.B. so markov condition's complement is complexity length is huge cases,
 //      however external of the low of the excluded middle convert to internal
 //      needs 3 variable dimension at all on possible near the root description,
@@ -4946,8 +4970,9 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 // N.B. layers:
 //       | function           | layer# | [wsp1] | data amount r   | time*(***) |
 //       +--------------------+--------+--------+-----------------+------------+
+//       | pPRandomMajority   | -1     | w      | in              | |loop|
 //       | pGuarantee         | 0      | w      | in              |
-//       | pPersistentP       | *      | w      | in              | loop
+//       | pPersistentP       | *      | w      | in              | |loop|
 //       | pPolish            | 1      | w      | in * 2          | 2
 //       | pMeasureable       | 1      | w      | in * sqrt(in)   | O(L^1/6)
 //       | pSectional         | 1      | w      | in * range      | 1
@@ -5007,7 +5032,7 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(const vector<vec
   return res;
 }
 
-template <typename T, int nprogress> vector<vector<SimpleMatrix<T> > > predMat0(const vector<vector<SimpleMatrix<T> > >& in0, const int& tail, const int& b, const int& loop, const string& strloop = string(")") ) {
+template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0, const int& tail, const int& b, const int& loop) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -5023,7 +5048,7 @@ template <typename T, int nprogress> vector<vector<SimpleMatrix<T> > > predMat0(
     }
   }
   vector<SimpleVector<T> > pres(
-    pRepeat<T, nprogress>(in, tail, b, loop, string(" (predMat") + strloop));
+    pRepeat<T, 20>(in, tail, b, loop, string(" (predMat") ));
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++) {
@@ -5036,41 +5061,6 @@ template <typename T, int nprogress> vector<vector<SimpleMatrix<T> > > predMat0(
             k * in0[0][0].cols(), in0[0][0].cols());
     }
   }
-  return res;
-}
-
-// N.B. from somehow, per-sub graphics improves T commands by tiny experiments.
-template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0, const int& tail, const int& b, const int& loop) {
-  if(0 <= loop) return predMat0<T, 20>(in0, tail, b, loop, string(": id.)") );
-  vector<vector<SimpleMatrix<T> > > res;
-  for(int i = 0; - i * loop < in0[0][0].rows(); i ++)
-    for(int j = 0; - j * loop < in0[0][0].cols(); j ++) {
-      vector<vector<SimpleMatrix<T> > > in;
-      in.resize(in0.size());
-      for(int k = 0; k < in.size(); k ++) {
-        in[k].resize(in0[k].size());
-        for(int m = 0; m < in[k].size(); m ++)
-          in[k][m] = in0[k][m].subMatrix(- i * loop, - j * loop,
-            min(- (i + 1) * loop, in0[k][m].rows()) + i * loop,
-              min(- (j + 1) * loop, in0[k][m].cols()) + j * loop);
-      }
-      if(! in[0][0].rows() || ! in[0][0].cols()) continue;
-      vector<vector<SimpleMatrix<T> > > pres(predMat0<T, 2>(in, tail, b, - 1,
-        string(": ") + to_string(- i * in0[0][0].cols() / loop + j) +
-          string("/") + to_string(in0[0][0].rows() * in0[0][0].cols() /
-            loop / loop) + string(")") ));
-      if(res.size() < pres.size()) res.resize(pres.size());
-      for(int k = 0; k < pres.size(); k ++) {
-        if(res[k].size() < pres[k].size()) res[k].resize(pres[k].size());
-        for(int m = 0; m < pres[k].size(); m ++) {
-          if(! res[k][m].rows() || ! res[k][m].cols()) {
-            res[k][m].resize(in0[0][0].rows(), in0[0][0].cols());
-            res[k][m].O();
-          }
-          res[k][m].setMatrix(- i * loop, - j * loop, pres[k][m]);
-        }
-      }
-    }
   return res;
 }
 
@@ -8160,6 +8150,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      wavy-entropy feeding bore first chase concerned on the catharsis bits
 //      also the internal states they or we have, however in the patternization
 //      meaning, it's selection from the saturated stream vs the stream we have.
+//      however, blending PRNG causes wavy to feed some stability on them.
 // (09) after some conversation with gemini around 2025/07, the jammers
 //      they have internal optimization calculation to output to saturate
 //      the stream intent condition or so also have the internal made intentions
