@@ -4773,7 +4773,9 @@ template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<Simple
   pnextcacher<T>(in.size(), 1);
 #pragma omp parallel for schedule(static, 1)
   for(int i = 1; i < in.size(); i ++) pnextcacher<T>(i, 1);
-  omp_set_max_active_levels(4);
+  // N.B. instead of this, use env OMP_MAX_ACTIVE_LEVELS=... to reduce
+  //      memory usage.
+  // omp_set_max_active_levels(4);
 #pragma omp parallel sections
   {
 #pragma omp section
@@ -4849,7 +4851,7 @@ template <typename T, int nprogress> SimpleVector<T> pTail(const vector<SimpleVe
 // N.B. blend moderate temperature PRNG and make majority logic on them causes
 //      +1d add some measureable condition.
 template <typename T, int nprogress> SimpleVector<T> pPRandomMajority(const vector<SimpleVector<T> >& in0, const int& tail, const int& b, const int& loop, const string& strloop) {
-  if(b < 0) return pTail<T, nprogress>(in0, tail, - b, loop, strloop);
+  if(b < 0) return pTail<T, nprogress>(in0, abs(tail), - b, loop, strloop);
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in.size(); i ++) {
@@ -4864,7 +4866,7 @@ template <typename T, int nprogress> SimpleVector<T> pPRandomMajority(const vect
 #endif
           offsetHalf<T>(- unOffsetHalf<T>(in0[i][m])) : in0[i][m];
   }
-  SimpleVector<T> pres(pTail<T, nprogress>(in, tail, b, loop, strloop));
+  SimpleVector<T> pres(pTail<T, nprogress>(in, abs(tail), b, tail < 0 ? - 1 : loop, strloop));
   SimpleVector<T> res;
   res.resize(in0[0].size());
   res.O();
@@ -5048,7 +5050,7 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vec
     }
   }
   vector<SimpleVector<T> > pres(
-    pRepeat<T, 20>(in, tail, b, loop, string(" (predMat") ));
+    pRepeat<T, 20>(in, tail, b, loop, string(" (predMat)") ));
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++) {
