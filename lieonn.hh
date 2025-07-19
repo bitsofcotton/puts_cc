@@ -4850,46 +4850,55 @@ template <typename T, int nprogress> SimpleVector<T> pTail(const vector<SimpleVe
 
 // N.B. blend moderate temperature PRNG and make majority logic on them causes
 //      +1d add some measureable condition.
-template <typename T, int nprogress> SimpleVector<T> pPRandomMajority(const vector<SimpleVector<T> >& in0, const int& tail, const int& b, const int& loop, const string& strloop) {
-  if(b < 0) return pTail<T, nprogress>(in0, abs(tail), - b, loop, strloop);
+template <typename T, int nprogress> SimpleVector<T> pPRandomMajority(const vector<SimpleVector<T> >& in0, const int& tail, const int& b, const string& strloop) {
+  const int ploop0(sqrt(T(int(in0[0].size())) ));
+        int ploop(tail < 0 ? - ploop0 : ploop0);
+  if(b < 0) return pTail<T, nprogress>(in0, abs(tail), - b, ploop, strloop);
+  // N.B. sqrt of thresh doesn't work well.
+  const T   thresh(pow(T(int(2)), - T(b) ));
+  const int loop(int(1) << b);
+  ploop *= b;
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in.size(); i ++) {
-    in[i].resize(in0[i].size() * abs(loop));
+    in[i].resize(in0[i].size() * loop);
     in[i].O();
     for(int m = 0; m < in0[i].size(); m ++)
-      for(int k = 0; k < abs(loop); k ++)
+      for(int k = 0; k < loop; k ++)
 #if defined(_ARCFOUR_)
-        in[i][m * abs(loop) + k] = (arc4random() & 1) ?
+        in[i][m * loop + k] = (arc4random() & 1) ?
 #else
-        in[i][m * abs(loop) + k] = (random() & 1) ?
+        in[i][m * loop + k] = (random() & 1) ?
 #endif
           offsetHalf<T>(- unOffsetHalf<T>(in0[i][m])) : in0[i][m];
   }
-  SimpleVector<T> pres(pTail<T, nprogress>(in, abs(tail), b, tail < 0 ? - 1 : loop, strloop));
+  SimpleVector<T> pres(pTail<T, nprogress>(in, abs(tail), b, ploop, strloop));
   SimpleVector<T> res;
   res.resize(in0[0].size());
   res.O();
   for(int i = 0; i < res.size(); i ++)
-    for(int k = 0; k < abs(loop); k ++)
+    for(int k = 0; k < loop; k ++)
 #if defined(_ARCFOUR_)
       res[i] += (arc4random() & 1) ?
 #else
       res[i] += (random() & 1) ?
 #endif
-        offsetHalf<T>(- unOffsetHalf<T>(pres[i * abs(loop) + k])) :
-          pres[i * abs(loop) + k];
-  res /= T(abs(loop));
+        offsetHalf<T>(- unOffsetHalf<T>(pres[i * loop + k])) :
+          pres[i * loop + k];
+  res /= T(loop);
+  for(int i = 0; i < res.size(); i ++)
+    if(abs(unOffsetHalf<T>(res[i])) <= thresh)
+      res[i] = offsetHalf<T>(T(int(0)));
   return res;
 }
 
 // N.B. repeat possible output whole range.
-template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const int& tail, const int& b, const int& loop, const string& strloop) {
+template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const int& tail, const int& b, const string& strloop) {
   vector<SimpleVector<T> > res;
   res.reserve(in.size() / tail);
   for(int i = 1; i <= in.size() / tail; i ++)
     res.emplace_back(pPRandomMajority<T, nprogress>(skipX<SimpleVector<T> >(in,
-      i), tail, b, loop, string(" ") + to_string(i - 1) + string("/") +
+      i), tail, b, string(" ") + to_string(i - 1) + string("/") +
         to_string(in.size() / tail) + strloop));
   return res;
 }
@@ -4963,6 +4972,10 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //      is 'feeding entropy stability' vs. 'n-markov size hypothesis' chase
 //      in some probability (> 1/2). also the sparse feeding is reduced by
 //      the pLebesgue feeding.
+// N.B. if our predictor focuses what information on the structure out of
+//      the table instead of what's on the input stream table, the shorter
+//      markov should behaves better. in this meaning, p0-[123]-length
+//      p0next have some advantages differed to the larger cases.
 // N.B. if we copy some structure on the purpose of prediction, the data amount
 //      3 * in (3 layers) for 2nd order saturation, 6 for multiple layer
 //      algebraic copying structure saturation, 9 for enough to decompose
@@ -4972,7 +4985,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 // N.B. layers:
 //       | function           | layer# | [wsp1] | data amount r   | time*(***) |
 //       +--------------------+--------+--------+-----------------+------------+
-//       | pPRandomMajority   | -1     | w      | in              | |loop|
+//       | pPRandomMajority   | -1     | w      | in              | 2^bits
 //       | pGuarantee         | 0      | w      | in              |
 //       | pPersistentP       | *      | w      | in              | |loop|
 //       | pPolish            | 1      | w      | in * 2          | 2
@@ -5009,7 +5022,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 // (***) time order ratio, L for input stream length, G for input vector size,
 //       stand from arithmatic operators. ind2varlen isn't considered.
 
-template <typename T> vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0, const int& tail, const int& b, const int& loop) {
+template <typename T> vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0, const int& b, const int& tail = 18) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -5023,7 +5036,7 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(const vector<vec
     }
   }
   vector<SimpleVector<T> > pres(
-    pRepeat<T, 20>(in, tail, b, loop, string(" (predVec)")));
+    pRepeat<T, 20>(in, tail, b, string(" (predVec)")));
   vector<vector<SimpleVector<T> > > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++) {
@@ -5034,7 +5047,7 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(const vector<vec
   return res;
 }
 
-template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0, const int& tail, const int& b, const int& loop) {
+template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0, const int& b, const int& tail = 18) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -5050,7 +5063,7 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vec
     }
   }
   vector<SimpleVector<T> > pres(
-    pRepeat<T, 20>(in, tail, b, loop, string(" (predMat)") ));
+    pRepeat<T, 20>(in, tail, b, string(" (predMat)") ));
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++) {
@@ -5066,7 +5079,7 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vec
   return res;
 }
 
-template <typename T> vector<SimpleSparseTensor(T)> predSTen(vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx, const int& tail, const int& b, const int& loop = - 1) {
+template <typename T> vector<SimpleSparseTensor(T)> predSTen(vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx, const int& b, const int& tail = 18) {
   assert(idx.size() && in0.size());
   // N.B. we don't do input scaling.
   // N.B. we should use each bit extended input stream but not now.
@@ -5097,7 +5110,7 @@ template <typename T> vector<SimpleSparseTensor(T)> predSTen(vector<SimpleSparse
   }
   in0.resize(0);
   vector<SimpleVector<T> > pres(
-    pRepeat<T, 20>(in, tail, b, loop, string(" (predSTen)")));
+    pRepeat<T, 20>(in, tail, b, string(" (predSTen)")));
   vector<SimpleSparseTensor(T) > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++)
@@ -7938,8 +7951,9 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
   os << input;
   vector<SimpleSparseTensor(T) > bin(in);
   corpus<T, U> pstats;
-  // XXX: fixed number
-  vector<SimpleSparseTensor(T)> p(predSTen<T>(in, idx, 18, 3));
+  int bits(absceil(- log(threshin) / log(T(int(2))) ));
+  // XXX: fixed number.
+  vector<SimpleSparseTensor(T)> p(predSTen<T>(in, idx, ++ bits));
   for(int i = 0; i < p.size(); i ++) {
     pstats.corpust = move(p[i]);
     getAbbreved<T>(pstats, detailtitle, detail, delimiter);
@@ -8147,12 +8161,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 // (07) there can be 0 invariant chain, so they can be caused by move average
 //      they caused return to average works very well.
 //      this is because <x,a> == 0, <[x,x+],[a,0]+[0,a]> == 0 chain in rough.
-// (08) the predictor vs jammer chase is also the which side
-//      bore first chase. after the pRepeat some exp, we conclude it's a
-//      wavy-entropy feeding bore first chase concerned on the catharsis bits
-//      also the internal states they or we have, however in the patternization
-//      meaning, it's selection from the saturated stream vs the stream we have.
-//      however, blending PRNG causes wavy to feed some stability on them.
+// (08) the predictor vs jammer chase is also the which side bore first chase.
 // (09) after some conversation with gemini around 2025/07, the jammers
 //      they have internal optimization calculation to output to saturate
 //      the stream intent condition or so also have the internal made intentions
@@ -8182,9 +8191,10 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      structures. this is to make the hypothesis n-markov's n as a input
 //      stream size, the invariant is come from another pre-trained inputs.
 //      mimicing ongoing machine learnings doing them.
-//      this might have dimension upper bound as 19,683 if they shirks
-//      generic i/o/(de)compression into externals but this can soon get
-//      saturated.
+//      this method have trivial upper bound of learning stream as
+//      2^(n-markov) because the combination saturates end this point.
+//      also applying into f(x,y,z) (de)?compression maximum apply onto
+//      external of low of the excluded middle also #f countup, it's 3^(3^3).
 
 #define _SIMPLELIN_
 #endif
