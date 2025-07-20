@@ -3083,33 +3083,15 @@ template <typename T> static inline T clipBin(const T& in) {
   return max(zero, min(one, in));
 }
 
-template <typename T> static inline T clipBin2(const T& in) {
-  static const T one(int(1));
-  static const T mone(- one);
-  return max(mone, min(one, in));
-}
-
 template <typename T> static inline SimpleVector<T> clipBin(const SimpleVector<T>& in) {
   SimpleVector<T> res(in);
   for(int i = 0; i < res.size(); i ++) res[i] = clipBin<T>(res[i]);
   return res;;
 }
 
-template <typename T> static inline SimpleVector<T> clipBin2(const SimpleVector<T>& in) {
-  SimpleVector<T> res(in);
-  for(int i = 0; i < res.size(); i ++) res[i] = clipBin2<T>(res[i]);
-  return res;;
-}
-
 template <typename T> static inline vector<SimpleVector<T> > clipBin(const vector<SimpleVector<T> >& in) {
   vector<SimpleVector<T> > res(in);
   for(int i = 0; i < res.size(); i ++) res[i] = clipBin<T>(res[i]);
-  return in;
-}
-
-template <typename T> static inline vector<SimpleVector<T> > clipBin2(const vector<SimpleVector<T> >& in) {
-  vector<SimpleVector<T> > res(in);
-  for(int i = 0; i < res.size(); i ++) res[i] = clipBin2<T>(res[i]);
   return in;
 }
 
@@ -4847,10 +4829,11 @@ template <typename T, int nprogress> SimpleVector<T> pPersistentP(const vector<S
 // N.B. to guarantee lim S f == S lim f also ||S input|| is in [0,1[-register.
 template <typename T, int nprogress> SimpleVector<T> pGuarantee(const vector<SimpleVector<T> >& in, const int& b, const int& loop, const string& strloop) {
   assert(0 < b);
-  // N.B. clipBin2 can clip useful information, this case isn't.
-  return clipBin2<T>(bitsG<T, true>(pPersistentP<T, nprogress>(
-    bitsG<T, true>(offsetHalf<T>(delta<SimpleVector<T> >(in)), b), loop,
-      strloop), - b) + in[in.size() - 1]);
+  // N.B. clipBin can clip useful information, this case isn't.
+  return unOffsetHalf<T>(
+    clipBin<T>(unOffsetHalf<T>(bitsG<T, true>(pPersistentP<T, nprogress>(
+      bitsG<T, true>(offsetHalf<T>(delta<SimpleVector<T> >(in)), b), loop,
+        strloop), - b)) + in[in.size() - 1]) );
 }
 
 // N.B. we only need some tails.
@@ -5008,7 +4991,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //      table is important case, we can gain some result meaning.
 //      also out of the low of the excluded middle either have cardinal
 //      meaning on the short range prediction goes better result.
-//      so each [34],1[1-9] length is valid in such of the meanings.
+//      so each [3,19] length is valid in such of the meanings.
 // N.B. if we copy some structure on the purpose of prediction, the data amount
 //      3 * in (3 layers) for 2nd order saturation, 6 for multiple layer
 //      algebraic copying structure saturation, 9 for enough to decompose
