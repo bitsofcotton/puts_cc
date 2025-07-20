@@ -3083,15 +3083,33 @@ template <typename T> static inline T clipBin(const T& in) {
   return max(zero, min(one, in));
 }
 
+template <typename T> static inline T clipBin2(const T& in) {
+  static const T one(int(1));
+  static const T mone(- one);
+  return max(mone, min(one, in));
+}
+
 template <typename T> static inline SimpleVector<T> clipBin(const SimpleVector<T>& in) {
   SimpleVector<T> res(in);
   for(int i = 0; i < res.size(); i ++) res[i] = clipBin<T>(res[i]);
   return res;;
 }
 
+template <typename T> static inline SimpleVector<T> clipBin2(const SimpleVector<T>& in) {
+  SimpleVector<T> res(in);
+  for(int i = 0; i < res.size(); i ++) res[i] = clipBin2<T>(res[i]);
+  return res;;
+}
+
 template <typename T> static inline vector<SimpleVector<T> > clipBin(const vector<SimpleVector<T> >& in) {
   vector<SimpleVector<T> > res(in);
   for(int i = 0; i < res.size(); i ++) res[i] = clipBin<T>(res[i]);
+  return in;
+}
+
+template <typename T> static inline vector<SimpleVector<T> > clipBin2(const vector<SimpleVector<T> >& in) {
+  vector<SimpleVector<T> > res(in);
+  for(int i = 0; i < res.size(); i ++) res[i] = clipBin2<T>(res[i]);
   return in;
 }
 
@@ -4829,11 +4847,10 @@ template <typename T, int nprogress> SimpleVector<T> pPersistentP(const vector<S
 // N.B. to guarantee lim S f == S lim f also ||S input|| is in [0,1[-register.
 template <typename T, int nprogress> SimpleVector<T> pGuarantee(const vector<SimpleVector<T> >& in, const int& b, const int& loop, const string& strloop) {
   assert(0 < b);
-  // XXX: clipBin
-  return unOffsetHalf<T>(
-    clipBin<T>(unOffsetHalf<T>(bitsG<T, true>(pPersistentP<T, nprogress>(
-      bitsG<T, true>(offsetHalf<T>(delta<SimpleVector<T> >(in)), b), loop,
-        strloop), - b)) + in[in.size() - 1]) );
+  // N.B. clipBin2 can clip useful information, this case isn't.
+  return clipBin2<T>(bitsG<T, true>(pPersistentP<T, nprogress>(
+    bitsG<T, true>(offsetHalf<T>(delta<SimpleVector<T> >(in)), b), loop,
+      strloop), - b) + in[in.size() - 1]);
 }
 
 // N.B. we only need some tails.
@@ -4983,27 +5000,15 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 
 // N.B. we make the first hypothesis as the stream is input-stream
 //      half-cbrt-markov made also the function is defined from the input
-//      stream itself only in stable.
+//      stream itself only in stable. attacking this structure needs
+//      unstable entropy feeding for the input stream.
 // N.B. we also suppose 6 of the measureable condition.
-//      the measureable condition's complement is null in ideal, since we're
-//      treating continuous objects' Poincare cut path of the points for
-//      the data stream, it's self describing in surface condition.
+//      so if the structure on the datastream which isn't information amount
+//      on the datastream is important, in another words what's not on the
+//      table is important case, we can gain some result meaning.
+//      also out of the low of the excluded middle either have cardinal
+//      meaning on the short range prediction goes better result.
 //      so each [34],1[1-9] length is valid in such of the meanings.
-// N.B. so markov condition's complement is complexity length is huge cases,
-//      however external of the low of the excluded middle convert to internal
-//      needs 3 variable dimension at all on possible near the root description,
-//      the cardinal condition is also valid in such of the length.
-// N.B. the worse structures always have catharsis bits in their internal states
-//      to make some gulfs into the predictors' continuity when they appear.
-//      however, the stable feeding catharsis bits isn't affects gulf when
-//      they have stable stance for input stream generation, so the conclusion
-//      is 'feeding entropy stability' vs. 'n-markov size hypothesis' chase
-//      in some probability (> 1/2). also the sparse feeding is reduced by
-//      the pLebesgue feeding.
-// N.B. if our predictor focuses what information on the structure out of
-//      the table instead of what's on the input stream table, the shorter
-//      markov should behaves better. in this meaning, p0-[123]-length
-//      p0next have some advantages differed to the larger cases.
 // N.B. if we copy some structure on the purpose of prediction, the data amount
 //      3 * in (3 layers) for 2nd order saturation, 6 for multiple layer
 //      algebraic copying structure saturation, 9 for enough to decompose
@@ -5013,25 +5018,26 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 // N.B. layers:
 //       | function           | layer# | [wsp1] | data amount r   | time*(***) |
 //       +--------------------+--------+--------+-----------------+------------+
-//       | pPRandomMajority   | -1     | w      | in              | 2^bits
-//       | pGuarantee         | 0      | w      | in              |
-//       | pPersistentP       | *      | w      | in              | |loop|
-//       | pPolish            | 1      | w      | in * 2          | 2
-//       | pMeasureable       | 1      | w      | in * sqrt(in)   | O(L^1/6)
-//       | pSectional         | 1      | w      | in * range      | 1
-//       | pLebesgue          | 2      | w      | in * range^2    | range
-//       | pCbrtMarkov        | 3      | w      | in * cbrt(in)   | +O(GL^(5/3))
-//       | after burn with p0next, loop| 4++ | w | in         | O(L)+O(GL+L^3)
-//       | divide by program invariant | 5+  | s | in         | +O(GL)
-//       | burn invariant by p0next    | 6++ | s | ~in*varlen | +O(GL+L^3)
-//       | makeProgramInvariant        | 7+  | p | in         | +O(GL)
+//       | pPersistentQ       | 0     | w      | in              | O(sqrt(G))
+//       | pPRandomMajority   | 0     | w      | in              | 2^bits
+//       | pGuarantee         | 1      | w      | in              |
+//       | pPersistentP       | *      | w      | in              | O(sqrt(G))
+//       | pPolish            | 2      | w      | in * 2          | 2
+//       | pMeasureable       | 2      | w      | in * sqrt(in)   | O(L^1/6)
+//       | pSectional         | 2      | w      | in * range      | 1
+//       | pLebesgue          | 3      | w      | in * range^2    | range
+//       | pCbrtMarkov        | 4      | w      | in * cbrt(in)   | +O(GL^(5/3))
+//       | after burn with p0next, loop| 5++ | w | in         | O(L)+O(GL+L^3)
+//       | divide by program invariant | 6+  | s | in         | +O(GL)
+//       | burn invariant by p0next    | 7++ | s | ~in*varlen | +O(GL+L^3)
+//       | makeProgramInvariant        | 8+  | p | in         | +O(GL)
 //       | linearInvariant             | -   | - | -          |
-//       |   - QR decomposition        | 9+* | s | > in * 4!  | O(GL)
-//       |   - orthogonalization       | 11+*| p | > in * 4!  | O(4!)
-//       |   - solve                   | 13* | p | > (4 * 4)  | +O(4^3)
-//       | T::operator *,/             | 14+ | 1 | in         |
-//       | T::operator +,-             | 15+ | 1 | in         |
-//       | T::bit operation            | 16+ | 1 | in         |
+//       |   - QR decomposition        | 10+*| s | > in * 4!  | O(GL)
+//       |   - orthogonalization       | 12+*| p | > in * 4!  | O(4!)
+//       |   - solve                   | 14* | p | > (4 * 4)  | +O(4^3)
+//       | T::operator *,/             | 15+ | 1 | in         |
+//       | T::operator +,-             | 16+ | 1 | in         |
+//       | T::bit operation            | 17+ | 1 | in         |
 // *(++) | sumCNext           | +0     | s      | in              |
 //       | sumCNext           | +1     | s      | in              |
 //       | logCNext           | +2     | s      | in              |
@@ -5049,6 +5055,10 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       | T::bit operation            | +14 | 1 | in         |
 // (***) time order ratio, L for input stream length, G for input vector size,
 //       stand from arithmatic operators. ind2varlen isn't considered.
+// N.B. total O(((GL)^2+L^3) * L^1/6) calculation time we need, this exceeds a
+//      square of memory region usage also we cannot shrink down in loop
+//      hard optimization case except for the ratio L^1/6 if algorithm is
+//      complex enough however in many core condition we can.
 
 template <typename T> vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0, const int& b, const int& tail = 18) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
@@ -8219,6 +8229,11 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      2^(n-markov) because the combination saturates end this point.
 //      also applying into f(x,y,z) (de)?compression maximum apply onto
 //      external of low of the excluded middle also #f countup, it's 3^(3^3).
+//      also the external of low of the excluded middle also have the structure
+//      hypothesis, we can extrapolate one of the structure is the hypothesis
+//      masp have and our calculation base N is on the dimension description
+//      on the matrix.rows(), so the condition 3^(3^3) is to shirk external
+//      dictionaly whole the entropy feedings.
 
 #define _SIMPLELIN_
 #endif

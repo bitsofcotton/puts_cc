@@ -105,4 +105,5 @@ This repository is archived, so without bug report, will no change.
 2025/07/13 merge latest ddpmopt result.
 2025/07/14-16 merge latest ddpmopt result, however, predSTen argments isn't optimal we have now.
 2025/07/17-19 merge latest ddpmopt result, either predSTen argments isn't optimal we have now.
+2025/07/20 merge latest ddpmopt result. configured predSTen params.
 
