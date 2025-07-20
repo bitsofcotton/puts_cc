@@ -4986,12 +4986,30 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //      stream itself only in stable. attacking this structure needs
 //      unstable entropy feeding for the input stream.
 // N.B. we also suppose 6 of the measureable condition.
-//      so if the structure on the datastream which isn't information amount
-//      on the datastream is important, in another words what's not on the
-//      table is important case, we can gain some result meaning.
+//      so if the structure on the datastream which information amount isn't
+//      important, in another words what's not on the table is important case,
+//      we can gain some result meaning also this justifies shorter range.
 //      also out of the low of the excluded middle either have cardinal
 //      meaning on the short range prediction goes better result.
-//      so each [3,19] length is valid in such of the meanings.
+//      so each [3,20[ length is valid in such of the meanings.
+// N.B. in this meaning, if we treat whole input stream as a payload,
+//      we also need the explicit whole context on our predictor as
+//      2*(input stream size)^3 - (input stream size) as a learning entity.
+//      we omit this implementation because this is equivalent to large input
+//      stream with selective separation.
+// N.B. this method also have trivial upper bound of learning stream as
+//      2^(n-markov) because the combination saturates end this point.
+//      also applying into f(x,y,z) (de)?compression maximum apply onto
+//      external of low of the excluded middle also #f countup, it's 3^(3^3).
+//      also the external of low of the excluded middle also have the structure
+//      hypothesis, we can extrapolate one of the structure is the hypothesis
+//      masp have and our calculation base N is on the dimension description
+//      on the matrix.rows(), so the condition 3^(3^3) is to shirk external
+//      dictionaly whole the entropy feedings.
+//      combining this concludes whole length size as 12 on single layer,
+//      this matches [3,20[ length whole.
+// N.B. (de)?compression after/before to prediction method is partially done
+//      by masp ans so on in our toolset.
 // N.B. if we copy some structure on the purpose of prediction, the data amount
 //      3 * in (3 layers) for 2nd order saturation, 6 for multiple layer
 //      algebraic copying structure saturation, 9 for enough to decompose
@@ -5001,8 +5019,8 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 // N.B. layers:
 //       | function           | layer# | [wsp1] | data amount r   | time*(***) |
 //       +--------------------+--------+--------+-----------------+------------+
-//       | pPersistentQ       | 0     | w      | in              | O(sqrt(G))
-//       | pPRandomMajority   | 0     | w      | in              | 2^bits
+//       | pPersistentQ       | 0      | w      | in              | O(sqrt(G))
+//       | pPRandomMajority   | 0      | w      | in              | 2^bits
 //       | pGuarantee         | 1      | w      | in              |
 //       | pPersistentP       | *      | w      | in              | O(sqrt(G))
 //       | pPolish            | 2      | w      | in * 2          | 2
@@ -5028,20 +5046,18 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       | northPoleNext      | +4     | s      | in              |
 //       | invNext            | +5     | s      | in              |
 //       | sumCNext           | +6     | s      | in              |
-//       | pnext              | +7     | s      | in+once(dft(6)) | O(GL)
-//       | integrate-diff in taylorc   | +8  | p | once(dft(6 * 2)) |
-//       | exp to shift   in taylorc   | +9  | p | once(dft(6 * 2)) |
-//       | dft                         | +10 | p | once(dft(6 * 2)) |
-//       | exp-log complex operation   | +11 | 1 | once(taylor(1))  |
-//       | T::operator *,/             | +12 | 1 | in         |
-//       | T::operator +,-             | +13 | 1 | in         |
-//       | T::bit operation            | +14 | 1 | in         |
+//       | pnext              | +7     | s      | in+once(dft)    | O(GL)
+//       | integrate-diff in taylorc  | +8  | p | once(dft)       |
+//       | exp to shift   in taylorc  | +9  | p | once(dft)       |
+//       | dft                        | +10 | p | once(dft)       |
+//       | exp-log complex operation  | +11 | 1 | once(taylor)    |
+//       | T::operator *,/            | +12 | 1 | in              |
+//       | T::operator +,-            | +13 | 1 | in              |
+//       | T::bit operation           | +14 | 1 | in              |
 // (***) time order ratio, L for input stream length, G for input vector size,
 //       stand from arithmatic operators. ind2varlen isn't considered.
-// N.B. total O(((GL)^2+L^3) * L^1/6) calculation time we need, this exceeds a
-//      square of memory region usage also we cannot shrink down in loop
-//      hard optimization case except for the ratio L^1/6 if algorithm is
-//      complex enough however in many core condition we can.
+// N.B. total O((GL)^2*L^(1/6)+L^3) calculation time we need, this exceeds a
+//      square of memory region usage.
 
 template <typename T> vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0, const int& b, const int& tail = 18) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
@@ -8076,7 +8092,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
   return;
 }
 
-// N.B. numbering is last renumbered 2025/07/15:
+// N.B. numbering is last renumbered 2025/07/21:
 // N.B. once implemented but abandoned and cleaned from this source code
 //      the reason why
 // (00) predictions via linear sum/diff based some reformation input and revert:
@@ -8166,57 +8182,37 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      sign bit result can be {1/3,1/3,1/3} in the best.
 // (04) if we're lucky enough, the static input stream can have 1 a.e. output
 //      as some of the shrinked output theirselves.
-// (05) the predictor vs. jammer made stream concludes the saturated input
-//      stream, the case is also to make dynamic dictionary to the input
-//      stream on such of a layer. so ddpmopt [+-] also the masp + is intended
-//      to make this, however they should have many much of the input stream
-//      size.
-// (06) so to extend them needs the much better problem information and to get
+// (05) the predictor vs. jammer made stream concludes the saturated input.
+//      also the condition is the which side bore first chase.
+//      so to extend them needs the much better problem information and to get
 //      better form to the stream. either, if the saturated result we get,
 //      we should reform the transformation structure for preprocess
 //      as to separate something.
-// (07) there can be 0 invariant chain, so they can be caused by move average
+// (06) there can be 0 invariant chain, so they can be caused by move average
 //      they caused return to average works very well.
 //      this is because <x,a> == 0, <[x,x+],[a,0]+[0,a]> == 0 chain in rough.
-// (08) the predictor vs jammer chase is also the which side bore first chase.
-// (09) after some conversation with gemini around 2025/07, the jammers
+// (07) after some conversation with gemini around 2025/07, the jammers
 //      they have internal optimization calculation to output to saturate
 //      the stream intent condition or so also have the internal made intentions
 //      to jam out the stream.
 //
 // N.B. another variants of the predictors fight with 2*3*2 pattern of #f
-//      fixation. (however, we don't use initial internal states, it's only 4).
-//      (00), (01), (02) is already implemented p01?2?next also we use 4 of
-//      a measureable condition. either, pred(Vec|Mat|STen) prediction untangles
-//      twice by two candidates so we perhaps don't need them.
-// (10) with taking multiplication invariant on f,
+//      fixation. since we have 6 of measureable condition, we perhaps don't
+//      need them.
+// (00) with taking multiplication invariant on f,
 //      S f(x) dx = S det(J((1,g0,...)/(1,x0,...)) dx0 ...
 //      retaking their addition invariant as det(...) == 0, the given function
 //      g0 ... should fit them also they describes much of continuities.
 //      this can flatten N when our N is something infected.
 //      also this is the analogy {1,x,x^2,...} on p0next meaning.
-// (11) saturating F_2^4 #f, the bra, ket condition indirect access.
-// (12) untangle by DFT or Wavelet triple. this is because R^R untangle
+// (01) untangle by DFT or Wavelet triple. this is because R^R untangle
 //      one by one causes Wavelet(Wavelet(Fourier+Discrete)+Discrete)+Discrete
-//      causes only a combination ordinal.
-// (13) (de)?compress after/before to out/input some of the range.
-// (14) brute force (de)?compressed out/input into internal states/output
-//      function number. this needs 19,683*19,683 table size we cannot treat
-//      on our machine. this shirks F_2^4 #f all of the generic i/o table
-//      then we brute force function listing.
-// (15) to make the hypotheis the input stream is only payload to known
-//      structures. this is to make the hypothesis n-markov's n as a input
-//      stream size, the invariant is come from another pre-trained inputs.
-//      mimicing ongoing machine learnings doing them.
-//      this method have trivial upper bound of learning stream as
-//      2^(n-markov) because the combination saturates end this point.
-//      also applying into f(x,y,z) (de)?compression maximum apply onto
-//      external of low of the excluded middle also #f countup, it's 3^(3^3).
-//      also the external of low of the excluded middle also have the structure
-//      hypothesis, we can extrapolate one of the structure is the hypothesis
-//      masp have and our calculation base N is on the dimension description
-//      on the matrix.rows(), so the condition 3^(3^3) is to shirk external
-//      dictionaly whole the entropy feedings.
+//      causes only a combination ordinal, we need Discrete part separation
+//      other than dft/Decompose class.
+// (02) saturating F_2^4 #f, the bra, ket condition indirect access.
+// (03) brute force (de)?compressed out/input into internal states/output
+//      function number. we can do this with masp concerns with small sized
+//      predictors.
 
 #define _SIMPLELIN_
 #endif
