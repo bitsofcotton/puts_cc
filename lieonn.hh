@@ -3377,11 +3377,7 @@ template <typename T> SimpleVector<T> pnextcacher(const int& size, const int& st
   return nonthreadsafe = (dft<T>(- size) * (dft<T>(size * 2).subMatrix(0, 0, size, size * 2) * taylorc<T>(size * 2, T(step < 0 ? step * 2 : (size + step) * 2 - 1), T(step < 0 ? step * 2 + 2 : (size + step) * 2 - 3)) )).template real<T>();
 }
 #else
-#if defined(_OPENMP)
-template <typename T> SimpleVector<T> pnextcacher(const int& size, const int& step) {
-#else
 template <typename T> const SimpleVector<T>& pnextcacher(const int& size, const int& step) {
-#endif
   assert(0 < size && 0 <= step);
   static vector<vector<SimpleVector<T> > > cp;
   if(cp.size() <= size)
@@ -3680,8 +3676,8 @@ template <typename T> static inline T p012next(const SimpleVector<T>& d, const i
       work[work.size() - 1] = invariant.dot(invariant) <= T(int(0)) ? T(int(0))
         : revertByProgramInvariant<T, true>(work, invariant);
       const T score(unOffsetHalf<T>(invariant.dot(
-        makeProgramInvariant<T>(work, T(int(1))).first) *
-          T(cat[i].first.size()) ));
+        makeProgramInvariant<T>(work, T(int(1))).first) ) *
+          T(cat[i].first.size()) );
       res    += score * unOffsetHalf<T>(work[work.size() - 1]);
       sscore += abs(score);
     } else for(int k = 0; k < cat[i].first.size(); k ++) {
@@ -4834,9 +4830,10 @@ template <typename T, int nprogress> SimpleVector<T> pPersistentP(const vector<S
 template <typename T, int nprogress> SimpleVector<T> pGuarantee(const vector<SimpleVector<T> >& in, const int& b, const int& loop, const string& strloop) {
   assert(0 < b);
   // XXX: clipBin
-  return clipBin<T>(unOffsetHalf<T>(bitsG<T, true>(pPersistentP<T, nprogress>(
-    bitsG<T, true>(offsetHalf<T>(delta<SimpleVector<T> >(in)), b), loop,
-      strloop), - b)) + in[in.size() - 1]);
+  return unOffsetHalf<T>(
+    clipBin<T>(unOffsetHalf<T>(bitsG<T, true>(pPersistentP<T, nprogress>(
+      bitsG<T, true>(offsetHalf<T>(delta<SimpleVector<T> >(in)), b), loop,
+        strloop), - b)) + in[in.size() - 1]) );
 }
 
 // N.B. we only need some tails.
@@ -4883,13 +4880,44 @@ template <typename T, int nprogress> SimpleVector<T> pPRandomMajority(const vect
 #else
       res[i] += (random() & 1) ?
 #endif
-        offsetHalf<T>(- unOffsetHalf<T>(pres[i * loop + k])) :
-          pres[i * loop + k];
+        - pres[i * loop + k] : pres[i * loop + k];
   res /= T(loop);
   for(int i = 0; i < res.size(); i ++)
-    if(abs(unOffsetHalf<T>(res[i])) <= thresh)
-      res[i] = offsetHalf<T>(T(int(0)));
+    if(abs(res[i]) <= thresh)
+      res[i] = T(int(0));
   return res;
+}
+
+// N.B. persistent retry on the unpredictable places.
+template <typename T, int nprogress> SimpleVector<T> pPersistentQ(const vector<SimpleVector<T> >& in, const int& tail, const int& b, const string& strloop) {
+  SimpleVector<T> res(pPRandomMajority<T, nprogress>(in, tail, b,
+    string(" 0") + strloop));
+  int last(res.size());
+  const int loop(sqrt(T(int(in[0].size())) ));
+  for(int i = 1; tail <= 0 || i < loop; i ++) {
+    vector<int> midx;
+    midx.reserve(res.size());
+    for(int j = 0; j < res.size(); j ++)
+      if(res[j] == T(int(0))) midx.emplace_back(j);
+    if(last == midx.size() || midx.size() < 2) break;
+    last = midx.size();
+    vector<SimpleVector<T> > work;
+    work.resize(in.size(), SimpleVector<T>(midx.size()).O());
+    for(int j = 0; j < work.size(); j ++)
+      for(int k = 0; k < work[j].size(); k ++)
+        work[j][k] = in[j][midx[k]];
+    SimpleVector<T> wres(pPRandomMajority<T, nprogress>(work, tail, b,
+      string(" ") + to_string(i) + strloop));
+    assert(wres.size() == midx.size());
+    for(int j = 0; j < midx.size(); j ++) res[midx[j]] = move(wres[j]);
+  }
+  if(nprogress) {
+    last = 0;
+    for(int j = 0; j < res.size(); j ++)
+      if(res[j] == T(int(0))) last ++;
+    cerr << "pPersistentQ: " << last << "dimension remains." << endl;
+  }
+  return offsetHalf<T>(res);
 }
 
 // N.B. repeat possible output whole range.
@@ -4897,7 +4925,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vect
   vector<SimpleVector<T> > res;
   res.reserve(in.size() / tail);
   for(int i = 1; i <= in.size() / tail; i ++)
-    res.emplace_back(pPRandomMajority<T, nprogress>(skipX<SimpleVector<T> >(in,
+    res.emplace_back(pPersistentQ<T, nprogress>(skipX<SimpleVector<T> >(in,
       i), tail, b, string(" ") + to_string(i - 1) + string("/") +
         to_string(in.size() / tail) + strloop));
   return res;
@@ -5081,9 +5109,6 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vec
 
 template <typename T> vector<SimpleSparseTensor(T)> predSTen(vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx, const int& b, const int& tail = 18) {
   assert(idx.size() && in0.size());
-  // N.B. we don't do input scaling.
-  // N.B. we should use each bit extended input stream but not now.
-  //      they uses large enough memory we cannot comput on our machines.
   vector<SimpleVector<T> > in;
   vector<pair<int, pair<int, int> > > attend;
   in.resize(in0.size());
@@ -7952,7 +7977,6 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
   vector<SimpleSparseTensor(T) > bin(in);
   corpus<T, U> pstats;
   int bits(absceil(- log(threshin) / log(T(int(2))) ));
-  // XXX: fixed number.
   vector<SimpleSparseTensor(T)> p(predSTen<T>(in, idx, ++ bits));
   for(int i = 0; i < p.size(); i ++) {
     pstats.corpust = move(p[i]);
