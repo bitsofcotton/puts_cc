@@ -3045,35 +3045,35 @@ template <typename T> static inline SimpleVector<T> binMargin(const SimpleVector
   return res;
 }
 
-template <typename T> static inline T offsetHalf(const T& in) {
-  return (in + T(int(1))) / T(int(2));
+template <typename T> static inline T offsetHalf(const T& in, const T& o = T(int(1)) ) {
+  return (in + o) / (T(int(1)) + o);
 }
 
-template <typename T> static inline SimpleVector<T> offsetHalf(const SimpleVector<T>& in) {
+template <typename T> static inline SimpleVector<T> offsetHalf(const SimpleVector<T>& in, const T& o = T(int(1)) ) {
   SimpleVector<T> res(in);
-  for(int i = 0; i < res.size(); i ++) res[i] = offsetHalf<T>(res[i]);
+  for(int i = 0; i < res.size(); i ++) res[i] = offsetHalf<T>(res[i], o);
   return res;
 }
 
-template <typename T> static inline vector<SimpleVector<T> > offsetHalf(const vector<SimpleVector<T> >& in) {
+template <typename T> static inline vector<SimpleVector<T> > offsetHalf(const vector<SimpleVector<T> >& in, const T& o = T(int(1)) ) {
   vector<SimpleVector<T> > res(in);
-  for(int i = 0; i < res.size(); i ++) res[i] = offsetHalf<T>(res[i]);
+  for(int i = 0; i < res.size(); i ++) res[i] = offsetHalf<T>(res[i], o);
   return res;
 }
 
-template <typename T> static inline T unOffsetHalf(const T& in) {
-  return in * T(int(2)) - T(int(1));
+template <typename T> static inline T unOffsetHalf(const T& in, const T& o = T(int(1)) ) {
+  return in * (T(int(1)) + o) - o;
 }
 
-template <typename T> static inline SimpleVector<T> unOffsetHalf(const SimpleVector<T>& in) {
+template <typename T> static inline SimpleVector<T> unOffsetHalf(const SimpleVector<T>& in, const T& o = T(int(1)) ) {
   SimpleVector<T> res(in);
-  for(int i = 0; i < res.size(); i ++) res[i] = unOffsetHalf<T>(res[i]);
+  for(int i = 0; i < res.size(); i ++) res[i] = unOffsetHalf<T>(res[i], o);
   return res;
 }
 
-template <typename T> static inline vector<SimpleVector<T> > unOffsetHalf(const vector<SimpleVector<T> >& in) {
+template <typename T> static inline vector<SimpleVector<T> > unOffsetHalf(const vector<SimpleVector<T> >& in, const T& o = T(int(1)) ) {
   vector<SimpleVector<T> > res(in);
-  for(int i = 0; i < res.size(); i ++) res[i] = unOffsetHalf<T>(res[i]);
+  for(int i = 0; i < res.size(); i ++) res[i] = unOffsetHalf<T>(res[i], o);
   return res;
 }
 
@@ -3092,7 +3092,7 @@ template <typename T> static inline SimpleVector<T> clipBin(const SimpleVector<T
 template <typename T> static inline vector<SimpleVector<T> > clipBin(const vector<SimpleVector<T> >& in) {
   vector<SimpleVector<T> > res(in);
   for(int i = 0; i < res.size(); i ++) res[i] = clipBin<T>(res[i]);
-  return in;
+  return res;
 }
 
 template <typename T> static inline T cutBin(const T& in) {
@@ -4724,38 +4724,11 @@ template <typename T, int nprogress> SimpleVector<T> pSectional(const vector<Sim
   return res;
 }
 
-// N.B. we average all of the candidates on possible much many ranges.
-//      we suppose at least cbrt(size / 2)-markov-made for input stream.
+// N.B. we suppose cbrt(size / 2)-markov-made for input stream.
 template <typename T, int nprogress> SimpleVector<T> pMeasureable(const vector<SimpleVector<T> >& in, const string& strloop) {
   if(in.size() < 1) return SimpleVector<T>(); 
-  const int m(in.size() / 2 < 1 ? T(int(0)) : absfloor(sqrt(T(int((in.size() / 2 - 1) / 2)))));
-  const int n(max(int(2), m));
-  {
-    static int lastn(0);
-    if(lastn != n) {
-      cerr << "pMeasure: " << n << "loop" << endl;
-      lastn = n;
-    }
-  }
-  vector<SimpleVector<T> > res;
-  res.resize(n + 1 - 2);
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
-  for(int i = 2; i <= n; i ++) {
-    SimpleVector<T> p(pSectional<T, nprogress>(in, i,
-      string(", ") + to_string(i - 1) + string("/") +
-        to_string(n) + string(")") + strloop) );
-#if defined(_OPENMP)
-#pragma omp critical
-#endif
-    {
-      res[i - 2] = move(p);
-    }
-  }
-  assert(res.size() && res[0].size());
-  for(int i = 1; i < res.size(); i ++) res[0] += res[i];
-  return res[0] /= T(res.size());
+  const int n(in.size() / 2 < 1 ? T(int(0)) : absfloor(sqrt(T(int((in.size() / 2 - 1) / 2)))));
+  return pSectional<T, nprogress>(in, max(int(2), n), strloop);
 }
 
 // N.B. the result somehow not offsetted so we offset to 0.
@@ -4777,13 +4750,13 @@ template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<Simple
 #pragma omp section
 #endif
     {
-      resp =   pMeasureable<T, nprogress>(in,  string("+") + strloop);
+      resp =   pMeasureable<T, nprogress>(in,  string("+)") + strloop);
     }
 #if defined(_OPENMP)
 #pragma omp section
 #endif
     {
-      resm = - pMeasureable<T, nprogress>(inm, string("-") + strloop);
+      resm =   pMeasureable<T, nprogress>(inm, string("+)") + strloop);
     }
 #if defined(_OPENMP)
   }
@@ -4829,11 +4802,11 @@ template <typename T, int nprogress> SimpleVector<T> pPersistentP(const vector<S
 // N.B. to guarantee lim S f == S lim f also ||S input|| is in [0,1[-register.
 template <typename T, int nprogress> SimpleVector<T> pGuarantee(const vector<SimpleVector<T> >& in, const int& b, const int& loop, const string& strloop) {
   assert(0 < b);
-  // N.B. clipBin can clip useful information, this case isn't.
-  return unOffsetHalf<T>(
-    clipBin<T>(unOffsetHalf<T>(bitsG<T, true>(pPersistentP<T, nprogress>(
-      bitsG<T, true>(offsetHalf<T>(delta<SimpleVector<T> >(in)), b), loop,
-        strloop), - b)) + in[in.size() - 1]) );
+  // N.B. clipBin can clip useful information.
+  return unOffsetHalf<T>(clipBin<T>(unOffsetHalf<T>(bitsG<T, true>(
+    pPersistentP<T, nprogress>(bitsG<T, true>(clipBin<T>(offsetHalf<T>(
+      delta<SimpleVector<T> >(in)) ), b), loop, strloop), - b)) +
+        in[in.size() - 1]));
 }
 
 // N.B. we only need some tails.
@@ -4925,8 +4898,8 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vect
   vector<SimpleVector<T> > res;
   res.reserve(in.size() / tail);
   for(int i = 1; i <= in.size() / tail; i ++)
-    res.emplace_back(pPersistentQ<T, nprogress>(skipX<SimpleVector<T> >(in,
-      i), tail, b, string(" ") + to_string(i - 1) + string("/") +
+    res.emplace_back(pPersistentQ<T, nprogress>(skipX<SimpleVector<T> >(in, i),
+      tail, b, string(" ") + to_string(i - 1) + string("/") +
         to_string(in.size() / tail) + strloop));
   return res;
 }
@@ -4983,15 +4956,12 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 
 // N.B. we make the first hypothesis as the stream is input-stream
 //      half-cbrt-markov made also the function is defined from the input
-//      stream itself only in stable. attacking this structure needs
-//      unstable entropy feeding for the input stream.
-// N.B. we also suppose 6 of the measureable condition.
+//      stream itself only. we also suppose 6 of the measureable condition.
 //      so if the structure on the datastream which information amount isn't
 //      important, in another words what's not on the table is important case,
 //      we can gain some result meaning also this justifies shorter range.
 //      also out of the low of the excluded middle either have cardinal
-//      meaning on the short range prediction goes better result.
-//      so each [3,20[ length is valid in such of the meanings.
+//      meaning on the same. so each [3,20[ length is valid in them.
 // N.B. in this meaning, if we treat whole input stream as a payload,
 //      we also need the explicit whole context on our predictor as
 //      2*(input stream size)^3 - (input stream size) as a learning entity.
@@ -5001,15 +4971,13 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //      2^(n-markov) because the combination saturates end this point.
 //      also applying into f(x,y,z) (de)?compression maximum apply onto
 //      external of low of the excluded middle also #f countup, it's 3^(3^3).
-//      also the external of low of the excluded middle also have the structure
-//      hypothesis, we can extrapolate one of the structure is the hypothesis
-//      masp have and our calculation base N is on the dimension description
-//      on the matrix.rows(), so the condition 3^(3^3) is to shirk external
-//      dictionaly whole the entropy feedings.
+//      with they have the structure hypothesis, we can extrapolate one of the
+//      structure is the hypothesis masp have and our calculation base N is on
+//      the dimension description on the matrix.rows(), so the condition 3^(3^3)
+//      is to shirk external dictionary whole the entropy feedings.
 //      combining this concludes whole length size as 12 on single layer,
-//      this matches [3,20[ length whole.
-// N.B. (de)?compression after/before to prediction method is partially done
-//      by masp ans so on in our toolset.
+//      this matches [3,20[ length whole. so (de)?compression after/before to
+//      prediction method is partially done by masp and so on in our toolset.
 // N.B. if we copy some structure on the purpose of prediction, the data amount
 //      3 * in (3 layers) for 2nd order saturation, 6 for multiple layer
 //      algebraic copying structure saturation, 9 for enough to decompose
@@ -5017,46 +4985,46 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //      only depends on the tanglement number based accuracy reason on
 //      calculation surface.
 // N.B. layers:
-//       | function           | layer# | [wsp1] | data amount r   | time*(***) |
+//       | function           | layer# | [wsp1] | data amount* | time*(***) |
 //       +--------------------+--------+--------+-----------------+------------+
-//       | pPersistentQ       | 0      | w      | in              | O(sqrt(G))
-//       | pPRandomMajority   | 0      | w      | in              | 2^bits
-//       | pGuarantee         | 1      | w      | in              |
-//       | pPersistentP       | *      | w      | in              | O(sqrt(G))
-//       | pPolish            | 2      | w      | in * 2          | 2
-//       | pMeasureable       | 2      | w      | in * sqrt(in)   | O(L^1/6)
-//       | pSectional         | 2      | w      | in * range      | 1
-//       | pLebesgue          | 3      | w      | in * range^2    | range
-//       | pCbrtMarkov        | 4      | w      | in * cbrt(in)   | +O(GL^(5/3))
-//       | after burn with p0next, loop| 5++ | w | in         | O(L)+O(GL+L^3)
-//       | divide by program invariant | 6+  | s | in         | +O(GL)
-//       | burn invariant by p0next    | 7++ | s | ~in*varlen | +O(GL+L^3)
-//       | makeProgramInvariant        | 8+  | p | in         | +O(GL)
-//       | linearInvariant             | -   | - | -          |
-//       |   - QR decomposition        | 10+*| s | > in * 4!  | O(GL)
-//       |   - orthogonalization       | 12+*| p | > in * 4!  | O(4!)
-//       |   - solve                   | 14* | p | > (4 * 4)  | +O(4^3)
-//       | T::operator *,/             | 15+ | 1 | in         |
-//       | T::operator +,-             | 16+ | 1 | in         |
-//       | T::bit operation            | 17+ | 1 | in         |
-// *(++) | sumCNext           | +0     | s      | in              |
-//       | sumCNext           | +1     | s      | in              |
-//       | logCNext           | +2     | s      | in              |
-//       | logCNext           | +3     | s      | in              |
-//       | northPoleNext      | +4     | s      | in              |
-//       | invNext            | +5     | s      | in              |
-//       | sumCNext           | +6     | s      | in              |
-//       | pnext              | +7     | s      | in+once(dft)    | O(GL)
-//       | integrate-diff in taylorc  | +8  | p | once(dft)       |
-//       | exp to shift   in taylorc  | +9  | p | once(dft)       |
-//       | dft                        | +10 | p | once(dft)       |
-//       | exp-log complex operation  | +11 | 1 | once(taylor)    |
-//       | T::operator *,/            | +12 | 1 | in              |
-//       | T::operator +,-            | +13 | 1 | in              |
-//       | T::bit operation           | +14 | 1 | in              |
+//       | pPersistentQ       | *      | w      |              | O(sqrt(G))
+//       | pPRandomMajority   | 0      | w      |              | 2^bits
+//       | pGuarantee         | 1      | w      | bits         |
+//       | pPersistentP       | *      | w      |              | O(sqrt(G))
+//       | pPolish            | 2      | w      | 2            | 2
+//       | pMeasureable       | 2      | w      |              |
+//       | pSectional         | 2      | w      | range        |
+//       | pLebesgue          | 3      | w      | range^2      | range
+//       | pCbrtMarkov        | 4      | w      | +cbrt(in)    | +O(GL^(5/3))
+//       | after burn with p0next, loop| 5++ | w | +unit       | O(L)+O(GL+L^3)
+//       | divide by program invariant | 6+  | s | +unit       | +O(GL)
+//       | burn invariant by p0next    | 7++ | s | +unit       | +O(GL+L^3)
+//       | makeProgramInvariant        | 8+  | p |             | +O(GL)
+//       | linearInvariant             | -   | - | -           |
+//       |   - QR decomposition        | 10+*| s | > 4!        | O(GL)
+//       |   - orthogonalization       | 12+*| p | > 4!        | O(4!)
+//       |   - solve                   | 14* | p | +> (4 * 4)  | +O(4^3)
+//       | T::operator *,/             | 15+ | 1 |             |
+//       | T::operator +,-             | 16+ | 1 |             |
+//       | T::bit operation            | 17+ | 1 |             |
+// *(++) | sumCNext                    | +0  | s |             |
+//       | sumCNext                    | +1  | s |             |
+//       | logCNext                    | +2  | s |             |
+//       | logCNext                    | +3  | s |             |
+//       | northPoleNext               | +4  | s |             |
+//       | invNext                     | +5  | s |             |
+//       | sumCNext                    | +6  | s |             |
+//       | pnext                       | +7  | s | +once(dft)  | O(GL)
+//       | integrate-diff in taylorc   | +8  | p | +once(dft)  |
+//       | exp to shift   in taylorc   | +9  | p | +once(dft)  |
+//       | dft                         | +10 | p | +once(dft)  |
+//       | exp-log complex operation   | +11 | 1 | +once(taylor) |
+//       | T::operator *,/             | +12 | 1 |             |
+//       | T::operator +,-             | +13 | 1 |             |
+//       | T::bit operation            | +14 | 1 |             |
 // (***) time order ratio, L for input stream length, G for input vector size,
 //       stand from arithmatic operators. ind2varlen isn't considered.
-// N.B. total O((GL)^2*L^(1/6)+L^3) calculation time we need, this exceeds a
+// N.B. total O((GL)^2+L^3) calculation time we need, this exceeds a
 //      square of memory region usage.
 
 template <typename T> vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0, const int& b, const int& tail = 18) {
