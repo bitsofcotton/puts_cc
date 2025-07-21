@@ -4803,10 +4803,10 @@ template <typename T, int nprogress> SimpleVector<T> pPersistentP(const vector<S
 template <typename T, int nprogress> SimpleVector<T> pGuarantee(const vector<SimpleVector<T> >& in, const int& b, const int& loop, const string& strloop) {
   assert(0 < b);
   // N.B. clipBin can clip useful information.
-  return unOffsetHalf<T>(clipBin<T>(unOffsetHalf<T>(bitsG<T, true>(
-    pPersistentP<T, nprogress>(bitsG<T, true>(clipBin<T>(offsetHalf<T>(
-      delta<SimpleVector<T> >(in)) ), b), loop, strloop), - b)) +
-        in[in.size() - 1]));
+  return unOffsetHalf<T>(unOffsetHalf<T>(bitsG<T, true>(
+    pPersistentP<T, nprogress>(bitsG<T, true>(offsetHalf<T>(
+      delta<SimpleVector<T> >(in)), b), loop, strloop), - b)) +
+        in[in.size() - 1]);
 }
 
 // N.B. we only need some tails.
