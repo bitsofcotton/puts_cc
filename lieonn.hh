@@ -3089,12 +3089,6 @@ template <typename T> static inline SimpleVector<T> clipBin(const SimpleVector<T
   return res;;
 }
 
-template <typename T> static inline vector<SimpleVector<T> > clipBin(const vector<SimpleVector<T> >& in) {
-  vector<SimpleVector<T> > res(in);
-  for(int i = 0; i < res.size(); i ++) res[i] = clipBin<T>(res[i]);
-  return res;
-}
-
 template <typename T> static inline T cutBin(const T& in) {
   static const T zero(int(0));
   static const T one(int(1));
@@ -4802,7 +4796,6 @@ template <typename T, int nprogress> SimpleVector<T> pPersistentP(const vector<S
 // N.B. to guarantee lim S f == S lim f also ||S input|| is in [0,1[-register.
 template <typename T, int nprogress> SimpleVector<T> pGuarantee(const vector<SimpleVector<T> >& in, const int& b, const int& loop, const string& strloop) {
   assert(0 < b);
-  // N.B. clipBin can clip useful information.
   return unOffsetHalf<T>(unOffsetHalf<T>(bitsG<T, true>(
     pPersistentP<T, nprogress>(bitsG<T, true>(offsetHalf<T>(
       delta<SimpleVector<T> >(in)), b), loop, strloop), - b)) +
@@ -4893,12 +4886,18 @@ template <typename T, int nprogress> SimpleVector<T> pPersistentQ(const vector<S
   return offsetHalf<T>(res);
 }
 
-// N.B. repeat possible output whole range.
+template <typename T, int nprogress> SimpleVector<T> pOff(const vector<SimpleVector<T> >& in, const int& tail, const int& b, const string& strloop) {
+  const T off(pow(T(int(2)), - T(b)) );
+  return unOffsetHalf<T>(pPersistentQ<T, nprogress>(offsetHalf<T>(in, off),
+      tail, b, strloop), off);
+}
+
+// N.B. repeat possible output whole range. also offset before/after predict.
 template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const int& tail, const int& b, const string& strloop) {
   vector<SimpleVector<T> > res;
   res.reserve(in.size() / tail);
   for(int i = 1; i <= in.size() / tail; i ++)
-    res.emplace_back(pPersistentQ<T, nprogress>(skipX<SimpleVector<T> >(in, i),
+    res.emplace_back(pOff<T, nprogress>(skipX<SimpleVector<T> >(in, i),
       tail, b, string(" ") + to_string(i - 1) + string("/") +
         to_string(in.size() / tail) + strloop));
   return res;
@@ -4985,8 +4984,9 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //      only depends on the tanglement number based accuracy reason on
 //      calculation surface.
 // N.B. layers:
-//       | function           | layer# | [wsp1] | data amount* | time*(***) |
-//       +--------------------+--------+--------+-----------------+------------+
+//       | function           | layer# | [wsp1] | data amount* | time*(***)   |
+//       +--------------------+--------+--------+--------------+--------------+
+//       | pOff               | -1     | w      |              |
 //       | pPersistentQ       | *      | w      |              | O(sqrt(G))
 //       | pPRandomMajority   | 0      | w      |              | 2^bits
 //       | pGuarantee         | 1      | w      | bits         |
@@ -5673,8 +5673,7 @@ template <typename T> SimpleMatrix<T> filter(const SimpleMatrix<T>& data, const 
   case CLIP:
     result.resize(data.rows(), data.cols());
     for(int i = 0; i < result.rows(); i ++)
-      for(int j = 0; j < result.cols(); j ++)
-        result(i, j) = clipBin<T>(data(i, j));
+      result.row(i) = clipBin<T>(data.row(i));
     break;
   default:
     assert(0 && "unknown command in filter (should not be reached.)");
