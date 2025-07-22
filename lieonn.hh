@@ -4512,8 +4512,18 @@ template <typename T, int nprogress> SimpleVector<T> pRS0(const vector<SimpleVec
 //      predict with discrete pseudo Riemann-Stieljes condition.
 template <typename T, int nprogress> SimpleVector<T> pRS(const vector<SimpleVector<T> >& intran0, const string& strloop) {
   static const int step(1);
-  if(intran0[0].size() < 10 + step * 2)
-    return SimpleVector<T>(intran0.size()).O();
+  SimpleVector<T> res;
+  res.resize(intran0.size());
+  res.O();
+  if(intran0[0].size() < 10 + step * 2) {
+    if(! intran0[0].size()) return SimpleVector<T>();
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static, 1)
+#endif
+    for(int i = 0; i < res.size(); i ++)
+      res[i] = p0maxNext<T>(intran0[i]);
+    return res;
+  }
   SimpleVector<T> seconds(intran0[0].size());
   seconds.O();
   vector<SimpleVector<T> > intran(offsetHalf<T>(intran0));
@@ -4535,9 +4545,6 @@ template <typename T, int nprogress> SimpleVector<T> pRS(const vector<SimpleVect
   for(int i = 0; i < intran.size(); i ++) intran[i] /= M;
   seconds /= M;
   const int start(8 + step);
-  SimpleVector<T> res;
-  res.resize(intran0.size());
-  res.O();
   SimpleVector<SimpleVector<T> > p;
   p.entity.reserve(intran0[0].size());
   for(int i = 1; i < start; i ++)
@@ -4883,15 +4890,36 @@ template <typename T, int nprogress> SimpleVector<T> pPersistentQ(const vector<S
       if(res[j] == T(int(0))) last ++;
     cerr << "pPersistentQ: " << last << "dimension remains." << endl;
   }
-  return offsetHalf<T>(res);
+  return res;
 }
 
-template <typename T, int nprogress> SimpleVector<T> pOff(const vector<SimpleVector<T> >& in, const int& tail, const int& b, const string& strloop) {
-  // N.B. we offset fixed origin to have after processing external of
-  //      our program, combining them causes somewhat broken results.
-  const T off(T(int(1)) / T(int(2)) );
-  return unOffsetHalf<T>(pPersistentQ<T, nprogress>(offsetHalf<T>(in, off),
-      tail, b, strloop), off);
+// N.B. after of all, we insert Riemann measureable cond.
+template <typename T, int nprogress> SimpleVector<T> pRiemann(const vector<SimpleVector<T> >& in, const int& tail, const int& b, const string& strloop) {
+  vector<SimpleVector<T> > work;
+  work.reserve(abs(tail) + 1);
+  for(int i = abs(tail); i < in.size(); i ++) {
+    vector<SimpleVector<T> > inw;
+    inw.reserve(in.size() - abs(tail));
+    for(int j = i - (abs(tail) + 1) / 2; j <= i; j ++) inw.emplace_back(in[j]);
+    work.emplace_back(pPersistentQ<T, nprogress>(inw, tail, b,
+      string(" ") + to_string(i - 1) + string("/") +
+        to_string(in.size()) + strloop));
+    if(i == in.size() - 1) break;
+    for(int j = 0; j < work[work.size() - 1].size(); j ++) {
+      const T& local(in[i + 1][j]);
+      work[work.size() - 1][j] = sgn<T>(work[work.size() - 1][j] *
+        in[i + 1][j]) * abs(work[work.size() - 1][j] - in[i + 1][j]);
+    }
+  }
+  SimpleVector<T> res(work[work.size() - 1]);
+  work.resize(work.size() - 1);
+  for(int i = 0; i < res.size(); i ++) {
+    idFeeder<T> lwork(work.size());
+    for(int j = 0; j < work.size(); j ++) lwork.next(work[j][i]);
+    assert(lwork.full);
+    res[i] *= p0maxNext<T>(lwork.res);
+  }
+  return offsetHalf<T>(res);
 }
 
 // N.B. repeat possible output whole range. also offset before/after predict.
@@ -4899,7 +4927,8 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vect
   vector<SimpleVector<T> > res;
   res.reserve(in.size() / tail);
   for(int i = 1; i <= in.size() / tail; i ++)
-    res.emplace_back(pOff<T, nprogress>(skipX<SimpleVector<T> >(in, i),
+    res.emplace_back(pPersistentQ<T, nprogress>(skipX<SimpleVector<T> >(in, i),
+    // res.emplace_back(pRiemann<T, nprogress>(skipX<SimpleVector<T> >(in, i),
       tail, b, string(" ") + to_string(i - 1) + string("/") +
         to_string(in.size() / tail) + strloop));
   return res;
