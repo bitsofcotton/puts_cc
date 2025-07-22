@@ -4887,7 +4887,9 @@ template <typename T, int nprogress> SimpleVector<T> pPersistentQ(const vector<S
 }
 
 template <typename T, int nprogress> SimpleVector<T> pOff(const vector<SimpleVector<T> >& in, const int& tail, const int& b, const string& strloop) {
-  const T off(pow(T(int(2)), - T(b)) );
+  // N.B. we offset fixed origin to have after processing external of
+  //      our program, combining them causes somewhat broken results.
+  const T off(T(int(1)) / T(int(2)) );
   return unOffsetHalf<T>(pPersistentQ<T, nprogress>(offsetHalf<T>(in, off),
       tail, b, strloop), off);
 }
