@@ -3166,7 +3166,7 @@ template <typename X> static inline vector<X> skipX(const vector<X>& in, const i
   assert(in.size());
   vector<X> res;
   res.resize((in.size() + step - 1) / step);
-  for(int i = (in.size() - step - 1) % step, ii = 0; i < in.size();
+  for(int i = (in.size() - 1) % step, ii = 0; i < in.size();
           i += step, ii ++) res[ii] = in[i];
   return res;
 }
@@ -4833,26 +4833,74 @@ template <typename T, int nprogress> SimpleVector<T> pPersistentQ(const vector<S
       if(res[j] == T(int(0))) last ++;
     cerr << "pPersistentQ: " << last << "dimension remains." << endl;
   }
+  return res;
+}
+
+template <typename T, int nprogress> SimpleVector<T> pCorrector(const vector<SimpleVector<T> >& in0, const int& b, const int& tail, const string& strloop) {
+  if(in0.size() <= abs(tail) * 8) {
+    if(in0.size() <= abs(tail))
+      return pPersistentQ<T, nprogress>(in0, b, tail, strloop);
+    vector<SimpleVector<T> > work;
+    work.reserve(abs(tail));
+    for(int i = 0; i < abs(tail); i ++)
+      work.emplace_back(in0[i - abs(tail) + in0.size()]);
+    return pPersistentQ<T, nprogress>(work, b, tail, strloop);
+  }
+  vector<SimpleVector<T> > in(in0);
+  vector<vector<SimpleVector<T> > > work;
+  work.reserve(in0.size() / abs(tail));
+  SimpleVector<T> res;
+  const int loop(log(T(int(in0.size())) / T(abs(tail))) / log(T(int(2))));
+  for(int i = 0; i < loop - 1; i ++) {
+    work.emplace_back(vector<SimpleVector<T> >());
+    work[i].reserve((! i ? in0.size() : work[i - 1].size()) - abs(tail) + 1);
+    for(int j = 0; j <= (! i ? in0.size() : work[i - 1].size()) - abs(tail);
+      j ++) {
+      vector<SimpleVector<T> > local;
+      local.reserve(abs(tail));
+      for(int k = 0; k < abs(tail); k ++)
+        local.emplace_back(! i ? in0[j + k] : work[i - 1][j + k]);
+      work[i].emplace_back(pPersistentQ<T, nprogress>(local, b, tail,
+        to_string(j) + "/" + to_string(in0.size() - abs(tail) * i + 1) +
+          to_string(i) + "/" + to_string(loop) + strloop));
+    }
+    if(! i) res = move(work[i][work[i].size() - 1]);
+    else {
+      work[i][work[i].size() - 1] *= T(int(i == 1 ? 2 : 2 * pow(4, i - 1)));
+      for(int j = 0; j < res.size(); j ++)
+        res[j] *= work[i][work[i].size() - 1][j];
+    }
+    work[i].resize(work[i].size() - 1);
+    for(int j = 0; j < work[i].size(); j ++)
+      for(int k = 0; k < work[i][j].size(); k ++)
+        work[i][j][k] *= ! i ? in0[j - work[i].size() + in0.size()][k] :
+          work[i - 1][j - work[i].size() + work[i - 1].size()][k];
+    if(i == loop - 1) break;
+    work[i] = skipX<SimpleVector<T> >(delta<SimpleVector<T> >(work[i]), 2);
+    for(int j = 0; j < work[i].size(); j ++)
+      for(int k = 0; k < work[i][j].size(); k ++)
+        work[i][j][k] /= T(int(i ? 4 : 2));
+    work[i] = offsetHalf<T>(work[i]);
+  }
+  for(int i = 0; i < in0[0].size(); i ++) {
+    idFeeder<T> local(work[work.size() - 1].size());
+    for(int j = 0; j < work[work.size() - 1].size(); j ++)
+      local.next(work[work.size() - 1][j][i]);
+    assert(local.full);
+    res[i] *= p0maxNext<T>(local.res);
+  }
   return offsetHalf<T>(res);
 }
 
 // N.B. repeat possible output whole range. also offset before/after predict.
 template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const int& b, const int& tail, const string& strloop) {
+  const int cand(max(int(1), int(in.size() / abs(tail * 2))));
   vector<SimpleVector<T> > res;
-  res.reserve(in.size() / abs(tail));
-  const int loop0(sqrt(T(int(in[0].size())) ));
-  const int loop(tail < 0 ? - loop0 : loop0);
-  for(int i = 1; i <= in.size() / abs(tail); i ++) {
-    vector<SimpleVector<T> > work0(skipX<SimpleVector<T> >(in, i));
-    vector<SimpleVector<T> > work;
-    work.reserve(abs(tail));
-    for(int j = 0; j < abs(tail); j ++) work.emplace_back(
-      move(work0[j - abs(tail) + work0.size()]));
-    work0.resize(0);
-    res.emplace_back(pPersistentQ<T, nprogress>(work, b, loop, string(" ") +
-      to_string(i - 1) + string("/") + to_string(in.size() / abs(tail)) +
-        strloop));
-  }
+  res.reserve(cand);
+  for(int i = 1; i <= cand; i ++)
+    res.emplace_back(pCorrector<T, nprogress>(skipX<SimpleVector<T> >(in, i),
+      b, tail, string(" ") + to_string(i - 1) + string("/") +
+        to_string(in.size() / abs(tail)) + strloop));
   return res;
 }
 
