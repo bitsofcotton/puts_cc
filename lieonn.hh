@@ -4710,11 +4710,14 @@ template <typename T, int nprogress> SimpleVector<T> pLebesgue(const vector<Simp
       res += p0;
     }
   }
-  return unOffsetHalf<T>(res /= T(int(reform.size())) );
+  return res /= T(int(reform.size()));
 }
 
 // N.B. add some sectional measurement part.
-template <typename T, int nprogress> SimpleVector<T> pSectional(const vector<SimpleVector<T> >& in, const int& range, const string& strloop) {
+template <typename T, int nprogress> SimpleVector<T> pSectional(const vector<SimpleVector<T> >& in, const string& strloop) {
+  // N.B. we suppose cbrt(size / 2)-markov-made for input stream.
+  const int n(in.size() / 2 < 1 ? T(int(0)) : absfloor(sqrt(T(int((in.size() / 2 - 1) / 2)))));
+  const int range(max(int(2), n));
   const int sectional(range * range);
   if(! in.size()) return SimpleVector<T>();
   if(in.size() <= sectional * 2)
@@ -4722,14 +4725,7 @@ template <typename T, int nprogress> SimpleVector<T> pSectional(const vector<Sim
   SimpleVector<T> res(pLebesgue<T, nprogress>(in, range, strloop) *
     T(sectional));
   for(int i = 1; i < sectional; i ++) res -= in[in.size() - i];
-  return res;
-}
-
-// N.B. we suppose cbrt(size / 2)-markov-made for input stream.
-template <typename T, int nprogress> SimpleVector<T> pMeasureable(const vector<SimpleVector<T> >& in, const string& strloop) {
-  if(in.size() < 1) return SimpleVector<T>(); 
-  const int n(in.size() / 2 < 1 ? T(int(0)) : absfloor(sqrt(T(int((in.size() / 2 - 1) / 2)))));
-  return pSectional<T, nprogress>(in, max(int(2), n), strloop);
+  return unOffsetHalf<T>(res);
 }
 
 // N.B. the result somehow not offsetted so we offset to 0.
@@ -4751,13 +4747,13 @@ template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<Simple
 #pragma omp section
 #endif
     {
-      resp =   pMeasureable<T, nprogress>(in,  string("+)") + strloop);
+      resp =   pSectional<T, nprogress>(in,  string("+)") + strloop);
     }
 #if defined(_OPENMP)
 #pragma omp section
 #endif
     {
-      resm =   pMeasureable<T, nprogress>(inm, string("+)") + strloop);
+      resm =   pSectional<T, nprogress>(inm, string("+)") + strloop);
     }
 #if defined(_OPENMP)
   }
@@ -4809,65 +4805,12 @@ template <typename T, int nprogress> SimpleVector<T> pGuarantee(const vector<Sim
         in[in.size() - 1]);
 }
 
-// N.B. we only need some tails.
-template <typename T, int nprogress> SimpleVector<T> pTail(const vector<SimpleVector<T> >& in, const int& tail, const int& b, const int& loop, const string& strloop) {
-  vector<SimpleVector<T> > work;
-  const int sz(min(int(in.size()), tail));
-  work.reserve(sz);
-  for(int i = 0; i < sz; i ++) work.emplace_back(in[i - sz + in.size()]);
-  return pGuarantee<T, nprogress>(work, b, loop, strloop);
-}
-
-// N.B. blend moderate temperature PRNG and make majority logic on them causes
-//      +1d add some measureable condition.
-template <typename T, int nprogress> SimpleVector<T> pPRandomMajority(const vector<SimpleVector<T> >& in0, const int& tail, const int& b, const string& strloop) {
-  const int ploop0(sqrt(T(int(in0[0].size())) ));
-        int ploop(tail < 0 ? - ploop0 : ploop0);
-  if(b < 0) return pTail<T, nprogress>(in0, abs(tail), - b, ploop, strloop);
-  // N.B. sqrt of thresh doesn't work well.
-  const T   thresh(pow(T(int(2)), - T(b) ));
-  const int loop(int(1) << b);
-  ploop *= b;
-  vector<SimpleVector<T> > in;
-  in.resize(in0.size());
-  for(int i = 0; i < in.size(); i ++) {
-    in[i].resize(in0[i].size() * loop);
-    in[i].O();
-    for(int m = 0; m < in0[i].size(); m ++)
-      for(int k = 0; k < loop; k ++)
-#if defined(_ARCFOUR_)
-        in[i][m * loop + k] = (arc4random() & 1) ?
-#else
-        in[i][m * loop + k] = (random() & 1) ?
-#endif
-          offsetHalf<T>(- unOffsetHalf<T>(in0[i][m])) : in0[i][m];
-  }
-  SimpleVector<T> pres(pTail<T, nprogress>(in, abs(tail), b, ploop, strloop));
-  SimpleVector<T> res;
-  res.resize(in0[0].size());
-  res.O();
-  for(int i = 0; i < res.size(); i ++)
-    for(int k = 0; k < loop; k ++)
-#if defined(_ARCFOUR_)
-      res[i] += (arc4random() & 1) ?
-#else
-      res[i] += (random() & 1) ?
-#endif
-        - pres[i * loop + k] : pres[i * loop + k];
-  res /= T(loop);
-  for(int i = 0; i < res.size(); i ++)
-    if(abs(res[i]) <= thresh)
-      res[i] = T(int(0));
-  return res;
-}
-
 // N.B. persistent retry on the unpredictable places.
-template <typename T, int nprogress> SimpleVector<T> pPersistentQ(const vector<SimpleVector<T> >& in, const int& tail, const int& b, const string& strloop) {
-  SimpleVector<T> res(pPRandomMajority<T, nprogress>(in, tail, b,
+template <typename T, int nprogress> SimpleVector<T> pPersistentQ(const vector<SimpleVector<T> >& in, const int& b, const int& loop, const string& strloop) {
+  SimpleVector<T> res(pGuarantee<T, nprogress>(in, b, loop,
     string(" 0") + strloop));
   int last(res.size());
-  const int loop(sqrt(T(int(in[0].size())) ));
-  for(int i = 1; tail <= 0 || i < loop; i ++) {
+  for(int i = 1; loop <= 0 || i < loop; i ++) {
     vector<int> midx;
     midx.reserve(res.size());
     for(int j = 0; j < res.size(); j ++)
@@ -4879,7 +4822,7 @@ template <typename T, int nprogress> SimpleVector<T> pPersistentQ(const vector<S
     for(int j = 0; j < work.size(); j ++)
       for(int k = 0; k < work[j].size(); k ++)
         work[j][k] = in[j][midx[k]];
-    SimpleVector<T> wres(pPRandomMajority<T, nprogress>(work, tail, b,
+    SimpleVector<T> wres(pGuarantee<T, nprogress>(in, b, loop,
       string(" ") + to_string(i) + strloop));
     assert(wres.size() == midx.size());
     for(int j = 0; j < midx.size(); j ++) res[midx[j]] = move(wres[j]);
@@ -4890,47 +4833,26 @@ template <typename T, int nprogress> SimpleVector<T> pPersistentQ(const vector<S
       if(res[j] == T(int(0))) last ++;
     cerr << "pPersistentQ: " << last << "dimension remains." << endl;
   }
-  return res;
-}
-
-// N.B. after of all, we insert Riemann measureable cond.
-template <typename T, int nprogress> SimpleVector<T> pRiemann(const vector<SimpleVector<T> >& in, const int& tail, const int& b, const string& strloop) {
-  vector<SimpleVector<T> > work;
-  work.reserve(abs(tail) + 1);
-  for(int i = abs(tail); i < in.size(); i ++) {
-    vector<SimpleVector<T> > inw;
-    inw.reserve(in.size() - abs(tail));
-    for(int j = i - (abs(tail) + 1) / 2; j <= i; j ++) inw.emplace_back(in[j]);
-    work.emplace_back(pPersistentQ<T, nprogress>(inw, tail, b,
-      string(" ") + to_string(i - 1) + string("/") +
-        to_string(in.size()) + strloop));
-    if(i == in.size() - 1) break;
-    for(int j = 0; j < work[work.size() - 1].size(); j ++) {
-      const T& local(in[i + 1][j]);
-      work[work.size() - 1][j] = sgn<T>(work[work.size() - 1][j] *
-        in[i + 1][j]) * abs(work[work.size() - 1][j] - in[i + 1][j]);
-    }
-  }
-  SimpleVector<T> res(work[work.size() - 1]);
-  work.resize(work.size() - 1);
-  for(int i = 0; i < res.size(); i ++) {
-    idFeeder<T> lwork(work.size());
-    for(int j = 0; j < work.size(); j ++) lwork.next(work[j][i]);
-    assert(lwork.full);
-    res[i] *= p0maxNext<T>(lwork.res);
-  }
   return offsetHalf<T>(res);
 }
 
 // N.B. repeat possible output whole range. also offset before/after predict.
-template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const int& tail, const int& b, const string& strloop) {
+template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const int& b, const int& tail, const string& strloop) {
   vector<SimpleVector<T> > res;
-  res.reserve(in.size() / tail);
-  for(int i = 1; i <= in.size() / tail; i ++)
-    res.emplace_back(pPersistentQ<T, nprogress>(skipX<SimpleVector<T> >(in, i),
-    // res.emplace_back(pRiemann<T, nprogress>(skipX<SimpleVector<T> >(in, i),
-      tail, b, string(" ") + to_string(i - 1) + string("/") +
-        to_string(in.size() / tail) + strloop));
+  res.reserve(in.size() / abs(tail));
+  const int loop0(sqrt(T(int(in[0].size())) ));
+  const int loop(tail < 0 ? - loop0 : loop0);
+  for(int i = 1; i <= in.size() / abs(tail); i ++) {
+    vector<SimpleVector<T> > work0(skipX<SimpleVector<T> >(in, i));
+    vector<SimpleVector<T> > work;
+    work.reserve(abs(tail));
+    for(int j = 0; j < abs(tail); j ++) work.emplace_back(
+      move(work0[j - abs(tail) + work0.size()]));
+    work0.resize(0);
+    res.emplace_back(pPersistentQ<T, nprogress>(work, b, loop, string(" ") +
+      to_string(i - 1) + string("/") + to_string(in.size() / abs(tail)) +
+        strloop));
+  }
   return res;
 }
 
@@ -5017,27 +4939,24 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 // N.B. layers:
 //       | function           | layer# | [wsp1] | data amount* | time*(***)   |
 //       +--------------------+--------+--------+--------------+--------------+
-//       | pOff               | -1     | w      |              |
 //       | pPersistentQ       | *      | w      |              | O(sqrt(G))
-//       | pPRandomMajority   | 0      | w      |              | 2^bits
-//       | pGuarantee         | 1      | w      | bits         |
+//       | pGuarantee         | 0      | w      | bits         |
 //       | pPersistentP       | *      | w      |              | O(sqrt(G))
-//       | pPolish            | 2      | w      | 2            | 2
-//       | pMeasureable       | 2      | w      |              |
-//       | pSectional         | 2      | w      | range        |
-//       | pLebesgue          | 3      | w      | range^2      | range
-//       | pCbrtMarkov        | 4      | w      | +cbrt(in)    | +O(GL^(5/3))
-//       | after burn with p0next, loop| 5++ | w | +unit       | O(L)+O(GL+L^3)
-//       | divide by program invariant | 6+  | s | +unit       | +O(GL)
-//       | burn invariant by p0next    | 7++ | s | +unit       | +O(GL+L^3)
-//       | makeProgramInvariant        | 8+  | p |             | +O(GL)
+//       | pPolish            | 1      | w      | 2            | 2
+//       | pSectional         | 1      | w      | range        |
+//       | pLebesgue          | 2      | w      | range^2      | range
+//       | pCbrtMarkov        | 3      | w      | +cbrt(in)    | +O(GL^(5/3))
+//       | after burn with p0next, loop| 4++ | w | +unit       | O(L)+O(GL+L^3)
+//       | divide by program invariant | 5+  | s | +unit       | +O(GL)
+//       | burn invariant by p0next    | 6++ | s | +unit       | +O(GL+L^3)
+//       | makeProgramInvariant        | 7+  | p |             | +O(GL)
 //       | linearInvariant             | -   | - | -           |
-//       |   - QR decomposition        | 10+*| s | > 4!        | O(GL)
-//       |   - orthogonalization       | 12+*| p | > 4!        | O(4!)
-//       |   - solve                   | 14* | p | +> (4 * 4)  | +O(4^3)
-//       | T::operator *,/             | 15+ | 1 |             |
-//       | T::operator +,-             | 16+ | 1 |             |
-//       | T::bit operation            | 17+ | 1 |             |
+//       |   - QR decomposition        | 9+* | s | > 4!        | O(GL)
+//       |   - orthogonalization       | 11+*| p | > 4!        | O(4!)
+//       |   - solve                   | 13* | p | +> (4 * 4)  | +O(4^3)
+//       | T::operator *,/             | 14+ | 1 |             |
+//       | T::operator +,-             | 15+ | 1 |             |
+//       | T::bit operation            | 16+ | 1 |             |
 // *(++) | sumCNext                    | +0  | s |             |
 //       | sumCNext                    | +1  | s |             |
 //       | logCNext                    | +2  | s |             |
@@ -5072,7 +4991,7 @@ template <typename T> vector<vector<SimpleVector<T> > > predVec(const vector<vec
     }
   }
   vector<SimpleVector<T> > pres(
-    pRepeat<T, 20>(in, tail, b, string(" (predVec)")));
+    pRepeat<T, 20>(in, b, tail, string(" (predVec)")));
   vector<vector<SimpleVector<T> > > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++) {
@@ -5099,7 +5018,7 @@ template <typename T> vector<vector<SimpleMatrix<T> > > predMat(const vector<vec
     }
   }
   vector<SimpleVector<T> > pres(
-    pRepeat<T, 20>(in, tail, b, string(" (predMat)") ));
+    pRepeat<T, 20>(in, b, tail, string(" (predMat)") ));
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++) {
@@ -5143,7 +5062,7 @@ template <typename T> vector<SimpleSparseTensor(T)> predSTen(vector<SimpleSparse
   }
   in0.resize(0);
   vector<SimpleVector<T> > pres(
-    pRepeat<T, 20>(in, tail, b, string(" (predSTen)")));
+    pRepeat<T, 20>(in, b, tail, string(" (predSTen)")));
   vector<SimpleSparseTensor(T) > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++)
