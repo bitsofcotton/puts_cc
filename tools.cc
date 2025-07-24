@@ -53,9 +53,6 @@ std::pair<std::string, std::string> loadbuf(const char* filename) {
 #undef int
 #endif
 int main(int argc, const char* argv[]) {
-#if !defined(_ARCFOUR_)
-  srandom_dev();
-#endif
 #if !defined(_OLDCPP_)
 #define int int64_t
 #endif

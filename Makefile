@@ -21,11 +21,12 @@ LDFLAGS+=	-lc++ -L/usr/local/lib
 #CXXFLAGS+=	-D_FLOAT_BITS_=256
 #CXXFLAGS+=	-D_FLOAT_BITS_=512
 
-CXXFLAGS+=	-D_ARCFOUR_
+# lieonn.hh flags
+#CXXFLAGS+=	-D_P_BIT_=-3
+#CXXFLAGS+=	-D_P_JAM_
 
 # N.B. sed -e s/static\ inline//g | sed -e s/inline//g
 #CXXFLAGS+=     -D_OLDCPP_ -ftemplate-depth-99
-#LDFLAGS+=	-lm
 
 CLEANFILES= *.o puts putsmp puts32 puts32mp
 
