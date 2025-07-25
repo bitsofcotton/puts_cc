@@ -4884,8 +4884,8 @@ template <typename T, int nprogress> SimpleVector<T> pCorrector(const vector<Sim
     for(int j = 0; j < wres.size(); j ++)
       for(int k = 0; k < wres[j].size(); k ++)
         wres[j][k] *= ! i ?
-          unOffsetHalf<T>(in0[j - work[i].size() + in0.size()][k]) :
-            work[i - 1][j - work[i].size() + work[i - 1].size()][k];
+          unOffsetHalf<T>(in0[j - (loop - 1) + in0.size()][k]) :
+            work[i - 1][j - (loop - 1) + work[i - 1].size()][k];
     if(i == loop - 2) break;
     for(int j = 0; j < work[i].size(); j ++) work[i][j] /= T(int(2));
     work[i] = delta<SimpleVector<T> >(work[i]);
