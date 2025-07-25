@@ -3324,17 +3324,16 @@ template <typename T, bool nonlinear> static inline T revertByProgramInvariant(S
 //      if we object F_3 or more accuracy, we need to increase the result.
 // N.B. there's also analogy to this as {0,1}^m*n operator orthogonalization
 //      invariant residue maximum dimensions. (sqrt(3!) <~ (#{0,1})^2).
-//      usually we use this with adding 1 dimension, so 3 is the lower bound.
 // N.B. also the binary 2 operand opereator is described in R^4 vector
 //      as a invariant.
 // N.B. this is for output is binary case especially sign bit on the
 //      information amount on any p-adics but in [0, 1[.
 static inline int ind2vd(const int& indim) {
   const int y(indim / 2 * (indim / 2 - 1));
-        int varlen(3);
+        int varlen(4);
   for( ; 0 <= varlen && varlen < sizeof(int) * 8 &&
     (varlen - 1) * (varlen - 1) << varlen <= y; varlen ++) ;
-  return max(-- varlen, int(3));
+  return max(-- varlen, int(4));
 }
 
 template <typename T> static inline SimpleVector<T> minsq(const int& size) {
@@ -3832,7 +3831,7 @@ template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
 //   det diag L^-t x' + det diag LD x', in the x' =: [x'', 1, x''_reverse]
 //   condition, one dimension down, repeat them causes det diag Y x.
 //  also we can do analytical calculus on them causes det diag (Yx) ==
-//   S d/d(x_1) det diag Yx d(x_1) == ... S...S... <y,x> d(x_1)... .
+//   d/d(x_1) S det diag Yx d(x_1) == d/d(x_1) ... S ... <y,x> d(x_1) ... .
 //   with repeat, we get <y,x>(x_1...)^m in first digit we get.
 //  also with negated gate, x_1...\bar(x_1)... is constant (usually
 //   x_k := {1,1/2}) so <y,x> in first digit part is what we need.
@@ -3873,6 +3872,17 @@ template <typename T> T p01next(const SimpleVector<T>& in) {
     for(int i = 0; i < toeplitz.rows(); i ++) {
       SimpleVector<T> work(in.subVector(i, varlen));
       work[work.size() - 1] = in[i + varlen + step - 2];
+#if defined(_P_LEVI_)
+      if(varlen == 4) {
+        SimpleMatrix<T> mwork(4, work.size());
+        mwork.row(0) = move(work);
+        mwork.row(1).O(T(int(1)));
+        mwork(2, 0) = mwork(2, 2) = T(int(0));
+        mwork(2, 1) = mwork(2, 3) = T(int(1));
+        mwork.row(3).O();
+        work = mwork.transpose().QR().row(2);
+      }
+#endif
       toeplitz.row(i) = makeProgramInvariant<T>(work,
         T(i + 1) / T(toeplitz.rows() + 1) ).first;
     }
@@ -4569,13 +4579,14 @@ template <typename T, int nprogress> SimpleVector<T> pRS(const vector<SimpleVect
 }
 
 // N.B. we feed a large markov into prediction stream as it's on the input
-//      pattern history on what ratio they affects.
-template <typename T, int nprogress> SimpleVector<T> pCrushMarkov(const vector<SimpleVector<T> >& intrans, const string& strloop) {
-  const int slen(ind2vd(intrans[0].size()));
+//      pattern history or not. we need this for continuous but harder
+//      input streams.
+template <typename T, int nprogress> SimpleVector<T> pCbrtMarkov(const vector<SimpleVector<T> >& intrans, const string& strloop) {
+  const int slen(max(int(4), int(exp(log(T(int(intrans[0].size()))) / T(int(3)) )) ) );
   vector<SimpleVector<T> > pass_next;
   SimpleVector<T> presidue(intrans.size());
   presidue.O(T(int(1)));
-  if(intrans[0].size() <= slen)
+  if(intrans[0].size() <= max(slen, int(18)))
     pass_next = unOffsetHalf<T>(intrans);
   else {
     pass_next.resize(intrans.size(),
@@ -4591,14 +4602,14 @@ template <typename T, int nprogress> SimpleVector<T> pCrushMarkov(const vector<S
               << ((intrans[0].size() - 1 - slen) * intrans.size())
                 << " cuttingDown " << strloop << endl;
         pass_next[j][i - slen] = unOffsetHalf<T>(
-          p012next<T>(intrans[j].subVector(0, i + 1) )) *
+          p012next<T>(intrans[j].subVector(0, i + 1), slen)) *
             unOffsetHalf<T>(intrans[j][i + 1]);
       }
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
     for(int j = 0; j < intrans.size(); j ++)
-      presidue[j] = unOffsetHalf<T>(p012next<T>(intrans[j]));
+      presidue[j] = unOffsetHalf<T>(p012next<T>(intrans[j], slen));
   }
   SimpleVector<T> res(pRS<T, nprogress>(pass_next, string(" feeding ") +
     strloop));
@@ -4666,7 +4677,7 @@ template <typename T, int nprogress> SimpleVector<T> pLebesgue(const vector<Simp
 #pragma omp section
 #endif
       {
-        p0 = pCrushMarkov<T, nprogress>(
+        p0 = pCbrtMarkov<T, nprogress>(
           reform[i], string(" L(0/3, ") + to_string(i) + string("/") +
             to_string(reform.size()) + strloop);
       }
@@ -4674,7 +4685,7 @@ template <typename T, int nprogress> SimpleVector<T> pLebesgue(const vector<Simp
 #pragma omp section
 #endif
       {
-        p1 = logscale<T>(pCrushMarkov<T, nprogress>(
+        p1 = logscale<T>(pCbrtMarkov<T, nprogress>(
           expscale<T>(reform[i]), string(" L(1/3, ") + to_string(i) +
             string("/") + to_string(reform.size()) + strloop) );
       }
@@ -4682,7 +4693,7 @@ template <typename T, int nprogress> SimpleVector<T> pLebesgue(const vector<Simp
 #pragma omp section
 #endif
       {
-        p2 = expscale<T>(pCrushMarkov<T, nprogress>(
+        p2 = expscale<T>(pCbrtMarkov<T, nprogress>(
           logscale<T>(reform[i]), string(" L(2/3, ") + to_string(i) +
             string("/") + to_string(reform.size()) + strloop) );
       }
@@ -4925,7 +4936,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       | pPolish                     | *   | w | 2           | 2
 //       | pSectional                  | 1   | w | range       |
 //       | pLebesgue                   | 2   | w | range^2     | range
-//       | pCrushMarkov                | 3   | w | +in         | +O(GL)
+//       | pCbrtMarkov                 | 3   | w | +in         | +O(GL^5/3)
 //       | after burn with p0next, loop| 4++ | w | +unit       | O(L)+O(GL+L^3)
 //       | divide by program invariant | 5+  | s | +unit       | +O(GL)
 //       | burn invariant by p0next    | 6++ | s | +unit       | +O(GL+L^3)
@@ -8129,8 +8140,6 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      causes only a combination ordinal, we need Discrete part separation
 //      other than dft/Decompose class.
 // (02) saturating F_2^4 #f, the bra, ket condition indirect access.
-// (03) Levi concerns, this can be applying orthogonal invariant to markov
-//      when we have 3 dimension with trivial average invariants.
 
 #define _SIMPLELIN_
 #endif

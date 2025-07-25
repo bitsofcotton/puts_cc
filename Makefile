@@ -23,7 +23,7 @@ LDFLAGS+=	-lc++ -L/usr/local/lib
 
 # lieonn.hh flags
 #CXXFLAGS+=	-D_P_BIT_=-3
-#CXXFLAGS+=	-D_P_JAM_
+#CXXFLAGS+=	-D_P_LEVI_
 
 # N.B. sed -e s/static\ inline//g | sed -e s/inline//g
 #CXXFLAGS+=     -D_OLDCPP_ -ftemplate-depth-99
