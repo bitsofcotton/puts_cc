@@ -194,7 +194,8 @@ int main(int argc, const char* argv[]) {
     std::cout << "<body>";
     optimizeTOC<num_t, std::string>(std::cout, input, rdetails, rdetailwords, delimiter, std::strcmp(argv[1], "findroot") == 0);
     std::cout << "<hr/>" << std::endl << "</body></html>" << std::endl;
-  } else if(std::strcmp(argv[1], "pred") == 0) {
+  } else if(std::strcmp(argv[1], "pred") == 0 ||
+            std::strcmp(argv[1], "Pred") == 0) {
     std::vector<std::string> details;
     std::vector<std::string> detailwords;
     for(int iidx = 3; iidx < argc; iidx ++) {
@@ -205,7 +206,7 @@ int main(int argc, const char* argv[]) {
     words.insert(words.end(), detailwords.begin(), detailwords.end());
     std::sort(words.begin(), words.end());
     words.erase(std::unique(words.begin(), words.end()), words.end());
-    predTOC<num_t, std::string>(std::cout, input, detailwords, details, delimiter);
+    predTOC<num_t, std::string>(std::cout, input, detailwords, details, delimiter, num_t(int(1)), argv[1][0] == 'P' ? - 27 : 27);
   } else if(std::strcmp(argv[1], "prep") == 0) {
     std::vector<std::string> buf;
     const int szwindow(sqrt(num_t(int(input.size()))));
