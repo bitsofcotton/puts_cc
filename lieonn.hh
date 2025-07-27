@@ -3872,14 +3872,19 @@ template <typename T, bool levi> T p01next(const SimpleVector<T>& in) {
     for(int i = 0; i < toeplitz.rows(); i ++) {
       SimpleVector<T> work(in.subVector(i, varlen));
       work[work.size() - 1] = in[i + varlen + step - 2];
-      if(levi && varlen == 4) {
-        SimpleMatrix<T> mwork(4, work.size());
+      if(levi) {
+        // N.B. varlen == 4 case, subtract original invariant, return to avg,
+        //      flip last one, we make hypothesis the residue is levi.
+        SimpleMatrix<T> mwork(varlen, work.size());
         mwork.row(0) = move(work);
-        mwork.row(1).O(T(int(1)));
-        mwork(2, 0) = mwork(2, 2) = T(int(0));
-        mwork(2, 1) = mwork(2, 3) = T(int(1));
-        mwork.row(3).O();
-        work = mwork.transpose().QR().row(3);
+        for(int j = 1; j < mwork.rows() - 1; j ++) {
+          mwork.row(j).O();
+          for(int k = 0; k < mwork.cols() / j; k ++)
+            for(int kk = k * j; kk < min(int(mwork.cols()), (k + 1) * j); kk ++)
+              mwork(j, kk) = T(int(k & 1 ? 0 : 1));
+        }
+        mwork.row(mwork.rows() - 1).O();
+        work = mwork.transpose().QR().row(mwork.rows() - 1);
       }
       toeplitz.row(i) = makeProgramInvariant<T>(work,
         T(i + 1) / T(toeplitz.rows() + 1) ).first;
@@ -4761,7 +4766,7 @@ template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<Simple
 
 #if ! defined(_P_BIT_)
 // N.B. we don't get 100% result on each prediction, so upper bit broken case,
-//      lower bits says nothing. _P_BIT_ < 0 for persistent loop condition.
+//      lower bits says nothing.
 #define _P_BIT_ 3
 #endif
 
