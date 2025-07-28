@@ -4757,11 +4757,7 @@ template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<Simple
   }
 #endif
   resp += resm;
-  resp /= T(int(2));
-  for(int i = 0; i < resp.size(); i ++)
-    if(T(int(1)) <= abs(resp[i]) )
-      resp[i] = T(int(0));
-  return resp;
+  return resp /= T(int(2));
 }
 
 #if ! defined(_P_BIT_)
