@@ -4751,13 +4751,12 @@ template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<Simple
 #pragma omp section
 #endif
     {
-      resm =   pSectional<T, nprogress>(inm, string("+)") + strloop);
+      resm = - pSectional<T, nprogress>(inm, string("+)") + strloop);
     }
 #if defined(_OPENMP)
   }
 #endif
-  resp += resm;
-  return resp /= T(int(2));
+  return (resp += resm) /= T(int(2));
 }
 
 #if ! defined(_P_BIT_)
