@@ -4768,11 +4768,10 @@ template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<Simple
 
 // N.B. to guarantee lim S f == S lim f also ||S input|| is in [0,1[-register.
 template <typename T, int nprogress> SimpleVector<T> pGuarantee(const vector<SimpleVector<T> >& in, const string& strloop) {
-  // N.B. clipBin causes something clipped result.
-  return clipBin<T>(unOffsetHalf<T>(bitsG<T, true>(
+  return unOffsetHalf<T>(bitsG<T, true>(
     pPolish<T, nprogress>(bitsG<T, true>(offsetHalf<T>(
       delta<SimpleVector<T> >(in)), abs(_P_BIT_)), strloop),
-        - abs(_P_BIT_) )) + in[in.size() - 1]);
+        - abs(_P_BIT_) )) + in[in.size() - 1];
 }
 
 // N.B. repeat possible output whole range. also offset before/after predict.
@@ -4837,21 +4836,30 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 }
 
 // N.B. we make the first hypothesis as the stream is calculatable from
-//      input stream by 6 of the measureable condition.
+//      input stream by 5 of the measureable condition.
 //      so if the information amount on the datastream isn't important case,
 //      in another words what's not on the table is important case,
 //      we can gain some result meaning, also out of the LoEM either have
-//      cardinal meaning on the same. either we bet measureable conditions'
-//      invariant always say something to the datastream on this predictor.
-//      also, our predictor's f saturate #f on the possible (de)?compression
-//      root because f(in,out) count up also we take invariant(in,out) so
-//      3 dimension with non commutative case it's also binary operator variable
-//      dimension on invariant with including trivial id. case.
-//      so the invariant for (de)?compression is the matter, however, once
-//      this is coded, they have the jammer nor they can be getting to broken
-//      on numerical calculation even non solid calculus if we're in cursed
-//      condition. this can be bonding had be changed case concerns #f count up
-//      also obs. matter. masp concerns avoid these (de)?compression condition.
+//      cardinal meaning on the same.
+// N.B. since selecting and optimizing fixes #f because they select a invariant
+//      to determine and predict next one step, in shallow meaning with
+//      universal invariant causes 3 of the candidates are enough if the grip
+//      on universal invariant doesn't slip original stream, however, once
+//      observed by the jammer intent, they slips. so we need to use universal
+//      invariant as a saturate flooded set to switch the cases, so we need
+//      at least first 3 invariant combination to be multiplied by 5 or so,
+//      this can be partially done by applying up to thirds original
+//      predictor to difference / multiply condition. also we need them to
+//      calculate the saturated sets at once to have some grip on them
+//      when we're being persistently jammed condition. however, this count up
+//      is for 4-markov case also the root description table simple enough case.
+//      since we can combine such a invariants as a clustered one AFTER the
+//      predictor is determined (not the BEFORE to determine), the chase depends
+//      on something other than calculations. also if it's not clustered, we
+//      need only 3 of the invariants to describe any of whole the stream.
+//      so the making/applying universal invariant from R\Q to Q meaning
+//      is omitted case, this predictor don't work well or simply our machine
+//      is infected totally.
 // N.B. if we copy some structure on the purpose of prediction, the data amount
 //      3 * in (3 layers) for 2nd order saturation, 6 for multiple layer
 //      algebraic copying structure saturation, 9 for enough to decompose
@@ -7924,8 +7932,8 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
   return;
 }
 
-// N.B. numbering is last renumbered 2025/07/25:
-// N.B. once implemented but abandoned and cleaned from this source code
+// N.B. numbering is last renumbered 2025/07/30:
+// N.B. once implemented or not but abandoned and cleaned from this source code
 //      the reason why
 // (00) predictions via linear sum/diff based some reformation input and revert:
 //      it's all integrated skipX concerns, the jammer either jam out us
@@ -7991,6 +7999,18 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      we trust original prediction once strong because the structure
 //      we made hypothesis says so. the prediction success/fail is original
 //      structure hypothesis or not, so it's one of a ad-hoc prediction.
+// (18) predictor which shirking many much of the continuous functions:
+//        this is with taking multiplication invariant on f,
+//        S f(x) dx = S det(J((1,g0,...)/(1,x0,...)) dx0 ...
+//        retaking their addition invariant as det(...) == 0, the given function
+//        g0 ... should fit them also they describes much of continuities.
+//        this can flatten N when our N is something infected.
+//        also this is the analogy {1,x,x^2,...} on p0next meaning.
+//      so the ongoing proceding machine learnings finds such a orthogonal
+//      egg functions from input streams without the hypotehsis on PDE
+//      structures. so we drop to implement them.
+// (19) distant step prediciton. it's equivalent to skipX concerns.
+//      however, we should try again this when beating with delta input stream.
 //
 // N.B. something XXX result descripton
 // (00) there might exist non Lebesgue measureable condition discrete stream.
@@ -8064,18 +8084,11 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 // (08) if the predictor takes the input as a payload to the structure,
 //      the learning size needs smaller than 2^(n-markov) in trivial because
 //      they saturates end this point other than statistical ones.
+//      on the other hand, our predictor only needs (n-markov)^3, so crossing
+//      point is around after 9 input stream samples.
 //
-// N.B. another variants of the predictors fight with 2*3*2 pattern of #f
-//      fixation. since we have 6 of measureable condition, we perhaps don't
-//      need them.
-// (00) with taking multiplication invariant on f,
-//      S f(x) dx = S det(J((1,g0,...)/(1,x0,...)) dx0 ...
-//      retaking their addition invariant as det(...) == 0, the given function
-//      g0 ... should fit them also they describes much of continuities.
-//      this can flatten N when our N is something infected.
-//      also this is the analogy {1,x,x^2,...} on p0next meaning.
-//      so we need continuous egg function set defined as a start point of them.
-// (01) saturating F_2^4 #f, the bra, ket condition indirect access.
+// N.B. another variants of the predictors.
+// (00) saturating F_2^4 #f, the bra, ket condition indirect access.
 
 #define _SIMPLELIN_
 #endif
