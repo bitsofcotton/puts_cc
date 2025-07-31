@@ -4767,32 +4767,43 @@ template <typename T, int nprogress> SimpleVector<T> pGuarantee(const vector<Sim
         - abs(_P_BIT_) )) + in[in.size() - 1];
 }
 
+#if !defined(_P_MLEN_)
+// N.B. specify max length.
+#define _P_MLEN_ (int(13 + 3 + 4 + 1))
+#endif
+
 // N.B. pSubtractInvariant[234] takes maximum dimension prediction in R^4
 //      invariant meaning.
 template <typename T, int nprogress> vector<SimpleVector<T> > pSubtractInvariant2(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
-  const int n(in.size() / 3);
+  const int n(min(int(in.size() / 3), _P_MLEN_));
   SimpleVector<SimpleVector<T> > pass;
+  SimpleVector<SimpleVector<T> > bpass;
   pass.entity.reserve(in.size() - n + 1);
+  bpass.entity.reserve(in.size() - n + 1);
   SimpleVector<T> last(in[0].size());
   for(int i = 0; i <= in.size() - n; i ++) {
-    if(i < in.size() - n)
-      pass.entity.emplace_back(offsetHalf<T>((unOffsetHalf<T>(in[i + n] -
-        unOffsetHalf<T>(pGuarantee<T, - nprogress>(in.subVector(i, n).entity,
-          string(" ") + to_string(i) + string("/") + to_string(in.size() - n) +
-            strloop) )) / T(int(4)) )) );
-    else last = pGuarantee<T, - nprogress>(in.subVector(i, n).entity,
-      string(" ") + to_string(i) + string("/") + to_string(in.size() - n) +
+    if(i < in.size() - n) {
+      bpass.entity.emplace_back(pGuarantee<T, - nprogress>(
+        in.subVector(i, n).entity, string(" ") + to_string(i) + string("/P") +
+          to_string(in.size() - n) + strloop) );
+      pass.entity.emplace_back(offsetHalf<T>(unOffsetHalf<T>(in[i + n] -
+        bpass[i]) / T(int(4)) ));
+    } else last = pGuarantee<T, - nprogress>(in.subVector(i, n).entity,
+      string(" ") + to_string(i) + string("/P") + to_string(in.size() - n) +
         strloop);
   }
   vector<SimpleVector<T> > res;
-  res.reserve(n);
-  for(int i = 0; i < n - 1; i ++)
+  const int residue(pass.size() - n);
+  res.reserve(residue);
+  for(int i = 0; i < residue - 1; i ++)
     res.emplace_back(unOffsetHalf<T>(pGuarantee<T, nprogress>(
-      pass.subVector(i - n - n + pass.size(), n).entity, strloop)) *
-        T(int(4)) + unOffsetHalf<T>(pass[i - n + pass.size()]) );
+      pass.subVector(i, n).entity, string(" ") + to_string(i) + string("/Q") +
+        to_string(residue) + strloop)) * T(int(4)) + unOffsetHalf<T>(
+          bpass[i - (residue - 1) + bpass.size()]));
   res.emplace_back(unOffsetHalf<T>(
     pGuarantee<T, nprogress>(pass.subVector(pass.size() - n, n).entity,
-      strloop)) * T(int(4)) + unOffsetHalf<T>(last) );
+      string(" ") + to_string(residue - 1) + string("/Q") + to_string(residue) +
+        strloop)) * T(int(4)) + unOffsetHalf<T>(last) );
   return offsetHalf<T>(res);
 }
 
@@ -4845,7 +4856,8 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pSubtractInvariant
 // N.B. however, the maximum dimension prediction isn't stable per each,
 //      so we take them as each ranged. either we take attach input stream
 //      by them.
-template <typename T, int nprogress> vector<SimpleVector<T> > pComplementStream(const vector<SimpleVector<T> >& in, const int& n, const string& strloop) {
+template <typename T, int nprogress> vector<SimpleVector<T> > pComplementStream(const vector<SimpleVector<T> >& in, const string& strloop) {
+  const int n(in.size() - (_P_MLEN_ * 2 + 3 + 1));
   vector<SimpleVector<T> > lres(pSubtractInvariant4<T, nprogress>(in, strloop));
   vector<SimpleVector<T> > res;
   res.reserve(n);
@@ -4875,25 +4887,22 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pJamout(const vect
   SimpleVector<T> sign(in[0].size());
   walk.O();
   sign.O(T(int(1)));
-  vector<SimpleVector<T> > lres(pComplementStream<T, nprogress>(in,
-    // N.B. wlen == (13 + 3 + 4 + 1) * 3 + 3 + 1
-    //      10 is reverse calculation whole length 81 = 3^2 * 3^2 case.
-    in.size() - 67 - 10, strloop));
+  vector<SimpleVector<T> > lres(pComplementStream<T, nprogress>(in, strloop));
   vector<SimpleVector<T> > res;
   res.reserve(n);
   for(int i = 0; i < lres.size(); i ++) {
-    if(lres.size() - n <= i) {
-      res.emplace_back(lres[i]);
-      for(int j = 0; j < lres[i].size(); j ++)
-        res[res.size() - 1][j] *= sign[j];
-    }
     walk += lres[i];
     for(int j = 0; j < walk.size(); j ++)
       // XXX: magic number.
-      if(T(int(4)) < abs(walk[j])) {
+      if(T(int(1)) / T(int(40)) < abs(walk[j])) {
         sign[j] = - sign[j];
         walk[j] = T(int(0));
       }
+    if(lres.size() - n <= i) {
+      res.emplace_back(lres[i]);
+      for(int j = 0; j < lres[i].size(); j ++)
+        res[res.size() - 1][j] = sgn<T>(res[res.size() - 1][j] * sign[j]);
+    }
   }
   return res;
 }
@@ -4928,14 +4937,19 @@ template <typename T, int nprogress> SimpleVector<T> pSaturatedInvariant(const v
 
 // N.B. repeat possible output whole range. also offset before/after predict.
 template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const string& strloop) {
-  const int cand(max(int(1), int(in.size() / 81) ));
+  // N.B. typically 80.
+  const int n((_P_MLEN_ * 2 + 3 + 1) + 12 + 4 + 18);
+  const int cand(max(int(1), int(in.size() / n) ));
   vector<SimpleVector<T> > res;
   res.reserve(cand);
-  for(int i = 1; i <= cand; i ++)
-    res.emplace_back(pSaturatedInvariant<T, nprogress>(
-      skipX<SimpleVector<T> >(in, i),
-        string(" ") + to_string(i - 1) + string("/") + to_string(cand) +
-          strloop));
+  for(int i = 1; i <= cand; i ++) {
+    vector<SimpleVector<T> > work(skipX<SimpleVector<T> >(in, i));
+    for(int i = 0; i < min(int(work.size()), int(81)); i ++)
+      work[i] = move(work[i - min(int(work.size()), int(81)) + work.size()]);
+    work.resize(min(int(work.size()), int(81)));
+    res.emplace_back(pSaturatedInvariant<T, nprogress>(work, string(" ") +
+      to_string(i - 1) + string("/") + to_string(cand) + strloop));
+  }
   return res;
 }
 
