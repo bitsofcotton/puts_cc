@@ -4734,12 +4734,6 @@ template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<Simple
   SimpleVector<T> resp;
   SimpleVector<T> resm;
 #if defined(_OPENMP)
-  pnextcacher<T>(in.size(), 1);
-#pragma omp parallel for schedule(static, 1)
-  for(int i = 1; i < in.size(); i ++) pnextcacher<T>(i, 1);
-  // N.B. comment out and use env OMP_MAX_ACTIVE_LEVELS=... to reduce
-  //      memory usage.
-  omp_set_max_active_levels(4);
 #pragma omp parallel sections
   {
 #pragma omp section
@@ -4773,14 +4767,175 @@ template <typename T, int nprogress> SimpleVector<T> pGuarantee(const vector<Sim
         - abs(_P_BIT_) )) + in[in.size() - 1];
 }
 
+// N.B. pSubtractInvariant[234] takes maximum dimension prediction in R^4
+//      invariant meaning.
+template <typename T, int nprogress> vector<SimpleVector<T> > pSubtractInvariant2(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
+  const int n(in.size() / 3);
+  SimpleVector<SimpleVector<T> > pass;
+  pass.entity.reserve(in.size() - n + 1);
+  SimpleVector<T> last(in[0].size());
+  for(int i = 0; i <= in.size() - n; i ++) {
+    if(i < in.size() - n)
+      pass.entity.emplace_back(offsetHalf<T>((unOffsetHalf<T>(in[i + n] -
+        unOffsetHalf<T>(pGuarantee<T, - nprogress>(in.subVector(i, n).entity,
+          string(" ") + to_string(i) + string("/") + to_string(in.size() - n) +
+            strloop) )) / T(int(4)) )) );
+    else last = pGuarantee<T, - nprogress>(in.subVector(i, n).entity,
+      string(" ") + to_string(i) + string("/") + to_string(in.size() - n) +
+        strloop);
+  }
+  vector<SimpleVector<T> > res;
+  res.reserve(n);
+  for(int i = 0; i < n - 1; i ++)
+    res.emplace_back(unOffsetHalf<T>(pGuarantee<T, nprogress>(
+      pass.subVector(i - n - n + pass.size(), n).entity, strloop)) *
+        T(int(4)) + unOffsetHalf<T>(pass[i - n + pass.size()]) );
+  res.emplace_back(unOffsetHalf<T>(
+    pGuarantee<T, nprogress>(pass.subVector(pass.size() - n, n).entity,
+      strloop)) * T(int(4)) + unOffsetHalf<T>(last) );
+  return offsetHalf<T>(res);
+}
+
+template <typename T, int nprogress> vector<SimpleVector<T> > pSubtractInvariant3(const vector<SimpleVector<T> >& in, const string& strloop) {
+  SimpleVector<SimpleVector<T> > pass;
+  pass.entity.reserve(in.size() - 3);
+  for(int i = 0; i < in.size() - 3; i ++) {
+    pass.entity.emplace_back(- unOffsetHalf<T>(in[i]));
+    pass[i] -= unOffsetHalf<T>(in[i + 1]);
+    pass[i] -= unOffsetHalf<T>(in[i + 2]);
+    pass[i] += unOffsetHalf<T>(in[i + 3]);
+    pass[i] /= T(int(4));
+    pass[i]  = offsetHalf<T>(pass[i]);
+  }
+  vector<SimpleVector<T> > res(pSubtractInvariant2<T, nprogress>(pass, strloop));
+  for(int i = 0; i < res.size(); i ++)
+    res[i] = res[i] * T(int(4)) + in[i - res.size() + in.size()] +
+      in[i - res.size() - 1 + in.size()] +
+        in[i - res.size() - 2 + in.size()];
+  return res;
+}
+
+template <typename T, int nprogress> vector<SimpleVector<T> > pSubtractInvariant4(const vector<SimpleVector<T> >& in, const string& strloop) {
+  vector<SimpleVector<T> > pass;
+  pass.reserve(in.size() - 1);
+  for(int i = 0; i < in.size() - 1; i ++)
+    pass.emplace_back(offsetHalf<T>((unOffsetHalf<T>(in[i + 1]) - 
+      unOffsetHalf<T>(in[i]) ) / T(int(2))));
+  vector<SimpleVector<T> > res(pSubtractInvariant3<T, nprogress>(pass, strloop));
+  vector<T> stat;
+  stat.reserve(res.size() * res[0].size());
+  for(int i = 0; i < res.size(); i ++) {
+    res[i] = unOffsetHalf<T>(res[i] * T(int(2)) +
+      in[i - res.size() + in.size()]);
+    for(int j = 0; j < res[i].size(); j ++) stat.emplace_back(res[i][j]);
+  }
+  sort(stat.begin(), stat.end());
+  // XXX: don't know why, but from somehow always offsetted randomly.
+  const T off(T(int(4 * 4)) < abs(stat[stat.size() / 2]) ?
+    sgn<T>(stat[stat.size() / 2]) * exp(absfloor(
+      log(abs(stat[stat.size() / 2])) / log(T(int(4 * 4))))) : T(int(0)));
+  for(int i = 0; i < res.size(); i ++) {
+    for(int j = 0; j < res[i].size(); j ++)
+      res[i][j] -= off;
+    res[i] = offsetHalf<T>(res[i]);
+  }
+  return res;
+}
+
+// N.B. however, the maximum dimension prediction isn't stable per each,
+//      so we take them as each ranged. either we take attach input stream
+//      by them.
+template <typename T, int nprogress> vector<SimpleVector<T> > pComplementStream(const vector<SimpleVector<T> >& in, const int& n, const string& strloop) {
+  vector<SimpleVector<T> > lres(pSubtractInvariant4<T, nprogress>(in, strloop));
+  vector<SimpleVector<T> > res;
+  res.reserve(n);
+  for(int i = 0; i < lres.size(); i ++)
+    lres[i]  = unOffsetHalf<T>(lres[i]);
+  for(int i = 0; i < n; i ++) {
+    SimpleVector<T> d(in[0].size());
+    d.O();
+    res.emplace_back(SimpleVector<T>(in[0].size()).O());
+    for(int j = i; j <= i - n + lres.size(); j ++) {
+      res[i] += lres[j];
+      // N.B. we cannot avoid this +1 slide condition. so we mobilize all of the
+      //      our prediction effort to some of the discontinuity attach.
+      d += unOffsetHalf<T>(in[j - (i - n + lres.size() + 1) + in.size()]);
+    }
+    for(int j = 0; j < res[i].size(); j ++) res[i][j] *= d[j] /
+      (T(lres.size() - n + 1) * T(lres.size() - n + 1));
+  }
+  return res;
+}
+
+// N.B. from somehow, we need to jam out better middle ranges.
+//      slow variables are not counted from our predictor, it's better data
+//      amount which isn't our business, it's finding core orthogonal function.
+template <typename T, int nprogress> vector<SimpleVector<T> > pJamout(const vector<SimpleVector<T> >& in, const int& n, const string& strloop) {
+  SimpleVector<T> walk(in[0].size());
+  SimpleVector<T> sign(in[0].size());
+  walk.O();
+  sign.O(T(int(1)));
+  vector<SimpleVector<T> > lres(pComplementStream<T, nprogress>(in,
+    // N.B. wlen == (13 + 3 + 4 + 1) * 3 + 3 + 1
+    //      10 is reverse calculation whole length 81 = 3^2 * 3^2 case.
+    in.size() - 67 - 10, strloop));
+  vector<SimpleVector<T> > res;
+  res.reserve(n);
+  for(int i = 0; i < lres.size(); i ++) {
+    if(lres.size() - n <= i) {
+      res.emplace_back(lres[i]);
+      for(int j = 0; j < lres[i].size(); j ++)
+        res[res.size() - 1][j] *= sign[j];
+    }
+    walk += lres[i];
+    for(int j = 0; j < walk.size(); j ++)
+      // XXX: magic number.
+      if(T(int(4)) < abs(walk[j])) {
+        sign[j] = - sign[j];
+        walk[j] = T(int(0));
+      }
+  }
+  return res;
+}
+
+// N.B. from somehow, each range prediction multiply into the stream causes
+//      better to use but worse continuous form than original.
+template <typename T, int nprogress> SimpleVector<T> pSaturatedInvariant(const vector<SimpleVector<T> >& in, const string& strloop) {
+  const int size(4);
+  SimpleMatrix<T> p(size, in[0].size());
+  p.O();
+#if defined(_OPENMP)
+  pnextcacher<T>(in.size(), 1);
+#pragma omp parallel for schedule(static, 1)
+  for(int i = 1; i < in.size(); i ++) pnextcacher<T>(i, 1);
+  // N.B. comment out and use env OMP_MAX_ACTIVE_LEVELS=... to reduce
+  //      memory usage.
+  omp_set_max_active_levels(2);
+#endif
+  p.entity = pJamout<T, nprogress>(in, size, strloop);
+  assert(p.entity.size() == size);
+  SimpleVector<T> res(move(p.row(p.rows() - 1)));
+  p.entity.resize(p.entity.size() - 1);
+  for(int i = 0; i < p.rows(); i ++)
+    for(int j = 0; j < p.cols(); j ++)
+      p(i, j) *= unOffsetHalf<T>(in[i - p.rows() + in.size()][j]);
+  for(int i = 0; i < res.size(); i ++)
+    res[i] *= p0maxNext<T>(p.col(i));
+  // N.B. the output variable range is worse wider than [0,1] .
+  // XXX: don't know why but the result always offsetted some.
+  return offsetHalf<T>(res);
+}
+
 // N.B. repeat possible output whole range. also offset before/after predict.
 template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const string& strloop) {
-  const int cand(max(int(1), int(in.size() / (13 + 3 + 4 + 1)) ));
+  const int cand(max(int(1), int(in.size() / 81) ));
   vector<SimpleVector<T> > res;
   res.reserve(cand);
   for(int i = 1; i <= cand; i ++)
-    res.emplace_back(pGuarantee<T, nprogress>(skipX<SimpleVector<T> >(in, i),
-      string(" ") + to_string(i - 1) + string("/") + to_string(cand) + strloop));
+    res.emplace_back(pSaturatedInvariant<T, nprogress>(
+      skipX<SimpleVector<T> >(in, i),
+        string(" ") + to_string(i - 1) + string("/") + to_string(cand) +
+          strloop));
   return res;
 }
 
