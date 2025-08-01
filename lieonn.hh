@@ -3843,6 +3843,8 @@ template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
 // N.B. we make the hypothesis the invariant coefficients are continuous or
 //      periodical. this is valid if original stream have less or equal to
 //      varlen-markov's Riemann-Stieljes measureable condition.
+//      this also inserts some story line hypothesis, if whole the story is
+//      given on data stream condition, we only need to take invariant once.
 // N.B. this is the analogy to toeplitz matrix inversion with singular one.
 // N.B. if the function has internal states variable to be projected into
 //      series, they're looked as <a,x>+<b,y>==<a,x>==0, y is internal states.
@@ -3859,11 +3861,9 @@ template <typename T, bool levi> T p01next(const SimpleVector<T>& in) {
   static const T zero(0);
   static const T one(1);
   static const T two(2);
-  // N.B. division accuracy glitch.
-  const T nin(sqrt(in.dot(in) * (one + SimpleMatrix<T>().epsilon())));
+  const T nin(sqrt(in.dot(in)));
   if(! isfinite(nin) || nin == zero) return zero;
   const int varlen(ind2vd(in.size()));
-  // N.B. we conclude making whole range invariants.
   SimpleMatrix<T> invariants(max(int(1), int(in.size()) -
     int(varlen * 2 + step)), varlen + 2);
   invariants.O();
@@ -4774,40 +4774,27 @@ template <typename T, int nprogress> SimpleVector<T> pGuarantee(const vector<Sim
 
 // N.B. pSubtractInvariant[234] takes maximum dimension prediction in R^4
 //      invariant meaning.
-template <typename T, int nprogress> vector<SimpleVector<T> > pSubtractInvariant2(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
-  const int n(min(int(in.size() / 3), _P_MLEN_));
+template <typename T, int nprogress> SimpleVector<T> pSubtractInvariant2(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
+  const int n(in.size() / 2);
   SimpleVector<SimpleVector<T> > pass;
-  SimpleVector<SimpleVector<T> > bpass;
   pass.entity.reserve(in.size() - n + 1);
-  bpass.entity.reserve(in.size() - n + 1);
   SimpleVector<T> last(in[0].size());
   for(int i = 0; i <= in.size() - n; i ++) {
     if(i < in.size() - n) {
-      bpass.entity.emplace_back(pGuarantee<T, - nprogress>(
-        in.subVector(i, n).entity, string(" ") + to_string(i) + string("/P") +
-          to_string(in.size() - n) + strloop) );
-      pass.entity.emplace_back(offsetHalf<T>(unOffsetHalf<T>(in[i + n] -
-        bpass[i]) / T(int(4)) ));
+      pass.entity.emplace_back(offsetHalf<T>(unOffsetHalf<T>(in[i + n]) -
+        unOffsetHalf<T>(pGuarantee<T, - nprogress>(in.subVector(i, n).entity,
+          string(" ") + to_string(i) + string("/P") + to_string(in.size() - n)
+        + strloop)) / T(int(2)) ));
     } else last = pGuarantee<T, - nprogress>(in.subVector(i, n).entity,
       string(" ") + to_string(i) + string("/P") + to_string(in.size() - n) +
         strloop);
   }
-  vector<SimpleVector<T> > res;
-  const int residue(pass.size() - n);
-  res.reserve(residue);
-  for(int i = 0; i < residue - 1; i ++)
-    res.emplace_back(unOffsetHalf<T>(pGuarantee<T, nprogress>(
-      pass.subVector(i, n).entity, string(" ") + to_string(i) + string("/Q") +
-        to_string(residue) + strloop)) * T(int(4)) + unOffsetHalf<T>(
-          bpass[i - (residue - 1) + bpass.size()]));
-  res.emplace_back(unOffsetHalf<T>(
+  return offsetHalf<T>(unOffsetHalf<T>(
     pGuarantee<T, nprogress>(pass.subVector(pass.size() - n, n).entity,
-      string(" ") + to_string(residue - 1) + string("/Q") + to_string(residue) +
-        strloop)) * T(int(4)) + unOffsetHalf<T>(last) );
-  return offsetHalf<T>(res);
+      strloop)) * T(int(2)) + unOffsetHalf<T>(last) );
 }
 
-template <typename T, int nprogress> vector<SimpleVector<T> > pSubtractInvariant3(const vector<SimpleVector<T> >& in, const string& strloop) {
+template <typename T, int nprogress> SimpleVector<T> pSubtractInvariant3(const vector<SimpleVector<T> >& in, const string& strloop) {
   SimpleVector<SimpleVector<T> > pass;
   pass.entity.reserve(in.size() - 3);
   for(int i = 0; i < in.size() - 3; i ++) {
@@ -4818,138 +4805,99 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pSubtractInvariant
     pass[i] /= T(int(4));
     pass[i]  = offsetHalf<T>(pass[i]);
   }
-  vector<SimpleVector<T> > res(pSubtractInvariant2<T, nprogress>(pass, strloop));
-  for(int i = 0; i < res.size(); i ++)
-    res[i] = res[i] * T(int(4)) + in[i - res.size() + in.size()] +
-      in[i - res.size() - 1 + in.size()] +
-        in[i - res.size() - 2 + in.size()];
-  return res;
+  return pSubtractInvariant2<T, nprogress>(pass, strloop) * T(int(4)) +
+    in[in.size() - 1] + in[in.size() - 2] + in[in.size() - 3];
 }
 
-template <typename T, int nprogress> vector<SimpleVector<T> > pSubtractInvariant4(const vector<SimpleVector<T> >& in, const string& strloop) {
+template <typename T, int nprogress> SimpleVector<T> pSubtractInvariant4(const vector<SimpleVector<T> >& in, const string& strloop) {
   vector<SimpleVector<T> > pass;
   pass.reserve(in.size() - 1);
   for(int i = 0; i < in.size() - 1; i ++)
     pass.emplace_back(offsetHalf<T>((unOffsetHalf<T>(in[i + 1]) - 
       unOffsetHalf<T>(in[i]) ) / T(int(2))));
-  vector<SimpleVector<T> > res(pSubtractInvariant3<T, nprogress>(pass, strloop));
-  vector<T> stat;
-  stat.reserve(res.size() * res[0].size());
-  for(int i = 0; i < res.size(); i ++) {
-    res[i] = unOffsetHalf<T>(res[i] * T(int(2)) +
-      in[i - res.size() + in.size()]);
-    for(int j = 0; j < res[i].size(); j ++) stat.emplace_back(res[i][j]);
-  }
-  sort(stat.begin(), stat.end());
-  // XXX: don't know why, but from somehow always offsetted randomly.
-  const T off(T(int(4 * 4)) < abs(stat[stat.size() / 2]) ?
-    sgn<T>(stat[stat.size() / 2]) * exp(absfloor(
-      log(abs(stat[stat.size() / 2])) / log(T(int(4 * 4))))) : T(int(0)));
-  for(int i = 0; i < res.size(); i ++) {
-    for(int j = 0; j < res[i].size(); j ++)
-      res[i][j] -= off;
-    res[i] = offsetHalf<T>(res[i]);
-  }
-  return res;
+  return unOffsetHalf<T>(pSubtractInvariant3<T, nprogress>(pass,
+    strloop)) * T(int(2)) + unOffsetHalf<T>(in[in.size() - 1]);
 }
 
-// N.B. however, the maximum dimension prediction isn't stable per each,
-//      so we take them as each ranged. either we take attach input stream
-//      by them.
-template <typename T, int nprogress> vector<SimpleVector<T> > pComplementStream(const vector<SimpleVector<T> >& in, const string& strloop) {
-  const int n(in.size() - (_P_MLEN_ * 2 + 3 + 1));
-  vector<SimpleVector<T> > lres(pSubtractInvariant4<T, nprogress>(in, strloop));
-  vector<SimpleVector<T> > res;
-  res.reserve(n);
-  for(int i = 0; i < lres.size(); i ++)
-    lres[i]  = unOffsetHalf<T>(lres[i]);
-  for(int i = 0; i < n; i ++) {
-    SimpleVector<T> d(in[0].size());
-    d.O();
-    res.emplace_back(SimpleVector<T>(in[0].size()).O());
-    for(int j = i; j <= i - n + lres.size(); j ++) {
-      res[i] += lres[j];
-      // N.B. we cannot avoid this +1 slide condition. so we mobilize all of the
-      //      our prediction effort to some of the discontinuity attach.
-      d += unOffsetHalf<T>(in[j - (i - n + lres.size() + 1) + in.size()]);
-    }
-    for(int j = 0; j < res[i].size(); j ++) res[i][j] *= d[j] /
-      (T(lres.size() - n + 1) * T(lres.size() - n + 1));
+// N.B. for speed purpose.
+template <typename T, int nprogress> SimpleVector<T> pComplementStreamSub(const vector<SimpleVector<T> >& slide, const int& skip, const int& lplen, idFeeder<SimpleVector<T> >& MM, idFeeder<SimpleVector<T> >& hd, idFeeder<SimpleVector<T> >& hM, idFeeder<SimpleVector<T> >& hh, const string& strloop) {
+  SimpleVector<T> M(slide[0].size());
+  if(MM.full) {
+    hd.next(unOffsetHalf<T>(slide[slide.size() - 1]));
+    hM.next(MM.res[MM.res.size() - 1]);
   }
-  return res;
-}
-
-// N.B. from somehow, we need to jam out better middle ranges.
-//      slow variables are not counted from our predictor, it's better data
-//      amount which isn't our business, it's finding core orthogonal function.
-template <typename T, int nprogress> vector<SimpleVector<T> > pJamout(const vector<SimpleVector<T> >& in, const int& n, const string& strloop) {
-  SimpleVector<T> walk(in[0].size());
-  SimpleVector<T> sign(in[0].size());
-  walk.O();
-  sign.O(T(int(1)));
-  vector<SimpleVector<T> > lres(pComplementStream<T, nprogress>(in, strloop));
-  vector<SimpleVector<T> > res;
-  res.reserve(n);
-  for(int i = 0; i < lres.size(); i ++) {
-    walk += lres[i];
-    for(int j = 0; j < walk.size(); j ++)
-      // XXX: magic number.
-      if(T(int(1)) / T(int(40)) < abs(walk[j])) {
-        sign[j] = - sign[j];
-        walk[j] = T(int(0));
+  M.O();
+  MM.next(pSubtractInvariant4<T, nprogress>(
+    skipX<SimpleVector<T> >(slide, skip * 2), strloop));
+  if(hM.full) {
+    SimpleVector<T> work(slide[0].size());
+    vector<SimpleVector<T> > mh;
+    mh.resize(lplen * 2, SimpleVector<T>(slide[0].size()).O());
+    for(int i = 0; i < mh.size(); i ++) {
+      work.O();
+      for(int j = 0; j < skip; j ++) {
+        mh[i] += hM.res[i * skip + j];
+        work  += hd.res[i * skip + j];
       }
-    if(lres.size() - n <= i) {
-      res.emplace_back(lres[i]);
-      for(int j = 0; j < lres[i].size(); j ++)
-        res[res.size() - 1][j] = sgn<T>(res[res.size() - 1][j] * sign[j]);
+      for(int j = 0; j < work.size(); j ++) mh[i][j] *= work[j];
+      mh[i] /= T(skip * skip);
+    }
+    mh = skipX<SimpleVector<T> >(mh, 2);
+    SimpleMatrix<T> mmh(mh.size(), mh[0].size());
+    mmh.entity = move(mh);
+     work.O();
+   for(int i = 0; i < work.size(); i ++) work[i] = p0maxNext<T>(mmh.col(i));
+     hh.next(work);
+   if(hh.full) {
+      assert(hh.res.size() == MM.res.size());
+      M.O();
+      work.O();
+      for(int i = 0; i < MM.res.size(); i ++) {
+        M    += MM.res[i];
+        work += hh.res[i];
+      }
+      for(int i = 0; i < M.size(); i ++) M[i] *= work[i];
+      M /= T(hh.res.size() * MM.res.size());
     }
   }
-  return res;
+  return M;
 }
 
-// N.B. from somehow, each range prediction multiply into the stream causes
-//      better to use but worse continuous form than original.
-template <typename T, int nprogress> SimpleVector<T> pSaturatedInvariant(const vector<SimpleVector<T> >& in, const string& strloop) {
-  const int size(4);
-  SimpleMatrix<T> p(size, in[0].size());
-  p.O();
-#if defined(_OPENMP)
-  pnextcacher<T>(in.size(), 1);
-#pragma omp parallel for schedule(static, 1)
-  for(int i = 1; i < in.size(); i ++) pnextcacher<T>(i, 1);
-  // N.B. comment out and use env OMP_MAX_ACTIVE_LEVELS=... to reduce
-  //      memory usage.
-  omp_set_max_active_levels(2);
-#endif
-  p.entity = pJamout<T, nprogress>(in, size, strloop);
-  assert(p.entity.size() == size);
-  SimpleVector<T> res(move(p.row(p.rows() - 1)));
-  p.entity.resize(p.entity.size() - 1);
-  for(int i = 0; i < p.rows(); i ++)
-    for(int j = 0; j < p.cols(); j ++)
-      p(i, j) *= unOffsetHalf<T>(in[i - p.rows() + in.size()][j]);
-  for(int i = 0; i < res.size(); i ++)
-    res[i] *= p0maxNext<T>(p.col(i));
-  // N.B. the output variable range is worse wider than [0,1] .
-  // XXX: don't know why but the result always offsetted some.
-  return offsetHalf<T>(res);
+//N.B. however, the maximum dimension prediction isn't stable per each,
+//      so we take them as each ranged. either we make hypothesis such a
+//      inner product stream is continuous.
+template <typename T, int nprogress> SimpleVector<T> pComplementStream(const vector<SimpleVector<T> >& in, const string& strloop) {
+  // N.B. shortest length on p01next not includes large markov.
+  const int length(_P_MLEN_ * 2 + 3 + 1);
+  // N.B. skip == in.size() - length * skip * 2
+  const int skip(in.size() / (1 + length * 2));
+  const int lplen(3);
+  idFeeder<SimpleVector<T> > MM(skip * 2);
+  idFeeder<SimpleVector<T> > hd(skip * lplen * 2);
+  idFeeder<SimpleVector<T> > hM(skip * lplen * 2);
+  idFeeder<SimpleVector<T> > hh(skip * 2);
+  SimpleVector<T> M;
+  for(int i0 = 0; i0 <= in.size() - length * skip * 2; i0 ++) {
+    vector<SimpleVector<T> > work;
+    for(int j = 0; j < length * skip * 2; j ++)
+      work.emplace_back(in[i0 + j]);
+    M = pComplementStreamSub<T, nprogress>(work, skip, lplen, MM, hd, hM, hh,
+      strloop);
+  }
+  return M;
 }
 
 // N.B. repeat possible output whole range. also offset before/after predict.
 template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const string& strloop) {
-  // N.B. typically 80.
-  const int n((_P_MLEN_ * 2 + 3 + 1) + 12 + 4 + 18);
+  // N.B. typically 186.
+  const int n(((_P_MLEN_ * 2 + 3 + 1) * 2 + 1) * 2);
   const int cand(max(int(1), int(in.size() / n) ));
   vector<SimpleVector<T> > res;
   res.reserve(cand);
-  for(int i = 1; i <= cand; i ++) {
-    vector<SimpleVector<T> > work(skipX<SimpleVector<T> >(in, i));
-    for(int i = 0; i < min(int(work.size()), int(81)); i ++)
-      work[i] = move(work[i - min(int(work.size()), int(81)) + work.size()]);
-    work.resize(min(int(work.size()), int(81)));
-    res.emplace_back(pSaturatedInvariant<T, nprogress>(work, string(" ") +
-      to_string(i - 1) + string("/") + to_string(cand) + strloop));
-  }
+  for(int i = 1; i <= cand; i ++)
+    res.emplace_back(pComplementStream<T, nprogress>(skipX<SimpleVector<T> >(
+      in, i), string(" ") + to_string(i - 1) + string("/") + to_string(cand) +
+        strloop));
   return res;
 }
 
@@ -5006,34 +4954,16 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 // N.B. we make the first hypothesis as the stream is calculatable from
 //      input stream by 5 of the measureable condition.
 //      so if the information amount on the datastream isn't important case,
-//      in another words what's not on the table is important case,
-//      we can gain some result meaning, also out of the LoEM either have
-//      cardinal meaning on the same.
-// N.B. since selecting and optimizing fixes #f because they select a invariant
-//      to determine and predict next one step, in shallow meaning with
-//      universal invariant causes 3 of the candidates are enough if the grip
-//      on universal invariant doesn't slip original stream, however, once
-//      observed by the jammer intent, they slips. so we need to use universal
-//      invariant as a saturate flooded set to switch the cases, so we need
-//      at least first 3 invariant combination to be multiplied by 5 or so,
-//      this can be partially done by applying up to thirds original
-//      predictor to difference / multiply condition. also we need them to
-//      calculate the saturated sets at once to have some grip on them
-//      when we're being persistently jammed condition. however, this count up
-//      is for 4-markov case also the root description table simple enough case.
-//      since we can combine such a invariants as a clustered one AFTER the
-//      predictor is determined (not the BEFORE to determine), the chase depends
-//      on something other than calculations. also if it's not clustered, we
-//      need only 3 of the invariants to describe any of whole the stream.
-//      so the making/applying universal invariant from R\Q to Q meaning
-//      is omitted case, this predictor don't work well or simply our machine
-//      is infected totally.
-// N.B. if we copy some structure on the purpose of prediction, the data amount
-//      3 * in (3 layers) for 2nd order saturation, 6 for multiple layer
-//      algebraic copying structure saturation, 9 for enough to decompose
-//      inverse of them. however, number of the internal calculation copy
-//      only depends on the tanglement number based accuracy reason on
-//      calculation surface.
+//      we can gain some result meaning.
+// N.B. also upper layers are for out of the LoEM conditions saturated case.
+//      so if the data stream is something meaningful case, even the maximum
+//      compressed invariant isn't so stable from left hand side case, 
+//      we subtract maximum dimension of invariants so output stream isn't
+//      have residue in LoEM applied meaning but first hypothesis isn't have
+//      LoEM condition. so pComplementStream result is better stable to
+//      continuous meaning. with subtracting middle ranged walk information,
+//      we get better discontinuous result stream on whole we observed,
+//      however, this can be came from our machines' infection totally.
 // N.B. layers:
 //       | function           | layer# | [wsp1] | data amount* | time*(***)   |
 //       +-----------------------------------------------------+--------------+
@@ -5071,6 +5001,15 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 // (***) time order ratio, L for input stream length, G for input vector size,
 //       stand from arithmatic operators. ind2varlen isn't considered.
 // N.B. we need O((mem region)^2) calculation time whole.
+// N.B. upper layers:
+// | function            | layers | len*   |
+// +---------------------+--------+--------+
+// | pSaturatedInvariant | 0      | +4
+// | pJamout             | 1      | +len
+// | pComplementStream   | 2      | +range
+// | pSubtractInvariant4 | 3      | +in-1
+// | pSubtractInvariant3 | 4      | +in-3
+// | pSubtractInvariant2 | 5++    | *2
 
 template <typename T, int nprogress> vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
@@ -8178,7 +8117,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      egg functions from input streams without the hypotehsis on PDE
 //      structures. so we drop to implement them.
 // (19) distant step prediciton. it's equivalent to skipX concerns.
-//      however, we should try again this when beating with delta input stream.
+// (20) offset canceler. it's harmful to predictor behaviour.
 //
 // N.B. something XXX result descripton
 // (00) there might exist non Lebesgue measureable condition discrete stream.
@@ -8255,8 +8194,8 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      on the other hand, our predictor only needs (n-markov)^3, so crossing
 //      point is around after 9 input stream samples.
 //
-// N.B. another variants of the predictors.
-// (00) saturating F_2^4 #f, the bra, ket condition indirect access.
+// N.B. there's plenty of the room to implement the predictor which is
+//      saturating F_2^4 #f, the bra, ket condition indirect access.
 
 #define _SIMPLELIN_
 #endif
