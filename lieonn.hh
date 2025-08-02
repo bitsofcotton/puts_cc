@@ -4781,17 +4781,18 @@ template <typename T, int nprogress> SimpleVector<T> pSubtractInvariant2(const S
   SimpleVector<T> last(in[0].size());
   for(int i = 0; i <= in.size() - n; i ++) {
     if(i < in.size() - n) {
-      pass.entity.emplace_back(offsetHalf<T>(unOffsetHalf<T>(in[i + n]) -
-        unOffsetHalf<T>(pGuarantee<T, - nprogress>(in.subVector(i, n).entity,
-          string(" ") + to_string(i) + string("/P") + to_string(in.size() - n)
-        + strloop)) / T(int(2)) ));
+      // N.B. CPU float glitch causes no estimate, so double them.
+      pass.entity.emplace_back(offsetHalf<T>(unOffsetHalf<T>(
+        in[i + n]) - unOffsetHalf<T>(pGuarantee<T, - nprogress>(in.subVector(i,
+          n).entity, string(" ") + to_string(i) + string("/") +
+            to_string(in.size() - n) + strloop)) / T(int(4)) ) );
     } else last = pGuarantee<T, - nprogress>(in.subVector(i, n).entity,
-      string(" ") + to_string(i) + string("/P") + to_string(in.size() - n) +
+      string(" ") + to_string(i) + string("/") + to_string(in.size() - n) +
         strloop);
   }
   return offsetHalf<T>(unOffsetHalf<T>(
     pGuarantee<T, nprogress>(pass.subVector(pass.size() - n, n).entity,
-      strloop)) * T(int(2)) + unOffsetHalf<T>(last) );
+      strloop)) * T(int(4)) + unOffsetHalf<T>(last) );
 }
 
 template <typename T, int nprogress> SimpleVector<T> pSubtractInvariant3(const vector<SimpleVector<T> >& in, const string& strloop) {
@@ -4819,86 +4820,47 @@ template <typename T, int nprogress> SimpleVector<T> pSubtractInvariant4(const v
     strloop)) * T(int(2)) + unOffsetHalf<T>(in[in.size() - 1]);
 }
 
-// N.B. for speed purpose.
-template <typename T, int nprogress> SimpleVector<T> pComplementStreamSub(const vector<SimpleVector<T> >& slide, const int& skip, const int& lplen, idFeeder<SimpleVector<T> >& MM, idFeeder<SimpleVector<T> >& hd, idFeeder<SimpleVector<T> >& hM, idFeeder<SimpleVector<T> >& hh, const string& strloop) {
-  SimpleVector<T> M(slide[0].size());
-  if(MM.full) {
-    hd.next(unOffsetHalf<T>(slide[slide.size() - 1]));
-    hM.next(MM.res[MM.res.size() - 1]);
-  }
-  M.O();
-  MM.next(pSubtractInvariant4<T, nprogress>(
-    skipX<SimpleVector<T> >(slide, skip * 2), strloop));
-  if(hM.full) {
-    SimpleVector<T> work(slide[0].size());
-    vector<SimpleVector<T> > mh;
-    mh.resize(lplen * 2, SimpleVector<T>(slide[0].size()).O());
-    for(int i = 0; i < mh.size(); i ++) {
-      work.O();
-      for(int j = 0; j < skip; j ++) {
-        mh[i] += hM.res[i * skip + j];
-        work  += hd.res[i * skip + j];
-      }
-      for(int j = 0; j < work.size(); j ++) mh[i][j] *= work[j];
-      mh[i] /= T(skip * skip);
-    }
-    mh = skipX<SimpleVector<T> >(mh, 2);
-    SimpleMatrix<T> mmh(mh.size(), mh[0].size());
-    mmh.entity = move(mh);
-     work.O();
-   for(int i = 0; i < work.size(); i ++) work[i] = p0maxNext<T>(mmh.col(i));
-     hh.next(work);
-   if(hh.full) {
-      assert(hh.res.size() == MM.res.size());
-      M.O();
-      work.O();
-      for(int i = 0; i < MM.res.size(); i ++) {
-        M    += MM.res[i];
-        work += hh.res[i];
-      }
-      for(int i = 0; i < M.size(); i ++) M[i] *= work[i];
-      M /= T(hh.res.size() * MM.res.size());
-    }
-  }
-  return M;
-}
-
 //N.B. however, the maximum dimension prediction isn't stable per each,
-//      so we take them as each ranged. either we make hypothesis such a
-//      inner product stream is continuous.
-template <typename T, int nprogress> SimpleVector<T> pComplementStream(const vector<SimpleVector<T> >& in, const string& strloop) {
+//     so we take them as each ranged. either we make hypothesis such a
+//     inner product stream is continuous.
+template <typename T, int nprogress> SimpleVector<T> pComplementStream(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
   // N.B. shortest length on p01next not includes large markov.
   const int length(_P_MLEN_ * 2 + 3 + 1);
-  // N.B. skip == in.size() - length * skip * 2
-  const int skip(in.size() / (1 + length * 2));
-  const int lplen(3);
-  idFeeder<SimpleVector<T> > MM(skip * 2);
-  idFeeder<SimpleVector<T> > hd(skip * lplen * 2);
-  idFeeder<SimpleVector<T> > hM(skip * lplen * 2);
-  idFeeder<SimpleVector<T> > hh(skip * 2);
-  SimpleVector<T> M;
-  for(int i0 = 0; i0 <= in.size() - length * skip * 2; i0 ++) {
-    vector<SimpleVector<T> > work;
-    for(int j = 0; j < length * skip * 2; j ++)
-      work.emplace_back(in[i0 + j]);
-    M = pComplementStreamSub<T, nprogress>(work, skip, lplen, MM, hd, hM, hh,
-      strloop);
-  }
-  return M;
+  // N.B. skip == in.size() - length * skip.
+  const int skip(in.size() / (1 + length));
+  idFeeder<SimpleVector<T> > MM(in.size() - length * skip + 1);
+  for(int i = 0; i <= in.size() - length * skip; i ++)
+    MM.next(pSubtractInvariant4<T, nprogress>(skipX<SimpleVector<T> >(
+      in.subVector(i, length * skip).entity, skip), string(" ") +
+        to_string(i) + "/" + to_string(in.size() - length * skip + 1) +strloop)
+    );
+  assert(MM.full);
+  T M2(int(0));
+  for(int i = 0; i < MM.res.size(); i ++)
+    for(int j = 0; j < MM.res[i].size(); j ++)
+      M2 = max(abs(MM.res[i][j]), M2);
+  SimpleVector<T> M(in[0].size());
+  M.O();
+  for(int i = 0; i < MM.res.size(); i ++)
+    M += MM.res[i];
+  M /= T(MM.res.size());
+  return T(int(1)) < M2 ? M /= M2 : M;
 }
 
 // N.B. repeat possible output whole range. also offset before/after predict.
 template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const string& strloop) {
   // N.B. typically 186.
-  const int n(((_P_MLEN_ * 2 + 3 + 1) * 2 + 1) * 2);
+  const int n((_P_MLEN_ * 2 + 3 + 1) * 2 + 1);
   const int cand(max(int(1), int(in.size() / n) ));
   vector<SimpleVector<T> > res;
   res.reserve(cand);
-  for(int i = 1; i <= cand; i ++)
-    res.emplace_back(pComplementStream<T, nprogress>(skipX<SimpleVector<T> >(
-      in, i), string(" ") + to_string(i - 1) + string("/") + to_string(cand) +
-        strloop));
-  return res;
+  for(int i = 1; i <= cand; i ++) {
+    SimpleVector<SimpleVector<T> > work;
+    work.entity = skipX<SimpleVector<T> >(in, i);
+    res.emplace_back(pComplementStream<T, nprogress>(work, string(" ") +
+      to_string(i - 1) + string("/") + to_string(cand) + strloop));
+  }
+  return offsetHalf<T>(res);
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
