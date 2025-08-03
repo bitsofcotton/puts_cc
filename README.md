@@ -111,4 +111,5 @@ This repository is archived, so without bug report, will no change.
 2025/07/26-28 merge latest ddpmopt result.
 2025/07/28 merge latest ddpmopt result.
 2025/08/01 merge latest ddpmopt result.
+2025/08/02-03 merge latest ddpmopt result.
 
