@@ -4840,14 +4840,13 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pSubtractInvariant
 // N.B. however, the maximum dimension prediction isn't stable per each,
 //      so we take them as each ranged. either we make hypothesis such a
 //      inner product stream is continuous.
-template <typename T, int nprogress> vector<SimpleVector<T> > pComplementStream(const SimpleVector<SimpleVector<T> >& in, const int& length, const int& skip, const string& strloop) {
+template <typename T, int nprogress> vector<SimpleVector<T> > pComplementStream(const vector<SimpleVector<T> >& in, const int& length, const int& skip, const string& strloop) {
   vector<SimpleVector<T> > work;
   work.resize(skip * skip + skip * 2);
   for(int i = 0; i < skip; i ++) {
     vector<SimpleVector<T> > lwork(pSubtractInvariant4<T, nprogress>(
-      skipX<SimpleVector<T> >(in.subVector(0, in.size() - i).entity, skip),
-        skip + 2, string(" ") + to_string(i) + string("/") + to_string(skip) +
-          strloop));
+      skipX<SimpleVector<T> >(in, skip), skip + 2, string(" ") + to_string(i) +
+        string("/") + to_string(skip) + strloop));
     for(int j = 0; j < skip + 2; j ++)
       work[j * skip + skip - i - 1] =
         move(lwork[j - skip - 2 + lwork.size()]);
@@ -4867,7 +4866,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pComplementStream(
 }
 
 // N.B. we might get some continuous part.
-template <typename T, int nprogress> SimpleVector<T> pGainCont(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
+template <typename T, int nprogress> SimpleVector<T> pGainCont(const vector<SimpleVector<T> >& in, const string& strloop) {
   // N.B. shortest length on p01next not includes large markov.
   // N.B. (length + skip + 2) * skip == in.size()
   const int length(_P_MLEN_ * 2 + 3 + 1);
@@ -4882,7 +4881,7 @@ template <typename T, int nprogress> SimpleVector<T> pGainCont(const SimpleVecto
       idFeeder<T> f(skip);
       for(int k = 0; k < skip; k ++) {
         const int noff(k * skip - (skip - 1) * skip + j - skip);
-        f.next(in[noff + in.size()][i] - cont[noff + cont.size() - 1][i]);
+        f.next(in[noff + in.size()][i] - cont[noff + cont.size()][i]);
       }
       assert(f.full);
       M[i] += cont[j - skip + cont.size()][i] + p0maxNext<T>(f.res);
@@ -4897,12 +4896,10 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vect
   const int cand(max(int(1), int(in.size() / n) ));
   vector<SimpleVector<T> > res;
   res.reserve(cand);
-  for(int i = 1; i <= cand; i ++) {
-    SimpleVector<SimpleVector<T> > work;
-    work.entity = skipX<SimpleVector<T> >(in, i);
-    res.emplace_back(pGainCont<T, nprogress>(work, string(" ") +
-      to_string(i - 1) + string("/") + to_string(cand) + strloop));
-  }
+  for(int i = 1; i <= cand; i ++)
+    res.emplace_back(pGainCont<T, nprogress>(skipX<SimpleVector<T> >(in, i),
+      string(" ") + to_string(i - 1) + string("/") + to_string(cand) +
+        strloop));
   return offsetHalf<T>(res);
 }
 
@@ -5492,7 +5489,7 @@ template <typename T> SimpleMatrix<T> filter(const SimpleMatrix<T>& data, const 
       //   == d^(exp(inf))/dx^exp(inf) == f(x + inf dx)
       SimpleMatrix<complex(T) > normalize(dft<T>(data.rows()) * data.template cast<complex(T) >());
       for(int i = 0; i < normalize.rows(); i ++) {
-        const Complex<T> n(complexctor(T)(T(0), - T(2) * Pi * T(i) / T(normalize.rows())));
+        const Complex<T> n(complexctor(T)(T(0), - T(2) * Pi * T(i) / T(normalize.rows())) * complexctor(T)(T(recur)) );
         normalize.row(i) *= exp(n) + exp(- n);
       }
       result = (dft<T>(- data.rows()) * normalize).template real<T>();
