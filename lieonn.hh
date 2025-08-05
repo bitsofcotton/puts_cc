@@ -4788,7 +4788,7 @@ template <typename T, int nprogress> static inline vector<SimpleVector<T> > pSub
           in.subVector(i, m).entity, string(" ") + to_string(i) +
             string("/P") + to_string(in.size() - m) + strloop)) / T(int(4)) ) );
     else last = pGuarantee<T, - nprogress>(in.subVector(i, m).entity,
-      string(" ") + to_string(i) + string("/P") + to_string(in.size() - m + 1) +
+      string(" ") + to_string(i) + string("/P") + to_string(in.size() - m) +
         strloop);
   }
   vector<SimpleVector<T> > res;
@@ -4840,13 +4840,14 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pSubtractInvariant
 // N.B. however, the maximum dimension prediction isn't stable per each,
 //      so we take them as each ranged. either we make hypothesis such a
 //      inner product stream is continuous.
-template <typename T, int nprogress> vector<SimpleVector<T> > pComplementStream(const vector<SimpleVector<T> >& in, const int& length, const int& skip, const string& strloop) {
+template <typename T, int nprogress> vector<SimpleVector<T> > pComplementStream(const SimpleVector<SimpleVector<T> >& in, const int& length, const int& skip, const string& strloop) {
   vector<SimpleVector<T> > work;
   work.resize(skip * skip + skip * 2);
   for(int i = 0; i < skip; i ++) {
     vector<SimpleVector<T> > lwork(pSubtractInvariant4<T, nprogress>(
-      skipX<SimpleVector<T> >(in, skip), skip + 2, string(" ") + to_string(i) +
-        string("/") + to_string(skip) + strloop));
+      skipX<SimpleVector<T> >(in.subVector(in.size() - (length + skip + 2) *
+        skip, (length + skip + 2) * skip).entity, skip), skip + 2, string(" ") +
+          to_string(i) + string("/") + to_string(skip) + strloop));
     for(int j = 0; j < skip + 2; j ++)
       work[j * skip + skip - i - 1] =
         move(lwork[j - skip - 2 + lwork.size()]);
@@ -4866,11 +4867,11 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pComplementStream(
 }
 
 // N.B. we might get some continuous part.
-template <typename T, int nprogress> SimpleVector<T> pGainCont(const vector<SimpleVector<T> >& in, const string& strloop) {
+template <typename T, int nprogress> SimpleVector<T> pGainCont(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
   // N.B. shortest length on p01next not includes large markov.
-  // N.B. (length + skip + 2) * skip == in.size()
+  // N.B. (length + skip + 3) * skip == in.size()
   const int length(_P_MLEN_ * 2 + 3 + 1);
-  const int skip((sqrt(T(length * length + int(4) * length + int(4) * in.size() + int(4))) - T(length + int(2)) ) / T(int(2)));
+  const int skip((sqrt(T(length * length + int(6) * length + int(4) * in.size() + int(9))) - T(length + int(3)) ) / T(int(2)));
   vector<SimpleVector<T> > cont(pComplementStream<T, nprogress>(in, length,
     skip, strloop));
   assert(skip * skip < cont.size());
@@ -4881,7 +4882,7 @@ template <typename T, int nprogress> SimpleVector<T> pGainCont(const vector<Simp
       idFeeder<T> f(skip);
       for(int k = 0; k < skip; k ++) {
         const int noff(k * skip - (skip - 1) * skip + j - skip);
-        f.next(in[noff + in.size()][i] - cont[noff + cont.size()][i]);
+        f.next(in[noff + in.size()][i] - cont[noff + cont.size() - skip][i]);
       }
       assert(f.full);
       M[i] += cont[j - skip + cont.size()][i] + p0maxNext<T>(f.res);
@@ -4896,10 +4897,12 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vect
   const int cand(max(int(1), int(in.size() / n) ));
   vector<SimpleVector<T> > res;
   res.reserve(cand);
-  for(int i = 1; i <= cand; i ++)
-    res.emplace_back(pGainCont<T, nprogress>(skipX<SimpleVector<T> >(in, i),
-      string(" ") + to_string(i - 1) + string("/") + to_string(cand) +
-        strloop));
+  for(int i = 1; i <= cand; i ++) {
+    SimpleVector<SimpleVector<T> > w;
+    w.entity = skipX<SimpleVector<T> >(in, i);
+    res.emplace_back(pGainCont<T, nprogress>(w, string(" ") + to_string(i - 1) +
+      string("/") + to_string(cand) + strloop));
+  }
   return offsetHalf<T>(res);
 }
 
