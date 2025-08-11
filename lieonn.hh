@@ -4772,6 +4772,7 @@ template <typename T, int nprogress> SimpleVector<T> pPolish(const vector<Simple
 #endif
 
 // N.B. to guarantee lim S f == S lim f also ||S input|| is in [0,1[-register.
+//      also this is wrapper for p01next hypothesis the result in {0,1}^n.
 template <typename T, int nprogress> SimpleVector<T> pGuarantee(const vector<SimpleVector<T> >& in, const string& strloop) {
   return unOffsetHalf<T>(bitsG<T, true>(
     pPolish<T, nprogress>(bitsG<T, true>(offsetHalf<T>(
@@ -4825,7 +4826,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> pSubtractInva
 }
 
 // N.B. this subtract trivial 1-markov invariant. whole of this is for the
-//      LoEM unstable case input stream, we don't need subtract them
+//      root of LoEM unstable case input stream, we don't need subtract them
 //      other than pGuarantee normal cases.
 template <typename T, int nprogress> SimpleVector<T> pSubtractMaxInvariant(const vector<SimpleVector<T> >& in, const string& strloop) {
   vector<SimpleVector<T> > pass;
@@ -4843,12 +4844,12 @@ template <typename T, int nprogress> SimpleVector<T> pSubtractMaxInvariant(const
 
 // N.B. twice twice. we add measureable condition virtually on first prediction,
 //      we do prediction to differ on them often gets better results.
-//      since we get abs value on prediction we do -(original stream) condition.
+//      since we get abs value on prediction,we do -(original stream) condition.
 template <typename T, int nprogress, SimpleVector<T> (*p)(const vector<SimpleVector<T> >&, const string&) > SimpleVector<T> pTwiceTwice(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
+  const int sz(in.size() / 2);
   const SimpleVector<SimpleVector<T> > inm(offsetHalf<T>(- unOffsetHalf<T>(in) ));
   SimpleVector<SimpleVector<T> > pp;
   SimpleVector<SimpleVector<T> > pm;
-  const int sz(in.size() / 2);
   pp.entity.reserve(sz + 2);
   pm.entity.reserve(sz + 2);
 #if defined(_OPENMP)
@@ -4874,24 +4875,25 @@ template <typename T, int nprogress, SimpleVector<T> (*p)(const vector<SimpleVec
   pp.resize(pp.size() - 1);
   pm.resize(pm.size() - 1);
   for(int i = 0; i < pp.size(); i ++) {
-    pp[i] = offsetHalf<T>((unOffsetHalf<T>(in[ i - pp.size() + in.size() ]) - pp[i]) / T(int(2)));
-    pm[i] = offsetHalf<T>((unOffsetHalf<T>(inm[i - pm.size() + inm.size()]) - pm[i]) / T(int(2)));
+    pp[i] = (unOffsetHalf<T>(in[ i - pp.size() + in.size() ]) - pp[i]) / T(int(2));
+    pm[i] = (unOffsetHalf<T>(inm[i - pm.size() + inm.size()]) - pm[i]) / T(int(2));
   }
-  const SimpleVector<SimpleVector<T> > pp_m(offsetHalf<T>(- unOffsetHalf<T>(pp)));
-  const SimpleVector<SimpleVector<T> > pm_m(offsetHalf<T>(- unOffsetHalf<T>(pm)));
-  const SimpleVector<T> ppp(ppl + p(pp.entity,   string(" -4") + strloop) * T(int(2)));
-  const SimpleVector<T> ppm(ppl - p(pp_m.entity, string(" -3") + strloop) * T(int(2)));
-  const SimpleVector<T> pmp(pml + p(pm.entity,   string(" -2") + strloop) * T(int(2)));
-  const SimpleVector<T> pmm(pml - p(pm_m.entity, string(" -1") + strloop) * T(int(2)));
+  const SimpleVector<T> ppp(ppl + p(offsetHalf<T>(  pp).entity, string(" -4") + strloop) * T(int(2)));
+  const SimpleVector<T> ppm(ppl - p(offsetHalf<T>(- pp).entity, string(" -3") + strloop) * T(int(2)));
+  const SimpleVector<T> pmp(pml + p(offsetHalf<T>(  pm).entity, string(" -2") + strloop) * T(int(2)));
+  const SimpleVector<T> pmm(pml - p(offsetHalf<T>(- pm).entity, string(" -1") + strloop) * T(int(2)));
   SimpleVector<T> res(in[0].size());
-  for(int i = 0; i < res.size(); i ++) res[i] = abs(ppp[i] * ppm[i]) - abs(pmp[i] * pmm[i]);
+  for(int i = 0; i < res.size(); i ++)
+    res[i] = abs(ppp[i] * ppm[i]) - abs(pmp[i] * pmm[i]);
   return res;
 }
 
 // N.B. repeat possible output whole range. also offset before/after predict.
 template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const string& strloop) {
+  // to avoid pGuarantee calculation time exhaust.
   const int length(_P_MLEN_ * 2);
-  const int cand(max(int(1), int(in.size() / (length + 1)) ));
+  // minimum of pGuarantee input length * 2.
+  const int cand(max(int(1), int(in.size() / 4)) );
   vector<SimpleVector<T> > res;
   res.reserve(cand);
   for(int i = 1; i <= cand; i ++) {
