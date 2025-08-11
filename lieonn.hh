@@ -3061,6 +3061,12 @@ template <typename T> static inline vector<SimpleVector<T> > offsetHalf(const ve
   return res;
 }
 
+template <typename T> static inline SimpleVector<SimpleVector<T> > offsetHalf(const SimpleVector<SimpleVector<T> >& in, const T& o = T(int(1)) ) {
+  SimpleVector<SimpleVector<T> > res;
+  res.entity = offsetHalf<T>(in.entity, o);
+  return res;
+}
+
 template <typename T> static inline T unOffsetHalf(const T& in, const T& o = T(int(1)) ) {
   return in * (T(int(1)) + o) - o;
 }
@@ -3077,6 +3083,12 @@ template <typename T> static inline vector<SimpleVector<T> > unOffsetHalf(const 
   return res;
 }
 
+template <typename T> static inline SimpleVector<SimpleVector<T> > unOffsetHalf(const SimpleVector<SimpleVector<T> >& in, const T& o = T(int(1)) ) {
+  SimpleVector<SimpleVector<T> > res;
+  res.entity = unOffsetHalf<T>(in.entity, o);
+  return res;
+}
+
 template <typename T> static inline T clipBin(const T& in) {
   static const T zero(int(0));
   static const T one(int(1));
@@ -3086,13 +3098,13 @@ template <typename T> static inline T clipBin(const T& in) {
 template <typename T> static inline SimpleVector<T> clipBin(const SimpleVector<T>& in) {
   SimpleVector<T> res(in);
   for(int i = 0; i < res.size(); i ++) res[i] = clipBin<T>(res[i]);
-  return res;;
+  return res;
 }
 
 template <typename T> static inline vector<SimpleVector<T> > clipBin(const vector<SimpleVector<T> >& in) {
   vector<SimpleVector<T> > res(in);
   for(int i = 0; i < res.size(); i ++) res[i] = clipBin<T>(res[i]);
-  return res;;
+  return res;
 }
 
 template <typename T> static inline T cutBin(const T& in) {
@@ -4101,6 +4113,15 @@ template <typename T> static inline void apply(SimpleVector<T>& v, const SimpleV
   return;
 }
 
+template <typename T> static inline SimpleVector<T> freq(const SimpleVector<T>& mother, const SimpleVector<T>& in) {
+  const int size(mother.size());
+  assert(size == in.size());
+  SimpleMatrix<T> work(size, size);
+  for(int i = 0; i < size; i ++)
+    work.setCol(i, mWavelet<T>(size)[i] * mother);
+  return work.solve(in);
+}
+
 template <typename T> static inline SimpleVector<T> mimic(const SimpleVector<T>& dst, const SimpleVector<T>& src, const int& size, const T& intensity = T(1)) {
   const int size2(dst.size() / size);
   const int size3(src.size() / size);
@@ -4126,15 +4147,6 @@ template <typename T> static inline SimpleVector<T> emphasis(const SimpleVector<
                dd * (T(1) - intensity), dd, i);
   }
   return res;
-}
-
-template <typename T> static inline SimpleVector<T> freq(const SimpleVector<T>& mother, const SimpleVector<T>& in) {
-  const int size(mother.size());
-  assert(size == in.size());
-  SimpleMatrix<T> work(size, size);
-  for(int i = 0; i < size; i ++)
-    work.setCol(i, mWavelet<T>(size)[i] * mother);
-  return work.solve(in);
 }
 
 template <typename T> SimpleVector<T> enlarge(const SimpleVector<T>& in, const int& r) {
@@ -4812,56 +4824,83 @@ template <typename T, int nprogress> static inline SimpleVector<T> pSubtractInva
     in[in.size() - 2] + in[in.size() - 3];
 }
 
-// N.B. this subtract trivial 1-markov invariant.
+// N.B. this subtract trivial 1-markov invariant. whole of this is for the
+//      LoEM unstable case input stream, we don't need subtract them
+//      other than pGuarantee normal cases.
 template <typename T, int nprogress> SimpleVector<T> pSubtractMaxInvariant(const vector<SimpleVector<T> >& in, const string& strloop) {
   vector<SimpleVector<T> > pass;
   pass.reserve(in.size() - 1);
   for(int i = 0; i < in.size() - 1; i ++)
     pass.emplace_back(offsetHalf<T>((unOffsetHalf<T>(in[i + 1]) - 
       unOffsetHalf<T>(in[i]) ) / T(int(2))));
-  return unOffsetHalf<T>(pSubtractInvariant3<T, nprogress>(pass, strloop)) *
-    T(int(2)) + unOffsetHalf<T>(in[in.size() - 1]);
+  SimpleVector<T> res(
+    unOffsetHalf<T>(pSubtractInvariant3<T, nprogress>(pass, strloop)) *
+      T(int(2)) + unOffsetHalf<T>(in[in.size() - 1]) );
+  T M(abs(res[0]));
+  for(int i = 1; i < res.size(); i ++) M = max(abs(res[i]), M);
+  return T(int(1)) <= M ? res /= M : res;
 }
 
-// N.B. however, the maximum dimension prediction isn't stable per each,
-//      so we take them as each ranged. so this returns next sectional
-//      step continuous result as a skip-step next prediction.
-template <typename T, int nprogress> SimpleVector<T> pComplementStream(const SimpleVector<SimpleVector<T> >& in, const int& length, const int& skip, const string& strloop) {
-  SimpleVector<T> res(in[0].size());
-  res.O();
-  T M(int(0));
+// N.B. twice twice. we add measureable condition virtually on first prediction,
+//      we do prediction to differ on them often gets better results.
+//      since we get abs value on prediction we do -(original stream) condition.
+template <typename T, int nprogress, SimpleVector<T> (*p)(const vector<SimpleVector<T> >&, const string&) > SimpleVector<T> pTwiceTwice(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
+  const SimpleVector<SimpleVector<T> > inm(offsetHalf<T>(- unOffsetHalf<T>(in) ));
+  SimpleVector<SimpleVector<T> > pp;
+  SimpleVector<SimpleVector<T> > pm;
+  const int sz(in.size() / 2);
+  pp.entity.reserve(sz + 2);
+  pm.entity.reserve(sz + 2);
 #if defined(_OPENMP)
   for(int i = 1; i < in.size(); i ++) pnextcacher<T>(i, 1);
   // N.B. comment out and use env OMP_MAX_ACTIVE_LEVELS=... to reduce
   //      memory usage.
   omp_set_max_active_levels(2);
-#pragma omp parallel for schedule(static, 1)
+#pragma omp parallel
+#pragma omp for schedule(static, 1)
 #endif
-  for(int i = 1; i <= skip; i ++) {
-    const SimpleVector<T> lwork(pSubtractMaxInvariant<T, nprogress>(
-      skipX<SimpleVector<T> >(in.subVector(in.size() - (length + 1) * i,
-        (length + 1) * i).entity, i), string(" ") + to_string(i) +
-          string("/") + to_string(skip) + strloop) );
-    // N.B. somehow unstable M.
-    for(int j = 0; j < lwork.size(); j ++)
-      M = max(M, abs(lwork[j]));
-    res += lwork;
+  for(int i = 0; i <= in.size() - sz; i ++)
+    pp.entity.emplace_back(p(in.subVector(i, sz).entity, string(" ") +
+      to_string(i) + string("/") + to_string(sz * 2 + 4) + strloop));
+#if defined(_OPENMP)
+#pragma omp for schedule(static, 1)
+#endif
+  for(int i = 0; i <= in.size() - sz; i ++)
+    pm.entity.emplace_back(p(inm.subVector(i, sz).entity, string(" ") +
+      to_string(i + sz) + string("/") + to_string(sz * 2 + 4) + strloop));
+  assert(pp.size() == pm.size());
+  const SimpleVector<T> ppl(move(pp[pp.size() - 1]));
+  const SimpleVector<T> pml(move(pm[pm.size() - 1]));
+  pp.resize(pp.size() - 1);
+  pm.resize(pm.size() - 1);
+  for(int i = 0; i < pp.size(); i ++) {
+    pp[i] = offsetHalf<T>((unOffsetHalf<T>(in[ i - pp.size() + in.size() ]) - pp[i]) / T(int(2)));
+    pm[i] = offsetHalf<T>((unOffsetHalf<T>(inm[i - pm.size() + inm.size()]) - pm[i]) / T(int(2)));
   }
-  return T(int(1)) < M ? res /= T(skip) * M : res /= T(skip);
+  const SimpleVector<SimpleVector<T> > pp_m(offsetHalf<T>(- unOffsetHalf<T>(pp)));
+  const SimpleVector<SimpleVector<T> > pm_m(offsetHalf<T>(- unOffsetHalf<T>(pm)));
+  const SimpleVector<T> ppp(ppl + p(pp.entity,   string(" -4") + strloop) * T(int(2)));
+  const SimpleVector<T> ppm(ppl - p(pp_m.entity, string(" -3") + strloop) * T(int(2)));
+  const SimpleVector<T> pmp(pml + p(pm.entity,   string(" -2") + strloop) * T(int(2)));
+  const SimpleVector<T> pmm(pml - p(pm_m.entity, string(" -1") + strloop) * T(int(2)));
+  SimpleVector<T> res(in[0].size());
+  for(int i = 0; i < res.size(); i ++) res[i] = abs(ppp[i] * ppm[i]) - abs(pmp[i] * pmm[i]);
+  return res;
 }
 
 // N.B. repeat possible output whole range. also offset before/after predict.
 template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const string& strloop) {
-  // N.B. shortest len on pSubtractMaxInvariant. typically 46.
-  const int length(_P_MLEN_ * 2 + 3 + 1);
+  const int length(_P_MLEN_ * 2);
   const int cand(max(int(1), int(in.size() / (length + 1)) ));
   vector<SimpleVector<T> > res;
   res.reserve(cand);
-  SimpleVector<SimpleVector<T> > w;
-  w.entity = in;
   for(int i = 1; i <= cand; i ++) {
-    res.emplace_back(pComplementStream<T, nprogress>(w, length, i,
-      string(" ") + to_string(i - 1) + string("/") + to_string(cand) + strloop));
+    SimpleVector<SimpleVector<T> > w;
+    w.entity = skipX<SimpleVector<T> >(in, i);
+    res.emplace_back(pTwiceTwice<T, nprogress, pGuarantee<T, nprogress> >(
+      w.size() > length ? w.subVector(w.size() - length, length) : w,
+        string(" ") + to_string(i - 1) + string("/") + to_string(cand) +
+          strloop));
   }
   return offsetHalf<T>(res);
 }
@@ -4920,15 +4959,6 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //      input stream by 5 of the measureable condition.
 //      so if the information amount on the datastream isn't important case,
 //      we can gain some result meaning.
-// N.B. also upper layers are for out of the LoEM conditions saturated case.
-//      so if the data stream is something meaningful case, even the maximum
-//      compressed invariant isn't so stable from left hand side case, 
-//      we subtract maximum dimension of invariants so output stream isn't
-//      have residue in LoEM applied meaning but first hypothesis isn't have
-//      LoEM condition. so pComplementStream result is better stable to
-//      continuous meaning. with subtracting middle ranged walk information,
-//      we get better discontinuous result stream on whole we observed,
-//      however, this can be came from our machines' infection totally.
 // N.B. layers:
 //       | function           | layer# | [wsp1] | data amount* | time*(***)   |
 //       +-----------------------------------------------------+--------------+
@@ -4966,13 +4996,6 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 // (***) time order ratio, L for input stream length, G for input vector size,
 //       stand from arithmatic operators. ind2varlen isn't considered.
 // N.B. we need O((mem region)^2) calculation time whole.
-// N.B. upper layers:
-// | function              | layers | len   |
-// +-----------------------+--------+-------+
-// | pComplementStream     | 0      | *skip
-// | pSubtractMaxInvariant | 1      | +1
-// | pSubtractInvariant3   | 2      | +3
-// | pSubtractInvariant2   | 4++    | *2
 
 template <typename T, int nprogress> vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
