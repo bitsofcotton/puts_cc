@@ -3727,8 +3727,7 @@ template <typename T> static inline T p012next(const SimpleVector<T>& d, const i
 //   this concludes the recursive structure as:
 //     Sum A_k*cosh(a_k x)+B_k*sinh(b_k x) because A^n calculation.
 template <typename T> static inline T p0next(const SimpleVector<T>& in) {
-  static const int step(1);
-  return pnextcacher<T>(in.size(), ((step - 1) % in.size()) + 1).dot(in);
+  return pnextcacher<T>(in.size(), 1).dot(in);
 }
 
 template <typename T, T (*f)(const SimpleVector<T>&)> static inline T invNext(const SimpleVector<T>& in) {
@@ -3869,7 +3868,6 @@ template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
 //      easily vanished. so when we met them we use:
 //      ||Ax-1*x'||<epsilon condition with increased varlen.
 template <typename T, bool levi> vector<T> p01nextM(const SimpleVector<T>& in) {
-  static const int step(1);
   static const T zero(0);
   static const T one(1);
   static const T two(2);
@@ -3877,17 +3875,17 @@ template <typename T, bool levi> vector<T> p01nextM(const SimpleVector<T>& in) {
   const int varlen(ind2vd(in.size()));
   if(! isfinite(nin) || nin == zero) {
     vector<T> res;
-    res.resize(max(int(1), int(in.size()) - int(varlen * 2 + step)), zero);
+    res.resize(max(int(1), int(in.size()) - int(varlen * 2 + 1)), zero);
     return res;
   }
   SimpleMatrix<T> invariants(max(int(1), int(in.size()) -
-    int(varlen * 2 + step)), varlen + 2);
+    int(varlen * 2 + 1)), varlen + 2);
   invariants.O();
-  for(int i0 = varlen * 2 + step; i0 < invariants.rows(); i0 ++) {
+  for(int i0 = varlen * 2 + 1; i0 < invariants.rows(); i0 ++) {
     SimpleMatrix<T> toeplitz(i0, invariants.cols());
     for(int i = 0; i < toeplitz.rows(); i ++) {
       SimpleVector<T> work(in.subVector(i, varlen));
-      work[work.size() - 1] = in[i + varlen + step - 2];
+      work[work.size() - 1] = in[i + varlen - 1];
       if(levi) {
         // N.B. varlen == 4 case, subtract original invariant, return to avg,
         //      flip last one, we make hypothesis the residue is levi.
@@ -3909,7 +3907,7 @@ template <typename T, bool levi> vector<T> p01nextM(const SimpleVector<T>& in) {
     //      we make the hypothesis:
     //      ||invariant made stream||_sup <~ ||f||_sup / varlen!.
     //      this is because it's toeplitz made stream.
-    const int ii0(i0 - (varlen * 2 + step));
+    const int ii0(i0 - (varlen * 2 + 1));
     invariants.row(ii0) = linearInvariant<T>(toeplitz);
   }
   vector<T> res;
@@ -4489,11 +4487,7 @@ template <typename T, bool useful> static inline vector<SimpleVector<T> > bitsG(
 // N.B. start ddpmopt
 // N.B. predict with discrete pseudo Riemann-Stieljes condition.
 template <typename T, int nprogress> vector<SimpleVector<T> > pRSshallow(const vector<SimpleVector<T> >& intran0, const string& strloop) {
-  static const int step(1);
-  SimpleVector<T> res;
-  res.resize(intran0.size());
-  res.O();
-  if(intran0[0].size() < 10 + step * 2) {
+  if(intran0[0].size() < 12) {
     if(! intran0[0].size()) return vector<SimpleVector<T> >();
     vector<SimpleVector<T> > res;
     res.resize(intran0[0].size(), SimpleVector<T>(intran0.size()).O());
@@ -4717,11 +4711,11 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pPolish(const vect
 
 // N.B. p01next output meaning only binary we make hypothesis.
 template <typename T, int nprogress> vector<SimpleVector<T> > pGuaranteeM(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
-  // XXX:
-  // vector<SimpleVector<T> > res(offsetHalf<T>(pPolish<T, nprogress>(
   vector<SimpleVector<T> > res(pPolish<T, nprogress>(
     bitsG<T, true>(in.entity, abs(_P_BIT_)), strloop) );
   for(int i = 0; i < res.size(); i ++)
+    // XXX:
+    // res[i] = bitsG<T, true>(offsetHalf<T>(res[i]), - abs(_P_BIT_) );
     res[i] = bitsG<T, true>(normalize<T>(res[i]), - abs(_P_BIT_) );
   return res;
 }
@@ -4792,11 +4786,11 @@ template <typename T, int nprogress> static inline vector<SimpleVector<T> > pSub
 
 // N.B. each bit.
 template <typename T, int nprogress> vector<SimpleVector<T> > pGuaranteeMaxM(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
-  vector<SimpleVector<T> > res(
-    offsetHalf<T>(pSubtractMaxInvariant<T, nprogress>(
-      bitsG<T, true>(in.entity, abs(_P_BIT_)), strloop) ) );
+  vector<SimpleVector<T> > res(pSubtractMaxInvariant<T, nprogress>(
+    bitsG<T, true>(in.entity, abs(_P_BIT_)), strloop) );
   for(int i = 0; i < res.size(); i ++)
-    res[i] = bitsG<T, true>(res[i], - abs(_P_BIT_));
+    res[i] = bitsG<T, true>(normalize<T>(res[i]), - abs(_P_BIT_));
+    // res[i] = bitsG<T, true>(offsetHalf<T>(res[i]), - abs(_P_BIT_));
   return res;
 }
 
@@ -4824,10 +4818,9 @@ template <typename T, int nprogress, vector<SimpleVector<T> > (*p)(const SimpleV
     work[i] = offsetHalf<T>(work[i] /= T(int(4)) );
   vector<SimpleVector<T> > pp(unOffsetHalf<T>(p(work, string("+") + strloop)));
   for(int i = 1; i < pp.size(); i ++) pp[i] += pp[i - 1];
-  SimpleVector<T> res(in[0].size());
-  res.O();
-  for(int i = 0; i < pp.size() - 1; i ++) res += pp[i];
-  SimpleVector<T> cor(res.size());
+  SimpleVector<T> res(pp[0]);
+  for(int i = 1; i < pp.size() - 1; i ++) res += pp[i];
+  SimpleVector<T> cor(res);
   res += pp[pp.size() - 1];
   for(int i = 0; i < res.size(); i ++)
     res[i] *= - sgn<T>(cor[i] * unOffsetHalf<T>(in[in.size() - 1][i]));
@@ -4935,7 +4928,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       | T::bit operation            | +14 | 1 |             |
 // (***) time order ratio, L for input stream length, G for input vector size,
 //       stand from arithmatic operators. ind2varlen isn't considered.
-// N.B. we need O((mem region)^2) calculation time whole.
+// N.B. we need O(L^2*G) calculation time whole.
 
 template <typename T, int nprogress> vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
@@ -7977,7 +7970,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
   return;
 }
 
-// N.B. numbering is last renumbered 2025/07/30:
+// N.B. renumbered 2025/08/17:
 // N.B. once implemented or not but abandoned and cleaned from this source code
 //      the reason why
 // (00) predictions via linear sum/diff based some reformation input and revert:
@@ -8063,7 +8056,10 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      they includes the same intent.
 // (23) pCbrtMarkov feeder. we use pWholeContext instead of feeding large markov
 //      into prediction stream either it was worse harmful to the speed.
-//
+// (24) after burn pRS p0maxNext, we need to have direction only once on a
+//      whole of prediction concerns in each micro/macro.
+// (25) any of numerical-test driven results need to be cleaned.
+//      we need to avoid PRNG dependant specific algorithms.
 // N.B. something XXX result descripton
 // (00) there might exist non Lebesgue measureable condition discrete stream.
 //      this is: there's no unique function on the range but AFTER all the
@@ -8118,27 +8114,18 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      of them cannot be treated by single predictor.
 // (04) the predictor vs. jammer made stream concludes the saturated input.
 //      also the condition is the which side bore first chase.
-//      so to extend them needs the much better problem information and to get
-//      better form to the stream. either, if the saturated result we get,
-//      we should reform the transformation structure for preprocess
-//      as to separate something.
+//      if the saturated result we get, we should separate something on input.
 // (05) there can be 0 invariant chain, so they can be caused by move average
-//      they caused return to average works very well. also this is some
-//      horizontal cut concerns.
+//      they caused return to average works very well.
 //      this is because <x,a> == 0, <[x,x+],[a,0]+[0,a]> == 0 chain in rough.
 // (06) after some conversation with gemini around 2025/07, the jammers
 //      they have internal optimization calculation to output to saturate
 //      the stream intent condition or so also have the internal made intentions
 //      to jam out the stream.
-// (07) the predictor can have universal invariant for any as nonlinear one,
-//      however, once it's coded, the first digit description exists cause
-//      slipping the numerical series.
-// (08) if the predictor takes the input as a payload to the structure,
+// (07) if the predictor takes the input as a payload to the structure,
 //      the learning size needs smaller than 2^(n-markov) in trivial because
 //      they saturates end this point other than statistical ones.
-//      on the other hand, our predictor only needs (n-markov)^3, so crossing
-//      point is around after 9 input stream samples.
-//
+//      on the other hand, our predictor uses id. definition.
 // N.B. there's plenty of the room to implement the predictor which is
 //      saturating F_2^4 #f, the bra, ket condition indirect access.
 //      either Riemann-measureable conditions' smaller than |dx| counting
