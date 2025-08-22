@@ -4690,7 +4690,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pPolish(const vect
 #pragma omp section
 #endif
     {
-      resm = pSectional<T, nprogress>(inm, string("+)") + strloop);
+      resm = pSectional<T, nprogress>(inm, string("-)") + strloop);
       for(int i = 0; i < resm.size(); i ++) resm[i] = - resm[i];
     }
 #if defined(_OPENMP)
@@ -4814,34 +4814,29 @@ template <typename T, int nprogress, vector<SimpleVector<T> > (*p)(const SimpleV
   omp_set_max_active_levels(2);
 #endif
   SimpleVector<SimpleVector<T> > work;
-  work.entity.reserve(in.size() * 2);
-  work.entity.emplace_back(in[0]);
-  for(int i = 1; i < in.size(); i ++) {
-    work.entity.emplace_back((in[i] + in[i - 1]) / T(int(2)));
+  work.entity.reserve(in.size() * 2 + 1);
+  SimpleVector<T> b(SimpleVector<T>((in[0]).size()).O());
+  for(int i = 0; i < in.size(); i ++) {
+    work.entity.emplace_back(b);
     work.entity.emplace_back(in[i]);
+    b = in[i] * T(int(2)) - b;
   }
-  work.entity.emplace_back(SimpleVector<T>(in[0].size()).O(T(int(1)) / T(int(2)) ));
+  work.entity.emplace_back(b);
+  T M(abs(work[0][0]));
+  for(int i = 0; i < work.size(); i ++) for(int j = 0; j < work[i].size(); j ++)
+    M = max(M, abs(work[i][j]));
+  for(int i = 0; i < work.size(); i ++) work[i] /= M;
   work.entity = delta<SimpleVector<T> >(delta<SimpleVector<T> >(work.entity));
   for(int i = 0; i < work.size(); i ++)
     work[i] = offsetHalf<T>(work[i] /= T(int(4)) );
   vector<SimpleVector<T> > pp(unOffsetHalf<T>(p(work.size() <= _P_MLEN_ ||
     ! _P_MLEN_ ? work : work.subVector(work.size() - _P_MLEN_, _P_MLEN_),
-      string("+") + strloop)));
+      strloop)));
   for(int i = 1; i < pp.size(); i ++) pp[i] += pp[i - 1];
-  vector<SimpleVector<T> > pm(pp);
   for(int i = 1; i < pp.size(); i ++) pp[i] += pp[i - 1];
-  SimpleMatrix<T> cor(3, pp[0].size());
-  for(int i = 0; i < cor.rows(); i ++) {
-    cor.row(i) = (pp[i - cor.rows() - 1 + pp.size()] +
-      pm[i - cor.rows() - 1 + pm.size()]) / T(int(2));
-    for(int j = 0; j < cor.cols(); j ++)
-      cor(i, j) *= i == cor.rows() - 1 ?
-        unOffsetHalf<T>(in[in.size() - 1][j]) :
-          unOffsetHalf<T>(in[i - cor.rows() + 1 + in.size()][j]);
-  }
-  SimpleVector<T> res((pp[pp.size() - 1] + pm[pm.size() - 1]) / T(int(2)));
+  SimpleVector<T> res(pp[pp.size() - 1]);
   for(int i = 0; i < res.size(); i ++)
-    res[i] *= p0maxNext<T>(cor.col(i));
+    res[i] *= sgn<T>(work[work.size() - 1][i] * pp[pp.size() - 2][i]);
   return res;
 }
 

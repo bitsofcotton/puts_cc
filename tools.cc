@@ -206,7 +206,7 @@ int main(int argc, const char* argv[]) {
     words.insert(words.end(), detailwords.begin(), detailwords.end());
     std::sort(words.begin(), words.end());
     words.erase(std::unique(words.begin(), words.end()), words.end());
-    predTOC<num_t, std::string>(std::cout, input, detailwords, details, delimiter, num_t(int(1)), argv[1][0] == 'P' ? - 27 : 27);
+    predTOC<num_t, std::string>(std::cout, input, detailwords, details, delimiter, int(sqrt(num_t(int(input.size() )))), num_t(int(1)), argv[1][0] == 'P' ? - 27 : 27);
   } else if(std::strcmp(argv[1], "prep") == 0) {
     std::vector<std::string> buf;
     const int szwindow(sqrt(num_t(int(input.size()))));
