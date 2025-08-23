@@ -4802,7 +4802,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> pGuaranteeMax
 #if ! defined(_P_MLEN_)
 // N.B. avoiding exhaust of the time usage but cut off the prediction
 //      internal states.
-#define _P_MLEN_ 21
+#define _P_MLEN_ 25
 #endif
 
 // N.B. whole context markov feeding with resilience to prediction noise.
@@ -4841,14 +4841,23 @@ template <typename T, int nprogress, vector<SimpleVector<T> > (*p)(const SimpleV
 }
 
 // N.B. repeat possible output whole range. also offset before/after predict.
-template <typename T, int nprogress, vector<SimpleVector<T> > (*p)(const SimpleVector<SimpleVector<T> >&, const string&) > vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const string& strloop) {
-  const int cand(max(int(1), int(in.size() / 12) ));
+template <typename T, int nprogress, bool shallow, vector<SimpleVector<T> > (*p)(const SimpleVector<SimpleVector<T> >&, const string&) > vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const string& strloop) {
+  const int cand(max(int(1), int(in.size() /
+    (p == pGuaranteeM<T, nprogress> ? 12 : 25)) ));
   vector<SimpleVector<T> > res;
   res.reserve(cand);
   for(int i = 1; i <= cand; i ++)
-    res.emplace_back(pWholeContext<T, nprogress, p>(skipX<SimpleVector<T> >(
-      in, i), string(" ") + to_string(i - 1) + string("/") + to_string(cand) +
-        strloop));
+    if(shallow) {
+      SimpleVector<SimpleVector<T> > w;
+      w.entity = skipX<SimpleVector<T> >(in, i);
+      vector<SimpleVector<T> > r(p(w.size() <= _P_MLEN_ || ! _P_MLEN_ ?
+        w : w.subVector(w.size() - _P_MLEN_, _P_MLEN_), string(" ") +
+          to_string(i - 1) + string("/") + to_string(cand) + strloop) );
+      res.emplace_back(r[r.size() - 1]);
+    } else
+      res.emplace_back(pWholeContext<T, nprogress, p>(skipX<SimpleVector<T> >(
+        in, i), string(" ") + to_string(i - 1) + string("/") + to_string(cand) +
+          strloop));
   return offsetHalf<T>(res);
 }
 
@@ -4903,7 +4912,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 }
 
 // N.B. we make the first hypothesis as the stream is calculatable from
-//      input stream by 5 of the measureable condition.
+//      input stream by 4 to 6 of the measureable condition.
 //      so if the information amount on the datastream isn't important case,
 //      we can gain some result meaning.
 // N.B. layers:
@@ -4943,7 +4952,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       stand from arithmatic operators. ind2varlen isn't considered.
 // N.B. we need O(L^2*G) calculation time whole.
 
-template <typename T, int nprogress> vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
+template <typename T, int nprogress, bool shallow> vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4957,9 +4966,9 @@ template <typename T, int nprogress> vector<vector<SimpleVector<T> > > predVec(c
     }
   }
   vector<SimpleVector<T> > pres(nprogress < 0 ?
-    pRepeat<T, - nprogress, pGuaranteeMaxM<T, - nprogress> >(in,
+    pRepeat<T, - nprogress, shallow, pGuaranteeMaxM<T, - nprogress> >(in,
       string(" (predVecM)")) :
-    pRepeat<T,   nprogress, pGuaranteeM<T, nprogress> >(in,
+    pRepeat<T,   nprogress, shallow, pGuaranteeM<T, nprogress> >(in,
       string(" (predVec)")) );
   vector<vector<SimpleVector<T> > > res;
   res.resize(pres.size());
@@ -4971,7 +4980,7 @@ template <typename T, int nprogress> vector<vector<SimpleVector<T> > > predVec(c
   return res;
 }
 
-template <typename T, int nprogress> vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
+template <typename T, int nprogress, bool shallow> vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4987,9 +4996,9 @@ template <typename T, int nprogress> vector<vector<SimpleMatrix<T> > > predMat(c
     }
   }
   vector<SimpleVector<T> > pres(nprogress < 0 ?
-    pRepeat<T, - nprogress, pGuaranteeMaxM<T, - nprogress> >(in,
+    pRepeat<T, - nprogress, shallow, pGuaranteeMaxM<T, - nprogress> >(in,
       string(" (predMatM)")) :
-    pRepeat<T,   nprogress, pGuaranteeM<T, nprogress> >(in,
+    pRepeat<T,   nprogress, shallow, pGuaranteeM<T, nprogress> >(in,
       string(" (predMat)")) );
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
@@ -5006,7 +5015,7 @@ template <typename T, int nprogress> vector<vector<SimpleMatrix<T> > > predMat(c
   return res;
 }
 
-template <typename T, int nprogress> vector<SimpleSparseTensor(T)> predSTen(vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx) {
+template <typename T, int nprogress, bool shallow> vector<SimpleSparseTensor(T)> predSTen(vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx) {
   assert(idx.size() && in0.size());
   vector<SimpleVector<T> > in;
   vector<pair<int, pair<int, int> > > attend;
@@ -5034,9 +5043,9 @@ template <typename T, int nprogress> vector<SimpleSparseTensor(T)> predSTen(vect
   }
   in0.resize(0);
   vector<SimpleVector<T> > pres(nprogress < 0 ?
-    pRepeat<T, - nprogress, pGuaranteeMaxM<T, - nprogress> >(in,
+    pRepeat<T, - nprogress, shallow, pGuaranteeMaxM<T, - nprogress> >(in,
       string(" (predSTenM)")) :
-    pRepeat<T,   nprogress, pGuaranteeM<T, nprogress> >(in,
+    pRepeat<T,   nprogress, shallow, pGuaranteeM<T, nprogress> >(in,
       string(" (predSTen)")) );
   vector<SimpleSparseTensor(T) > res;
   res.resize(pres.size());
@@ -7876,8 +7885,17 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
   os << input;
   vector<SimpleSparseTensor(T) > bin(in);
   corpus<T, U> pstats;
-  vector<SimpleSparseTensor(T)> p(nrwords < 0 ? predSTen<T, - 20>(in, idx) :
-    predSTen<T, 20>(in, idx));
+  vector<SimpleSparseTensor(T)> p(predSTen<T, - 20, false>(in, idx));
+  vector<SimpleSparseTensor(T)> q(predSTen<T,   20, false>(in, idx));
+  p.reserve(p.size() + q.size());
+  for(int i = 0; i < q.size(); i ++) p.emplace_back(move(q[i]));
+  q = predSTen<T, - 20, true>(in, idx);
+  p.reserve(p.size() + q.size());
+  for(int i = 0; i < q.size(); i ++) p.emplace_back(move(q[i]));
+  q = predSTen<T,   20, true>(in, idx);
+  p.reserve(p.size() + q.size());
+  for(int i = 0; i < q.size(); i ++) p.emplace_back(move(q[i]));
+  q.resize(0);
   for(int i = 0; i < p.size(); i ++) {
     pstats.corpust = move(p[i]);
     getAbbreved<T>(pstats, detailtitle, detail, delimiter);
@@ -7983,7 +8001,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
   return;
 }
 
-// N.B. renumbered 2025/08/17:
+// N.B. renumbered 2025/08/23:
 // N.B. once implemented or not but abandoned and cleaned from this source code
 //      the reason why
 // (00) predictions via linear sum/diff based some reformation input and revert:
@@ -8095,6 +8113,27 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      the things we really trust from bottom of our hearts but this needs
 //      a priori description on the stream however there exists the jammer
 //      for any of the predictor, the description seems unfavorable.
+// (05) we're now start believing the condition s.t. once universal invariant
+//      algorithm is compiled and got real binary tree with prediction,
+//      the existence of jammer intention or some of the observer can effect
+//      to break the invariant as to remove LoEM glitch by applying LoEM.
+//      this is: ok:ng:noattach == 1:1:1 condition in the best on surface of
+//      LoEM applied condition, with applying ok <~ 1/3 or 2/3 <~ ok condition
+//      to majority logic causes a.e. 1 result we get but this is inconsistent
+//      from the stream information amount have, so the glitch going to be
+//      applied. this concludes our believe base structure can be switched
+//      when someone is utterly get benefits or disadvantage, so the our
+//      believe structure root #f function set switched, so the structure on
+//      f-start tree can slips the phenomenon we feel, but the most of the
+//      probability we can believe is our machine is infected condition.
+//      however, if this is true, we should leave as is not to improve the
+//      condition when we met better 2/3 result so we should leave this.
+//      so to stuff up the crack, we should implement at least 3 kinds of
+//      predictors to make part of their 1:1:1 result combination well.
+//      however, if we combine them mobilize into 1 a.e. part, the whole
+//      predictor (nor their combination) causes such a implemented LoEM
+//      condition causes some part of them or whole of them slips.
+//      but this might be our machines' infection condition.
 // N.B. tips around jammer
 // (-1) any of the predictor they have a jammer to them.
 // (00) after of all, the dynamic jammer can be avoided if the predictor entropy
