@@ -4841,7 +4841,7 @@ template <typename T, int nprogress, vector<SimpleVector<T> > (*p)(const SimpleV
 }
 
 // N.B. repeat possible output whole range. also offset before/after predict.
-template <typename T, int nprogress, bool shallow, vector<SimpleVector<T> > (*p)(const SimpleVector<SimpleVector<T> >&, const string&) > vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const string& strloop) {
+template <typename T, int nprogress, bool shallow, vector<SimpleVector<T> > (*p)(const SimpleVector<SimpleVector<T> >&, const string&) > vector<SimpleVector<T> > pRepeatSingle(const vector<SimpleVector<T> >& in, const string& strloop) {
   const int cand(max(int(1), int(in.size() /
     (p == pGuaranteeM<T, nprogress> ? 12 : 25)) ));
   vector<SimpleVector<T> > res;
@@ -4859,6 +4859,19 @@ template <typename T, int nprogress, bool shallow, vector<SimpleVector<T> > (*p)
         in, i), string(" ") + to_string(i - 1) + string("/") + to_string(cand) +
           strloop));
   return offsetHalf<T>(res);
+}
+
+template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const string& strloop) {
+  assert(0 < nprogress);
+  vector<SimpleVector<T> > p(pRepeatSingle<T, nprogress, false, pGuaranteeM<T, nprogress> >(in, string(" 0/4") + strloop));
+  vector<SimpleVector<T> > q(pRepeatSingle<T, nprogress, true,  pGuaranteeM<T, nprogress> >(in, string(" 1/4") + strloop));
+  vector<SimpleVector<T> > r(pRepeatSingle<T, nprogress, false, pGuaranteeMaxM<T, nprogress> >(in, string(" 2/4") + strloop));
+  vector<SimpleVector<T> > s(pRepeatSingle<T, nprogress, true,  pGuaranteeMaxM<T, nprogress> >(in, string(" 3/4") + strloop));
+  p.reserve(p.size() + q.size() + r.size() + s.size());
+  for(int i = 0; i < q.size(); i ++) p.emplace_back(move(q[i]));
+  for(int i = 0; i < r.size(); i ++) p.emplace_back(move(r[i]));
+  for(int i = 0; i < s.size(); i ++) p.emplace_back(move(s[i]));
+  return p;
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
@@ -4952,7 +4965,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       stand from arithmatic operators. ind2varlen isn't considered.
 // N.B. we need O(L^2*G) calculation time whole.
 
-template <typename T, int nprogress, bool shallow> vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
+template <typename T, int nprogress> vector<vector<SimpleVector<T> > > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4965,11 +4978,7 @@ template <typename T, int nprogress, bool shallow> vector<vector<SimpleVector<T>
       in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
-  vector<SimpleVector<T> > pres(nprogress < 0 ?
-    pRepeat<T, - nprogress, shallow, pGuaranteeMaxM<T, - nprogress> >(in,
-      string(" (predVecM)")) :
-    pRepeat<T,   nprogress, shallow, pGuaranteeM<T, nprogress> >(in,
-      string(" (predVec)")) );
+  vector<SimpleVector<T> > pres(pRepeat<T, nprogress>(in, string(" predVec")));
   vector<vector<SimpleVector<T> > > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++) {
@@ -4980,7 +4989,7 @@ template <typename T, int nprogress, bool shallow> vector<vector<SimpleVector<T>
   return res;
 }
 
-template <typename T, int nprogress, bool shallow> vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
+template <typename T, int nprogress> vector<vector<SimpleMatrix<T> > > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
   vector<SimpleVector<T> > in;
   in.resize(in0.size());
@@ -4995,11 +5004,7 @@ template <typename T, int nprogress, bool shallow> vector<vector<SimpleMatrix<T>
                          k * in0[i][0].cols(), in0[i][j].row(k));
     }
   }
-  vector<SimpleVector<T> > pres(nprogress < 0 ?
-    pRepeat<T, - nprogress, shallow, pGuaranteeMaxM<T, - nprogress> >(in,
-      string(" (predMatM)")) :
-    pRepeat<T,   nprogress, shallow, pGuaranteeM<T, nprogress> >(in,
-      string(" (predMat)")) );
+  vector<SimpleVector<T> > pres(pRepeat<T, nprogress>(in, string(" predMat")));
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++) {
@@ -5015,7 +5020,7 @@ template <typename T, int nprogress, bool shallow> vector<vector<SimpleMatrix<T>
   return res;
 }
 
-template <typename T, int nprogress, bool shallow> vector<SimpleSparseTensor(T)> predSTen(vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx) {
+template <typename T, int nprogress> vector<SimpleSparseTensor(T)> predSTen(const vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx) {
   assert(idx.size() && in0.size());
   vector<SimpleVector<T> > in;
   vector<pair<int, pair<int, int> > > attend;
@@ -5041,12 +5046,7 @@ template <typename T, int nprogress, bool shallow> vector<SimpleSparseTensor(T)>
               make_pair(j, make_pair(k, m))))
             in[i][cnt ++] = offsetHalf<T>(in0[i][idx[j]][idx[k]][idx[m]]);
   }
-  in0.resize(0);
-  vector<SimpleVector<T> > pres(nprogress < 0 ?
-    pRepeat<T, - nprogress, shallow, pGuaranteeMaxM<T, - nprogress> >(in,
-      string(" (predSTenM)")) :
-    pRepeat<T,   nprogress, shallow, pGuaranteeM<T, nprogress> >(in,
-      string(" (predSTen)")) );
+  vector<SimpleVector<T> > pres(pRepeat<T, nprogress>(in, string(" predSTen")));
   vector<SimpleSparseTensor(T) > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++)
@@ -7885,17 +7885,7 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
   os << input;
   vector<SimpleSparseTensor(T) > bin(in);
   corpus<T, U> pstats;
-  vector<SimpleSparseTensor(T)> p(predSTen<T, - 20, false>(in, idx));
-  vector<SimpleSparseTensor(T)> q(predSTen<T,   20, false>(in, idx));
-  p.reserve(p.size() + q.size());
-  for(int i = 0; i < q.size(); i ++) p.emplace_back(move(q[i]));
-  q = predSTen<T, - 20, true>(in, idx);
-  p.reserve(p.size() + q.size());
-  for(int i = 0; i < q.size(); i ++) p.emplace_back(move(q[i]));
-  q = predSTen<T,   20, true>(in, idx);
-  p.reserve(p.size() + q.size());
-  for(int i = 0; i < q.size(); i ++) p.emplace_back(move(q[i]));
-  q.resize(0);
+  vector<SimpleSparseTensor(T)> p(predSTen<T, 20>(in, idx));
   for(int i = 0; i < p.size(); i ++) {
     pstats.corpust = move(p[i]);
     getAbbreved<T>(pstats, detailtitle, detail, delimiter);
