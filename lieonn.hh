@@ -4725,153 +4725,71 @@ template <typename T, int nprogress> static inline SimpleVector<T> pGuarantee(co
   return res[res.size() - 1];
 }
 
-// N.B. pSubtractInvariant[234] takes maximum dimension prediction in R^4
-//      invariant meaning. this is for input stream hard specific 2 choices.
-template <typename T, int nprogress> static inline vector<SimpleVector<T> > pSubtractInvariant2(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
-  vector<SimpleVector<T> > pass;
-  SimpleVector<SimpleVector<T> > bpass;
-  bpass.entity = pGuaranteeM<T, - nprogress>(in, string(" P") + strloop);
-  SimpleVector<T> last(move(bpass[bpass.size() - 1]));
-  bpass.resize(bpass.size() - 1);
-  pass.reserve(bpass.size());
-  for(int i = 0; i < bpass.size(); i ++)
-    pass.emplace_back(offsetHalf<T>((unOffsetHalf<T>(
-      in[i - bpass.size() + in.size()]) -
-        unOffsetHalf<T>(bpass[i])) / T(int(4))) );
-  vector<SimpleVector<T> > res(pPolish<T, nprogress>(pass, string(" Q") +
-    strloop) );
-  for(int i = 0; i < res.size() - 1; i ++) {
-    res[i] *= T(int(4));
-    res[i] += unOffsetHalf<T>(bpass[i - (res.size() - 1) + bpass.size()]);
-  }
-  res[res.size() - 1] *= T(int(4));
-  res[res.size() - 1] += unOffsetHalf<T>(last);
-  return offsetHalf<T>(res);
-}
-
-// N.B. this subtract return to average either const. invariant.
-template <typename T, int nprogress> static inline vector<SimpleVector<T> > pSubtractInvariant3(const vector<SimpleVector<T> >& in, const string& strloop) {
-  SimpleVector<SimpleVector<T> > pass;
-  pass.entity.reserve(in.size() - 3);
-  for(int i = 0; i < in.size() - 3; i ++) {
-    pass.entity.emplace_back(- unOffsetHalf<T>(in[i]));
-    pass[i] -= unOffsetHalf<T>(in[i + 1]);
-    pass[i] -= unOffsetHalf<T>(in[i + 2]);
-    pass[i] += unOffsetHalf<T>(in[i + 3]);
-    pass[i] /= T(int(4));
-    pass[i]  = offsetHalf<T>(pass[i]);
-  }
-  vector<SimpleVector<T> > res(pSubtractInvariant2<T, nprogress>(pass, strloop));
-  for(int i = 0; i < res.size(); i ++)
-    res[i] = res[i] * T(int(4)) + in[i - res.size() + in.size()] +
-      in[i - res.size() - 1 + in.size()] + in[i - res.size() - 2 + in.size()];
-  return res;
-}
-
-// N.B. this subtract trivial 1-markov invariant. whole of this is for the
-//      root of LoEM unstable case input stream, we don't need subtract them
-//      other than pGuarantee normal cases.
-template <typename T, int nprogress> static inline vector<SimpleVector<T> > pSubtractMaxInvariant(const vector<SimpleVector<T> >& in, const string& strloop) {
-  vector<SimpleVector<T> > pass;
-  pass.reserve(in.size() - 1);
-  for(int i = 0; i < in.size() - 1; i ++)
-    pass.emplace_back(offsetHalf<T>((unOffsetHalf<T>(in[i + 1]) - 
-      unOffsetHalf<T>(in[i]) ) / T(int(2))));
-  vector<SimpleVector<T> > res(pSubtractInvariant3<T, nprogress>(pass, strloop));
-  for(int i = 0; i < res.size(); i ++)
-    res[i] = unOffsetHalf<T>(res[i]) * T(int(2)) +
-      unOffsetHalf<T>(in[i - res.size() + in.size()]);
-  return offsetHalf<T>(res);
-}
-
-// N.B. each bit.
-template <typename T, int nprogress> vector<SimpleVector<T> > pGuaranteeMaxM(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
-  vector<SimpleVector<T> > res(pSubtractMaxInvariant<T, nprogress>(
-    bitsG<T, true>(in.entity, abs(_P_BIT_)), strloop) );
-  for(int i = 0; i < res.size(); i ++)
-    res[i] = bitsG<T, true>(normalize<T>(res[i]), - abs(_P_BIT_));
-    // res[i] = bitsG<T, true>(offsetHalf<T>(res[i]), - abs(_P_BIT_));
-  return res;
-}
-
-template <typename T, int nprogress> static inline SimpleVector<T> pGuaranteeMax(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
-  vector<SimpleVector<T> > res(pGuaranteeMaxM<T, nprogress>(in, strloop));
-  return res[res.size() - 1];
-}
-
 #if ! defined(_P_MLEN_)
 // N.B. avoiding exhaust of the time usage but cut off the prediction
-//      internal states.
-#define _P_MLEN_ 25
+//      internal states length.
+#define _P_MLEN_ 21
 #endif
 
-// N.B. whole context markov feeding with resilience to prediction noise.
-template <typename T, int nprogress, vector<SimpleVector<T> > (*p)(const SimpleVector<SimpleVector<T> >&, const string&) > SimpleVector<T> pWholeContext(const vector<SimpleVector<T> >& in, const string& strloop) {
+// N.B. append pseudo-measureable condition into original input
+//      stream but the predictor isn't depend pseudo-things.
+//      also add whole context length markov feeding.
+template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector<SimpleVector<T> >& in, const string& strloop) {
 #if defined(_OPENMP)
   for(int i = 1; i < in.size(); i ++) pnextcacher<T>(i, 1);
   // N.B. comment out and use env OMP_MAX_ACTIVE_LEVELS=... to reduce
   //      memory usage.
   omp_set_max_active_levels(2);
 #endif
-  SimpleVector<SimpleVector<T> > work;
-  work.entity.reserve(in.size() * 2 + 1);
+  SimpleVector<SimpleVector<T> > workp;
+  SimpleVector<SimpleVector<T> > workm;
+  workp.entity.reserve(in.size() * 2 + 1);
+  workm.entity.reserve(in.size() * 2 + 1);
   SimpleVector<T> b(SimpleVector<T>((in[0]).size()).O());
   for(int i = 0; i < in.size(); i ++) {
-    work.entity.emplace_back(b);
-    work.entity.emplace_back(in[i]);
+    workp.entity.emplace_back(b);
+    workm.entity.emplace_back(- b);
+    workp.entity.emplace_back(in[i]);
+    workm.entity.emplace_back(in[i]);
     b = in[i] * T(int(2)) - b;
   }
-  work.entity.emplace_back(b);
-  T M(abs(work[0][0]));
-  for(int i = 0; i < work.size(); i ++) for(int j = 0; j < work[i].size(); j ++)
-    M = max(M, abs(work[i][j]));
-  for(int i = 0; i < work.size(); i ++) work[i] /= M;
-  work.entity = delta<SimpleVector<T> >(delta<SimpleVector<T> >(work.entity));
-  for(int i = 0; i < work.size(); i ++)
-    work[i] = offsetHalf<T>(work[i] /= T(int(4)) );
-  vector<SimpleVector<T> > pp(unOffsetHalf<T>(p(work.size() <= _P_MLEN_ ||
-    ! _P_MLEN_ ? work : work.subVector(work.size() - _P_MLEN_, _P_MLEN_),
-      strloop)));
-  for(int i = 1; i < pp.size(); i ++) pp[i] += pp[i - 1];
-  for(int i = 1; i < pp.size(); i ++) pp[i] += pp[i - 1];
-  SimpleVector<T> res(pp[pp.size() - 1]);
-  for(int i = 0; i < res.size(); i ++)
-    res[i] *= sgn<T>(work[work.size() - 1][i] * pp[pp.size() - 2][i]);
-  return res;
+  workp.entity.emplace_back(b);
+  workm.entity.emplace_back(- b);
+  T M(abs(workp[0][0]));
+  for(int i = 0; i < workp.size(); i ++)
+    for(int j = 0; j < workp[i].size(); j ++)
+      M = max(M, abs(workp[i][j]));
+  for(int i = 0; i < workp.size(); i ++) {
+    workp[i] /= M;
+    workm[i] /= M;
+  }
+  workp.entity = delta<SimpleVector<T> >(delta<SimpleVector<T> >(workp.entity));
+  workm.entity = delta<SimpleVector<T> >(delta<SimpleVector<T> >(workm.entity));
+  for(int i = 0; i < workp.size(); i ++) {
+    workp[i] = offsetHalf<T>(workp[i] /= T(int(4)) );
+    workm[i] = offsetHalf<T>(workm[i] /= T(int(4)) );
+  }
+  vector<SimpleVector<T> > pp(unOffsetHalf<T>(pGuaranteeM<T, nprogress>(
+    workp.size() <= _P_MLEN_ || !_P_MLEN_ ? workp :
+      workp.subVector(workp.size() - _P_MLEN_, _P_MLEN_), strloop)));
+  vector<SimpleVector<T> > pm(unOffsetHalf<T>(pGuaranteeM<T, nprogress>(
+    workm.size() <= _P_MLEN_ || ! _P_MLEN_ ? workm :
+      workm.subVector(workm.size() - _P_MLEN_, _P_MLEN_), strloop)));
+  for(int i = 1; i < pp.size(); i ++) pp[0] += pp[i];
+  for(int i = 1; i < pm.size(); i ++) pm[0] += pm[i];
+  return (pp[0] + pm[0]) / T(int(2));
 }
 
 // N.B. repeat possible output whole range. also offset before/after predict.
-template <typename T, int nprogress, bool shallow, vector<SimpleVector<T> > (*p)(const SimpleVector<SimpleVector<T> >&, const string&) > vector<SimpleVector<T> > pRepeatSingle(const vector<SimpleVector<T> >& in, const string& strloop) {
-  const int cand(max(int(1), int(in.size() /
-    (p == pGuaranteeM<T, nprogress> ? 12 : 25)) ));
+template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const string& strloop) {
+  const int cand(max(int(1), int(in.size() / 12)));
   vector<SimpleVector<T> > res;
   res.reserve(cand);
   for(int i = 1; i <= cand; i ++)
-    if(shallow) {
-      SimpleVector<SimpleVector<T> > w;
-      w.entity = skipX<SimpleVector<T> >(in, i);
-      vector<SimpleVector<T> > r(p(w.size() <= _P_MLEN_ || ! _P_MLEN_ ?
-        w : w.subVector(w.size() - _P_MLEN_, _P_MLEN_), string(" ") +
-          to_string(i - 1) + string("/") + to_string(cand) + strloop) );
-      res.emplace_back(r[r.size() - 1]);
-    } else
-      res.emplace_back(pWholeContext<T, nprogress, p>(skipX<SimpleVector<T> >(
-        in, i), string(" ") + to_string(i - 1) + string("/") + to_string(cand) +
-          strloop));
+    res.emplace_back(pAppendMeasure<T, nprogress>(skipX<SimpleVector<T> >(
+      in, i), string(" ") + to_string(i - 1) + string("/") + to_string(cand) +
+        strloop));
   return offsetHalf<T>(res);
-}
-
-template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const string& strloop) {
-  assert(0 < nprogress);
-  vector<SimpleVector<T> > p(pRepeatSingle<T, nprogress, false, pGuaranteeM<T, nprogress> >(in, string(" 0/4") + strloop));
-  vector<SimpleVector<T> > q(pRepeatSingle<T, nprogress, true,  pGuaranteeM<T, nprogress> >(in, string(" 1/4") + strloop));
-  vector<SimpleVector<T> > r(pRepeatSingle<T, nprogress, false, pGuaranteeMaxM<T, nprogress> >(in, string(" 2/4") + strloop));
-  vector<SimpleVector<T> > s(pRepeatSingle<T, nprogress, true,  pGuaranteeMaxM<T, nprogress> >(in, string(" 3/4") + strloop));
-  p.reserve(p.size() + q.size() + r.size() + s.size());
-  for(int i = 0; i < q.size(); i ++) p.emplace_back(move(q[i]));
-  for(int i = 0; i < r.size(); i ++) p.emplace_back(move(r[i]));
-  for(int i = 0; i < s.size(); i ++) p.emplace_back(move(s[i]));
-  return p;
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
@@ -4925,13 +4843,13 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 }
 
 // N.B. we make the first hypothesis as the stream is calculatable from
-//      input stream by 4 to 6 of the measureable condition.
-//      so if the information amount on the datastream isn't important case,
-//      we can gain some result meaning.
+//      input stream by 6 of the measureable condition.
+//      we only need pAppendMeasure and p0maxNext for 2/3 result in many cases.
+//      however, stacked measureable condition addition effects better result.
 // N.B. layers:
 //       | function           | layer# | [wsp1] | data amount* | time*(***)   |
 //       +-----------------------------------------------------+--------------+
-//       | pWholeContext               | 0   | w | in          | in
+//       | pAppendMeasure              | 0   | w | in          | in
 //       | pGuarantee                  | 1   | w | bits        |
 //       | pPolish                     | *   | w | 2           | 2
 //       | pSectional                  | 2   | w | range       |
@@ -4978,7 +4896,7 @@ template <typename T, int nprogress> vector<vector<SimpleVector<T> > > predVec(c
       in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
-  vector<SimpleVector<T> > pres(pRepeat<T, nprogress>(in, string(" predVec")));
+  vector<SimpleVector<T> > pres(pRepeat<T, nprogress>(in, string(" predVec")) );
   vector<vector<SimpleVector<T> > > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++) {
@@ -5004,7 +4922,7 @@ template <typename T, int nprogress> vector<vector<SimpleMatrix<T> > > predMat(c
                          k * in0[i][0].cols(), in0[i][j].row(k));
     }
   }
-  vector<SimpleVector<T> > pres(pRepeat<T, nprogress>(in, string(" predMat")));
+  vector<SimpleVector<T> > pres(pRepeat<T, nprogress>(in, string(" predMat")) );
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++) {
@@ -5046,7 +4964,7 @@ template <typename T, int nprogress> vector<SimpleSparseTensor(T)> predSTen(cons
               make_pair(j, make_pair(k, m))))
             in[i][cnt ++] = offsetHalf<T>(in0[i][idx[j]][idx[k]][idx[m]]);
   }
-  vector<SimpleVector<T> > pres(pRepeat<T, nprogress>(in, string(" predSTen")));
+  vector<SimpleVector<T> > pres(pRepeat<T, nprogress>(in, string(" predSTen")) );
   vector<SimpleSparseTensor(T) > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++)
@@ -7885,7 +7803,7 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
   os << input;
   vector<SimpleSparseTensor(T) > bin(in);
   corpus<T, U> pstats;
-  vector<SimpleSparseTensor(T)> p(predSTen<T, 20>(in, idx));
+  vector<SimpleSparseTensor(T)> p(predSTen<T, 99>(in, idx));
   for(int i = 0; i < p.size(); i ++) {
     pstats.corpust = move(p[i]);
     getAbbreved<T>(pstats, detailtitle, detail, delimiter);
@@ -7991,101 +7909,46 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
   return;
 }
 
-// N.B. renumbered 2025/08/23:
+// N.B. rewrote 2025/08/30:
+// N.B. generally speaking, the raw input stream with high entropy predictor
+//      dislikes to predict in general meanings because {ok,ng,invariant}
+//      each 1/3 condition. however, there's at least 2 hole to the condition.
+//      they're (i) attach input stream as we can treat well (ii) learn large
+//      set of data stream and predict with internal of explicitly described
+//      numerical stream form. we select (i) condition also worked well for now.
+//      this is from the stream and predictor better tangled condition with
+//      good temperature. however, the tangle condition can slide to run away
+//      from some of the reason we don't know why but the tanglement on the
+//      calculation space structure - numerical series abstract structure
+//      slip. so the predictor condition is for now, not the ever never.
 // N.B. once implemented or not but abandoned and cleaned from this source code
 //      the reason why
-// (00) predictions via linear sum/diff based some reformation input and revert:
-//      it's all integrated skipX concerns, the jammer either jam out us
-//      even *ANY* reformation and revert them in which way.
-//      so it's integrated into *linear* meanings to reform prediction vector.
-//      eg. PdeltaOnce, Ppersistent, Pprogression, (P0DFT).
-//      they goes well because timing-related concerns A_0 ... A_k B x_0
-//      made initial entropy and A'^k B' x_0 -> x_k structures.
-// (01) make input stream transformed by xor-filter by patternized fixed
-//      ones. this is equivalent to skipx concerns but with maybe random timing.
-//      we already have fixed range skipx also pSubesube jammer condition,
-//      so it's pseudo one of the condition.
-// (02) pskipp to skip input in some steps.
-//      it's a counter measure to the jammer. so any of the predictor has the
-//      jammers, so if the jammer adjust theirs to our algorithms, it's useless.
-// (03) we eliminated predvall, we don't need them with whole internal states
-//      awared predictors they have a better prediction concerned with some
-//      series of a PRNG tests.
-// (04) arctanFeeder concerns intended to avoid some jammers.
-//      we shouldn't completely avoid the jammers by them because of the
-//      jammers' strategy can select *any* function.
-// (05) (comment move from predMat): before and after to apply DFT concerned
-//      prediction isn't get better result because they get non 100% result
-//      causes whole data affected noises. so we eliminated them.
-//      this condition is compatible to any of the orthogonal transform or
-//      eigen vector concerns on our prediction.
-// (06) some small number of the nonlinear transformation series.
-//      we target almost linear also some exceptions are handled by
-//      expscale/logscale matter. with d^e/dx^e == dx condition,
-//      f^-1(f(x)) == x 's some of the combination untangles them.
+// (i)  difference, summation concerns they have the condition s.t.
+//      the noise of the prediction stream can spread entire of the result
+//      so we eliminated: PdeltaOnce, Ppersistent, Pprogression, (P0DFT) and so.
+//      also they're mostly equivalent to input timing skip concerns.
+//      this is because A_0 ... A_k B x_0 matrix described form.
+//      also patternized xor-filter have the timing related conditions.
+//      however, skip conditions are to avoid jammer things, so we eliminated
+//      from core predictors.
+//      this include input stream non-linear scaling (even in x-axis).
+//      also distant step predictions aren't fight with skip concerns.
+// (ii) PRNG concerns can breaks continuity on input stream.
+// (iii)non linear function transformations we target is only exp/log scale.
+//      this is because d^e/dx^e == dx condition and f^-1(f(x)) == x condition.
 //      cf. (arctan(logscale))-n times chain causes y=x into sigmoid-like graph.
-// (07) pgoshigoshi persistent corrector.
-//      it's near the result same algorithm twice condition.
-// (08) recursion on same function based functions.
-//      this depends on the first prediction is continuous or not causes
-//      the prediction stream's quality. also they depends on the first
-//      hypothesis is satisfied or not. so they returns clear edge of them.
-// (09) goki_check_cc:test.py [qQ]red auto continuity tuner.
-//      we dropped them because they also make the hypothesis input stream
-//      to have some of the continuity.
-// (10) pgatherexp, ppositivesel concerns.
-//      we don't implement pre/after-processing because it's bricks condition
-//      also combination explodes. the jammer can jam out us even in such
-//      cases.
-// (11) shift gulf concerns to fight with jammers.
-//      it's verbose and it's out of our target condition.
-//      we should simply increase the input data or separate input or
-//      only to shirk PRNG blending part of them.
-// (12) any of the ad-hoc layer implementations.
-//      it's useless because of adaptic one in generic meaning.
-// (13) PRNG addition parts. they are harmful when original input stream
-//      has some small amount of continuity case, they breaks them.
-// (14) unstable output contexts.
-//      they're origin of mistakes. so only output raw differ/ratio in plain
-//      except for commented.
-// (15) brute force change state/output functions on (de)?compressed stream.
-//      they are equivalent to p01next, p012next partially also we cannot
-//      test because of their size on the memory.
-// (16) after burn measureable condition.
-//      they slips somehow, this can caused by the place we upload is cursed
-//      condition.
-// (17) persistent retry when prediction is out of the range.
-//      we trust original prediction once strong because the structure
-//      we made hypothesis says so. the prediction success/fail is original
-//      structure hypothesis or not, so it's one of a ad-hoc prediction.
-// (18) predictor which shirking many much of the continuous functions:
-//        this is with taking multiplication invariant on f,
-//        S f(x) dx = S det(J((1,g0,...)/(1,x0,...)) dx0 ...
-//        retaking their addition invariant as det(...) == 0, the given function
-//        g0 ... should fit them also they describes much of continuities.
-//        this can flatten N when our N is something infected.
-//        also this is the analogy {1,x,x^2,...} on p0next meaning.
-//      so the ongoing proceding machine learnings finds such a orthogonal
-//      egg functions from input streams without the hypotehsis on PDE
-//      structures. so we drop to implement them.
-// (19) distant step prediciton. it's equivalent to skipX concerns.
-// (20) offset canceler. it's harmful to predictor behaviour.
-// (21) add virtual measureable condition by predictor then predict with them.
-//      the original stream attach is better pretend than them either better
-//      adding some of the measureable conditions.
-// (22) after burn by p0maxNext pRS00 result. we add pWholeContext condition
-//      they includes the same intent.
-// (23) pCbrtMarkov feeder. we use pWholeContext instead of feeding large markov
-//      into prediction stream either it was worse harmful to the speed.
-// (24) after burn pRS p0maxNext, we need to have direction only once on a
-//      whole of prediction concerns in each micro/macro.
-// (25) any of numerical-test driven results need to be cleaned.
-//      we need to avoid PRNG dependant specific algorithms.
+// (iv) predict twice or more by one predictor often causes clear edge but the
+//      gulf things. this also includes {ok,ng,invariant}'s invariant condition
+//      retry.
+// (v)  ad-hoc layer implementations also inspired by numerical test isn't
+//      useful for generic predictor because it's only ad-hoc to specific
+//      numerical series. also after burner is.
 // N.B. something XXX result descripton
 // (00) there might exist non Lebesgue measureable condition discrete stream.
 //      this is: there's no unique function on the range but AFTER all the
 //      data is treated (observed), this condition never satisfied.
-//      so this is the which is the latter chase.
+//      so this is the which is the latter chase. either if original stream
+//      is something attached, this condition can be avoided well.
 // (01) the prediction fail is come from first continuity hypothesis
 //      satisfied or not. AFTER the whole stream is given context,
 //      we can avoid such of the conditions with certain error.
@@ -8136,42 +7999,34 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      instead of the fixation of code optimization, we use optimization result
 //      to get orthogonal to input stream condition or pivot to get high
 //      frequency result.
-// (02) if there's both jammer and predictor, the versus condition concludes
-//      {1/3,1/3,1/3} ideally because we can output {ok,ng,invariant} condition
-//      either jammer can attack AFTER the predictor is determined also this
-//      condition is predictor can predict AFTER the jammer is determined
-//      condition. so it's which side have the greater internal states chase.
-//      so jammers can attack our predictors' any of the layer, so we should
-//      output each layer apply/not apply cases but this causes combination
-//      explode.
-// (03) this is also be able to be verified by x+ := Ax (first binary digit),
-//      x in {0,1}^n, A in (2^p)^(n*n) operation runs any of the input causes 
-//      sign bit result can be {1/3,1/3,1/3} in the best.
-//      this is because [0,1] fixed point description causes upside down input
-//      outputs upside down output. so fixed input stream with fixed condition,
-//      this is valid. however, if there's universal invariant either bucket
-//      out of #f presence, this condition isn't satisfied. otherwise,
-//      especially code is into the binary once, they have representation of
-//      <a,x> (first digit) description with x in {0,1}^n, almost the half
-//      of them cannot be treated by single predictor.
-// (04) the predictor vs. jammer made stream concludes the saturated input.
+// (02) the predictor vs. jammer made stream concludes the saturated input.
 //      also the condition is the which side bore first chase.
 //      if the saturated result we get, we should separate something on input.
-// (05) there can be 0 invariant chain, so they can be caused by move average
+// (03) there can be 0 invariant chain, so they can be caused by move average
 //      they caused return to average works very well.
 //      this is because <x,a> == 0, <[x,x+],[a,0]+[0,a]> == 0 chain in rough.
-// (06) after some conversation with gemini around 2025/07, the jammers
+// (04) after some conversation with gemini around 2025/07, the jammers
 //      they have internal optimization calculation to output to saturate
 //      the stream intent condition or so also have the internal made intentions
 //      to jam out the stream.
-// (07) if the predictor takes the input as a payload to the structure,
-//      the learning size needs smaller than 2^(n-markov) in trivial because
-//      they saturates end this point other than statistical ones.
-//      on the other hand, our predictor uses id. definition.
 // N.B. there's plenty of the room to implement the predictor which is
 //      saturating F_2^4 #f, the bra, ket condition indirect access.
 //      either Riemann-measureable conditions' smaller than |dx| counting
 //      causes whole function reference.
+// N.B. things not implemented nor tested but abandoned.
+// (01) brute force change state/output functions on (de)?compressed stream.
+//      they are equivalent to p01next, p012next partially also we cannot
+//      test because of their size on the memory.
+// (02) predictor which shirking many much of the continuous functions:
+//        this is with taking multiplication invariant on f,
+//        S f(x) dx = S det(J((1,g0,...)/(1,x0,...)) dx0 ...
+//        retaking their addition invariant as det(...) == 0, the given function
+//        g0 ... should fit them also they describes much of continuities.
+//        this can flatten N when our N is something infected.
+//        also this is the analogy {1,x,x^2,...} on p0next meaning.
+//      so the ongoing proceding machine learnings finds such a orthogonal
+//      egg functions from input streams without the hypotehsis on PDE
+//      structures. so we drop to implement them.
 
 #define _SIMPLELIN_
 #endif
