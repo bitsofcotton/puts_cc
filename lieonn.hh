@@ -3867,7 +3867,7 @@ template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
 //      return 1; program. this is also in the condition but the dimension
 //      easily vanished. so when we met them we use:
 //      ||Ax-1*x'||<epsilon condition with increased varlen.
-template <typename T, bool levi> vector<T> p01nextM(const SimpleVector<T>& in) {
+template <typename T> vector<T> p01nextM(const SimpleVector<T>& in) {
   static const T zero(0);
   static const T one(1);
   static const T two(2);
@@ -3886,20 +3886,6 @@ template <typename T, bool levi> vector<T> p01nextM(const SimpleVector<T>& in) {
     for(int i = 0; i < toeplitz.rows(); i ++) {
       SimpleVector<T> work(in.subVector(i, varlen));
       work[work.size() - 1] = in[i + varlen - 1];
-      if(levi) {
-        // N.B. varlen == 4 case, subtract original invariant, return to avg,
-        //      flip last one, we make hypothesis the residue is levi.
-        SimpleMatrix<T> mwork(varlen, work.size());
-        mwork.row(0) = move(work);
-        for(int j = 1; j < mwork.rows() - 1; j ++) {
-          mwork.row(j).O();
-          for(int k = 0; k < mwork.cols() / j; k ++)
-            for(int kk = k * j; kk < min(int(mwork.cols()), (k + 1) * j); kk ++)
-              mwork(j, kk) = T(int(k & 1 ? 0 : 1));
-        }
-        mwork.row(mwork.rows() - 1).O();
-        work = offsetHalf<T>(mwork.transpose().QR().row(mwork.rows() - 1));
-      }
       toeplitz.row(i) = makeProgramInvariant<T>(work,
         T(i + 1) / T(toeplitz.rows() + 1) ).first;
     }
@@ -3933,8 +3919,8 @@ template <typename T, bool levi> vector<T> p01nextM(const SimpleVector<T>& in) {
   return res;
 }
 
-template <typename T, bool levi> T p01next(const SimpleVector<T>& in) {
-  vector<T> res(p01nextM<T, levi>(in));
+template <typename T> static inline T p01next(const SimpleVector<T>& in) {
+  vector<T> res(p01nextM<T>(in));
   return res[res.size() - 1];
 }
 
@@ -4184,15 +4170,6 @@ template <typename T> SimpleVector<T> enlarge(const SimpleVector<T>& in, const i
     ff[i] = i ? f2[(i % (f2.size() - 1)) + 1] : f2[i];
   SimpleVector<T> result(synth<T>(bm, ff));
   return result *= sqrt(in.dot(in) / result.dot(result) * T(r));
-}
-
-// N.B. untangle by DFT or Wavelet triple. this is because R^R untangle
-//      one by one causes Wavelet(Wavelet(Fourier+Discrete)+Discrete)+Discrete
-//      causes only a combination ordinal, we need Discrete part separation
-//      other than dft/mWavelet in fact.
-template <typename T> static inline T p7next(const SimpleVector<T>& d) {
-  T res(int(0));
-  return res;
 }
 
 // N.B. start image functions
@@ -4519,7 +4496,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pRSshallow(const v
   vector<SimpleVector<T> > p;
   // N.B. p01next calls p0maxNext implicitly, this needs to be cached single
   //      threaded process on first call.
-  vector<T> p0(p01nextM<T, nprogress < 0>(intran[0]));
+  vector<T> p0(p01nextM<T>(intran[0]));
   p.resize(p0.size(), SimpleVector<T>(intran.size()).O());
   for(int i = 0; i < p0.size(); i ++) p[i][0] = p0[i];
 #if defined(_OPENMP)
@@ -4528,12 +4505,12 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pRSshallow(const v
   for(int j = 1; j < p[0].size(); j ++) {
     if(1 < abs(nprogress) && ! (j % max(int(1), int(p[0].size() / nprogress))) )
       cerr << j << " / " << p[0].size() << strloop << endl;
-    vector<T> pp(p01nextM<T, nprogress < 0>(intran[j]));
+    vector<T> pp(p01nextM<T>(intran[j]));
     assert(pp.size() == p0.size());
     for(int i = 0; i < pp.size(); i ++) p[i][j] = pp[i];
   }
   const T nseconds(sqrt(seconds.dot(seconds)) );
-  const vector<T> peconds(p01nextM<T, nprogress < 0>(seconds / nseconds) );
+  const vector<T> peconds(p01nextM<T>(seconds / nseconds) );
   assert(p.size() == peconds.size());
   for(int i = 0; i < p.size(); i ++)
     p[i] = unOffsetHalf<T>(revertProgramInvariant<T>(make_pair(
@@ -4739,7 +4716,7 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
   for(int i = 1; i < in.size(); i ++) pnextcacher<T>(i, 1);
   // N.B. comment out and use env OMP_MAX_ACTIVE_LEVELS=... to reduce
   //      memory usage.
-  omp_set_max_active_levels(2);
+  omp_set_max_active_levels(3);
 #endif
   SimpleVector<SimpleVector<T> > workp;
   SimpleVector<SimpleVector<T> > workm;
@@ -4748,13 +4725,13 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
   SimpleVector<T> b(SimpleVector<T>((in[0]).size()).O());
   for(int i = 0; i < in.size(); i ++) {
     workp.entity.emplace_back(b);
-    workm.entity.emplace_back(- b);
+    workm.entity.emplace_back(offsetHalf<T>(- unOffsetHalf<T>(b)));
     workp.entity.emplace_back(in[i]);
     workm.entity.emplace_back(in[i]);
     b = in[i] * T(int(2)) - b;
   }
   workp.entity.emplace_back(b);
-  workm.entity.emplace_back(- b);
+  workm.entity.emplace_back(offsetHalf<T>(- unOffsetHalf<T>(b)));
   T M(abs(workp[0][0]));
   for(int i = 0; i < workp.size(); i ++)
     for(int j = 0; j < workp[i].size(); j ++)
@@ -4769,12 +4746,31 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
     workp[i] = offsetHalf<T>(workp[i] /= T(int(4)) );
     workm[i] = offsetHalf<T>(workm[i] /= T(int(4)) );
   }
-  vector<SimpleVector<T> > pp(unOffsetHalf<T>(pGuaranteeM<T, nprogress>(
-    workp.size() <= _P_MLEN_ || !_P_MLEN_ ? workp :
-      workp.subVector(workp.size() - _P_MLEN_, _P_MLEN_), strloop)));
-  vector<SimpleVector<T> > pm(unOffsetHalf<T>(pGuaranteeM<T, nprogress>(
-    workm.size() <= _P_MLEN_ || ! _P_MLEN_ ? workm :
-      workm.subVector(workm.size() - _P_MLEN_, _P_MLEN_), strloop)));
+  vector<SimpleVector<T> > pp;
+  vector<SimpleVector<T> > pm;
+#if defined(_OPENMP)
+#pragma omp parallel sections
+  {
+#pragma omp section
+#endif
+    {
+      pp = unOffsetHalf<T>(pGuaranteeM<T, nprogress>(
+        workp.size() <= _P_MLEN_ || !_P_MLEN_ ? workp :
+          workp.subVector(workp.size() - _P_MLEN_, _P_MLEN_),
+            string("+") + strloop));
+    }
+#if defined(_OPENMP)
+#pragma omp section
+#endif
+    {
+      pm = unOffsetHalf<T>(pGuaranteeM<T, nprogress>(
+        workm.size() <= _P_MLEN_ || ! _P_MLEN_ ? workm :
+          workm.subVector(workm.size() - _P_MLEN_, _P_MLEN_),
+            string("-") + strloop));
+    }
+#if defined(_OPENMP)
+  }
+#endif
   for(int i = 1; i < pp.size(); i ++) pp[0] += pp[i];
   for(int i = 1; i < pm.size(); i ++) pm[0] += pm[i];
   return (pp[0] + pm[0]) / T(int(2));
@@ -4839,7 +4835,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
   const T nnwork(sqrt(nwork.dot(nwork)));
   return revertProgramInvariant<T>(make_pair(
     makeProgramInvariant<T>(normalize<T>(res)).first,
-      p01next<T, false>(nwork / nnwork) * nnwork));
+      p01next<T>(nwork / nnwork) * nnwork));
 }
 
 // N.B. we make the first hypothesis as the stream is calculatable from
@@ -7920,9 +7916,8 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      good temperature. however, the tangle condition can slide to run away
 //      from some of the reason we don't know why but the tanglement on the
 //      calculation space structure - numerical series abstract structure
-//      slip. so the predictor condition is for now, not the ever never.
-// N.B. once implemented or not but abandoned and cleaned from this source code
-//      the reason why
+//      slip. so the predictor condition is for now, not the ever or never.
+// N.B. the codes eliminated from this header the reason why:
 // (i)  difference, summation concerns they have the condition s.t.
 //      the noise of the prediction stream can spread entire of the result
 //      so we eliminated: PdeltaOnce, Ppersistent, Pprogression, (P0DFT) and so.
@@ -7943,6 +7938,8 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 // (v)  ad-hoc layer implementations also inspired by numerical test isn't
 //      useful for generic predictor because it's only ad-hoc to specific
 //      numerical series. also after burner is.
+// (vi) we don't need LoEM unstable case implementation on input stream attached
+//      case because it's verbose.
 // N.B. something XXX result descripton
 // (00) there might exist non Lebesgue measureable condition discrete stream.
 //      this is: there's no unique function on the range but AFTER all the
@@ -7966,27 +7963,6 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      the things we really trust from bottom of our hearts but this needs
 //      a priori description on the stream however there exists the jammer
 //      for any of the predictor, the description seems unfavorable.
-// (05) we're now start believing the condition s.t. once universal invariant
-//      algorithm is compiled and got real binary tree with prediction,
-//      the existence of jammer intention or some of the observer can effect
-//      to break the invariant as to remove LoEM glitch by applying LoEM.
-//      this is: ok:ng:noattach == 1:1:1 condition in the best on surface of
-//      LoEM applied condition, with applying ok <~ 1/3 or 2/3 <~ ok condition
-//      to majority logic causes a.e. 1 result we get but this is inconsistent
-//      from the stream information amount have, so the glitch going to be
-//      applied. this concludes our believe base structure can be switched
-//      when someone is utterly get benefits or disadvantage, so the our
-//      believe structure root #f function set switched, so the structure on
-//      f-start tree can slips the phenomenon we feel, but the most of the
-//      probability we can believe is our machine is infected condition.
-//      however, if this is true, we should leave as is not to improve the
-//      condition when we met better 2/3 result so we should leave this.
-//      so to stuff up the crack, we should implement at least 3 kinds of
-//      predictors to make part of their 1:1:1 result combination well.
-//      however, if we combine them mobilize into 1 a.e. part, the whole
-//      predictor (nor their combination) causes such a implemented LoEM
-//      condition causes some part of them or whole of them slips.
-//      but this might be our machines' infection condition.
 // N.B. tips around jammer
 // (-1) any of the predictor they have a jammer to them.
 // (00) after of all, the dynamic jammer can be avoided if the predictor entropy
@@ -8027,7 +8003,10 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      so the ongoing proceding machine learnings finds such a orthogonal
 //      egg functions from input streams without the hypotehsis on PDE
 //      structures. so we drop to implement them.
-
+// (03) untangle by DFT or Wavelet triple. this is because R^R untangle
+//      one by one causes Wavelet(Wavelet(Fourier+Discrete)+Discrete)+Discrete
+//      causes only a combination ordinal, we need Discrete part separation
+//      other than dft/mWavelet in fact. however, we drop this implementation.
 #define _SIMPLELIN_
 #endif
 
