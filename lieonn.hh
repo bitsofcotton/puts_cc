@@ -4722,16 +4722,17 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
   SimpleVector<SimpleVector<T> > workm;
   workp.entity.reserve(in.size() * 2 + 1);
   workm.entity.reserve(in.size() * 2 + 1);
-  SimpleVector<T> b(SimpleVector<T>((in[0]).size()).O());
+  SimpleVector<T> b(in[0].size());
+  b.O();
   for(int i = 0; i < in.size(); i ++) {
-    workp.entity.emplace_back(b);
-    workm.entity.emplace_back(offsetHalf<T>(- unOffsetHalf<T>(b)));
+    workp.entity.emplace_back(offsetHalf<T>(  b));
+    workm.entity.emplace_back(offsetHalf<T>(- b));
     workp.entity.emplace_back(in[i]);
     workm.entity.emplace_back(in[i]);
-    b = in[i] * T(int(2)) - b;
+    b = unOffsetHalf<T>(in[i]) * T(int(2)) - b;
   }
-  workp.entity.emplace_back(b);
-  workm.entity.emplace_back(offsetHalf<T>(- unOffsetHalf<T>(b)));
+  workp.entity.emplace_back(offsetHalf<T>(  b));
+  workm.entity.emplace_back(offsetHalf<T>(- b));
   T M(abs(workp[0][0]));
   for(int i = 0; i < workp.size(); i ++)
     for(int j = 0; j < workp[i].size(); j ++)
