@@ -2459,8 +2459,8 @@ template <typename T> inline SimpleMatrix<T> SimpleMatrix<T>::SVD() const {
   res.I();
   for(int i = 0; i <= sym.rows() + 1; i ++) {
     SimpleMatrix<T> svd(sym.SVD1d());
-    sym = svd.first * sym * svd.second;
-    res = svd.first * res;
+    sym = svd * sym * sym.transpose().SVD1d().transpose();
+    res = svd * res;
   }
   return res;
 }
@@ -2475,7 +2475,7 @@ template <typename T> inline pair<pair<SimpleMatrix<T>, SimpleMatrix<T> >, Simpl
   C.setMatrix(this->rows(), 0, src);
   const SimpleMatrix<T> P(C.SVD());
   const SimpleMatrix<T> Qt(C.transpose().SVD().transpose());
-  const SimpleMatrix<T> D(P.first * C * Qt.transpose());
+  const SimpleMatrix<T> D(P * C * Qt.transpose());
   SimpleMatrix<T> P1(this->rows(), this->cols());
   SimpleMatrix<T> P2(src.rows(), this->cols());
   for(int i = 0; i < P1.rows(); i ++)
@@ -4725,14 +4725,14 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
   SimpleVector<T> b(in[0].size());
   b.O();
   for(int i = 0; i < in.size(); i ++) {
-    workp.entity.emplace_back(offsetHalf<T>(  b));
-    workm.entity.emplace_back(offsetHalf<T>(- b));
-    workp.entity.emplace_back(in[i]);
-    workm.entity.emplace_back(in[i]);
+    workp.entity.emplace_back(  b);
+    workm.entity.emplace_back(- b);
+    workp.entity.emplace_back(unOffsetHalf<T>(in[i]));
+    workm.entity.emplace_back(unOffsetHalf<T>(in[i]));
     b = unOffsetHalf<T>(in[i]) * T(int(2)) - b;
   }
-  workp.entity.emplace_back(offsetHalf<T>(  b));
-  workm.entity.emplace_back(offsetHalf<T>(- b));
+  workp.entity.emplace_back(  b);
+  workm.entity.emplace_back(- b);
   T M(abs(workp[0][0]));
   for(int i = 0; i < workp.size(); i ++)
     for(int j = 0; j < workp[i].size(); j ++)
@@ -4774,7 +4774,16 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
 #endif
   for(int i = 1; i < pp.size(); i ++) pp[0] += pp[i];
   for(int i = 1; i < pm.size(); i ++) pm[0] += pm[i];
+  // XXX: something goes wrong with some step length.
   return (pp[0] + pm[0]) / T(int(2));
+/*
+  for(int i = 1; i < pp.size() - 2; i ++) pp[0] += pp[i];
+  for(int i = 1; i < pm.size() - 2; i ++) pm[0] += pm[i];
+  // N.B. some test goes well on some step length.
+  for(int i = 0; i < pp[0].size(); i ++)
+    std::cout << (pp[0][i] + pm[0][i]) * unOffsetHalf<T>(in[in.size() - 1][i]) << std::endl;
+  return pp[0].O();
+*/
 }
 
 // N.B. repeat possible output whole range. also offset before/after predict.

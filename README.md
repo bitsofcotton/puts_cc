@@ -120,4 +120,5 @@ This repository is archived, so without bug report, will no change.
 2025/08/17-23 merge latest p2 result.
 2025/08/25 merge latest ddpmopt result also fix crash.
 2025/09/01 offset bug fix on pAppendMeasure.
+2025/09/05 fix to compile with latest g++, pAppendMeasure fix (should be done).
 
