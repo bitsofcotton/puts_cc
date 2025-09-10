@@ -7807,7 +7807,6 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
     in.emplace_back(move(stats[i].corpust));
   }
   os << input;
-  vector<SimpleSparseTensor(T) > bin(in);
   corpus<T, U> pstats;
   vector<SimpleSparseTensor(T)> p(predSTen<T, 99>(in, idx));
   for(int i = 0; i < p.size(); i ++) {
