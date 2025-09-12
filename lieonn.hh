@@ -673,7 +673,7 @@ public:
          SimpleFloat<T,W,bits,U>  atan() const;
   inline SimpleFloat<T,W,bits,U>  sqrt() const;
   
-  unsigned char s;
+  uint64_t s;
   typedef enum {
     INF = 0,
     NaN = 1,
@@ -772,7 +772,7 @@ private:
     }
     return * this;
   }
-  inline unsigned char safeAdd(U& dst, const U& src) {
+  inline uint64_t safeAdd(U& dst, const U& src) {
     const U dst0(dst);
     dst += src;
     if((dst0 > uzero() && src > uzero() && dst <= uzero()) ||
@@ -780,10 +780,10 @@ private:
       return 1 << (dst0 < uzero() ? DWRK : INF);
     return 0;
   }
-  inline char residue2() const {
+  inline int64_t residue2() const {
     if(uzero() < e || U(bits) <= - e) return 0;
-    if(! e) return char(int(m) & 1);
-    return char(int(m >> - int(e)) & 1);
+    if(! e) return int64_t(int(m) & 1);
+    return int64_t(int(m >> - int(e)) & 1);
   }
 
   // XXX: these are NOT threadsafe on first call.
@@ -3328,6 +3328,11 @@ template <typename T, bool nonlinear> static inline T revertByProgramInvariant(S
           complexctor(T)(one) );
     work[idx] = (t.real() /= vdp.second);
   } else work[idx] = - invariant.dot(work) / invariant[idx];
+  static bool shown(false);
+  if(absfloor(work[idx]) == work[idx] && ! shown) {
+    shown = true;
+    cerr << "revertByInvariant: accuracy regression." << endl;
+  }
   work[idx] = cutBin<T>(work[idx]);
   return isfinite(work[idx]) ? work[idx] : T(int(0));
 }
@@ -4380,6 +4385,13 @@ template <typename T> static inline vector<vector<SimpleVector<T> > > normalize(
   return v;
 }
 
+template <typename T> static inline vector<SimpleVector<T> > normalize(const vector<SimpleVector<T> >& in, const T& upper = T(1)) {
+  SimpleMatrix<T> w;
+  w.resize(in.size(), in[0].size());
+  w.entity = in;
+  return normalize<T>(w, upper).entity;
+}
+
 template <typename T> static inline SimpleVector<T> normalize(const SimpleVector<T>& in, const T& upper = T(1)) {
   SimpleMatrix<T> w;
   w.resize(1, in.size());
@@ -4691,9 +4703,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pGuaranteeM(const 
   vector<SimpleVector<T> > res(pPolish<T, nprogress>(
     bitsG<T, true>(in.entity, abs(_P_BIT_)), strloop) );
   for(int i = 0; i < res.size(); i ++)
-    // XXX:
-    // res[i] = bitsG<T, true>(offsetHalf<T>(res[i]), - abs(_P_BIT_) );
-    res[i] = bitsG<T, true>(normalize<T>(res[i]), - abs(_P_BIT_) );
+    res[i] = bitsG<T, true>(offsetHalf<T>(res[i]), - abs(_P_BIT_) );
   return res;
 }
 
@@ -4772,27 +4782,74 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
 #if defined(_OPENMP)
   }
 #endif
-  for(int i = 1; i < pp.size(); i ++) pp[0] += pp[i];
-  for(int i = 1; i < pm.size(); i ++) pm[0] += pm[i];
+  assert(pp.size() == pm.size());
+  for(int i = 1; i < pp.size(); i ++) {
+    pp[0] += pp[i];
+    pm[0] += pm[i];
+#if defined(_P_DEBUG_)
+    // N.B. some test goes well on some step length.
+    if(i & 1) for(int j = 0; j < pp[0].size(); j ++)
+      std::cout << (pp[0][i] + pm[0][i]) * unOffsetHalf<T>(in[(i / 2) - pp.size() / 2 + in.size()][j]) << std::endl;
+#endif
+  }
   // XXX: something goes wrong with some step length.
   return (pp[0] + pm[0]) / T(int(2));
-/*
-  for(int i = 1; i < pp.size() - 2; i ++) pp[0] += pp[i];
-  for(int i = 1; i < pm.size() - 2; i ++) pm[0] += pm[i];
-  // N.B. some test goes well on some step length.
-  for(int i = 0; i < pp[0].size(); i ++)
-    std::cout << (pp[0][i] + pm[0][i]) * unOffsetHalf<T>(in[in.size() - 1][i]) << std::endl;
-  return pp[0].O();
-*/
 }
+
+// N.B. each pixel each bit prediction with PRNG blended stream.
+//      however, this gets broken result. so this is dead code.
+#if defined(_P_PRNG_)
+template <typename T, int nprogress> SimpleVector<T> pEachPRNG(const vector<SimpleVector<T> >& in0, const string& strloop) {
+  vector<SimpleVector<T> > in(bitsG<T, false>(in0, abs(_P_BIT_)) );
+  for(int i = 0; i < in.size(); i ++) in[i] = normalize<T>(in[i]);
+  SimpleVector<T> out;
+  out.resize(in[0].size());
+  out.O();
+  for(int i = 0; i < in[0].size(); i ++) {
+    vector<SimpleVector<T> > work(in.size());
+    for(int j = 0; j < in.size(); j ++) {
+      work[j].resize(_P_PRNG_);
+      for(int k = 0; k < work[j].size(); k ++) work[j][k] = offsetHalf<T>(
+#if defined(_ARCFOUR_)
+        arc4random() & 1 ?
+#else
+        random() & 1 ?
+#endif
+        - unOffsetHalf<T>(in[j][i]) : unOffsetHalf<T>(in[j][i]) );
+    }
+    cerr << i << "/" << in[0].size() << strloop << endl;
+    SimpleVector<T> w(pAppendMeasure<T, 0>(work, string(" ") +
+      to_string(i) + string("/") + to_string(in[0].size()) + strloop) );
+    for(int j = 0; j < w.size(); j ++) out[i] += w[j];
+    int sign(0);
+    for(int j = 0; j < work[0].size(); j ++) sign += 
+#if defined(_ARCFOUR_)
+        arc4random() & 1;
+#else
+        random() & 1;
+#endif
+    if(sign < work[0].size() / 2)
+      out[i] = offsetHalf<T>(- unOffsetHalf<T>(out[i]));
+  }
+  return bitsG<T, true>(normalize<T>(out), - abs(_P_BIT_) );
+}
+#endif
 
 // N.B. repeat possible output whole range. also offset before/after predict.
 template <typename T, int nprogress> vector<SimpleVector<T> > pRepeat(const vector<SimpleVector<T> >& in, const string& strloop) {
+#if _P_MLEN_ == 0
+  const int cand(1);
+#else
   const int cand(max(int(1), int(in.size() / 12)));
+#endif
   vector<SimpleVector<T> > res;
   res.reserve(cand);
   for(int i = 1; i <= cand; i ++)
+#if defined(_P_PRNG_)
+    res.emplace_back(pEachPRNG<T, nprogress>(skipX<SimpleVector<T> >(
+#else
     res.emplace_back(pAppendMeasure<T, nprogress>(skipX<SimpleVector<T> >(
+#endif
       in, i), string(" ") + to_string(i - 1) + string("/") + to_string(cand) +
         strloop));
   return offsetHalf<T>(res);
@@ -4902,7 +4959,7 @@ template <typename T, int nprogress> vector<vector<SimpleVector<T> > > predVec(c
       in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
-  vector<SimpleVector<T> > pres(pRepeat<T, nprogress>(in, string(" predVec")) );
+  vector<SimpleVector<T> > pres(normalize<T>(pRepeat<T, nprogress>(in, string(" predVec")) ));
   vector<vector<SimpleVector<T> > > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++) {
@@ -4928,7 +4985,7 @@ template <typename T, int nprogress> vector<vector<SimpleMatrix<T> > > predMat(c
                          k * in0[i][0].cols(), in0[i][j].row(k));
     }
   }
-  vector<SimpleVector<T> > pres(pRepeat<T, nprogress>(in, string(" predMat")) );
+  vector<SimpleVector<T> > pres(normalize<T>(pRepeat<T, nprogress>(in, string(" predMat")) ));
   vector<vector<SimpleMatrix<T> > > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++) {
@@ -4970,7 +5027,7 @@ template <typename T, int nprogress> vector<SimpleSparseTensor(T)> predSTen(cons
               make_pair(j, make_pair(k, m))))
             in[i][cnt ++] = offsetHalf<T>(in0[i][idx[j]][idx[k]][idx[m]]);
   }
-  vector<SimpleVector<T> > pres(pRepeat<T, nprogress>(in, string(" predSTen")) );
+  vector<SimpleVector<T> > pres(normalize<T>(pRepeat<T, nprogress>(in, string(" predSTen")) ));
   vector<SimpleSparseTensor(T) > res;
   res.resize(pres.size());
   for(int i = 0; i < pres.size(); i ++)
