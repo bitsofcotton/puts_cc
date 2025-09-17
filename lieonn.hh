@@ -4788,8 +4788,11 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
     pm[0] += pm[i];
 #if defined(_P_DEBUG_)
     // N.B. some test goes well on some step length.
-    if(i & 1) for(int j = 0; j < pp[0].size(); j ++)
-      std::cout << (pp[0][i] + pm[0][i]) * unOffsetHalf<T>(in[(i / 2) - pp.size() / 2 + in.size()][j]) << std::endl;
+    if(i & 1 && (i / 2 < pp.size() / 2 - 1))
+      for(int j = 0; j < pp[0].size(); j ++)
+        std::cout << (pp[0][j] + pm[0][j]) * unOffsetHalf<T>(in[(i / 2) - pp.size() / 2 + in.size() + 1][j]) << std::endl;
+    else if(i == pp.size() - 1) for(int j = 0; j < pp[0].size(); j ++)
+      std::cout << pp[0][j] + pm[0][j] << std::endl;
 #endif
   }
   // XXX: something goes wrong with some step length.
@@ -4863,7 +4866,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
   static const T zero(0);
   static const T one(1);
   static const T two(2);
-  SimpleVector<T> res(in[1].size());
+  SimpleVector<T> res(in[0].size());
   vector<SimpleVector<T> > inw;
   inw.reserve(in.size());
   SimpleVector<T> nwork(in.size());
@@ -4889,8 +4892,8 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
     for(int j = 0; j < toeplitz.rows(); j ++) {
       SimpleVector<T> vw(5);
       vw.O();
-      vw.setVector(0, inw[j * 2].subVector(0, 4));
-      vw[4] = inw[j * 2 + 1][i];
+      vw.setVector(0, inw[j * 2 + 1].subVector(0, 4));
+      vw[4] = inw[j * 2][i];
       toeplitz.row(j) =
         makeProgramInvariant<T>(vw, T(j + 1) / T(int(toeplitz.rows() + 1)) ).first;
     }
