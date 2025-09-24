@@ -3875,7 +3875,7 @@ template <typename T> vector<T> p01nextM(const SimpleVector<T>& in) {
   const int varlen(ind2vd(in.size()));
   if(! isfinite(nin) || nin == zero) {
     vector<T> res;
-    res.resize(max(int(1), int(in.size()) - int(varlen * 2 + 1)), zero);
+    res.resize(max(int(1), int(in.size()) - varlen + 1), zero);
     return res;
   }
   SimpleMatrix<T> invariants(max(int(1), int(in.size()) - varlen + 1),
