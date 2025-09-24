@@ -3878,8 +3878,8 @@ template <typename T> vector<T> p01nextM(const SimpleVector<T>& in) {
     res.resize(max(int(1), int(in.size()) - int(varlen * 2 + 1)), zero);
     return res;
   }
-  SimpleMatrix<T> invariants(max(int(1), int(in.size()) -
-    int(varlen + 1)), varlen + 2);
+  SimpleMatrix<T> invariants(max(int(1), int(in.size()) - varlen + 1),
+    varlen + 2);
   invariants.O();
   for(int i0 = varlen * 2 + 1; i0 < invariants.rows(); i0 ++) {
     SimpleMatrix<T> toeplitz(i0, invariants.cols());
@@ -3907,10 +3907,9 @@ template <typename T> vector<T> p01nextM(const SimpleVector<T>& in) {
       //      so the continuity concerns 1st index also orthogonalizing
       //      causes one dimension theta continuity concerns.
       //      in raw meaning, taking the invariant causes ||p_0||<<epsilon
-      //      in raw meaning, however we should take ||p_0'||/||p_0|| for
-      //      this transformation is valid or not.
-      //      however, in weak differential meaning, it's sliding and
-      //      add some continuity by higher frequency average.
+      //      however we should take ||p_0'||/||p_0|| for this transformation
+      //      is valid or not. in weak differential meaning, it's sliding and
+      //      add some continuity by higher frequency as a average.
       //      so in very roughly this includes any of the cases except
       //      for the condition invariant-next's linearInvariant fixes
       //      the whole invariant by orthogonalization case, but this
