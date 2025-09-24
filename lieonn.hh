@@ -3856,12 +3856,7 @@ template <typename T> static inline T p0maxNext(const SimpleVector<T>& in) {
 //  however, this concludes #f count up collision, so ind2vd makes better
 //   dimension we need when it's observed and fixed.
 //  so the condition might came from external R^3n to R^4n matrices.
-// N.B. we make the hypothesis the invariant coefficients are continuous or
-//      periodical. this is valid if original stream have less or equal to
-//      varlen-markov's Riemann-Stieljes measureable condition.
-//      this also inserts some story line hypothesis, if whole the story is
-//      given on data stream condition, we only need to take invariant once.
-// N.B. this is the analogy to toeplitz matrix inversion with singular one.
+//  also this is the analogy to toeplitz matrix inversion with singular one.
 // N.B. if the function has internal states variable to be projected into
 //      series, they're looked as <a,x>+<b,y>==<a,x>==0, y is internal states.
 //      so this causes A*x==B*y, so increasing dimension causes ok result.
@@ -3884,7 +3879,7 @@ template <typename T> vector<T> p01nextM(const SimpleVector<T>& in) {
     return res;
   }
   SimpleMatrix<T> invariants(max(int(1), int(in.size()) -
-    int(varlen * 2 + 1)), varlen + 2);
+    int(varlen + 1)), varlen + 2);
   invariants.O();
   for(int i0 = varlen * 2 + 1; i0 < invariants.rows(); i0 ++) {
     SimpleMatrix<T> toeplitz(i0, invariants.cols());
@@ -3908,10 +3903,18 @@ template <typename T> vector<T> p01nextM(const SimpleVector<T>& in) {
     if(invariants.rows() <= 1)
       invariant = move(invariants.row(0));
     else {
-      // N.B. we make the hypothesis continuous invariant change.
-      //      this is equivalent to entropy feed on input stream is
-      //      enough stable or invariant is periodical case.
-      //      in normally, bored input stream's invariant is periodical.
+      // N.B. the QR decomposition mixes as average on 2 or latter index.
+      //      so the continuity concerns 1st index also orthogonalizing
+      //      causes one dimension theta continuity concerns.
+      //      in raw meaning, taking the invariant causes ||p_0||<<epsilon
+      //      in raw meaning, however we should take ||p_0'||/||p_0|| for
+      //      this transformation is valid or not.
+      //      however, in weak differential meaning, it's sliding and
+      //      add some continuity by higher frequency average.
+      //      so in very roughly this includes any of the cases except
+      //      for the condition invariant-next's linearInvariant fixes
+      //      the whole invariant by orthogonalization case, but this
+      //      condition is rarely satisfied by PRNG blended streams.
       invariant.O();
       for(int i = 0; i < invariants.cols(); i ++)
         invariant[i] = p0maxNext<T>(invariants.col(i).subVector(0, j));
@@ -4487,7 +4490,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pRSshallow(const v
   }
   SimpleVector<T> seconds(intran0[0].size());
   seconds.O();
-  vector<SimpleVector<T> > intran(offsetHalf<T>(intran0));
+  vector<SimpleVector<T> > intran(intran0);
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
