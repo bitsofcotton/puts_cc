@@ -4967,7 +4967,7 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
         b = uo * T(int(2)) - b;
       }
       workp.entity.emplace_back(b);
-      workp.entity = delta<SimpleVector<T> >(workp.entity);
+      workp.entity = delta<SimpleVector<T> >(delta<SimpleVector<T> >(workp.entity));
       pair<SimpleVector<SimpleVector<T> >, T> wp(normalizeS<T>(workp));
       pp = unOffsetHalf<T>(pGuaranteeM<T, nprogress>(offsetHalf<T>(
         wp.first), string("+)") + strloop));
@@ -4988,7 +4988,7 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
         b = uo * T(int(2)) - b;
       }
       workm.entity.emplace_back(- b);
-      workm.entity = delta<SimpleVector<T> >(workm.entity);
+      workm.entity = delta<SimpleVector<T> >(delta<SimpleVector<T> >(workm.entity));
       pair<SimpleVector<SimpleVector<T> >, T> wm(normalizeS<T>(workm));
       pm = unOffsetHalf<T>(pGuaranteeM<T, nprogress>(offsetHalf<T>(
         wm.first), string("-)") + strloop));
