@@ -4752,9 +4752,6 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pLebesgue(const ve
 #else
   vector<SimpleVector<T> > res;
 #endif
-#if defined(_OPENMP)
-#pragma omp parallel for schedule(static, 1)
-#endif
   for(int i = 0; i < reform.size(); i ++) {
     T n2(int(0));
     for(int j = 0; j < reform[i].size(); j ++)
@@ -4774,44 +4771,21 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pLebesgue(const ve
     vector<SimpleVector<T> > p1;
     vector<SimpleVector<T> > p2;
 #endif
-#if defined(_OPENMP)
-#pragma omp parallel sections
-    {
-#pragma omp section
-#endif
-      {
-        p0 = pRS<T, nprogress>(
-          reform[i], string(" L(0/3, ") + to_string(i) + string("/") +
-            to_string(reform.size()) + strloop);
-      }
-#if defined(_OPENMP)
-#pragma omp section
-#endif
-      {
-        p1 = logscale<T>(pRS<T, nprogress>(
-          expscale<T>(reform[i]), string(" L(1/3, ") + to_string(i) +
-            string("/") + to_string(reform.size()) + strloop) );
-      }
-#if defined(_OPENMP)
-#pragma omp section
-#endif
-      {
-        p2 = expscale<T>(pRS<T, nprogress>(
-          logscale<T>(reform[i]), string(" L(2/3, ") + to_string(i) +
-            string("/") + to_string(reform.size()) + strloop) );
-      }
-#if defined(_OPENMP)
-    }
-#endif
+    p0 = pRS<T, nprogress>(
+      reform[i], string(" L(0/3, ") + to_string(i) + string("/") +
+        to_string(reform.size()) + strloop);
+    p1 = logscale<T>(pRS<T, nprogress>(
+      expscale<T>(reform[i]), string(" L(1/3, ") + to_string(i) +
+        string("/") + to_string(reform.size()) + strloop) );
+    p2 = expscale<T>(pRS<T, nprogress>(
+      logscale<T>(reform[i]), string(" L(2/3, ") + to_string(i) +
+        string("/") + to_string(reform.size()) + strloop) );
     assert(p0.size() == p1.size() && p1.size() == p2.size());
     for(int i = 0; i < p0.size(); i ++) {
       p0[i] += p1[i];
       p0[i] += p2[i];
       p0[i] *= T(i + 1) / T(horizontal) / T(int(3));
     }
-#if defined(_OPENMP)
-#pragma omp critical
-#endif
     {
       if(! res.size()) res = move(p0);
       else for(int i = 0; i < res.size(); i ++) res[i] += p0[i];
@@ -4860,31 +4834,18 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pPolish(const vect
   vector<SimpleVector<T> > resp;
   vector<SimpleVector<T> > resm;
 #endif
-#if defined(_OPENMP)
-#pragma omp parallel sections
+  resp = pSectional<T, nprogress>(in,  string("+") + strloop);
   {
-#pragma omp section
-#endif
-    {
-      resp = pSectional<T, nprogress>(in,  string("+") + strloop);
-    }
-#if defined(_OPENMP)
-#pragma omp section
-#endif
-    {
 #if defined(_SIMPLEALLOC_)
-      vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > inm(in);
+    vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > inm(in);
 #else
-      vector<SimpleVector<T> > inm(in);
+    vector<SimpleVector<T> > inm(in);
 #endif
-      for(int i = 0; i < inm.size(); i ++)
-        inm[i] = offsetHalf<T>(- unOffsetHalf<T>(inm[i]));
-      resm = pSectional<T, nprogress>(inm, string("-") + strloop);
-      for(int i = 0; i < resm.size(); i ++) resm[i] = - resm[i];
-    }
-#if defined(_OPENMP)
+    for(int i = 0; i < inm.size(); i ++)
+      inm[i] = offsetHalf<T>(- unOffsetHalf<T>(inm[i]));
+    resm = pSectional<T, nprogress>(inm, string("-") + strloop);
+    for(int i = 0; i < resm.size(); i ++) resm[i] = - resm[i];
   }
-#endif
   for(int i = 0; i < resp.size(); i ++) {
     resp[i] += resm[i];
     resp[i] /= T(int(2));
@@ -4932,9 +4893,6 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
 #endif
 #if defined(_OPENMP) && ! defined(_P_PRNG_)
   for(int i = 1; i < _P_MLEN_; i ++) pnextcacher<T>(i, 1);
-  // N.B. comment out and use env OMP_MAX_ACTIVE_LEVELS=... to reduce
-  //      memory usage.
-  omp_set_max_active_levels(3);
 #endif
   const int realin(_P_MLEN_ ? min(int(in.size()), int(_P_MLEN_)) : int(in.size()) );
 #if defined(_SIMPLEALLOC_)
@@ -4950,53 +4908,42 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
   vector<SimpleVector<T> > q;
   vector<SimpleVector<T> > r;
 #endif
-#if defined(_OPENMP)
-#pragma omp parallel sections
   {
-#pragma omp section
-#endif
-    {
-      SimpleVector<SimpleVector<T> > workp;
-      workp.entity.reserve(realin * 2 + 1);
-      SimpleVector<T> b(in[0].size());
-      b.O();
-      for(int i = 0; i < realin; i ++) {
-        SimpleVector<T> uo(unOffsetHalf<T>(in[i - realin + in.size()]));
-        workp.entity.emplace_back(b);
-        workp.entity.emplace_back(uo);
-        b = uo * T(int(2)) - b;
-      }
+    SimpleVector<SimpleVector<T> > workp;
+    workp.entity.reserve(realin * 2 + 1);
+    SimpleVector<T> b(in[0].size());
+    b.O();
+    for(int i = 0; i < realin; i ++) {
+      SimpleVector<T> uo(unOffsetHalf<T>(in[i - realin + in.size()]));
       workp.entity.emplace_back(b);
-      workp.entity = delta<SimpleVector<T> >(delta<SimpleVector<T> >(workp.entity));
-      pair<SimpleVector<SimpleVector<T> >, T> wp(normalizeS<T>(workp));
-      pp = unOffsetHalf<T>(pGuaranteeM<T, nprogress>(offsetHalf<T>(
-        wp.first), string("+)") + strloop));
-      for(int i = 0; i < pp.size(); i ++) pp[i] *= wp.second;
+      workp.entity.emplace_back(uo);
+      b = uo * T(int(2)) - b;
     }
-#if defined(_OPENMP)
-#pragma omp section
-#endif
-    {
-      SimpleVector<SimpleVector<T> > workm;
-      workm.entity.reserve(realin * 2 + 1);
-      SimpleVector<T> b(in[0].size());
-      b.O();
-      for(int i = 0; i < realin; i ++) {
-        SimpleVector<T> uo(unOffsetHalf<T>(in[i - realin + in.size()]));
-        workm.entity.emplace_back(- b);
-        workm.entity.emplace_back(uo);
-        b = uo * T(int(2)) - b;
-      }
-      workm.entity.emplace_back(- b);
-      workm.entity = delta<SimpleVector<T> >(delta<SimpleVector<T> >(workm.entity));
-      pair<SimpleVector<SimpleVector<T> >, T> wm(normalizeS<T>(workm));
-      pm = unOffsetHalf<T>(pGuaranteeM<T, nprogress>(offsetHalf<T>(
-        wm.first), string("-)") + strloop));
-      for(int i = 0; i < pm.size(); i ++) pm[i] *= wm.second;
-    }
-#if defined(_OPENMP)
+    workp.entity.emplace_back(b);
+    workp.entity = delta<SimpleVector<T> >(delta<SimpleVector<T> >(workp.entity));
+    pair<SimpleVector<SimpleVector<T> >, T> wp(normalizeS<T>(workp));
+    pp = unOffsetHalf<T>(pGuaranteeM<T, nprogress>(offsetHalf<T>(
+      wp.first), string("+)") + strloop));
+    for(int i = 0; i < pp.size(); i ++) pp[i] *= wp.second;
   }
-#endif
+  {
+    SimpleVector<SimpleVector<T> > workm;
+    workm.entity.reserve(realin * 2 + 1);
+    SimpleVector<T> b(in[0].size());
+    b.O();
+    for(int i = 0; i < realin; i ++) {
+      SimpleVector<T> uo(unOffsetHalf<T>(in[i - realin + in.size()]));
+      workm.entity.emplace_back(- b);
+      workm.entity.emplace_back(uo);
+      b = uo * T(int(2)) - b;
+    }
+    workm.entity.emplace_back(- b);
+    workm.entity = delta<SimpleVector<T> >(delta<SimpleVector<T> >(workm.entity));
+    pair<SimpleVector<SimpleVector<T> >, T> wm(normalizeS<T>(workm));
+    pm = unOffsetHalf<T>(pGuaranteeM<T, nprogress>(offsetHalf<T>(
+      wm.first), string("-)") + strloop));
+    for(int i = 0; i < pm.size(); i ++) pm[i] *= wm.second;
+  }
   assert(pp.size() == pm.size());
   p.reserve(pp.size());
   q.reserve(pp.size());
@@ -5045,7 +4992,6 @@ template <typename T, int nprogress> static inline SimpleVector<T> pEachPRNG(con
   out.O();
 #if defined(_OPENMP)
   for(int i = 1; i < _P_MLEN_; i ++) pnextcacher<T>(i, 1);
-#pragma omp parallel for schedule(static, 1)
 #endif
   for(int i = 0; i < in[0].size(); i ++) {
     vector<SimpleVector<T> > work(in.size());
@@ -5207,10 +5153,11 @@ template <typename T, int nprogress> vector<vector<SimpleVector<T> > > predVec(c
       in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
+  // N.B. don't normalize here because of puts/txtpgm.py
 #if defined(_SIMPLEALLOC_)
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > pres(normalize<T>(pRepeat<T, nprogress>(in, string(" predVec")) ));
+  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > pres(pRepeat<T, nprogress>(in, string(" predVec")) );
 #else
-  vector<SimpleVector<T> > pres(normalize<T>(pRepeat<T, nprogress>(in, string(" predVec")) ));
+  vector<SimpleVector<T> > pres(pRepeat<T, nprogress>(in, string(" predVec")) );
 #endif
   vector<vector<SimpleVector<T> > > res;
   res.resize(pres.size());
