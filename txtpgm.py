@@ -4,20 +4,16 @@ if(sys.argv[1] == '-'):
   sys.stdin.readline()
   sys.stdin.readline()
   b = int(sys.stdin.readline())
-  s   = []
-  B   = 0
-  tb  = 1
-  ctr = 0
+  s = []
+  B = 0
+  c = 0
   for line in sys.stdin:
-    if(ctr == 0):
-      B  = 0
-      tb = 1
-    ctr += 1
-    if(int(line) >= b / 2): B += tb
-    tb *= 2
-    if(tb >= 255): ctr = 0
-    if(ctr == 0):
+    c += 1
+    if(int(line) >= b / 2): B += 1
+    if(c >= 8):
       s.append(int(B))
+      B = c = 0
+    B *= 2
   print(bytearray(s).decode("utf-8", errors="ignore"))
 elif(sys.argv[1] == '+'):
   s = ""
@@ -28,8 +24,11 @@ elif(sys.argv[1] == '+'):
   print("8", len(s))
   print("255")
   for ss in s:
-    tb = 1
+    ls = ss
     for tt in range(0, 8):
-      print((int(ss / tb) % 2) * 255)
-      tb *= 2
+      print(ls)
+      ls *= 2
+      if(ls >= 256):
+        ls -= 256
+        ls += 1
 
