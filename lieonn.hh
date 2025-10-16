@@ -1635,6 +1635,7 @@ extern size_t last;
 extern size_t lastptr;
 extern vector<size_t> alloc;
 extern vector<bool>   in_use;
+// N.B. around 20% endurance, so making here into binary tree can reduce some.
 template <typename T> class SimpleAllocator {
 public:
   typedef T* pointer;
@@ -1669,8 +1670,8 @@ public:
       if((work -= alloc[i]) == pp) break;
       flag = flag || in_use[i];
     }
-    assert(0 <= i && pp == work);
     in_use[i] = false;
+    assert(0 <= i && pp == work);
     if(! flag) {
       last = pp;
       lastptr = i;
@@ -5095,17 +5096,17 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
       p01next<T>(nwork / nnwork) * nnwork));
 }
 
-// N.B. we make the first hypothesis as the stream is calculatable from
-//      input stream by 6 of the measureable condition.
-//      we only need pAppendMeasure and p0maxNext for 2/3 result in many cases.
-//      however, stacked measureable condition addition effects better result.
+// N.B. we make the first hypothesis as the stream is calculatable by *single*
+//      function as n-markov also which measureability-appendant stream can
+//      seep out the original stream from information amount reason.
 // N.B. layers:
 //       | function           | layer# | [wsp1] | data amount* | time*(***)   |
 //       +-----------------------------------------------------+--------------+
+//       | pEachPRNG                   | -1  | w | _P_PRNG_    | _P_PRNG_
 //       | pAppendMeasure              | 0   | w | in          | in
-//       | pGuarantee                  | 1   | w | bits        |
+//       | pGuarantee                  | 1   | w | _P_BITS_    | _P_BITS_
 //       | pPolish                     | *   | w | 2           | 2
-//       | pSectional                  | 2   | w | range       |
+//       | pSectional                  | 2   | w |             |
 //       | pLebesgue                   | 3   | w | range^2     | range
 //       | divide by program invariant | 4+  | s | +unit       | +O(GL)
 //       | burn invariant by p0next    | 5++ | s | +unit       | +O(GL+L^3)
@@ -8179,7 +8180,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
   return;
 }
 
-// N.B. rewrote 2025/08/30:
+// N.B. rewrote 2025/08/30, last update 2025/10/17:
 // N.B. generally speaking, the raw input stream with high entropy predictor
 //      dislikes to predict in general meanings because {ok,ng,invariant}
 //      each 1/3 condition. however, there's at least 2 hole to the condition.
@@ -8202,17 +8203,16 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      from core predictors.
 //      this include input stream non-linear scaling (even in x-axis).
 //      also distant step predictions aren't fight with skip concerns.
-// (ii) PRNG concerns can breaks continuity on input stream.
-// (iii)non linear function transformations we target is only exp/log scale.
+// (ii) non linear function transformations we target is only exp/log scale.
 //      this is because d^e/dx^e == dx condition and f^-1(f(x)) == x condition.
 //      cf. (arctan(logscale))-n times chain causes y=x into sigmoid-like graph.
-// (iv) predict twice or more by one predictor often causes clear edge but the
+// (iii)predict twice or more by one predictor often causes clear edge but the
 //      gulf things. this also includes {ok,ng,invariant}'s invariant condition
 //      retry.
-// (v)  ad-hoc layer implementations also inspired by numerical test isn't
+// (iv) ad-hoc layer implementations also inspired by numerical test isn't
 //      useful for generic predictor because it's only ad-hoc to specific
 //      numerical series. also after burner is.
-// (vi) we don't need LoEM unstable case implementation on input stream attached
+// (v)  we don't need LoEM unstable case implementation on input stream attached
 //      case because it's verbose.
 // N.B. something XXX result descripton
 // (00) there might exist non Lebesgue measureable condition discrete stream.
@@ -8267,6 +8267,9 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 // (01) brute force change state/output functions on (de)?compressed stream.
 //      they are equivalent to p01next, p012next partially also we cannot
 //      test because of their size on the memory.
+//      the brute force condition isn't mean directly the things finding
+//      pseudo-patternized ones because of (de)compression condition they
+//      breaks LoEM causes some resonance on the stream.
 // (02) predictor which shirking many much of the continuous functions:
 //        this is with taking multiplication invariant on f,
 //        S f(x) dx = S det(J((1,g0,...)/(1,x0,...)) dx0 ...
