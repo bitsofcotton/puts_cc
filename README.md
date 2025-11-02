@@ -123,4 +123,5 @@ This repository is archived, so without bug report, will no change.
 2025/09/05 fix to compile with latest g++, pAppendMeasure fix (should be done).
 2025/09/25 merge latest ddpmopt result cause bug fix around pRS, p01next.
 2025/10/06 merge latest ddpmopt result cause intended fix.
+2025/11/03 check point.
 
