@@ -124,4 +124,5 @@ This repository is archived, so without bug report, will no change.
 2025/09/25 merge latest ddpmopt result cause bug fix around pRS, p01next.
 2025/10/06 merge latest ddpmopt result cause intended fix.
 2025/11/03 check point.
+2025/11/12 merge latest ddpmopt result.
 
