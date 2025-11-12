@@ -22,8 +22,8 @@ LDFLAGS+=	-lc++ -L/usr/local/lib
 #CXXFLAGS+=	-D_FLOAT_BITS_=512
 
 # lieonn.hh flags
-#CXXFLAGS+=     -D_P_BIT_=3
-#CXXFLAGS+=     -D_P_PRNG_=1
+#CXXFLAGS+=     -D_P_BIT_=1
+#CXXFLAGS+=     -D_P_PRNG_=11
 #CXXFLAGS+=     -D_ARCFOUR_
 
 # N.B. sed -e s/static\ inline//g | sed -e s/inline//g

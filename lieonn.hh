@@ -4761,35 +4761,20 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pLebesgue(const ve
       if(nprogress) cerr << " L(skip:" << i << strloop << ")" << endl;
       continue;
     }
-    // N.B. try 3 of the context from single input stream possible enough
-    //      then take arithmetic average.
+    // N.B. we only need linear prediction by checking p2.cc output.
 #if defined(_SIMPLEALLOC_)
-    vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > p0;
-    vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > p1;
-    vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > p2;
+    vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > p(
 #else
-    vector<SimpleVector<T> > p0;
-    vector<SimpleVector<T> > p1;
-    vector<SimpleVector<T> > p2;
+    vector<SimpleVector<T> > p(
 #endif
-    p0 = pRS<T, nprogress>(
-      reform[i], string(" L(0/3, ") + to_string(i) + string("/") +
-        to_string(reform.size()) + string(")") + strloop);
-    p1 = logscale<T>(pRS<T, nprogress>(
-      expscale<T>(reform[i]), string(" L(1/3, ") + to_string(i) +
-        string("/") + to_string(reform.size()) + string(")") + strloop) );
-    p2 = expscale<T>(pRS<T, nprogress>(
-      logscale<T>(reform[i]), string(" L(2/3, ") + to_string(i) +
-        string("/") + to_string(reform.size()) + string(")") + strloop) );
-    assert(p0.size() == p1.size() && p1.size() == p2.size());
-    for(int i = 0; i < p0.size(); i ++) {
-      p0[i] += p1[i];
-      p0[i] += p2[i];
-      p0[i] *= T(i + 1) / T(horizontal) / T(int(3));
-    }
+      pRS<T, nprogress>(
+        reform[i], string(" L(") + to_string(i) + string("/") +
+          to_string(reform.size()) + string(")") + strloop) );
+    for(int i = 0; i < p.size(); i ++)
+      p[i] *= T(i + 1) / T(horizontal);
     {
-      if(! res.size()) res = move(p0);
-      else for(int i = 0; i < res.size(); i ++) res[i] += p0[i];
+      if(! res.size()) res = move(p);
+      else for(int i = 0; i < res.size(); i ++) res[i] += p[i];
     }
   }
   for(int i = 0; i < res.size(); i ++) {
@@ -8073,6 +8058,8 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 // (ii) non linear function transformations we target is only exp/log scale.
 //      this is because d^e/dx^e == dx condition and f^-1(f(x)) == x condition.
 //      cf. (arctan(logscale))-n times chain causes y=x into sigmoid-like graph.
+//      -&gt; we eliminated non linear function handling because we're trusting
+//      makeProgramInvariant a little stronger for output.
 // (iii)predict twice or more by one predictor often causes clear edge but the
 //      gulf things. this also includes {ok,ng,invariant}'s invariant condition
 //      retry.
