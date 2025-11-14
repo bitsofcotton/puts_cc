@@ -3128,7 +3128,7 @@ template <typename T> static inline SimpleVector<T> offsetHalf(const SimpleVecto
 }
 
 template <typename T> static inline SimpleVector<SimpleVector<T> > offsetHalf(const SimpleVector<SimpleVector<T> >& in, const T& o = T(int(1)) ) {
-  SimpleVector<SimpleVector<T> > res;
+  SimpleVector<SimpleVector<T> > res(in);
   for(int i = 0; i < res.size(); i ++) res[i] = offsetHalf<T>(res[i], o);
   return res;
 }
@@ -3144,7 +3144,7 @@ template <typename T> static inline SimpleVector<T> unOffsetHalf(const SimpleVec
 }
 
 template <typename T> static inline SimpleVector<SimpleVector<T> > unOffsetHalf(const SimpleVector<SimpleVector<T> >& in, const T& o = T(int(1)) ) {
-  SimpleVector<SimpleVector<T> > res;
+  SimpleVector<SimpleVector<T> > res(in);
   for(int i = 0; i < res.size(); i ++) res[i] = unOffsetHalf<T>(res[i], o);
   return res;
 }

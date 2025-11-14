@@ -125,4 +125,5 @@ This repository is archived, so without bug report, will no change.
 2025/10/06 merge latest ddpmopt result cause intended fix.
 2025/11/03 check point.
 2025/11/12 merge latest ddpmopt result.
+2025/11/15 merge latest ddpmopt result.
 
