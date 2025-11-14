@@ -1952,7 +1952,7 @@ public:
   inline SimpleMatrix() { ecols = 0; }
   inline SimpleMatrix(const int& rows, const int& cols) {
     assert(0 <= rows && 0 <= cols);
-    entity.resize(rows);
+    entity.entity.resize(rows);
     for(int i = 0; i < entity.size(); i ++)
       entity[i].resize(cols);
     ecols = cols;
@@ -2185,7 +2185,7 @@ public:
   inline       void resize(const int& rows, const int& cols) {
     assert(0 <= rows && 0 <= cols);
     ecols = cols;
-    entity.resize(rows);
+    entity.entity.resize(rows);
     for(int i = 0; i < entity.size(); i ++)
       entity[i].resize(ecols);
     return;
@@ -2347,11 +2347,7 @@ public:
     return is;
   }
   // this isn't better idea for faster calculations.
-#if defined(_SIMPLEALLOC_)
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > entity;
-#else
-  vector<SimpleVector<T> > entity;
-#endif
+  SimpleVector<SimpleVector<T> > entity;
   int ecols;
 };
 
@@ -3131,20 +3127,9 @@ template <typename T> static inline SimpleVector<T> offsetHalf(const SimpleVecto
   return res;
 }
 
-#if defined(_SIMPLEALLOC_)
-template <typename T> static inline vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > offsetHalf(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& in, const T& o = T(int(1)) ) {
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > res(in);
-#else
-template <typename T> static inline vector<SimpleVector<T> > offsetHalf(const vector<SimpleVector<T> >& in, const T& o = T(int(1)) ) {
-  vector<SimpleVector<T> > res(in);
-#endif
-  for(int i = 0; i < res.size(); i ++) res[i] = offsetHalf<T>(res[i], o);
-  return res;
-}
-
 template <typename T> static inline SimpleVector<SimpleVector<T> > offsetHalf(const SimpleVector<SimpleVector<T> >& in, const T& o = T(int(1)) ) {
   SimpleVector<SimpleVector<T> > res;
-  res.entity = offsetHalf<T>(in.entity, o);
+  for(int i = 0; i < res.size(); i ++) res[i] = offsetHalf<T>(res[i], o);
   return res;
 }
 
@@ -3158,20 +3143,9 @@ template <typename T> static inline SimpleVector<T> unOffsetHalf(const SimpleVec
   return res;
 }
 
-#if defined(_SIMPLEALLOC_)
-template <typename T> static inline vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > unOffsetHalf(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& in, const T& o = T(int(1)) ) {
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > res(in);
-#else
-template <typename T> static inline vector<SimpleVector<T> > unOffsetHalf(const vector<SimpleVector<T> >& in, const T& o = T(int(1)) ) {
-  vector<SimpleVector<T> > res(in);
-#endif
-  for(int i = 0; i < res.size(); i ++) res[i] = unOffsetHalf<T>(res[i], o);
-  return res;
-}
-
 template <typename T> static inline SimpleVector<SimpleVector<T> > unOffsetHalf(const SimpleVector<SimpleVector<T> >& in, const T& o = T(int(1)) ) {
   SimpleVector<SimpleVector<T> > res;
-  res.entity = unOffsetHalf<T>(in.entity, o);
+  for(int i = 0; i < res.size(); i ++) res[i] = unOffsetHalf<T>(res[i], o);
   return res;
 }
 
@@ -3244,13 +3218,8 @@ template <typename T> static inline SimpleVector<T> expscale(const SimpleVector<
   return res;
 }
 
-#if defined(_SIMPLEALLOC_)
-template <typename T> static inline vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > expscale(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& x) {
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > res(x);
-#else
-template <typename T> static inline vector<SimpleVector<T> > expscale(const vector<SimpleVector<T> >& x) {
-  vector<SimpleVector<T> > res(x);
-#endif
+template <typename T> static inline SimpleVector<SimpleVector<T> > expscale(const SimpleVector<SimpleVector<T> >& x) {
+  SimpleVector<SimpleVector<T> > res(x);
   for(int i = 0; i < res.size(); i ++) res[i] = expscale<T>(res[i]);
   return res;
 }
@@ -3265,24 +3234,14 @@ template <typename T> static inline SimpleVector<T> logscale(const SimpleVector<
   return res;
 }
 
-#if defined(_SIMPLEALLOC_)
-template <typename T> static inline vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > logscale(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& x) {
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > res(x);
-#else
-template <typename T> static inline vector<SimpleVector<T> > logscale(const vector<SimpleVector<T> >& x) {
-  vector<SimpleVector<T> > res(x);
-#endif
+template <typename T> static inline SimpleVector<SimpleVector<T> > logscale(const SimpleVector<SimpleVector<T> >& x) {
+  SimpleVector<SimpleVector<T> > res(x);
   for(int i = 0; i < res.size(); i ++) res[i] = logscale<T>(res[i]);
   return res;
 }
 
-#if defined(_SIMPLEALLOC_)
-template <typename X> static inline vector<X, SimpleAllocator<X> > skipX(const vector<X, SimpleAllocator<X> >& in, const int& step = 1) {
-  vector<X, SimpleAllocator<X> > res;
-#else
-template <typename X> static inline vector<X> skipX(const vector<X>& in, const int& step = 1) {
-  vector<X> res;
-#endif
+template <typename X> static inline SimpleVector<X> skipX(const SimpleVector<X>& in, const int& step = 1) {
+  SimpleVector<X> res;
   assert(in.size());
   res.resize((in.size() + step - 1) / step);
   for(int i = (in.size() - 1) % step, ii = 0; i < in.size();
@@ -3290,13 +3249,8 @@ template <typename X> static inline vector<X> skipX(const vector<X>& in, const i
   return res;
 }
 
-#if defined(_SIMPLEALLOC_)
-template <typename X> static inline vector<X, SimpleAllocator<X> > delta(const vector<X, SimpleAllocator<X> >& in0) {
-  vector<X, SimpleAllocator<X> > in(in0);
-#else
-template <typename X> static inline vector<X> delta(const vector<X>& in0) {
-  vector<X> in(in0);
-#endif
+template <typename X> static inline SimpleVector<X> delta(const SimpleVector<X>& in0) {
+  SimpleVector<X> in(in0);
   for(int i = 1; i < in.size(); i ++) in[i] = in0[i] - in0[i - 1];
   return in;
 }
@@ -3607,12 +3561,8 @@ template <typename T> inline CatG<T>::CatG(const int& size0, const vector<Simple
   cut = R.solve(ptone);
   const T cutn(sqrt(cut.dot(cut)));
   if(cutn != T(int(0))) cut /= cutn;
-#if defined(_SIMPLEALLOC_)
-  vector<T, SimpleAllocator<T> > testv((A * cut).entity);
-#else
-  vector<T> testv((A * cut).entity);
-#endif
-  sort(testv.begin(), testv.end());
+  SimpleVector<T> testv(A * cut);
+  sort(testv.entity.begin(), testv.entity.end());
   distance = T(int(0));
   for(int i = 1; i < testv.size(); i ++)
     if(distance <= testv[i] - testv[i - 1]) {
@@ -4488,21 +4438,17 @@ template <typename T> static inline SimpleMatrix<T> normalize(const SimpleMatrix
   return normalize<T>(d, upper);
 }
 
-#if defined(_SIMPLEALLOC_)
-template <typename T> static inline vector<vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >, SimpleAllocator<vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > > > normalize(const vector<vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >, SimpleAllocator<vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > > >& in, const T& upper = T(1)) {
-#else
-template <typename T> static inline vector<vector<SimpleVector<T> > > normalize(const vector<vector<SimpleVector<T> > >& in, const T& upper = T(1)) {
-#endif
-  vector<vector<SimpleMatrix<T> > > w;
+template <typename T> static inline SimpleVector<SimpleVector<SimpleVector<T> > > normalize(const SimpleVector<SimpleVector<SimpleVector<T> > >& in, const T& upper = T(1)) {
+  SimpleVector<SimpleVector<SimpleMatrix<T> > > w;
   w.resize(in.size());
   for(int i = 0; i < in.size(); i ++) {
     w[i].resize(in[i].size(), SimpleMatrix<T>(1, in[i][0].size()).O());
     for(int j = 0; j < in[i].size(); j ++)
       w[i][j].row(0) = in[i][j];
   }
-  vector<vector<SimpleMatrix<T> > > res(normalize<T>(w, upper));
+  SimpleVector<SimpleVector<SimpleMatrix<T> > > res(normalize<T>(w, upper));
   w.resize(0);
-  vector<vector<SimpleVector<T> > > v;
+  SimpleVector<SimpleVector<SimpleVector<T> > > v;
   v.resize(res.size());
   for(int i = 0; i < res.size(); i ++) {
     v[i].resize(res[i].size(), SimpleVector<T>(res[i][0].cols()).O());
@@ -4512,15 +4458,12 @@ template <typename T> static inline vector<vector<SimpleVector<T> > > normalize(
   return v;
 }
 
-#if defined(_SIMPLEALLOC_)
-template <typename T> static inline vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > normalize(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& in, const T& upper = T(1)) {
-#else
-template <typename T> static inline vector<SimpleVector<T> > normalize(const vector<SimpleVector<T> >& in, const T& upper = T(1)) {
-#endif
+template <typename T> static inline SimpleVector<SimpleVector<T> > normalize(const SimpleVector<SimpleVector<T> >& in, const T& upper = T(1)) {
   SimpleMatrix<T> w;
   w.resize(in.size(), in[0].size());
-  w.entity = in;
-  return normalize<T>(w, upper).entity;
+  w.entity  = in.entity;
+  in.entity = normalize<T>(w, upper).entity;
+  return in;
 }
 
 template <typename T> static inline SimpleVector<T> normalize(const SimpleVector<T>& in, const T& upper = T(1)) {
@@ -4598,33 +4541,19 @@ template <typename T, bool useful> static inline SimpleVector<T> bitsG(const Sim
   return res;
 }
 
-#if defined(_SIMPLEALLOC_)
-template <typename T, bool useful> static inline vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > bitsG(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& d, const int& b) {
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > res(d);
-#else
-template <typename T, bool useful> static inline vector<SimpleVector<T> > bitsG(const vector<SimpleVector<T> >& d, const int& b) {
-  vector<SimpleVector<T> > res(d);
-#endif
+template <typename T, bool useful> static inline SimpleVector<SimpleVector<T> > bitsG(const SimpleVector<SimpleVector<T> >& d, const int& b) {
+  SimpleVector<SimpleVector<T> > res(d);
   for(int i = 0; i < res.size(); i ++) res[i] = bitsG<T, useful>(res[i], b);
   return res;
 }
 
 // N.B. start ddpmopt
 // N.B. predict with discrete pseudo Riemann-Stieljes condition.
-#if defined(_SIMPLEALLOC_)
-template <typename T, int nprogress> vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > pRS(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& intran0, const string& strloop) {
-#else
-template <typename T, int nprogress> vector<SimpleVector<T> > pRS(const vector<SimpleVector<T> >& intran0, const string& strloop) {
-#endif
+template <typename T, int nprogress> SimpleVector<SimpleVector<T> > pRS(const SimpleVector<SimpleVector<T> >& intran0, const string& strloop) {
   if(intran0[0].size() < 12) {
-#if defined(_SIMPLEALLOC_)
-    if(! intran0[0].size()) return vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >();
-    vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > res;
-#else
-    if(! intran0[0].size()) return vector<SimpleVector<T> >();
-    vector<SimpleVector<T> > res;
-#endif
-    res.resize(intran0[0].size(), SimpleVector<T>(intran0.size()).O());
+    if(! intran0[0].size()) return SimpleVector<SimpleVector<T> >();
+    SimpleVector<SimpleVector<T> > res;
+    res.entity.resize(intran0[0].size(), SimpleVector<T>(intran0.size()).O());
     for(int j = 0; j < res.size(); j ++)
       for(int i = 0; i < res[j].size(); i ++)
         res[j][i] = p0maxNext<T>(intran0[i].subVector(0, j + 1));
@@ -4632,11 +4561,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pRS(const vector<S
   }
   SimpleVector<T> seconds(intran0[0].size());
   seconds.O();
-#if defined(_SIMPLEALLOC_)
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > intran(intran0);
-#else
-  vector<SimpleVector<T> > intran(intran0);
-#endif
+  SimpleVector<SimpleVector<T> > intran(intran0);
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
 #endif
@@ -4654,15 +4579,11 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pRS(const vector<S
       M = max(abs(intran[i][j]), M);
   for(int i = 0; i < intran.size(); i ++) intran[i] /= M;
   seconds /= M;
-#if defined(_SIMPLEALLOC_)
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > p;
-#else
-  vector<SimpleVector<T> > p;
-#endif
+  SimpleVector<SimpleVector<T> > p;
   // N.B. p01next calls p0maxNext implicitly, this needs to be cached single
   //      threaded process on first call.
   vector<T> p0(p01nextM<T>(intran[0]));
-  p.resize(p0.size(), SimpleVector<T>(intran.size()).O());
+  p.entity.resize(p0.size(), SimpleVector<T>(intran.size()).O());
   for(int i = 0; i < p0.size(); i ++) p[i][0] = p0[i];
 #if defined(_OPENMP)
 #pragma omp parallel for schedule(static, 1)
@@ -4684,13 +4605,8 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pRS(const vector<S
   return p;
 }
 
-#if defined(_SIMPLEALLOC_)
-template <typename T, int nprogress> static inline vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > pRS00(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& in, const string& strloop) {
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > intran;
-#else
-template <typename T, int nprogress> static inline vector<SimpleVector<T> > pRS00(const vector<SimpleVector<T> >& in, const string& strloop) {
-  vector<SimpleVector<T> > intran;
-#endif
+template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> > pRS00(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
+  SimpleVector<SimpleVector<T> > intran;
   intran.resize(in[0].size());
   for(int i = 0; i < intran.size(); i ++) {
     intran[i].resize(in.size());
@@ -4700,38 +4616,24 @@ template <typename T, int nprogress> static inline vector<SimpleVector<T> > pRS0
   return pRS<T, nprogress>(intran, strloop);
 }
 
-#if defined(_SIMPLEALLOC_)
-template <typename T, int nprogress> static inline SimpleVector<T> pRS0(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& in) {
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > res(pRS00<T, nprogress>(in, string("")) );
-#else
-template <typename T, int nprogress> static inline SimpleVector<T> pRS0(const vector<SimpleVector<T> >& in) {
-  vector<SimpleVector<T> > res(pRS00<T, nprogress>(in, string("")) );
-#endif
+template <typename T, int nprogress> static inline SimpleVector<T> pRS0(const SimpleVector<SimpleVector<T> >& in) {
+  SimpleVector<SimpleVector<T> > res(pRS00<T, nprogress>(in, string("")) );
   return res[res.size() - 1];
 }
 
-#if ! defined(_P_BIT_)
+// N.B. p01next output meaning only binary we make hypothesis.
+template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> > pGuaranteeM(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
+  SimpleVector<SimpleVector<T> > res(
 // N.B. we don't get 100% result on each prediction, so upper bit broken case,
 //      lower bits says nothing.
-#define _P_BIT_ 3
-#endif
-
-// N.B. p01next output meaning only binary we make hypothesis.
-#if defined(_SIMPLEALLOC_)
-template <typename T, int nprogress> static inline vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > pGuaranteeM(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& in, const string& strloop) {
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > res(
-#else
-template <typename T, int nprogress> static inline vector<SimpleVector<T> > pGuaranteeM(const vector<SimpleVector<T> >& in, const string& strloop) {
-  vector<SimpleVector<T> > res(
-#endif
-    pRS00<T, nprogress>(bitsG<T, true>(in, abs(_P_BIT_)), strloop) );
+    pRS00<T, nprogress>(bitsG<T, true>(in, 3), strloop) );
   for(int i = 0; i < res.size(); i ++)
-    res[i] = bitsG<T, true>(res[i], - abs(_P_BIT_) );
+    res[i] = bitsG<T, true>(res[i], - 3);
   return res;
 }
 
 template <typename T, int nprogress> static inline SimpleVector<T> pGuarantee(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
-  vector<SimpleVector<T> > res(pGuaranteeM<T, nprogress>(in.entity, strloop));
+  SimpleVector<SimpleVector<T> > res(pGuaranteeM<T, nprogress>(in, strloop));
   return res[res.size() - 1];
 }
 
@@ -4739,22 +4641,13 @@ template <typename T, int nprogress> static inline SimpleVector<T> pGuarantee(co
 //      stream but the predictor isn't depend pseudo-things.
 //      also add whole context length markov feeding.
 //      also this feeds something dense and as a result continuous to predictor.
-#if defined(_SIMPLEALLOC_)
-template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& in0, const string& strloop) {
-#else
-template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector<SimpleVector<T> >& in0, const string& strloop) {
-#endif
-#if defined(_SIMPLEALLOC_)
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > p;
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > q;
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > in(delta<SimpleVector<T> >(unOffsetHalf<T>(in0)));
-#else
-  vector<SimpleVector<T> > p;
-  vector<SimpleVector<T> > q;
-  vector<SimpleVector<T> > in(delta<SimpleVector<T> >(unOffsetHalf<T>(in0)));
-#endif
-  for(int i = 0; i < in.size(); i += 2) in[i] = - in[i];
+template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const SimpleVector<SimpleVector<T> >& in0, const int& bits, const string& strloop) {
+  assert(0 < bits);
+  SimpleVector<SimpleVector<T> > p;
+  SimpleVector<SimpleVector<T> > q;
   SimpleVector<SimpleVector<T> > work;
+  SimpleVector<SimpleVector<T> > in(delta<SimpleVector<T> >(unOffsetHalf<T>(in0)));
+  for(int i = 0; i < in.size(); i += 2) in[i] = - in[i];
   work.entity.reserve(in.size() * 2 + 1);
   SimpleVector<T> b(in[0].size());
   b.O();
@@ -4765,23 +4658,35 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
     b = uo * T(int(2)) - b;
   }
   work.entity.emplace_back(b);
-  work.entity = delta<SimpleVector<T> >(delta<SimpleVector<T> >(work.entity));
-  pair<SimpleVector<SimpleVector<T> >, T> wp(normalizeS<T>(work));
-  p = unOffsetHalf<T>(pGuaranteeM<T, nprogress>(offsetHalf<T>(wp.first).entity, strloop));
+  pair<SimpleVector<SimpleVector<T> >, T> wp(normalizeS<T>(delta<SimpleVector<T> >(delta<SimpleVector<T> >(work)) ));
+  p = unOffsetHalf<T>(pRS00<T, nprogress>(offsetHalf<T>(wp.first), strloop));
+  for(int i0 = 0; i0 < p.size(); i0 ++)
+    for(int i = 0; i < p[i0].size() / bits; i ++) {
+      for(int j = 0; j < bits - 3; j ++) {
+        for(int k = 0; k < 3; k ++)
+          p[i0][i * bits + j] += p[i0][i * bits + j + k];
+        p[i0][i * bits + j] /= T(int(3));
+      }
+      for(int j = bits - 3; j < bits; j ++)
+        p[i0][i * bits + j] = T(int(0));
+    }
   for(int i = 0; i < p.size(); i ++) p[i] *= wp.second;
   for(int i = 1; i < p.size(); i ++) p[i] += p[i - 1];
   for(int i = 1; i < p.size(); i ++) p[i] += p[i - 1];
-  q.reserve(p.size());
+  q.entity.reserve(p.size());
   for(int i = 0; i < p.size(); i ++)
-    q.emplace_back((i ^ p.size()) & 1 ?
+    q.entity.emplace_back((i ^ p.size()) & 1 ?
       SimpleVector<T>(p[i].size()).O() :
       unOffsetHalf<T>(in[(i - int(p.size())) / 2 - 1 + in.size()]) );
   SimpleVector<T> plast(p[0]);
   SimpleVector<T> qlast(q[0]);
   for(int i = 1; i < p.size() - 2; i ++) plast += p[i];
   for(int i = 1; i < q.size() - 2; i ++) qlast += q[i];
-  plast /= T(p.size() - 2);
-  qlast /= T(q.size() - 2);
+  // N.B. we take focus on only msb, otherwise the accuracy going to be null.
+  plast += p[p.size() - 2] * T(int(3)) / T(int(4));
+  qlast += q[q.size() - 2] * T(int(3)) / T(int(4));
+  plast /= T(p.size() - 1);
+  qlast /= T(q.size() - 1);
   for(int i = 0; i < p.size(); i ++) p[i] -= plast;
   for(int i = 0; i < q.size(); i ++) q[i] -= qlast;
   for(int i = 1; i < p.size(); i ++) p[i] += p[i - 1];
@@ -4789,7 +4694,6 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
   SimpleVector<T> r(p[p.size() - 1]);
   for(int j = 0; j < r.size(); j ++)
     r[j] *= p[p.size() - 2][j] * q[q.size() - 1][j];
-  // N.B. ||in0.last|| << ||r||.
   return in0.size() & 1 ? r : - r;
 }
 
@@ -4805,21 +4709,30 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
 //      however, if the original raw stream have whole vector context each pixel
 //      structure have better structure than PRNGs, it's better bet with the
 //      condition after prediction shrinking.
-#if defined(_SIMPLEALLOC_)
-template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& in, const string& strloop) {
-#else
-template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const vector<SimpleVector<T> >& in, const string& strloop) {
-#endif
+template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const SimpleVector<SimpleVector<T> >& in0, const int& bits, const string& strloop) {
+  assert(0 < bits);
 #if defined(_OPENMP)
-  for(int i = 1; i <= in.size() * 2 + 1; i ++) pnextcacher<T>(i, 1);
+  for(int i = 1; i <= in0.size() * 2 + 1; i ++) pnextcacher<T>(i, 1);
 #endif
+  SimpleVector<SimpleVector<T> > in;
+  in.entity.reserve(in0.size());
+  for(int i = 0; i < in0.size(); i ++) {
+    SimpleVector<T> work(in0[i].size() * bits);
+    for(int j = 0; j < in0[i].size(); j ++) {
+      T w(in0[i][j]);
+      for(int k = 0; k < bits; k ++) {
+        work[j * bits + k] = w;
+        w *= T(int(2));
+        const T ww(absfloor(w));
+        w -= ww;
+        w += ww / T(int(1) << bits);
+      }
+    }
+    in.entity.emplace_back(work);
+  }
   if(_P_PRNG_ <= 1)
-    return normalize<T>(pAppendMeasure<T, nprogress>(in, strloop));
-#if defined(_SIMPLEALLOC_)
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > work(in.size());
-#else
-  vector<SimpleVector<T> > work(in.size());
-#endif
+    return bitsG<T, true>(offsetHalf<T>(pAppendMeasure<T, nprogress>(in, bits, strloop)), - bits);
+  SimpleVector<SimpleVector<T> > work(in.size());
   for(int j = 0; j < in.size(); j ++) {
     work[j].resize(in[0].size() * _P_PRNG_);
     for(int k = 0; k < work[j].size(); k ++) work[j][k] = offsetHalf<T>(
@@ -4831,9 +4744,8 @@ template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const v
       - unOffsetHalf<T>(in[j][k / _P_PRNG_]) :
         unOffsetHalf<T>(in[j][k / _P_PRNG_]) );
   }
-  SimpleVector<T> w(pAppendMeasure<T, nprogress>(work, strloop));
-  SimpleVector<T> out;
-  out.resize(in[0].size());
+  SimpleVector<T> w(pAppendMeasure<T, nprogress>(work, bits, strloop));
+  SimpleVector<T> out(in[0].size());
   out.O();
   for(int i = 0; i < out.size(); i ++)
     for(int j = 0; j < _P_PRNG_; j ++) {
@@ -4843,10 +4755,9 @@ template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const v
 #else
         random() & 1 ?
 #endif
-        - unOffsetHalf<T>(w[i * _P_PRNG_ + j]) :
-          unOffsetHalf<T>(w[i * _P_PRNG_ + j]) ;
+        - w[i * _P_PRNG_ + j] : w[i * _P_PRNG_ + j];
     }
-  return normalize<T>(out);
+  return bitsG<T, true>(offsetHalf<T>(out), - bits);
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
@@ -4907,7 +4818,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       +-----------------------------------------------------+--------------+
 //       | pPRNG                       | -1  | w | _P_PRNG_    | _P_PRNG_
 //       | pAppendMeasure              | 0   | w | ~2          | ~2
-//       | pGuarantee                  | 1   | w | _P_BITS_    | _P_BITS_
+//       | pRS00 call for each bit     | 1   | w | bits        | bits
 //       | grow context                | 2   | w |             | O(L)
 //       | divide by program invariant | 3+  | s | +unit       | +O(GL)
 //       | burn invariant by p0next    | ++  | s | +unit       | +O(GL)
@@ -4941,11 +4852,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 
 template <typename T, int nprogress> vector<SimpleVector<T> > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
-#if defined(_SIMPLEALLOC_)
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > in;
-#else
-  vector<SimpleVector<T> > in;
-#endif
+  SimpleVector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
     assert(in0[i].size() == in0[0].size() &&
@@ -4956,7 +4863,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > predVec(const vect
       in[i].setVector(j * in0[i][0].size(), in0[i][j]);
     }
   }
-  SimpleVector<T> pres(pPRNG<T, nprogress>(in, string(" predVec")) );
+  SimpleVector<T> pres(pPRNG<T, nprogress>(in, 8, string(" predVec")) );
   vector<SimpleVector<T> > res;
   res.resize(in0[0].size());
   for(int j = 0; j < res.size(); j ++)
@@ -4966,11 +4873,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > predVec(const vect
 
 template <typename T, int nprogress> vector<SimpleMatrix<T> > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].rows() && in0[0][0].cols());
-#if defined(_SIMPLEALLOC_)
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > in;
-#else
-  vector<SimpleVector<T> > in;
-#endif
+  SimpleVector<SimpleVector<T> > in;
   in.resize(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
     assert(in0[i].size() == in0[0].size());
@@ -4983,7 +4886,7 @@ template <typename T, int nprogress> vector<SimpleMatrix<T> > predMat(const vect
                         k * in0[i][0].cols(),  in0[i][j].row(k));
     }
   }
-  SimpleVector<T> pres(pPRNG<T, nprogress>(in, string(" predMat")) );
+  SimpleVector<T> pres(pPRNG<T, nprogress>(in, 8, string(" predMat")) );
   vector<SimpleMatrix<T> > res;
   res.resize(in0[0].size());
   for(int j = 0; j < res.size(); j ++) {
@@ -4996,9 +4899,9 @@ template <typename T, int nprogress> vector<SimpleMatrix<T> > predMat(const vect
   return res;
 }
 
-template <typename T, int nprogress> SimpleSparseTensor(T) predSTen(const vector<SimpleSparseTensor(T) >& in0, const vector<int>& idx) {
+template <typename T, int nprogress> SimpleSparseTensor(T) predSTen(const vector<SimpleSparseTensor(T) >& in0, const int& bits, const vector<int>& idx) {
   assert(idx.size() && in0.size());
-  vector<SimpleVector<T> > in;
+  SimpleVector<SimpleVector<T> > in;
   vector<pair<int, pair<int, int> > > attend;
   in.resize(in0.size());
   attend.reserve(idx.size() * idx.size() * idx.size());
@@ -5022,7 +4925,7 @@ template <typename T, int nprogress> SimpleSparseTensor(T) predSTen(const vector
               make_pair(j, make_pair(k, m))))
             in[i][cnt ++] = offsetHalf<T>(in0[i][idx[j]][idx[k]][idx[m]]);
   }
-  SimpleVector<T> pres(pPRNG<T, nprogress>(in, string(" predSTen")) );
+  SimpleVector<T> pres(pPRNG<T, nprogress>(in, bits, string(" predSTen")) );
   SimpleSparseTensor(T) res;
   for(int j = 0, cnt = 0; j < idx.size(); j ++)
     for(int k = 0; k < idx.size(); k ++)
@@ -7858,7 +7761,7 @@ template <typename T, typename U> ostream& predTOC(ostream& os, const U& input, 
   }
   os << input;
   corpus<T, U> pstats;
-  pstats.corpust = predSTen<T, 20>(in, idx);
+  pstats.corpust = predSTen<T, 20>(in, int(- log(abs(threshin - T(int(1))) ) / log(T(int(2))) ), idx);
   getAbbreved<T>(pstats, detailtitle, detail, delimiter);
   return os << endl << " --- " << pstats.simpleThresh(threshin / T(int(4))).serialize();
 }
