@@ -4669,7 +4669,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pRS(const vector<S
 #endif
   for(int j = 1; j < p[0].size(); j ++) {
     if(nprogress && ! (j % max(int(1), int(intran.size() / nprogress))) )
-      cerr << j << " / " << intran.size() << strloop << endl;
+      cerr << "RS(" << j << "/" << intran.size() << ")" << strloop << endl;
     vector<T> pp(p01nextM<T>(intran[j]));
     assert(pp.size() == p0.size());
     for(int i = 0; i < pp.size(); i ++) p[i][j] = pp[i];
@@ -4684,11 +4684,11 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pRS(const vector<S
   return p;
 }
 
-// N.B. output combination untangled into continuity prediction.
-template <typename T, int nprogress> static inline SimpleVector<T> pRS0(const vector<SimpleVector<T> >& in, const string& strloop = string("")) {
 #if defined(_SIMPLEALLOC_)
+template <typename T, int nprogress> static inline vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > pRS00(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& in, const string& strloop) {
   vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > intran;
 #else
+template <typename T, int nprogress> static inline vector<SimpleVector<T> > pRS00(const vector<SimpleVector<T> >& in, const string& strloop) {
   vector<SimpleVector<T> > intran;
 #endif
   intran.resize(in[0].size());
@@ -4697,92 +4697,17 @@ template <typename T, int nprogress> static inline SimpleVector<T> pRS0(const ve
     for(int j = 0; j < intran[i].size(); j ++)
       intran[i][j] = in[j][i];
   }
-  vector<SimpleVector<T> > res(pRS<T, nprogress>(intran, strloop));
-  return res[res.size() - 1];
+  return pRS<T, nprogress>(intran, strloop);
 }
 
-// N.B. we add some Lebesgue part by cutting input horizontal.
 #if defined(_SIMPLEALLOC_)
-template <typename T, int nprogress> vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > pLebesgue(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& in, const int& horizontal, const string& strloop) {
+template <typename T, int nprogress> static inline SimpleVector<T> pRS0(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& in) {
+  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > res(pRS00<T, nprogress>(in, string("")) );
 #else
-template <typename T, int nprogress> vector<SimpleVector<T> > pLebesgue(const vector<SimpleVector<T> >& in, const int& horizontal, const string& strloop) {
+template <typename T, int nprogress> static inline SimpleVector<T> pRS0(const vector<SimpleVector<T> >& in) {
+  vector<SimpleVector<T> > res(pRS00<T, nprogress>(in, string("")) );
 #endif
-  if(in.size() <= horizontal * horizontal)
-#if defined(_SIMPLEALLOC_)
-    return vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >();
-#else
-    return vector<SimpleVector<T> >();
-#endif
-#if defined(_SIMPLEALLOC_)
-  vector<vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >, SimpleAllocator<vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > > > reform;
-#else
-  vector<vector<SimpleVector<T> > > reform;
-#endif
-  reform.resize(horizontal);
-  for(int i = 0; i < reform.size(); i ++) {
-    reform[i].resize(in[0].size());
-    for(int j = 0; j < reform[i].size(); j ++)
-      reform[i][j].entity.reserve(in.size() - horizontal * horizontal + 1);
-  }
-  for(int i = 0; i <= in.size() - horizontal * horizontal; i ++) {
-    vector<vector<vector<T> > > les;
-    les.resize(in[0].size());
-    for(int j = 0; j < les.size(); j ++) {
-      les[j].resize(horizontal);
-      for(int k = 0; k < les[j].size(); k ++)
-        les[j][k].reserve(horizontal * horizontal);
-    }
-    for(int j = i; j < i + horizontal * horizontal; j ++)
-      for(int k = 0; k < les.size(); k ++)
-        les[k][int(binMargin<T>(in[j][k]) * T(horizontal))].emplace_back(
-          in[j][k]);
-    for(int k = 0; k < in[0].size(); k ++) {
-      int Mtot(0);
-      for(int j = 0; j < horizontal; j ++)
-        Mtot = max(Mtot, int(les[k][j].size()));
-      for(int j = 0; j < horizontal; j ++) {
-        T sum(int(0));
-        for(int n = 0; n < les[k][j].size(); n ++) sum += les[k][j][n];
-        reform[j][k].entity.emplace_back(binMargin<T>(sum / T(Mtot) *
-          T(horizontal) / T(j + 1) ) );
-      }
-    }
-  }
-#if defined(_SIMPLEALLOC_)
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > res;
-#else
-  vector<SimpleVector<T> > res;
-#endif
-  for(int i = 0; i < reform.size(); i ++) {
-    T n2(int(0));
-    for(int j = 0; j < reform[i].size(); j ++)
-      n2 += reform[i][j].dot(reform[i][j]);
-    if(n2 == T(int(0))) {
-      if(nprogress) cerr << " L(skip:" << i << strloop << ")" << endl;
-      continue;
-    }
-    // N.B. we only need linear prediction by checking p2.cc output.
-#if defined(_SIMPLEALLOC_)
-    vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > p(
-#else
-    vector<SimpleVector<T> > p(
-#endif
-      pRS<T, nprogress>(
-        reform[i], string(" L(") + to_string(i) + string("/") +
-          to_string(reform.size()) + string(")") + strloop) );
-    for(int i = 0; i < p.size(); i ++)
-      p[i] *= T(i + 1) / T(horizontal);
-    {
-      if(! res.size()) res = move(p);
-      else for(int i = 0; i < res.size(); i ++) res[i] += p[i];
-    }
-  }
-  for(int i = 0; i < res.size(); i ++) {
-    res[i] *= T(horizontal * horizontal) / T(int(reform.size()));
-    for(int j = 1; j <= horizontal * horizontal; j ++)
-      res[i] -= in[j - horizontal * horizontal + i - res.size() + in.size()];
-  }
-  return res;
+  return res[res.size() - 1];
 }
 
 #if ! defined(_P_BIT_)
@@ -4793,28 +4718,27 @@ template <typename T, int nprogress> vector<SimpleVector<T> > pLebesgue(const ve
 
 // N.B. p01next output meaning only binary we make hypothesis.
 #if defined(_SIMPLEALLOC_)
-template <typename T, int nprogress> static inline vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > pGuaranteeM(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > res(pLebesgue<T, nprogress>(
+template <typename T, int nprogress> static inline vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > pGuaranteeM(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& in, const string& strloop) {
+  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > res(
 #else
-template <typename T, int nprogress> static inline vector<SimpleVector<T> > pGuaranteeM(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
-  vector<SimpleVector<T> > res(pLebesgue<T, nprogress>(
+template <typename T, int nprogress> static inline vector<SimpleVector<T> > pGuaranteeM(const vector<SimpleVector<T> >& in, const string& strloop) {
+  vector<SimpleVector<T> > res(
 #endif
-    bitsG<T, true>(in.entity, abs(_P_BIT_)), max(int(2), int(
-      absfloor(sqrt(max(T(int(0)), log(T(in.size())) / log(T(int(2))) )) ) ) ),
-        strloop) );
+    pRS00<T, nprogress>(bitsG<T, true>(in, abs(_P_BIT_)), strloop) );
   for(int i = 0; i < res.size(); i ++)
     res[i] = bitsG<T, true>(res[i], - abs(_P_BIT_) );
   return res;
 }
 
 template <typename T, int nprogress> static inline SimpleVector<T> pGuarantee(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
-  vector<SimpleVector<T> > res(pGuaranteeM<T, nprogress>(in, strloop));
+  vector<SimpleVector<T> > res(pGuaranteeM<T, nprogress>(in.entity, strloop));
   return res[res.size() - 1];
 }
 
 // N.B. append pseudo-measureable condition into original input
 //      stream but the predictor isn't depend pseudo-things.
 //      also add whole context length markov feeding.
+//      also this feeds something dense and as a result continuous to predictor.
 #if defined(_SIMPLEALLOC_)
 template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& in0, const string& strloop) {
 #else
@@ -4823,11 +4747,11 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
 #if defined(_SIMPLEALLOC_)
   vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > p;
   vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > q;
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > in(delta<SimpleVector<T> >(in0));
+  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > in(delta<SimpleVector<T> >(unOffsetHalf<T>(in0)));
 #else
   vector<SimpleVector<T> > p;
   vector<SimpleVector<T> > q;
-  vector<SimpleVector<T> > in(delta<SimpleVector<T> >(in0));
+  vector<SimpleVector<T> > in(delta<SimpleVector<T> >(unOffsetHalf<T>(in0)));
 #endif
   for(int i = 0; i < in.size(); i += 2) in[i] = - in[i];
   SimpleVector<SimpleVector<T> > work;
@@ -4843,7 +4767,7 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
   work.entity.emplace_back(b);
   work.entity = delta<SimpleVector<T> >(delta<SimpleVector<T> >(work.entity));
   pair<SimpleVector<SimpleVector<T> >, T> wp(normalizeS<T>(work));
-  p = unOffsetHalf<T>(pGuaranteeM<T, nprogress>(offsetHalf<T>(wp.first), strloop));
+  p = unOffsetHalf<T>(pGuaranteeM<T, nprogress>(offsetHalf<T>(wp.first).entity, strloop));
   for(int i = 0; i < p.size(); i ++) p[i] *= wp.second;
   for(int i = 1; i < p.size(); i ++) p[i] += p[i - 1];
   for(int i = 1; i < p.size(); i ++) p[i] += p[i - 1];
@@ -4873,23 +4797,28 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const vector
 #define _P_PRNG_ 1
 #endif
 
-// N.B. each pixel each bit prediction with PRNG blended stream.
+// N.B. each pixel prediction with PRNG blended stream.
 //      we're aiming p01next's PRNG blended meaning.
+//      this is to make hypothesis true-PRNG cannot run away from p01next
+//      hypothesis, this makes analogy to 2/3 prediction on saturated input
+//      stream in artificial created raw prediction however this is worse bet.
+//      however, if the original raw stream have whole vector context each pixel
+//      structure have better structure than PRNGs, it's better bet with the
+//      condition after prediction shrinking.
 #if defined(_SIMPLEALLOC_)
-template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& in0, const string& strloop) {
-  if(_P_PRNG_ <= 1)
-    return normalize<T>(pAppendMeasure<T, nprogress>(in0, strloop));
-  const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > in(bitsG<T, false>(in0, abs(_P_BIT_)) );
-  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > work(in.size());
+template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > >& in, const string& strloop) {
 #else
-template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const vector<SimpleVector<T> >& in0, const string& strloop) {
-  if(_P_PRNG_ <= 1)
-    return normalize<T>(pAppendMeasure<T, nprogress>(in0, strloop));
-  const vector<SimpleVector<T> > in(bitsG<T, false>(in0, abs(_P_BIT_)) );
-  vector<SimpleVector<T> > work(in.size());
+template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const vector<SimpleVector<T> >& in, const string& strloop) {
 #endif
 #if defined(_OPENMP)
-  for(int i = 1; i <= in0.size() * 2 + 1; i ++) pnextcacher<T>(i, 1);
+  for(int i = 1; i <= in.size() * 2 + 1; i ++) pnextcacher<T>(i, 1);
+#endif
+  if(_P_PRNG_ <= 1)
+    return normalize<T>(pAppendMeasure<T, nprogress>(in, strloop));
+#if defined(_SIMPLEALLOC_)
+  vector<SimpleVector<T>, SimpleAllocator<SimpleVector<T> > > work(in.size());
+#else
+  vector<SimpleVector<T> > work(in.size());
 #endif
   for(int j = 0; j < in.size(); j ++) {
     work[j].resize(in[0].size() * _P_PRNG_);
@@ -4906,20 +4835,18 @@ template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const v
   SimpleVector<T> out;
   out.resize(in[0].size());
   out.O();
-  for(int i = 0; i < out.size(); i ++) {
-    int sign(0);
+  for(int i = 0; i < out.size(); i ++)
     for(int j = 0; j < _P_PRNG_; j ++) {
-      sign += 
+      out[i] +=
 #if defined(_ARCFOUR_)
-        arc4random() & 1;
+        arc4random() & 1 ?
 #else
-        random() & 1;
+        random() & 1 ?
 #endif
-      out[i] += w[i * _P_PRNG_ + j];
+        - unOffsetHalf<T>(w[i * _P_PRNG_ + j]) :
+          unOffsetHalf<T>(w[i * _P_PRNG_ + j]) ;
     }
-    if(sign < work[0].size() / 2) out[i] = - out[i];
-  }
-  return bitsG<T, true>(normalize<T>(out), - abs(_P_BIT_) );
+  return normalize<T>(out);
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
@@ -4979,19 +4906,20 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       | function           | layer# | [wsp1] | data amount* | time*(***)   |
 //       +-----------------------------------------------------+--------------+
 //       | pPRNG                       | -1  | w | _P_PRNG_    | _P_PRNG_
-//       | pAppendMeasure              | 0   | w | in          | in
+//       | pAppendMeasure              | 0   | w | ~2          | ~2
 //       | pGuarantee                  | 1   | w | _P_BITS_    | _P_BITS_
-//       | pLebesgue                   | 2   | w | range^2     | range
+//       | grow context                | 2   | w |             | O(L)
 //       | divide by program invariant | 3+  | s | +unit       | +O(GL)
-//       | burn invariant by p0next    | 4++ | s | +unit       | +O(GL+L^3)
-//       | makeProgramInvariant        | 5+  | p |             | +O(GL)
+//       | burn invariant by p0next    | ++  | s | +unit       | +O(GL)
+//       |                             |     |   |             | +once(L^3)
+//       | makeProgramInvariant        | 4+  | p |             | +O(GL)
 //       | linearInvariant             | -   | - | -           |
-//       |   - QR decomposition        | 7+* | s | > 4!        | O(GL)
-//       |   - orthogonalization       | 9+* | p | > 4!        | O(4!)
-//       |   - solve                   | 11* | p | +> (4 * 4)  | +O(4^3)
-//       | T::operator *,/             | 12+ | 1 |             |
-//       | T::operator +,-             | 13+ | 1 |             |
-//       | T::bit operation            | 14+ | 1 |             |
+//       |  - QR decomposition         | 6+* | s | > 4!        | O(GL)
+//       |  - orthogonalization        | 8+* | p | > 4!        | O(4!)
+//       |  - solve                    | 10* | p | +> (4 * 4)  | +O(4^3)
+//       | T::operator *,/             | 11+ | 1 |             |
+//       | T::operator +,-             | 12+ | 1 |             |
+//       | T::bit operation            | 13+ | 1 |             |
 // *(++) | sumCNext                    | +0  | s |             |
 //       | sumCNext                    | +1  | s |             |
 //       | logCNext                    | +2  | s |             |
@@ -8070,6 +7998,11 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      case because it's verbose.
 // (vi) sectional measureament addition/subtraction. they are only harmful
 //      reformation because of the accuracy and offset.
+// (vii)Lebesgue measureament condition prediction. they are only harmful
+//      because of some of the averaged in/output causes blurring, also
+//      the Lebesgue measureable condition can be included RiemannStieljes
+//      measureable condition in some hacks with non strict hypothesis such of
+//      axiom of choice.
 // N.B. something XXX result descripton
 // (00) there might exist non Lebesgue measureable condition discrete stream.
 //      this is: there's no unique function on the range but AFTER all the
