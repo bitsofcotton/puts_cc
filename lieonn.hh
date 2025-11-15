@@ -4641,60 +4641,58 @@ template <typename T, int nprogress> static inline SimpleVector<T> pGuarantee(co
 //      stream but the predictor isn't depend pseudo-things.
 //      also add whole context length markov feeding.
 //      also this feeds something dense and as a result continuous to predictor.
-template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const SimpleVector<SimpleVector<T> >& in0, const int& bits, const string& strloop) {
+template <typename T, int nprogress, bool need_prep> SimpleVector<SimpleVector<T> > pAppendMeasure0(const SimpleVector<SimpleVector<T> >& in0, const int& bits, const string& strloop) {
   assert(0 < bits);
-  SimpleVector<SimpleVector<T> > p;
-  SimpleVector<SimpleVector<T> > q;
-  SimpleVector<SimpleVector<T> > work;
-  SimpleVector<SimpleVector<T> > in(delta<SimpleVector<T> >(unOffsetHalf<T>(in0)));
-  for(int i = 0; i < in.size(); i += 2) in[i] = - in[i];
-  work.entity.reserve(in.size() * 2 + 1);
-  SimpleVector<T> b(in[0].size());
-  b.O();
-  for(int i = 0; i < in.size(); i ++) {
-    SimpleVector<T> uo(unOffsetHalf<T>(in[i]));
-    work.entity.emplace_back(b);
-    work.entity.emplace_back(uo);
-    b = uo * T(int(2)) - b;
-  }
-  work.entity.emplace_back(b);
-  pair<SimpleVector<SimpleVector<T> >, T> wp(normalizeS<T>(delta<SimpleVector<T> >(delta<SimpleVector<T> >(work)) ));
-  p = unOffsetHalf<T>(pRS00<T, nprogress>(offsetHalf<T>(wp.first), strloop));
+  SimpleVector<SimpleVector<T> > in;
+  if(need_prep) {
+    in = (delta<SimpleVector<T> >(unOffsetHalf<T>(in0)));
+    for(int i = 0; i < in.size(); i += 2) in[i] = - in[i];
+    // N.B. p d | p B in upper layer.
+  } else in = unOffsetHalf<T>(in0);
+  pair<SimpleVector<SimpleVector<T> >, T> wp(normalizeS<T>(delta<SimpleVector<T> >(delta<SimpleVector<T> >(in) )) );
+  SimpleVector<SimpleVector<T> > p(unOffsetHalf<T>(pRS00<T, nprogress>(offsetHalf<T>(wp.first), strloop)) );
   for(int i0 = 0; i0 < p.size(); i0 ++)
     for(int i = 0; i < p[i0].size() / bits; i ++) {
-      for(int j = 0; j < bits - 3; j ++) {
-        for(int k = 0; k < 3; k ++)
-          p[i0][i * bits + j] += p[i0][i * bits + j + k];
+      for(int j = 0; j < bits - 2; j ++) {
+        for(int k = 1; k <= 2; k ++)
+          p[i0][i * bits + j] += p[i0][i * bits + j + k] / T(int(1) << k);
         p[i0][i * bits + j] /= T(int(3));
       }
-      for(int j = bits - 3; j < bits; j ++)
+      for(int j = bits - 2; j < bits; j ++)
         p[i0][i * bits + j] = T(int(0));
     }
   for(int i = 0; i < p.size(); i ++) p[i] *= wp.second;
   for(int i = 1; i < p.size(); i ++) p[i] += p[i - 1];
   for(int i = 1; i < p.size(); i ++) p[i] += p[i - 1];
-  q.entity.reserve(p.size());
-  for(int i = 0; i < p.size(); i ++)
-    q.entity.emplace_back((i ^ p.size()) & 1 ?
-      SimpleVector<T>(p[i].size()).O() :
-      unOffsetHalf<T>(in[(i - int(p.size())) / 2 - 1 + in.size()]) );
-  SimpleVector<T> plast(p[0]);
-  SimpleVector<T> qlast(q[0]);
-  for(int i = 1; i < p.size() - 2; i ++) plast += p[i];
-  for(int i = 1; i < q.size() - 2; i ++) qlast += q[i];
-  // N.B. we take focus on only msb, otherwise the accuracy going to be null.
-  plast += p[p.size() - 2] * T(int(3)) / T(int(4));
-  qlast += q[q.size() - 2] * T(int(3)) / T(int(4));
-  plast /= T(p.size() - 1);
-  qlast /= T(q.size() - 1);
-  for(int i = 0; i < p.size(); i ++) p[i] -= plast;
-  for(int i = 0; i < q.size(); i ++) q[i] -= qlast;
-  for(int i = 1; i < p.size(); i ++) p[i] += p[i - 1];
-  for(int i = 1; i < q.size(); i ++) q[i] += q[i - 1];
-  SimpleVector<T> r(p[p.size() - 1]);
-  for(int j = 0; j < r.size(); j ++)
-    r[j] *= p[p.size() - 2][j] * q[q.size() - 1][j];
-  return in0.size() & 1 ? r : - r;
+  SimpleVector<SimpleVector<T> > res;
+  res.entity.reserve(p.size() / 2 - 1);
+  for(int i0 = ((p.size() - 1) & 1) + 2, ii = 0; i0 < p.size();
+    i0 += 2, ii ++) {
+    SimpleVector<T> plast(p[0]);
+    for(int i = 1; i < i0 - 2; i ++) plast += p[i];
+    // N.B. we take focus on only msb, otherwise the accuracy going to be null.
+    plast += p[i0 - 2] * T(int(3)) / T(int(4));
+    plast /= T(i0 - 1);
+    SimpleVector<SimpleVector<T> > pp(p.subVector(0, i0 + 1));
+    for(int i = 0; i < pp.size(); i ++) pp[i] -= plast;
+    for(int i = 1; i < pp.size(); i ++) pp[i] += pp[i - 1];
+    // N.B. somehow, ||in[i0]|| << ||pp[i0]||
+    res.entity.emplace_back(i0 & 1 ? move(pp[i0]) : - pp[i0]);
+  }
+  if(need_prep) {
+    for(int i = 1; i < res.size(); i ++) res[i] += res[i - 1];
+    for(int i = res.size() - 1; 0 < i; i --)
+      for(int j = 0; j < res[i].size(); j ++)
+        res[i][j] *= res[i - 1][j] * in[i - (res.size() - 1) + in.size()][j];
+  }
+  // N.B. we need (p B |) p s | p0 0 1 after this line.
+  return res;
+}
+
+template <typename T, int nprogress> static inline SimpleVector<T> pAppendMeasure(const SimpleVector<SimpleVector<T> >& in0, const int& bits, const string& strloop) {
+  SimpleVector<SimpleVector<T> > p(
+    pAppendMeasure0<T, nprogress, true>(in0, bits, strloop));
+  return p[p.size() - 1];
 }
 
 #if !defined(_P_PRNG_)
@@ -4709,7 +4707,7 @@ template <typename T, int nprogress> SimpleVector<T> pAppendMeasure(const Simple
 //      however, if the original raw stream have whole vector context each pixel
 //      structure have better structure than PRNGs, it's better bet with the
 //      condition after prediction shrinking.
-template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const SimpleVector<SimpleVector<T> >& in0, const int& bits, const string& strloop) {
+template <typename T, int nprogress> SimpleVector<SimpleVector<T> > pPRNG0(const SimpleVector<SimpleVector<T> >& in0, const int& bits, const string& strloop) {
   assert(0 < bits);
 #if defined(_OPENMP)
   for(int i = 1; i <= in0.size() * 2 + 1; i ++) pnextcacher<T>(i, 1);
@@ -4730,34 +4728,46 @@ template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const S
     }
     in.entity.emplace_back(work);
   }
-  if(_P_PRNG_ <= 1)
-    return bitsG<T, true>(offsetHalf<T>(pAppendMeasure<T, nprogress>(in, bits, strloop)), - bits);
+  if(_P_PRNG_ <= 1) {
+    SimpleVector<SimpleVector<T> > res(offsetHalf<T>(
+      pAppendMeasure0<T, nprogress, true>(in, bits, strloop)) );
+    for(int i = 0; i < res.size(); i ++)
+      res[i] = bitsG<T, true>(res[i], - bits);
+    return res;
+  }
+  SimpleVector<SimpleVector<T> > prng(in.size() + 1);
+  for(int j = 0; j < prng.size(); j ++) {
+    prng[j].resize(in[0].size() * _P_PRNG_);
+    for(int k = 0; k < prng[j].size(); k ++)
+#if defined(_ARCFOUR_)
+      prng[j][k] = arc4random() & 1 ? - T(int(1)) : T(int(1));
+#else
+      prng[j][k] = random() & 1 ? - T(int(1)) : T(int(1));
+#endif
+  }
   SimpleVector<SimpleVector<T> > work(in.size());
   for(int j = 0; j < in.size(); j ++) {
     work[j].resize(in[0].size() * _P_PRNG_);
     for(int k = 0; k < work[j].size(); k ++) work[j][k] = offsetHalf<T>(
-#if defined(_ARCFOUR_)
-      arc4random() & 1 ?
-#else
-      random() & 1 ?
-#endif
-      - unOffsetHalf<T>(in[j][k / _P_PRNG_]) :
-        unOffsetHalf<T>(in[j][k / _P_PRNG_]) );
+      prng[j][k] * unOffsetHalf<T>(in[j][k / _P_PRNG_]) );
   }
-  SimpleVector<T> w(pAppendMeasure<T, nprogress>(work, bits, strloop));
-  SimpleVector<T> out(in[0].size());
-  out.O();
-  for(int i = 0; i < out.size(); i ++)
-    for(int j = 0; j < _P_PRNG_; j ++) {
-      out[i] +=
-#if defined(_ARCFOUR_)
-        arc4random() & 1 ?
-#else
-        random() & 1 ?
-#endif
-        - w[i * _P_PRNG_ + j] : w[i * _P_PRNG_ + j];
-    }
-  return bitsG<T, true>(offsetHalf<T>(out), - bits);
+  SimpleVector<SimpleVector<T> > w(pAppendMeasure0<T, nprogress, true>(work,
+    bits, strloop));
+  SimpleVector<SimpleVector<T> > out(w.size());
+  for(int i = 0; i < out.size(); i ++) {
+    out[i].resize(in[0].size());
+    out[i].O();
+    for(int j = 0; j < w[i].size(); j ++)
+      out[i][j / _P_PRNG_] += w[i][j] *
+        prng[i - out.size() + prng.size()][j];
+    out[i] = bitsG<T, true>(offsetHalf<T>(out[i]), - bits);
+  }
+  return out;
+}
+
+template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const SimpleVector<SimpleVector<T> >& in0, const int& bits, const string& strloop) {
+  SimpleVector<SimpleVector<T> > p(pPRNG0<T, nprogress>(in0, bits, strloop));
+  return p[p.size() - 1];
 }
 
 // N.B. predv4 is for masp generated -4.ppm predictors.
