@@ -4645,12 +4645,14 @@ template <typename T, int nprogress, bool need_prep> SimpleVector<SimpleVector<T
   assert(0 < bits);
   SimpleVector<SimpleVector<T> > in;
   if(need_prep) {
-    in = (delta<SimpleVector<T> >(unOffsetHalf<T>(in0)));
+    in = delta<SimpleVector<T> >(unOffsetHalf<T>(in0));
     for(int i = 0; i < in.size(); i += 2) in[i] = - in[i];
     // N.B. p d | p B in upper layer.
   } else in = unOffsetHalf<T>(in0);
-  pair<SimpleVector<SimpleVector<T> >, T> wp(normalizeS<T>(delta<SimpleVector<T> >(delta<SimpleVector<T> >(in) )) );
-  SimpleVector<SimpleVector<T> > p(unOffsetHalf<T>(pRS00<T, nprogress>(offsetHalf<T>(wp.first), strloop)) );
+  pair<SimpleVector<SimpleVector<T> >, T> wp(normalizeS<T>(
+    delta<SimpleVector<T> >(delta<SimpleVector<T> >(in)) ));
+  SimpleVector<SimpleVector<T> > p(unOffsetHalf<T>(pRS00<T, nprogress>(
+    offsetHalf<T>(wp.first), strloop)) );
   for(int i0 = 0; i0 < p.size(); i0 ++)
     for(int i = 0; i < p[i0].size() / bits; i ++) {
       for(int j = 0; j < bits - 2; j ++) {
@@ -4665,9 +4667,8 @@ template <typename T, int nprogress, bool need_prep> SimpleVector<SimpleVector<T
   for(int i = 1; i < p.size(); i ++) p[i] += p[i - 1];
   for(int i = 1; i < p.size(); i ++) p[i] += p[i - 1];
   SimpleVector<SimpleVector<T> > res;
-  res.entity.reserve(p.size() / 2 - 1);
-  for(int i0 = ((p.size() - 1) & 1) + 2, ii = 0; i0 < p.size();
-    i0 += 2, ii ++) {
+  res.entity.reserve(p.size() - 2);
+  for(int i0 = 2; i0 < p.size(); i0 ++) {
     SimpleVector<T> plast(p[0]);
     for(int i = 1; i < i0 - 2; i ++) plast += p[i];
     // N.B. we take focus on only msb, otherwise the accuracy going to be null.
@@ -4676,14 +4677,14 @@ template <typename T, int nprogress, bool need_prep> SimpleVector<SimpleVector<T
     SimpleVector<SimpleVector<T> > pp(p.subVector(0, i0 + 1));
     for(int i = 0; i < pp.size(); i ++) pp[i] -= plast;
     for(int i = 1; i < pp.size(); i ++) pp[i] += pp[i - 1];
-    // N.B. somehow, ||in[i0]|| << ||pp[i0]||
-    res.entity.emplace_back(i0 & 1 ? move(pp[i0]) : - pp[i0]);
+    // N.B. somehow, ||in0[i0]|| << ||pp[i0]||
+    res.entity.emplace_back(i0 & 1 || ! need_prep ? move(pp[i0]) : - pp[i0]);
   }
   if(need_prep) {
     for(int i = 1; i < res.size(); i ++) res[i] += res[i - 1];
     for(int i = res.size() - 1; 0 < i; i --)
       for(int j = 0; j < res[i].size(); j ++)
-        res[i][j] *= res[i - 1][j] * in[i - (res.size() - 1) + in.size()][j];
+        res[i][j] *= res[i - 1][j] * in[i - res.size() + in.size()][j];
   }
   // N.B. we need (p B |) p s | p0 0 1 after this line.
   return res;
@@ -4710,7 +4711,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> pAppendMeasur
 template <typename T, int nprogress> SimpleVector<SimpleVector<T> > pPRNG0(const SimpleVector<SimpleVector<T> >& in0, const int& bits, const string& strloop) {
   assert(0 < bits);
 #if defined(_OPENMP)
-  for(int i = 1; i <= in0.size() * 2 + 1; i ++) pnextcacher<T>(i, 1);
+  for(int i = 1; i <= in0.size(); i ++) pnextcacher<T>(i, 1);
 #endif
   SimpleVector<SimpleVector<T> > in;
   in.entity.reserve(in0.size());
