@@ -4787,8 +4787,12 @@ template <typename T, int nprogress> SimpleVector<SimpleVector<T> > pPRNG0(const
 }
 
 template <typename T, int nprogress> SimpleVector<SimpleVector<T> > pPRNG1(const SimpleVector<SimpleVector<T> >& in, const int& bits, const string& strloop) {
-  SimpleVector<SimpleVector<T> > p(delta<SimpleVector<T> >(unOffsetHalf<T>(
-    pPRNG0<T, nprogress>(in, bits, string("+") + strloop))));
+  SimpleVector<SimpleVector<T> > p(unOffsetHalf<T>(
+    pPRNG0<T, nprogress>(in, bits, string("+") + strloop)));
+  for(int i = 0; i < p.size() - 1; i ++)
+    for(int j = 0; j < p[i].size(); j ++)
+      p[i][j] *= unOffsetHalf<T>(in[i - (p.size() - 1) + in.size()][j]);
+  p = delta<SimpleVector<T> >(p);
   for(int i = 0; i < p.size(); i += 2) p[i] = - p[i];
   for(int i = 1; i < p.size(); i ++) p[i] += p[i - 1];
   p = delta<SimpleVector<T> >(unOffsetHalf<T>(pPRNG0<T, nprogress>(
