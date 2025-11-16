@@ -4802,8 +4802,8 @@ template <typename T, int nprogress> SimpleVector<SimpleVector<T> > pPRNG1(const
   for(int i = 0; i < q.size(); i ++)
     for(int j = 0; j < q[i].size(); j ++) if(i < q.size() - 1) {
       const T w(unOffsetHalf<T>(in[i - (q.size() - 1) + in.size()][j]));
-      if(w != T(int(0))) q[i][j] *= p[i][j] / w;
-    } else q[i][j] *= p[i][j];
+      if(w != T(int(0))) q[i][j] *= p[i - q.size() + p.size()][j] / w;
+    } else q[i][j] *= p[i - q.size() + p.size()][j];
   q = delta<SimpleVector<T> >(q);
   for(int i = 0; i < q.size(); i += 2) q[i] = - q[i];
   for(int i = 1; i < q.size(); i ++) q[i] += q[i - 1];
