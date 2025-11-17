@@ -4798,6 +4798,14 @@ template <typename T, int nprogress> SimpleVector<SimpleVector<T> > pPRNG1(const
 
 template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const SimpleVector<SimpleVector<T> >& in0, const int& bits, const string& strloop) {
   SimpleVector<SimpleVector<T> > p(pPRNG1<T, nprogress>(in0, bits, strloop));
+  SimpleVector<int> c(p[0].size());
+  c.O();
+  for(int i = 0; i < p.size() - 1; i ++)
+    for(int j = 0; j < c.size(); j ++)
+      if(p[i][j] < T(int(0))) c[j] --;
+      else if(T(int(0)) < p[i][j]) c[j] ++;
+  for(int j = 0; j < c.size(); j ++) if(c[j] < 0)
+    p[p.size() - 1][j] = - p[p.size() - 1][j];
   return p[p.size() - 1];
 }
 
