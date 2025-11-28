@@ -4637,24 +4637,8 @@ template <typename T, int nprogress> static inline SimpleVector<T> pGuarantee(co
   return res[res.size() - 1];
 }
 
-// N.B. pre/post process
-template <typename T> static inline SimpleVector<SimpleVector<T> > preAppend(const SimpleVector<SimpleVector<T> >& in) {
-  SimpleVector<SimpleVector<T> > res(unOffsetHalf<T>(in));
-  for(int i = 0; i < res.size(); i += 2) res[i] = - res[i];
-  return res;
-}
-
-template <typename T> static inline SimpleVector<SimpleVector<T> > postAppend(SimpleVector<SimpleVector<T> > res, const SimpleVector<SimpleVector<T> >& in) {
-  for(int i = 1; i < res.size(); i ++)
-    for(int j = 0; j < res[i].size(); j ++) res[i][j] *= sgn<T>(res[i - 1][j]);
-  for(int i = 0; i < res.size() - 1; i ++)
-    for(int j = 0; j < res[i].size(); j ++)
-      res[i][j] *= sgn<T>(in[i - res.size() + in.size()][j]);
-  return res;
-}
-
 // N.B. add whole context length markov feeding.
-template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> > pWholeMarkov0(const SimpleVector<SimpleVector<T> >& in, const int& bits, const string& strloop) {
+template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> > pWholeMarkovM(const SimpleVector<SimpleVector<T> >& in, const int& bits, const string& strloop) {
   assert(0 < bits);
   pair<SimpleVector<SimpleVector<T> >, T> wp(normalizeS<T>(
     delta<SimpleVector<T> >(in) ));
@@ -4675,10 +4659,9 @@ template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> 
   return p;
 }
 
-template <typename T, int nprogress> static inline SimpleVector<T> pWholeMarkov(const SimpleVector<SimpleVector<T> >& in0, const int& bits, const string& strloop) {
-  SimpleVector<SimpleVector<T> > in(preAppend<T>(in0));
-  SimpleVector<SimpleVector<T> > p(postAppend<T>(
-    pWholeMarkov0<T, nprogress>(in, bits, strloop), in));
+template <typename T, int nprogress> static inline SimpleVector<T> pWholeMarkov(const SimpleVector<SimpleVector<T> >& in, const int& bits, const string& strloop) {
+  SimpleVector<SimpleVector<T> > p(
+    pWholeMarkovM<T, nprogress>(in, bits, strloop) );
   return p[p.size() - 1];
 }
 
@@ -4694,12 +4677,11 @@ template <typename T, int nprogress> static inline SimpleVector<T> pWholeMarkov(
 //      however, if the original raw stream have whole vector context each pixel
 //      structure have better structure than PRNGs, it's better bet with the
 //      condition after prediction shrinking.
-template <typename T, int nprogress> SimpleVector<SimpleVector<T> > pPRNG0(const SimpleVector<SimpleVector<T> >& in00, const int& bits, const string& strloop) {
+template <typename T, int nprogress> SimpleVector<SimpleVector<T> > pPRNGM(const SimpleVector<SimpleVector<T> >& in0, const int& bits, const string& strloop) {
   assert(0 < bits);
 #if defined(_OPENMP)
-  for(int i = 1; i <= in00.size(); i ++) pnextcacher<T>(i, 1);
+  for(int i = 1; i <= in0.size(); i ++) pnextcacher<T>(i, 1);
 #endif
-  SimpleVector<SimpleVector<T> > in0(offsetHalf<T>(preAppend<T>(in00)));
   SimpleVector<SimpleVector<T> > in;
   in.entity.reserve(in0.size());
   for(int i = 0; i < in0.size(); i ++) {
@@ -4718,10 +4700,10 @@ template <typename T, int nprogress> SimpleVector<SimpleVector<T> > pPRNG0(const
   }
   if(_P_PRNG_ <= 1) {
     SimpleVector<SimpleVector<T> > res(offsetHalf<T>(
-      pWholeMarkov0<T, nprogress>(in, bits, strloop) ));
+      pWholeMarkovM<T, nprogress>(in, bits, strloop) ));
     for(int i = 0; i < res.size(); i ++)
       res[i] = bitsG<T, true>(res[i], - bits);
-    return postAppend<T>(unOffsetHalf<T>(res), unOffsetHalf<T>(in0));
+    return unOffsetHalf<T>(res);
   }
   SimpleVector<SimpleVector<T> > prng(in.size() + 1);
   for(int j = 0; j < prng.size(); j ++) {
@@ -4740,7 +4722,7 @@ template <typename T, int nprogress> SimpleVector<SimpleVector<T> > pPRNG0(const
       prng[j][k] * unOffsetHalf<T>(in[j][k / _P_PRNG_]) );
   }
   SimpleVector<SimpleVector<T> > res(
-    pWholeMarkov0<T, nprogress>(work, bits, strloop) );
+    pWholeMarkovM<T, nprogress>(work, bits, strloop) );
   SimpleVector<SimpleVector<T> > out(res.size());
   for(int i = 0; i < out.size(); i ++) {
     out[i].resize(in[0].size());
@@ -4750,34 +4732,11 @@ template <typename T, int nprogress> SimpleVector<SimpleVector<T> > pPRNG0(const
         prng[i - out.size() + prng.size()][j];
     out[i] = bitsG<T, true>(offsetHalf<T>(out[i]), - bits);
   }
-  return postAppend<T>(unOffsetHalf<T>(out), unOffsetHalf<T>(in0));
-}
-
-// N.B. this is for somehow harder PRNG like inputs.
-template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> > pPRNG1(const SimpleVector<SimpleVector<T> >& in, const int& bits, const string& strloop) {
-  SimpleVector<SimpleVector<T> > p(delta<SimpleVector<T> >(
-    pPRNG0<T, nprogress>(in, bits, string("+") + strloop) ));
-  for(int i = 0; i < p.size(); i += 2) p[i] = - p[i];
-  for(int i = 1; i < p.size(); i ++) p[i] += p[i - 1];
-  pair<SimpleVector<SimpleVector<T> >, T> pn(normalizeS<T>(p));
-  p = delta<SimpleVector<T> >(pPRNG0<T, nprogress>(
-    offsetHalf<T>(pn.first), bits, string("-") + strloop) );
-  p.resize(p.size() - 1);
-  for(int i = 0; i < p.size(); i += 2) p[i] = - p[i];
-  p = normalizeS<T>(p).first;
-  for(int i = 0; i < p.size(); i ++)
-    p[i] += unOffsetHalf<T>(in[i - p.size() + in.size()]);
-  for(int i = 1; i < p.size(); i ++)
-    for(int j = 0; j < p[i].size(); j ++) p[i][j] *= sgn<T>(p[i - 1][j]);
-  return p;
+  return unOffsetHalf<T>(out);
 }
 
 template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const SimpleVector<SimpleVector<T> >& in, const int& bits, const string& strloop) {
-#if _P_PRNG_ > 1
-  SimpleVector<SimpleVector<T> > p(pPRNG1<T, nprogress>(in, bits, strloop));
-#else
-  SimpleVector<SimpleVector<T> > p(pPRNG0<T, nprogress>(in, bits, strloop));
-#endif
+  SimpleVector<SimpleVector<T> > p(pPRNGM<T, nprogress>(in, bits, strloop));
   return p[p.size() - 1];
 }
 
@@ -4838,7 +4797,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       | function           | layer# | [wsp1] | data amount* | time*(***)   |
 //       +-----------------------------------------------------+--------------+
 //       | pPRNG                       | -1  | w | _P_PRNG_    | _P_PRNG_
-//       | pWholeMarkov0               | 0   | w | ~2          | ~2
+//       | pWholeMarkovM               | 0   | w | ~2          | ~2
 //       | pRS00 call for each bit     | 1   | w | bits        | bits
 //       | grow context                | 2   | w |             | O(L)
 //       | divide by program invariant | 3+  | s | +unit       | +O(GL)
@@ -4907,7 +4866,7 @@ template <typename T, int nprogress> vector<SimpleMatrix<T> > predMat(const vect
                         k * in0[i][0].cols(),  in0[i][j].row(k));
     }
   }
-  SimpleVector<T> pres(normalize<T>(pPRNG<T, nprogress>(in, 8, string(" predMat")) ));
+  SimpleVector<SimpleVector<T> > pres(normalize<T>(pPRNGM<T, nprogress>(in, 8, string(" predMat")) ));
   vector<SimpleMatrix<T> > res;
   res.resize(in0[0].size());
   for(int j = 0; j < res.size(); j ++) {
