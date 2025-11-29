@@ -3936,8 +3936,7 @@ template <typename T> vector<T> p01nextM(const SimpleVector<T>& in) {
     res.resize(max(int(1), int(in.size()) - varlen + 1), zero);
     return res;
   }
-  SimpleMatrix<T> invariants(max(int(1), int(in.size()) - varlen + 1),
-    varlen + 2);
+  SimpleMatrix<T> invariants(max(int(1), int(in.size()) - varlen + 2), varlen + 2);
   invariants.O();
   for(int i0 = varlen * 2 + 1; i0 < invariants.rows(); i0 ++) {
     SimpleMatrix<T> toeplitz(i0, invariants.cols());
@@ -3951,8 +3950,7 @@ template <typename T> vector<T> p01nextM(const SimpleVector<T>& in) {
     //      we make the hypothesis:
     //      ||invariant made stream||_sup <~ ||f||_sup / varlen!.
     //      this is because it's toeplitz made stream.
-    const int ii0(i0 - (varlen * 2 + 1));
-    invariants.row(ii0) = linearInvariant<T>(toeplitz);
+    invariants.row(i0) = linearInvariant<T>(toeplitz);
   }
   vector<T> res;
   res.reserve(invariants.rows());
