@@ -4660,16 +4660,6 @@ template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> 
     delta<SimpleVector<T> >(in) ));
   SimpleVector<SimpleVector<T> > p(unOffsetHalf<T>(pRS00<T, nprogress>(
     offsetHalf<T>(wp.first), strloop)) );
-  for(int i0 = 0; i0 < p.size(); i0 ++)
-    for(int i = 0; i < p[i0].size() / bits; i ++) {
-      for(int j = 0; j < bits - 2; j ++) {
-        for(int k = 1; k <= 2; k ++)
-          p[i0][i * bits + j] += p[i0][i * bits + j + k] / T(int(1) << k);
-        p[i0][i * bits + j] /= T(int(3));
-      }
-      for(int j = bits - 2; j < bits; j ++)
-        p[i0][i * bits + j] = T(int(0));
-    }
   for(int i = 0; i < p.size(); i ++) p[i] *= wp.second;
   for(int i = 1; i < p.size(); i ++) p[i] += p[i - 1];
   return p;
@@ -4707,6 +4697,21 @@ template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> 
 #if !defined(_P_PRNG_)
 #define _P_PRNG_ 1
 #endif
+
+template <typename T> static inline SimpleVector<SimpleVector<T> > seepBits(const SimpleVector<SimpleVector<T> >& in, const int& bits) {
+  SimpleVector<SimpleVector<T> > p(in);
+  for(int i0 = 0; i0 < p.size(); i0 ++)
+    for(int i = 0; i < p[i0].size() / bits; i ++) {
+      for(int j = 0; j < bits - 2; j ++) {
+        for(int k = 1; k <= 2; k ++)
+          p[i0][i * bits + j] += p[i0][i * bits + j + k] / T(int(1) << k);
+        p[i0][i * bits + j] /= T(int(3));
+      }
+      for(int j = bits - 2; j < bits; j ++)
+        p[i0][i * bits + j] = T(int(0));
+    }
+  return p;
+}
 
 static inline SimpleVector<SimpleVector<char> > preparePRNG(const int& len, const int& size) {
   SimpleVector<SimpleVector<char> > res(len);
@@ -4762,18 +4767,18 @@ template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> 
   for(int i = 1; i <= in0.size(); i ++) pnextcacher<T>(i, 1);
 #endif
 #if _P_PRNG_ <= 1
-  return unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(
-    pWholeMarkovCherry<T, nprogress>(bitsSlide<T>(in0, bits), bits, strloop)),
-      - bits));
+  return cherryStat<T>(unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(seepBits<T>(
+    pWholeMarkovCherry<T, nprogress>(bitsSlide<T>(in0, bits), bits, strloop),
+      bits)), - bits)), unOffsetHalf<T>(in0));
 #else
   const SimpleVector<SimpleVector<char> > prng0(preparePRNG(in0.size() + 1, in0[0].size() * _P_PRNG_));
   const SimpleVector<SimpleVector<char> > prng1(preparePRNG(in0.size() + 1, prng0[0].size() * _P_PRNG_ * bits));
   return applyPostPRNG<T>(cherryStat<T>(
-    unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(applyPostPRNG<T>(
+    unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(seepBits<T>(applyPostPRNG<T>(
       pWholeMarkovCherry<T, nprogress>(offsetHalf<T>(applyPrepPRNG<T>(
         unOffsetHalf<T>(bitsSlide<T>(offsetHalf<T>(applyPrepPRNG<T>(
           unOffsetHalf<T>(in0), prng0)), bits)), prng1)), bits, strloop),
-            prng1, prng0[0].size() * bits)), - bits)), applyPrepPRNG<T>(
+            prng1, prng0[0].size() * bits), bits)), - bits)), applyPrepPRNG<T>(
               unOffsetHalf<T>(in0), prng0)), prng0, in0[0].size());
 #endif
 }
@@ -7974,10 +7979,6 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      they have internal optimization calculation to output to saturate
 //      the stream intent condition or so also have the internal made intentions
 //      to jam out the stream.
-// (05) the mostly we have a result for our predictors: the external prediction
-//      corrector often better works, however if we implemented them into one-
-//      binary condition, its upper is around 2/3, don't know why but might
-//      come from our machines' infection.
 // N.B. there's plenty of the room to implement the predictor which is
 //      saturating F_2^4 #f, the bra, ket condition indirect access.
 //      either Riemann-measureable conditions' smaller than |dx| counting
