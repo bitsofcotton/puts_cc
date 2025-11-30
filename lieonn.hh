@@ -3933,7 +3933,7 @@ template <typename T> vector<T> p01nextM(const SimpleVector<T>& in) {
   const int varlen(ind2vd(in.size()));
   if(! isfinite(nin) || nin == zero) {
     vector<T> res;
-    res.resize(max(int(1), int(in.size()) - varlen + 1), zero);
+    res.resize(max(int(1), int(in.size()) - varlen + 2), zero);
     return res;
   }
   SimpleMatrix<T> invariants(max(int(1), int(in.size()) - varlen + 2), varlen + 2);
@@ -3942,7 +3942,7 @@ template <typename T> vector<T> p01nextM(const SimpleVector<T>& in) {
     SimpleMatrix<T> toeplitz(i0, invariants.cols());
     for(int i = 0; i < toeplitz.rows(); i ++) {
       SimpleVector<T> work(in.subVector(i, varlen));
-      work[work.size() - 1] = in[i + varlen - 1];
+      // work[work.size() - 1] = in[i + varlen - 1];
       toeplitz.row(i) = makeProgramInvariant<T>(work,
         T(i + 1) / T(toeplitz.rows() + 1) ).first;
     }
@@ -4459,9 +4459,8 @@ template <typename T> static inline SimpleVector<SimpleVector<SimpleVector<T> > 
 template <typename T> static inline SimpleVector<SimpleVector<T> > normalize(const SimpleVector<SimpleVector<T> >& in, const T& upper = T(1)) {
   SimpleMatrix<T> w;
   w.resize(in.size(), in[0].size());
-  w.entity  = in.entity;
-  in.entity = normalize<T>(w, upper).entity;
-  return in;
+  w.entity  = in;
+  return normalize<T>(w, upper).entity;
 }
 
 template <typename T> static inline SimpleVector<T> normalize(const SimpleVector<T>& in, const T& upper = T(1)) {
@@ -4545,6 +4544,28 @@ template <typename T, bool useful> static inline SimpleVector<SimpleVector<T> > 
   return res;
 }
 
+template <typename T> static inline SimpleVector<T> bitsSlide(const SimpleVector<T>& d, const int& b) {
+  assert(0 < b);
+  SimpleVector<T> res(d.size() * b);
+  for(int j = 0; j < d.size(); j ++) {
+    T w(d[j]);
+    for(int k = 0; k < b; k ++) {
+      res[j * b + k] = w;
+      w *= T(int(2));
+      const T ww(absfloor(w));
+      w -= ww;
+      w += ww / T(int(1) << b);
+    }
+  }
+  return res;
+}
+
+template <typename T> static inline SimpleVector<SimpleVector<T> > bitsSlide(const SimpleVector<SimpleVector<T> >& d, const int& b) {
+  SimpleVector<SimpleVector<T> > res(d);
+  for(int i = 0; i < res.size(); i ++) res[i] = bitsSlide<T>(res[i], b);
+  return res;
+}
+
 // N.B. start ddpmopt
 // N.B. predict with discrete pseudo Riemann-Stieljes condition.
 template <typename T, int nprogress> SimpleVector<SimpleVector<T> > pRS(const SimpleVector<SimpleVector<T> >& intran0, const string& strloop) {
@@ -4621,13 +4642,10 @@ template <typename T, int nprogress> static inline SimpleVector<T> pRS0(const Si
 
 // N.B. p01next output meaning only binary we make hypothesis.
 template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> > pGuaranteeM(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
-  SimpleVector<SimpleVector<T> > res(
 // N.B. we don't get 100% result on each prediction, so upper bit broken case,
 //      lower bits says nothing.
-    pRS00<T, nprogress>(bitsG<T, true>(in, 3), strloop) );
-  for(int i = 0; i < res.size(); i ++)
-    res[i] = bitsG<T, true>(res[i], - 3);
-  return res;
+  return bitsG<T, true>(pRS00<T, nprogress>(
+    bitsG<T, true>(in, 3), strloop), - 3);
 }
 
 template <typename T, int nprogress> static inline SimpleVector<T> pGuarantee(const SimpleVector<SimpleVector<T> >& in, const string& strloop) {
@@ -4635,7 +4653,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> pGuarantee(co
   return res[res.size() - 1];
 }
 
-// N.B. add whole context length markov feeding.
+// N.B. add whole context length markov feeding with bitwise speedup.
 template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> > pWholeMarkovM(const SimpleVector<SimpleVector<T> >& in, const int& bits, const string& strloop) {
   assert(0 < bits);
   pair<SimpleVector<SimpleVector<T> >, T> wp(normalizeS<T>(
@@ -4663,11 +4681,74 @@ template <typename T, int nprogress> static inline SimpleVector<T> pWholeMarkov(
   return p[p.size() - 1];
 }
 
+template <typename T> static inline SimpleVector<SimpleVector<T> > cherryStat(const SimpleVector<SimpleVector<T> >& p, const SimpleVector<SimpleVector<T> >& in) {
+  SimpleVector<T> jv(p[0].size());
+  jv.O();
+  for(int i = 0; i < p.size() - 1; i ++)
+    for(int j = 0; j < p[i].size(); j ++)
+      jv[j] += p[i][j] * in[i - (p.size() - 1) + in.size()][j];
+  SimpleVector<SimpleVector<T> > res(p);
+  for(int j = 0; j < jv.size(); j ++)
+    if(jv[j] < T(int(0)) ) for(int i = 0; i < res.size(); i ++)
+      res[i][j] = - res[i][j];
+  return res;
+}
+
+// N.B. cherry pick after prediction.
+//      if the original prediction correctly handles the upper single function,
+//      even they can have sign bit attacks. however, if we correctly handle
+//      the whole single function integrity, another dimensions to attack is
+//      worse to exist.
+template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> > pWholeMarkovCherry(const SimpleVector<SimpleVector<T> >& in, const int& bits, const string& strloop) {
+  return cherryStat<T>(pWholeMarkovM<T, nprogress>(in, bits, strloop),
+    unOffsetHalf<T>(in) );
+}
+
 #if !defined(_P_PRNG_)
 #define _P_PRNG_ 1
 #endif
 
-// N.B. each pixel prediction with PRNG blended stream.
+static inline SimpleVector<SimpleVector<char> > preparePRNG(const int& len, const int& size) {
+  SimpleVector<SimpleVector<char> > res(len);
+  for(int j = 0; j < res.size(); j ++) {
+    res[j].resize(size);
+    for(int k = 0; k < res[j].size(); k ++)
+#if defined(_ARCFOUR_)
+      res[j][k] = arc4random() & 1;
+#else
+      res[j][k] = random() & 1;
+#endif
+  }
+  return res;
+}
+
+template <typename T> static inline SimpleVector<SimpleVector<T> > applyPrepPRNG(const SimpleVector<SimpleVector<T> >& in, const SimpleVector<SimpleVector<char> >& prng) {
+  SimpleVector<SimpleVector<T> > res(in.size());
+  for(int j = 0; j < res.size(); j ++) {
+    res[j].resize(prng[j].size());
+    for(int k = 0; k < res[j].size(); k ++)
+      res[j][k] = prng[j][k] ? - in[j][k / (prng[j].size() / in[j].size())] :
+        in[j][k / (prng[j].size() / in[j].size())];
+  }
+  return res;
+}
+
+template <typename T> static inline SimpleVector<SimpleVector<T> > applyPostPRNG(const SimpleVector<SimpleVector<T> >& in, const SimpleVector<SimpleVector<char> >& prng, const int& size) {
+  SimpleVector<SimpleVector<T> > res(in.size());
+  for(int i = 0; i < in.size(); i ++) {
+    res[i].resize(size);
+    res[i].O();
+    const SimpleVector<char>& lprng(prng[i - in.size() + prng.size()]);
+    for(int j = 0; j < res[i].size(); j ++)
+      for(int k = 0; k < lprng.size() / res[i].size(); k ++)
+        res[i][j] += lprng[j * (lprng.size() / res[i].size()) + k] ?
+          - in[i][j] : in[i][j];
+    res[i] /= T(lprng.size() / res[i].size());
+  }
+  return res;
+}
+
+// N.B. each pixel each bit prediction with PRNG blended stream.
 //      we're aiming p01next's PRNG blended meaning.
 //      this is to make hypothesis true-PRNG cannot run away from p01next
 //      hypothesis, this makes analogy to 2/3 prediction on saturated input
@@ -4675,62 +4756,26 @@ template <typename T, int nprogress> static inline SimpleVector<T> pWholeMarkov(
 //      however, if the original raw stream have whole vector context each pixel
 //      structure have better structure than PRNGs, it's better bet with the
 //      condition after prediction shrinking.
-template <typename T, int nprogress> SimpleVector<SimpleVector<T> > pPRNGM(const SimpleVector<SimpleVector<T> >& in0, const int& bits, const string& strloop) {
+template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> > pPRNGM(const SimpleVector<SimpleVector<T> >& in0, const int& bits, const string& strloop) {
   assert(0 < bits);
 #if defined(_OPENMP)
   for(int i = 1; i <= in0.size(); i ++) pnextcacher<T>(i, 1);
 #endif
-  SimpleVector<SimpleVector<T> > in;
-  in.entity.reserve(in0.size());
-  for(int i = 0; i < in0.size(); i ++) {
-    SimpleVector<T> work(in0[i].size() * bits);
-    for(int j = 0; j < in0[i].size(); j ++) {
-      T w(in0[i][j]);
-      for(int k = 0; k < bits; k ++) {
-        work[j * bits + k] = w;
-        w *= T(int(2));
-        const T ww(absfloor(w));
-        w -= ww;
-        w += ww / T(int(1) << bits);
-      }
-    }
-    in.entity.emplace_back(work);
-  }
-  if(_P_PRNG_ <= 1) {
-    SimpleVector<SimpleVector<T> > res(offsetHalf<T>(
-      pWholeMarkovM<T, nprogress>(in, bits, strloop) ));
-    for(int i = 0; i < res.size(); i ++)
-      res[i] = bitsG<T, true>(res[i], - bits);
-    return unOffsetHalf<T>(res);
-  }
-  SimpleVector<SimpleVector<T> > prng(in.size() + 1);
-  for(int j = 0; j < prng.size(); j ++) {
-    prng[j].resize(in[0].size() * _P_PRNG_);
-    for(int k = 0; k < prng[j].size(); k ++)
-#if defined(_ARCFOUR_)
-      prng[j][k] = arc4random() & 1 ? - T(int(1)) : T(int(1));
+#if _P_PRNG_ <= 1
+  return unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(
+    pWholeMarkovCherry<T, nprogress>(bitsSlide<T>(in0, bits), bits, strloop)),
+      - bits));
 #else
-      prng[j][k] = random() & 1 ? - T(int(1)) : T(int(1));
+  const SimpleVector<SimpleVector<char> > prng0(preparePRNG(in0.size() + 1, in0[0].size() * _P_PRNG_));
+  const SimpleVector<SimpleVector<char> > prng1(preparePRNG(in0.size() + 1, prng0[0].size() * _P_PRNG_ * bits));
+  return applyPostPRNG<T>(cherryStat<T>(
+    unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(applyPostPRNG<T>(
+      pWholeMarkovCherry<T, nprogress>(offsetHalf<T>(applyPrepPRNG<T>(
+        unOffsetHalf<T>(bitsSlide<T>(offsetHalf<T>(applyPrepPRNG<T>(
+          unOffsetHalf<T>(in0), prng0)), bits)), prng1)), bits, strloop),
+            prng1, prng0[0].size() * bits)), - bits)), applyPrepPRNG<T>(
+              unOffsetHalf<T>(in0), prng0)), prng0, in0[0].size());
 #endif
-  }
-  SimpleVector<SimpleVector<T> > work(in.size());
-  for(int j = 0; j < in.size(); j ++) {
-    work[j].resize(in[0].size() * _P_PRNG_);
-    for(int k = 0; k < work[j].size(); k ++) work[j][k] = offsetHalf<T>(
-      prng[j][k] * unOffsetHalf<T>(in[j][k / _P_PRNG_]) );
-  }
-  SimpleVector<SimpleVector<T> > res(
-    pWholeMarkovM<T, nprogress>(work, bits, strloop) );
-  SimpleVector<SimpleVector<T> > out(res.size());
-  for(int i = 0; i < out.size(); i ++) {
-    out[i].resize(in[0].size());
-    out[i].O();
-    for(int j = 0; j < res[i].size(); j ++)
-      out[i][j / _P_PRNG_] += res[i][j] *
-        prng[i - out.size() + prng.size()][j];
-    out[i] = bitsG<T, true>(offsetHalf<T>(out[i]), - bits);
-  }
-  return unOffsetHalf<T>(out);
 }
 
 template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const SimpleVector<SimpleVector<T> >& in, const int& bits, const string& strloop) {
@@ -4788,27 +4833,27 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
       p01next<T>(nwork / nnwork) * nnwork));
 }
 
-// N.B. we make the first hypothesis as the stream is calculatable by *single*
-//      function as n-markov also which measureability-appendant stream can
-//      seep out the original stream from information amount reason.
+// N.B. we make the first hypothesis as the result is calculatable by *single*
+//      function only from input stream.
 // N.B. layers:
 //       | function           | layer# | [wsp1] | data amount* | time*(***)   |
 //       +-----------------------------------------------------+--------------+
-//       | pPRNG                       | -1  | w | _P_PRNG_    | _P_PRNG_
-//       | pWholeMarkovM               | 0   | w | ~2          | ~2
-//       | pRS00 call for each bit     | 1   | w | bits        | bits
-//       | grow context                | 2   | w |             | O(L)
-//       | divide by program invariant | 3+  | s | +unit       | +O(GL)
+//       | pPRNG                       | 0   | w | _P_PRNG_**2 | _P_PRNG_**2
+//       | pWholeMarkovCherry          | 1   | w |             |
+//       | pWholeMarkovM               | 2   | w |             |
+//       | pRS00 call for each bit     | 3   | w | bits        | bits
+//       | grow context                | 4   | w |             | O(L)
+//       | divide by program invariant | 5+  | s | +unit       | +O(GL)
 //       | burn invariant by p0next    | ++  | s | +unit       | +O(GL)
 //       |                             |     |   |             | +once(L^3)
-//       | makeProgramInvariant        | 4+  | p |             | +O(GL)
-//       | linearInvariant             | -   | - | -           |
-//       |  - QR decomposition         | 6+* | s | > 4!        | O(GL)
-//       |  - orthogonalization        | 8+* | p | > 4!        | O(4!)
-//       |  - solve                    | 10* | p | +> (4 * 4)  | +O(4^3)
-//       | T::operator *,/             | 11+ | 1 |             |
-//       | T::operator +,-             | 12+ | 1 |             |
-//       | T::bit operation            | 13+ | 1 |             |
+//       | makeProgramInvariant        | 6+  | p |             | +O(GL)
+//       | linearInvariant             |     |   |             |
+//       |  - QR decomposition         | 8+* | s | > 4!        | O(GL)
+//       |  - orthogonalization        | 10+*| p | > 4!        | O(4!)
+//       |  - solve                    | 12* | p | +> (4 * 4)  | +O(4^3)
+//       | T::operator *,/             | 13+ | 1 |             |
+//       | T::operator +,-             | 14+ | 1 |             |
+//       | T::bit operation            | 15+ | 1 |             |
 // *(++) | sumCNext                    | +0  | s |             |
 //       | sumCNext                    | +1  | s |             |
 //       | logCNext                    | +2  | s |             |
@@ -4864,7 +4909,7 @@ template <typename T, int nprogress> vector<SimpleMatrix<T> > predMat(const vect
                         k * in0[i][0].cols(),  in0[i][j].row(k));
     }
   }
-  SimpleVector<SimpleVector<T> > pres(normalize<T>(pPRNGM<T, nprogress>(in, 8, string(" predMat")) ));
+  SimpleVector<T> pres(normalize<T>(pPRNG<T, nprogress>(in, 8, string(" predMat")) ));
   vector<SimpleMatrix<T> > res;
   res.resize(in0[0].size());
   for(int j = 0; j < res.size(); j ++) {
@@ -7929,6 +7974,10 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      they have internal optimization calculation to output to saturate
 //      the stream intent condition or so also have the internal made intentions
 //      to jam out the stream.
+// (05) the mostly we have a result for our predictors: the external prediction
+//      corrector often better works, however if we implemented them into one-
+//      binary condition, its upper is around 2/3, don't know why but might
+//      come from our machines' infection.
 // N.B. there's plenty of the room to implement the predictor which is
 //      saturating F_2^4 #f, the bra, ket condition indirect access.
 //      either Riemann-measureable conditions' smaller than |dx| counting
