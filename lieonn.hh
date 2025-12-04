@@ -4772,13 +4772,14 @@ template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> 
 #else
   const SimpleVector<SimpleVector<char> > prng0(preparePRNG(in0.size() + 1, in0[0].size() * _P_PRNG_));
   const SimpleVector<SimpleVector<char> > prng1(preparePRNG(in0.size() + 1, prng0[0].size() * _P_PRNG_ * bits));
-  return applyPostPRNG<T>(cherryStat<T>(
+  return cherryStat<T>(applyPostPRNG<T>(cherryStat<T>(
     unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(seepBits<T>(applyPostPRNG<T>(
       pWholeMarkovCherry<T, nprogress>(offsetHalf<T>(applyPrepPRNG<T>(
         unOffsetHalf<T>(bitsSlide<T>(offsetHalf<T>(applyPrepPRNG<T>(
           unOffsetHalf<T>(in0), prng0)), bits)), prng1)), bits, strloop),
             prng1, prng0[0].size() * bits), bits)), - bits)), applyPrepPRNG<T>(
-              unOffsetHalf<T>(in0), prng0)), prng0, in0[0].size());
+              unOffsetHalf<T>(in0), prng0)), prng0, in0[0].size()),
+                unOffsetHalf<T>(in0) );
 #endif
 }
 
