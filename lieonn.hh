@@ -4765,33 +4765,32 @@ template <typename T> static inline SimpleVector<SimpleVector<T> > applyPostPRNG
 //      however, if the original raw stream have whole vector context each pixel
 //      structure have better structure than PRNGs, it's better bet with the
 //      condition after prediction shrinking.
-template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> > pPRNGM(const SimpleVector<SimpleVector<T> >& in0, const int& bits, const string& strloop) {
+// XXX: we're facing the condition on our machine s.t. implement into this
+//      function causes broken result as the upper layered result function
+//      needs same structure on prediction. this might be recursive jammer.
+//      so we reduce them from function into original meaning.
+//      however, we don't know why our machine caused as so.
+template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> > pPRNGM(const SimpleVector<SimpleVector<T> >& in, const int& bits, const string& strloop) {
   assert(0 < bits);
 #if defined(_OPENMP)
-  for(int i = 1; i <= in0.size(); i ++) pnextcacher<T>(i, 1);
+  for(int i = 1; i <= in.size(); i ++) pnextcacher<T>(i, 1);
 #endif
-  SimpleVector<SimpleVector<T> > in(delta<SimpleVector<T> >(in0));
-  for(int i = 0; i < in.size(); i ++) in[i] /= T(int(2));
-  in = offsetHalf<T>(in);
 #if _P_PRNG_ <= 1
-  SimpleVector<SimpleVector<T> > p(
-    cherryStat<T>(unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(seepBits<T>(
-      pWholeMarkovCherry<T, nprogress>(bitsSlide<T>(in, bits), bits, strloop),
-        bits)), - bits)), unOffsetHalf<T>(in)) );
+  return cherryStat<T>(unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(seepBits<T>(
+    pWholeMarkovCherry<T, nprogress>(bitsSlide<T>(in, bits), bits, strloop),
+      bits)), - bits)), unOffsetHalf<T>(in));
 #else
   const SimpleVector<SimpleVector<char> > prng0(preparePRNG(in.size() + 1, in[0].size() * _P_PRNG_));
   const SimpleVector<SimpleVector<char> > prng1(preparePRNG(in.size() + 1, prng0[0].size() * _P_PRNG_ * bits));
-  SimpleVector<SimpleVector<T> > p(cherryStat<T>(applyPostPRNG<T>(cherryStat<T>(
+  return cherryStat<T>(applyPostPRNG<T>(cherryStat<T>(
     unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(seepBits<T>(applyPostPRNG<T>(
       pWholeMarkovCherry<T, nprogress>(offsetHalf<T>(applyPrepPRNG<T>(
         unOffsetHalf<T>(bitsSlide<T>(offsetHalf<T>(applyPrepPRNG<T>(
           unOffsetHalf<T>(in), prng0)), bits)), prng1)), bits, strloop),
             prng1, prng0[0].size() * bits), bits)), - bits)), applyPrepPRNG<T>(
               unOffsetHalf<T>(in), prng0)), prng0, in[0].size()),
-                unOffsetHalf<T>(in) ) );
+                unOffsetHalf<T>(in) );
 #endif
-  for(int i = 1; i < p.size(); i ++) p[i] += p[i - 1];
-  return cherryStat<T>(p, unOffsetHalf<T>(in0));
 }
 
 template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const SimpleVector<SimpleVector<T> >& in, const int& bits, const string& strloop) {
@@ -4850,7 +4849,8 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 }
 
 // N.B. we make the first hypothesis as the result is calculatable by *single*
-//      function only from input stream.
+//      function only from input stream itself without no prepared internal
+//      states.
 // N.B. layers:
 //       | function           | layer# | [wsp1] | data amount* | time*(***)   |
 //       +-----------------------------------------------------+--------------+
@@ -4858,18 +4858,18 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 //       | pWholeMarkovCherry          | 1   | w |             |
 //       | pWholeMarkovM               | 2   | w |             |
 //       | pRS00 call for each bit     | 3   | w | bits        | bits
-//       | grow context                | 4   | w |             | O(L)
-//       | divide by program invariant | 5+  | s | +unit       | +O(GL)
+//       | divide by program invariant | 4+  | s | +unit       | +O(GL)
+//       | grow context                | 5   | w |             | O(L)
 //       | burn invariant by p0next    | ++  | s | +unit       | +O(GL)
 //       |                             |     |   |             | +once(L^3)
 //       | makeProgramInvariant        | 6+  | p |             | +O(GL)
 //       | linearInvariant             |     |   |             |
-//       |  - QR decomposition         | 8+* | s | > 4!        | O(GL)
-//       |  - orthogonalization        | 10+*| p | > 4!        | O(4!)
-//       |  - solve                    | 12* | p | +> (4 * 4)  | +O(4^3)
-//       | T::operator *,/             | 13+ | 1 |             |
-//       | T::operator +,-             | 14+ | 1 |             |
-//       | T::bit operation            | 15+ | 1 |             |
+//       |  - QR decomposition         | 7+* | s | > 4!        | O(GL)
+//       |  - orthogonalization        | 9+* | p | > 4!        | O(4!)
+//       |  - solve                    | 11* | p | +> (4 * 4)  | +O(4^3)
+//       | T::operator *,/             | 12+ | 1 |             |
+//       | T::operator +,-             | 13+ | 1 |             |
+//       | T::bit operation            | 14+ | 1 |             |
 // *(++) | sumCNext                    | +0  | s |             |
 //       | sumCNext                    | +1  | s |             |
 //       | logCNext                    | +2  | s |             |
@@ -4912,7 +4912,7 @@ template <typename T, int nprogress> vector<SimpleVector<T> > predVec(const vect
 
 template <typename T, int nprogress> static inline vector<SimpleVector<T> > predVec(const SimpleVector<vector<SimpleVector<T> > >& in0) {
   vector<vector<SimpleVector<T> > > in;
-  in.reserve(in0);
+  in.reserve(in0.size());
   for(int i = 0; i < in0.size(); i ++) in.emplace_back(in0[i]);
   return predVec<T, nprogress>(in);
 }
@@ -7975,6 +7975,10 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      the things we really trust from bottom of our hearts but this needs
 //      a priori description on the stream however there exists the jammer
 //      for any of the predictor, the description seems unfavorable.
+// (05) we faced the single binary implementation causes we need same upper
+//      layer prediction hack to work better with in recursive case.
+//      so we cannot improve the predictor with such a false positive case
+//      because the numerical tests aren't reliable on our machine.
 // N.B. tips around jammer
 // (-1) any of the predictor they have a jammer to them.
 // (00) after of all, the dynamic jammer can be avoided if the predictor entropy
@@ -8015,6 +8019,8 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //        g0 ... should fit them also they describes much of continuities.
 //        this can flatten N when our N is something infected.
 //        also this is the analogy {1,x,x^2,...} on p0next meaning.
+//        either with gn(x) implements as data stream case, we need to solve
+//        n-degree n-dimensional equation to find such a base geometry.
 //      so the ongoing proceding machine learnings finds such a orthogonal
 //      egg functions from input streams without the hypotehsis on PDE
 //      structures. so we drop to implement them.
