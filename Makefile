@@ -22,6 +22,9 @@ LDFLAGS+=	-lc++ -L/usr/local/lib
 #CXXFLAGS+=	-D_FLOAT_BITS_=512
 
 # lieonn.hh flags
+# N.B. this breaks original input sream measureability condition.
+#CXXFLAGS+=	-D_P_PRNG_=5
+#CXXFLAGS+=	-D_ARCFOUR_
 # N.B. sed -e s/static\ inline//g | sed -e s/inline//g
 #CXXFLAGS+=     -D_OLDCPP_ -ftemplate-depth-99
 

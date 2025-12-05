@@ -4673,12 +4673,17 @@ template <typename T, int nprogress> static inline SimpleVector<T> pWholeMarkov(
 template <typename T> static inline SimpleVector<SimpleVector<T> > cherryStat(const SimpleVector<SimpleVector<T> >& p, const SimpleVector<SimpleVector<T> >& in) {
   SimpleVector<T> jv(p[0].size());
   jv.O();
-  for(int i = 0; i < p.size() - 1; i ++)
+  SimpleVector<SimpleVector<T> > res(p);
+  for(int i = 0; i < p.size() - 1; i ++) {
+    for(int j = 0; j < jv.size(); j ++)
+      if(jv[j] < T(int(0)) )
+        res[i][j] = - res[i][j];
     for(int j = 0; j < p[i].size(); j ++)
       jv[j] += p[i][j] * in[i - (p.size() - 1) + in.size()][j];
-  SimpleVector<SimpleVector<T> > res(p);
+  }
+  const int i(p.size() - 1);
   for(int j = 0; j < jv.size(); j ++)
-    if(jv[j] < T(int(0)) ) for(int i = 0; i < res.size(); i ++)
+    if(jv[j] < T(int(0)) )
       res[i][j] = - res[i][j];
   return res;
 }
@@ -4765,22 +4770,28 @@ template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> 
 #if defined(_OPENMP)
   for(int i = 1; i <= in0.size(); i ++) pnextcacher<T>(i, 1);
 #endif
+  SimpleVector<SimpleVector<T> > in(delta<SimpleVector<T> >(in0));
+  for(int i = 0; i < in.size(); i ++) in[i] /= T(int(2));
+  in = offsetHalf<T>(in);
 #if _P_PRNG_ <= 1
-  return cherryStat<T>(unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(seepBits<T>(
-    pWholeMarkovCherry<T, nprogress>(bitsSlide<T>(in0, bits), bits, strloop),
-      bits)), - bits)), unOffsetHalf<T>(in0));
+  SimpleVector<SimpleVector<T> > p(
+    cherryStat<T>(unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(seepBits<T>(
+      pWholeMarkovCherry<T, nprogress>(bitsSlide<T>(in, bits), bits, strloop),
+        bits)), - bits)), unOffsetHalf<T>(in)) );
 #else
-  const SimpleVector<SimpleVector<char> > prng0(preparePRNG(in0.size() + 1, in0[0].size() * _P_PRNG_));
-  const SimpleVector<SimpleVector<char> > prng1(preparePRNG(in0.size() + 1, prng0[0].size() * _P_PRNG_ * bits));
-  return cherryStat<T>(applyPostPRNG<T>(cherryStat<T>(
+  const SimpleVector<SimpleVector<char> > prng0(preparePRNG(in.size() + 1, in[0].size() * _P_PRNG_));
+  const SimpleVector<SimpleVector<char> > prng1(preparePRNG(in.size() + 1, prng0[0].size() * _P_PRNG_ * bits));
+  SimpleVector<SimpleVector<T> > p(cherryStat<T>(applyPostPRNG<T>(cherryStat<T>(
     unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(seepBits<T>(applyPostPRNG<T>(
       pWholeMarkovCherry<T, nprogress>(offsetHalf<T>(applyPrepPRNG<T>(
         unOffsetHalf<T>(bitsSlide<T>(offsetHalf<T>(applyPrepPRNG<T>(
-          unOffsetHalf<T>(in0), prng0)), bits)), prng1)), bits, strloop),
+          unOffsetHalf<T>(in), prng0)), bits)), prng1)), bits, strloop),
             prng1, prng0[0].size() * bits), bits)), - bits)), applyPrepPRNG<T>(
-              unOffsetHalf<T>(in0), prng0)), prng0, in0[0].size()),
-                unOffsetHalf<T>(in0) );
+              unOffsetHalf<T>(in), prng0)), prng0, in[0].size()),
+                unOffsetHalf<T>(in) ) );
 #endif
+  for(int i = 1; i < p.size(); i ++) p[i] += p[i - 1];
+  return cherryStat<T>(p, unOffsetHalf<T>(in0));
 }
 
 template <typename T, int nprogress> static inline SimpleVector<T> pPRNG(const SimpleVector<SimpleVector<T> >& in, const int& bits, const string& strloop) {
@@ -4897,6 +4908,13 @@ template <typename T, int nprogress> vector<SimpleVector<T> > predVec(const vect
   for(int j = 0; j < res.size(); j ++)
     res[j] = pres.subVector(in0[0][0].size() * j, in0[0][0].size());
   return res;
+}
+
+template <typename T, int nprogress> static inline vector<SimpleVector<T> > predVec(const SimpleVector<vector<SimpleVector<T> > >& in0) {
+  vector<vector<SimpleVector<T> > > in;
+  in.reserve(in0);
+  for(int i = 0; i < in0.size(); i ++) in.emplace_back(in0[i]);
+  return predVec<T, nprogress>(in);
 }
 
 template <typename T, int nprogress> vector<SimpleMatrix<T> > predMat(const vector<vector<SimpleMatrix<T> > >& in0) {
