@@ -4698,8 +4698,8 @@ template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> 
     unOffsetHalf<T>(in) );
 }
 
-#if !defined(_P_PRNG_)
-#define _P_PRNG_ 1
+#if !defined(_BURN_)
+#define _BURN_ 1
 #endif
 
 template <typename T> static inline SimpleVector<SimpleVector<T> > seepBits(const SimpleVector<SimpleVector<T> >& in, const int& bits) {
@@ -4775,21 +4775,17 @@ template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> 
 #if defined(_OPENMP)
   for(int i = 1; i <= in.size(); i ++) pnextcacher<T>(i, 1);
 #endif
-#if _P_PRNG_ <= 1
-  return cherryStat<T>(unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(seepBits<T>(
-    pWholeMarkovCherry<T, nprogress>(bitsSlide<T>(in, bits), bits, strloop),
-      bits)), - bits)), unOffsetHalf<T>(in));
+#if _BURN_ <= 1
+  return cherryStat<T>(unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(
+    seepBits<T>(pWholeMarkovCherry<T, nprogress>(bitsSlide<T>(in, bits),
+      bits, strloop), bits)), - bits)), unOffsetHalf<T>(in));
 #else
-  const SimpleVector<SimpleVector<char> > prng0(preparePRNG(in.size() + 1, in[0].size() * _P_PRNG_));
-  const SimpleVector<SimpleVector<char> > prng1(preparePRNG(in.size() + 1, prng0[0].size() * _P_PRNG_ * bits));
-  return cherryStat<T>(applyPostPRNG<T>(cherryStat<T>(
-    unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(seepBits<T>(applyPostPRNG<T>(
-      pWholeMarkovCherry<T, nprogress>(offsetHalf<T>(applyPrepPRNG<T>(
-        unOffsetHalf<T>(bitsSlide<T>(offsetHalf<T>(applyPrepPRNG<T>(
-          unOffsetHalf<T>(in), prng0)), bits)), prng1)), bits, strloop),
-            prng1, prng0[0].size() * bits), bits)), - bits)), applyPrepPRNG<T>(
-              unOffsetHalf<T>(in), prng0)), prng0, in[0].size()),
-                unOffsetHalf<T>(in) );
+  const SimpleVector<SimpleVector<char> > prng(preparePRNG(in.size() + 1, in[0].size() * _BURN_ * bits));
+  return cherryStat<T>(unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(
+    seepBits<T>(applyPostPRNG<T>(pWholeMarkovCherry<T, nprogress>(
+      offsetHalf<T>(applyPrepPRNG<T>(unOffsetHalf<T>(bitsSlide<T>(in, bits)),
+        prng)), bits, strloop), prng, in[0].size() * bits), bits)), - bits)),
+          unOffsetHalf<T>(in) );
 #endif
 }
 
@@ -4854,7 +4850,7 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
 // N.B. layers:
 //       | function           | layer# | [wsp1] | data amount* | time*(***)   |
 //       +-----------------------------------------------------+--------------+
-//       | pPRNG                       | 0   | w | _P_PRNG_**2 | _P_PRNG_**2
+//       | pPRNG                       | 0   | w | _BURN_      | _BURN_
 //       | pWholeMarkovCherry          | 1   | w |             |
 //       | pWholeMarkovM               | 2   | w |             |
 //       | pRS00 call for each bit     | 3   | w | bits        | bits
