@@ -4652,7 +4652,7 @@ template <typename T, int nprogress> static inline SimpleVector<T> pGuarantee(co
   return res[res.size() - 1];
 }
 
-// N.B. add whole context length markov feeding with bitwise speedup.
+// N.B. add whole context length markov feeding.
 template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> > pWholeMarkovM(const SimpleVector<SimpleVector<T> >& in, const int& bits, const string& strloop) {
   assert(0 < bits);
   pair<SimpleVector<SimpleVector<T> >, T> wp(normalizeS<T>(
@@ -4697,10 +4697,6 @@ template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> 
   return cherryStat<T>(pWholeMarkovM<T, nprogress>(in, bits, strloop),
     unOffsetHalf<T>(in) );
 }
-
-#if !defined(_BURN_)
-#define _BURN_ 1
-#endif
 
 template <typename T> static inline SimpleVector<SimpleVector<T> > seepBits(const SimpleVector<SimpleVector<T> >& in, const int& bits) {
   SimpleVector<SimpleVector<T> > p(in);
@@ -4765,6 +4761,8 @@ template <typename T> static inline SimpleVector<SimpleVector<T> > applyPostPRNG
 //      however, if the original raw stream have whole vector context each pixel
 //      structure have better structure than PRNGs, it's better bet with the
 //      condition after prediction shrinking.
+// N.B. we apply PRNG to original offsetted input sign as to negate block-wise.
+//      so this is better choice for us around testing on bare efi.
 // XXX: we're facing the condition on our machine s.t. implement into this
 //      function causes broken result as the upper layered result function
 //      needs same structure on prediction. this might be recursive jammer.
@@ -4775,16 +4773,16 @@ template <typename T, int nprogress> static inline SimpleVector<SimpleVector<T> 
 #if defined(_OPENMP)
   for(int i = 1; i <= in.size(); i ++) pnextcacher<T>(i, 1);
 #endif
-#if _BURN_ <= 1
+#if !defined(_BURN_)
   return cherryStat<T>(unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(
     seepBits<T>(pWholeMarkovCherry<T, nprogress>(bitsSlide<T>(in, bits),
       bits, strloop), bits)), - bits)), unOffsetHalf<T>(in));
 #else
-  const SimpleVector<SimpleVector<char> > prng(preparePRNG(in.size() + 1, in[0].size() * _BURN_ * bits));
-  return cherryStat<T>(unOffsetHalf<T>(bitsG<T, true>(offsetHalf<T>(
-    seepBits<T>(applyPostPRNG<T>(pWholeMarkovCherry<T, nprogress>(
-      offsetHalf<T>(applyPrepPRNG<T>(unOffsetHalf<T>(bitsSlide<T>(in, bits)),
-        prng)), bits, strloop), prng, in[0].size() * bits), bits)), - bits)),
+  const SimpleVector<SimpleVector<char> > prng(preparePRNG(in.size() + 1, in[0].size() * _BURN_));
+  return cherryStat<T>(applyPostPRNG<T>(unOffsetHalf<T>(bitsG<T, true>(
+    offsetHalf<T>(seepBits<T>(pWholeMarkovCherry<T, nprogress>(
+      bitsSlide<T>(offsetHalf<T>(applyPrepPRNG<T>(unOffsetHalf<T>(in), prng)),
+        bits), bits, strloop), bits)), - bits)), prng, in[0].size()),
           unOffsetHalf<T>(in) );
 #endif
 }
@@ -4843,47 +4841,6 @@ template <typename T, int nprogress> SimpleVector<T> predv4(vector<SimpleVector<
     makeProgramInvariant<T>(normalize<T>(res)).first,
       p01next<T>(nwork / nnwork) * nnwork));
 }
-
-// N.B. we make the first hypothesis as the result is calculatable by *single*
-//      function only from input stream itself without no prepared internal
-//      states.
-// N.B. layers:
-//       | function           | layer# | [wsp1] | data amount* | time*(***)   |
-//       +-----------------------------------------------------+--------------+
-//       | pPRNG                       | 0   | w | _BURN_      | _BURN_
-//       | pWholeMarkovCherry          | 1   | w |             |
-//       | pWholeMarkovM               | 2   | w |             |
-//       | pRS00 call for each bit     | 3   | w | bits        | bits
-//       | divide by program invariant | 4+  | s | +unit       | +O(GL)
-//       | grow context                | 5   | w |             | O(L)
-//       | burn invariant by p0next    | ++  | s | +unit       | +O(GL)
-//       |                             |     |   |             | +once(L^3)
-//       | makeProgramInvariant        | 6+  | p |             | +O(GL)
-//       | linearInvariant             |     |   |             |
-//       |  - QR decomposition         | 7+* | s | > 4!        | O(GL)
-//       |  - orthogonalization        | 9+* | p | > 4!        | O(4!)
-//       |  - solve                    | 11* | p | +> (4 * 4)  | +O(4^3)
-//       | T::operator *,/             | 12+ | 1 |             |
-//       | T::operator +,-             | 13+ | 1 |             |
-//       | T::bit operation            | 14+ | 1 |             |
-// *(++) | sumCNext                    | +0  | s |             |
-//       | sumCNext                    | +1  | s |             |
-//       | logCNext                    | +2  | s |             |
-//       | logCNext                    | +3  | s |             |
-//       | northPoleNext               | +4  | s |             |
-//       | invNext                     | +5  | s |             |
-//       | sumCNext                    | +6  | s |             |
-//       | pnext                       | +7  | s | +once(dft)  |
-//       | integrate-diff in taylorc   | +8  | p | +once(dft)  |
-//       | exp to shift   in taylorc   | +9  | p | +once(dft)  |
-//       | dft                         | +10 | p | +once(dft)  |
-//       | exp-log complex operation   | +11 | 1 | +once(taylor) |
-//       | T::operator *,/             | +12 | 1 |             |
-//       | T::operator +,-             | +13 | 1 |             |
-//       | T::bit operation            | +14 | 1 |             |
-// (***) time order ratio, L for input stream length, G for input vector size,
-//       stand from arithmatic operators. ind2varlen isn't considered.
-// N.B. we need O(L^2*G) calculation time whole.
 
 template <typename T, int nprogress> vector<SimpleVector<T> > predVec(const vector<vector<SimpleVector<T> > >& in0) {
   assert(in0.size() && in0[0].size() && in0[0][0].size());
@@ -7906,6 +7863,53 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 }
 
 // N.B. rewrote 2025/08/30, last update 2025/10/17:
+// N.B. rewrote once again 2025/12/10.
+// N.B. we make the first hypothesis as the result is calculatable by *single*
+//      function only from input stream itself without no prepared internal
+//      states. however, this depends on upper layers' intention and cache,
+//      so we conclude the algorithm consistency/intent/resonance is the matter.
+//      either if this predictor condition is cursed, we always need upper
+//      layer condition to get reasonable result, either this predictor
+//      could cause the upper layer pollution for ourselves as a confusion.
+// N.B. layers:
+//       | function           | layer# | [wsp1] | data amount* | time*(***)   |
+//       +-----------------------------------------------------+--------------+
+//       | pPRNG                       | 0   | w | _BURN_      | _BURN_
+//       | pWholeMarkovCherry          | 1   | w |             |
+//       | pWholeMarkovM               | 2   | w |             |
+//       | pRS00 call for each bit     | 3   | w | bits        | bits
+//       | divide by program invariant | 4+  | s | +unit       | +O(GL)
+//       | grow context                | 5   | w |             | O(L)
+//       | burn invariant by p0next    | ++  | s | +unit       | +O(GL)
+//       |                             |     |   |             | +once(L^3)
+//       | make/revertProgramInvariant | 6+  | p |             | +O(GL)
+//       | linearInvariant             |     |   |             |
+//       |  - QR decomposition         | 8+* | s | > 4!        | O(GL)
+//       |  - orthogonalization        | 10+*| p | > 4!        | O(4!)
+//       |  - solve                    | 12* | p | +> (4 * 4)  | +O(4^3)
+//       | T::operator *,/             | 13+ | 1 |             |
+//       | T::operator +,-             | 14+ | 1 |             |
+//       | T::bit operation            | 15+ | 1 |             |
+// *(++) | sumCNext                    | +0  | s |             |
+//       | sumCNext                    | +1  | s |             |
+//       | logCNext                    | +2  | s |             |
+//       | logCNext                    | +3  | s |             |
+//       | northPoleNext               | +4  | s |             |
+//       | invNext                     | +5  | s |             |
+//       | sumCNext                    | +6  | s |             |
+//       | pnext                       | +7  | s | +once(dft)  |
+//       | integrate-diff in taylorc   | +8  | p | +once(dft)  |
+//       | exp to shift   in taylorc   | +9  | p | +once(dft)  |
+//       | dft                         | +10 | p | +once(dft)  |
+//       | exp-log complex operation   | +11 | 1 | +once(taylor) |
+//       | T::operator *,/             | +12 | 1 |             |
+//       | T::operator +,-             | +13 | 1 |             |
+//       | T::bit operation            | +14 | 1 |             |
+// (***) time order ratio, L for input stream length, G for input vector size,
+//       stand from arithmatic operators. ind2varlen isn't considered.
+// N.B. we need O(L^2*G) calculation time whole.
+// N.B. in ideal, we can only apply G <= L case this predictor because of
+//      multiply sum entropy itself.
 // N.B. generally speaking, the raw input stream with high entropy predictor
 //      dislikes to predict in general meanings because {ok,ng,invariant}
 //      each 1/3 condition. however, there's at least 2 hole to the condition.
@@ -7918,36 +7922,25 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      calculation space structure - numerical series abstract structure
 //      slip. so the predictor condition is for now, not the ever or never.
 // N.B. the codes eliminated from this header the reason why:
-// (i)  difference, summation concerns they have the condition s.t.
-//      the noise of the prediction stream can spread entire of the result
-//      so we eliminated: PdeltaOnce, Ppersistent, Pprogression, (P0DFT) and so.
-//      also they're mostly equivalent to input timing skip concerns.
-//      this is because A_0 ... A_k B x_0 matrix described form.
-//      also patternized xor-filter have the timing related conditions.
-//      however, skip conditions are to avoid jammer things, so we eliminated
-//      from core predictors.
-//      this include input stream non-linear scaling (even in x-axis).
+// (i)  PdeltaOnce, Ppersistent, Pprogression, (P0DFT) and so on.
+//      eg. timing skip concerns, xor-filter (like a timing related).
+//      cf. sectional measureable condition, Lebesgue measureable condition.
+//      only causes regression of accuracy, it's integrated into pWholeMarkov.
+// (ii) input stream non-linear scaling in x-axis.
 //      also distant step predictions aren't fight with skip concerns.
-// (ii) non linear function transformations we target is only exp/log scale.
+// (iii)non linear function transformations we target is only exp/log scale.
 //      this is because d^e/dx^e == dx condition and f^-1(f(x)) == x condition.
 //      cf. (arctan(logscale))-n times chain causes y=x into sigmoid-like graph.
 //      -&gt; we eliminated non linear function handling because we're trusting
 //      makeProgramInvariant a little stronger for output.
-// (iii)predict twice or more by one predictor often causes clear edge but the
+// (iv) predict twice or more by one predictor often causes clear edge but the
 //      gulf things. this also includes {ok,ng,invariant}'s invariant condition
 //      retry.
-// (iv) ad-hoc layer implementations also inspired by numerical test isn't
+// (v)  ad-hoc layer implementations also inspired by numerical test isn't
 //      useful for generic predictor because it's only ad-hoc to specific
 //      numerical series. also after burner is.
-// (v)  we don't need LoEM unstable case implementation on input stream attached
+// (vi) we don't need LoEM unstable case implementation on input stream attached
 //      case because it's verbose.
-// (vi) sectional measureament addition/subtraction. they are only harmful
-//      reformation because of the accuracy and offset.
-// (vii)Lebesgue measureament condition prediction. they are only harmful
-//      because of some of the averaged in/output causes blurring, also
-//      the Lebesgue measureable condition can be included RiemannStieljes
-//      measureable condition in some hacks with non strict hypothesis such of
-//      axiom of choice.
 // N.B. something XXX result descripton
 // (00) there might exist non Lebesgue measureable condition discrete stream.
 //      this is: there's no unique function on the range but AFTER all the
@@ -7961,6 +7954,9 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      we cannot avoid this other than verifying after the phenomenon
 //      also having a verifiability of low of excluded middle based on
 //      our calculation based on our conscious uniqueness.
+//      -&gt; we cannot verify with such a methods because it's implemented.
+//      so only the hole we face with this condition is to burn with
+//      something predict with continuity guaranteed function.
 // (03) might have once coded as obs. concerns. when we implement binary
 //      they means we select one of the #f causes the jammer can jam out
 //      our invariant condition. so if there's universal invariant,
@@ -7971,10 +7967,6 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      the things we really trust from bottom of our hearts but this needs
 //      a priori description on the stream however there exists the jammer
 //      for any of the predictor, the description seems unfavorable.
-// (05) we faced the single binary implementation causes we need same upper
-//      layer prediction hack to work better with in recursive case.
-//      so we cannot improve the predictor with such a false positive case
-//      because the numerical tests aren't reliable on our machine.
 // N.B. tips around jammer
 // (-1) any of the predictor they have a jammer to them.
 // (00) after of all, the dynamic jammer can be avoided if the predictor entropy
@@ -7983,7 +7975,8 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 // (01) however, the predictor entropy can be counted by program binary size
 //      in some of the layer, so graphics predictor seems to have the quantity
 //      so. either, once algorithm is coded as exist, they have upper entropy
-//      size n bit-input, n bit-output, n^3 bit as a optimization result.
+//      size n bit-input, n bit-output, 2n bit as a -Ohard result however
+//      this skids N calculation basis.
 //      instead of the fixation of code optimization, we use optimization result
 //      to get orthogonal to input stream condition or pivot to get high
 //      frequency result.
@@ -8017,6 +8010,7 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //        also this is the analogy {1,x,x^2,...} on p0next meaning.
 //        either with gn(x) implements as data stream case, we need to solve
 //        n-degree n-dimensional equation to find such a base geometry.
+//        either they only results n^2 variables as a entropy to be fixed.
 //      so the ongoing proceding machine learnings finds such a orthogonal
 //      egg functions from input streams without the hypotehsis on PDE
 //      structures. so we drop to implement them.
@@ -8024,6 +8018,15 @@ template <typename T, typename U> static inline void makelword(vector<U>& words,
 //      one by one causes Wavelet(Wavelet(Fourier+Discrete)+Discrete)+Discrete
 //      causes only a combination ordinal, we need Discrete part separation
 //      other than dft/mWavelet in fact. however, we drop this implementation.
+//      however, this indirectly uses (02) condition as a flat basis, however,
+//      the treated entropy nor eyeball number might not get enough result.
+// N.B. crashes around universal invariant
+// (00) since we make layers on our predictor as 16 layeres or so,
+//      either they uses abstracting layer# as thirds also on high possible
+//      recursive recursive ... layeres, so they can saturate the upper layer
+//      caches so they could results the N calculation base nor F-matrix
+//      saturations. this condition the N slips cannot avoided by any of the
+//      universal invariants if we're targetted.
 #define _SIMPLELIN_
 #endif
 
