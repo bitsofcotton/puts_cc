@@ -8,11 +8,24 @@
 #include <vector>
 #include <map>
 #include <algorithm>
+#include <limits>
 #include <cctype>
 #include <assert.h>
+#include <stdlib.h>
+#include <stdint.h>
 
 #if defined(_OPENMP)
 #include <omp.h>
+#endif
+
+#if defined(_P_VULKAN_)
+#include <vulkan/vulkan.h>
+#endif
+
+#if defined(_MIMALLOC_)
+#define MIMALLOC_OVERRIDE_H
+#define MIMALLOC_NEW_DELETE_H
+#include <mimalloc.h>
 #endif
 
 #if !defined(_OLDCPP_)
@@ -21,6 +34,7 @@
 #include "lieonn.hh"
 typedef myfloat num_t;
 std::vector<std::string> words;
+lieonn_t lieonn;
 
 std::pair<std::string, std::string> loadbuf(const char* filename) {
   std::ifstream input;
@@ -56,6 +70,7 @@ int main(int argc, const char* argv[]) {
 #if !defined(_OLDCPP_)
 #define int int64_t
 #endif
+  lieonnStaticInit();
   std::string input, line;
   std::vector<std::string> delimiter;
   std::vector<std::string> csvelim;
@@ -80,22 +95,27 @@ int main(int argc, const char* argv[]) {
   std::sort(csvelim.begin(), csvelim.end());
   std::sort(csvdelim.begin(), csvdelim.end());
   while(std::getline(std::cin, line)) {
-    for(int i = 0; i < line.size(); i ++)
-      if(line[i] == '<' || line[i] == '>' || line[i] == '&') line[i] = '!';
+    if(strcmp(argv[1], "plain") != 0)
+      for(int i = 0; i < line.size(); i ++) {
+        if(line[i] == '<' || line[i] == '>' || line[i] == '&') line[i] = '!';
+      }
     input += line + std::string("\n");
   }
   words.insert(words.end(), csvelim.begin(),  csvelim.end());
   words.insert(words.end(), csvdelim.begin(), csvdelim.end());
   std::sort(words.begin(), words.end());
   words.erase(std::unique(words.begin(), words.end()), words.end());
-  if(strcmp(argv[1], "lword") != 0) {
-    if(2 < argc) {
+  if(strcmp(argv[1], "plain") != 0) {
+    if(strcmp(argv[1], "lword") != 0) {
+      if(2 < argc) {
+        words = cutText(loadbuf(argv[2]).second, csvelim, csvdelim, true);
+        if(! words.size())
+          makelword<num_t, std::string>(words, input, delimiter);
+      } else
+        makelword<num_t, std::string>(words, input, delimiter);
+    } else if(2 < argc)
       words = cutText(loadbuf(argv[2]).second, csvelim, csvdelim, true);
-      if(! words.size()) makelword<num_t, std::string>(words, input, delimiter);
-    } else
-      makelword<num_t, std::string>(words, input, delimiter);
-  } else if(2 < argc)
-    words = cutText(loadbuf(argv[2]).second, csvelim, csvdelim, true);
+  }
   std::sort(words.begin(), words.end());
   words.erase(std::unique(words.begin(), words.end()), words.end());
   if(std::strcmp(argv[1], "lword") == 0)
@@ -194,8 +214,7 @@ int main(int argc, const char* argv[]) {
     std::cout << "<body>";
     optimizeTOC<num_t, std::string>(std::cout, input, rdetails, rdetailwords, delimiter, std::strcmp(argv[1], "findroot") == 0);
     std::cout << "<hr/>" << std::endl << "</body></html>" << std::endl;
-  } else if(std::strcmp(argv[1], "pred") == 0 ||
-            std::strcmp(argv[1], "Pred") == 0) {
+  } else if(std::strcmp(argv[1], "pred") == 0) {
     std::vector<std::string> details;
     std::vector<std::string> detailwords;
     for(int iidx = 3; iidx < argc; iidx ++) {
@@ -206,8 +225,11 @@ int main(int argc, const char* argv[]) {
     words.insert(words.end(), detailwords.begin(), detailwords.end());
     std::sort(words.begin(), words.end());
     words.erase(std::unique(words.begin(), words.end()), words.end());
-    predTOC<num_t, std::string>(std::cout, input, detailwords, details, delimiter, int(sqrt(num_t(int(input.size() )))), num_t(int(1)), argv[1][0] == 'P' ? - 27 : 27);
-  } else if(std::strcmp(argv[1], "prep") == 0) {
+    predTOC<num_t, std::string>(std::cout, input, detailwords, details, delimiter, int(sqrt(num_t(int(input.size() )))), num_t(int(1)) );
+  } else if(std::strcmp(argv[1], "plain") == 0)
+    std::cout << predPlain<num_t, std::string>(input, 2 < argc ?
+      std::atoi(argv[2]) : 5) << std::endl;
+  else if(std::strcmp(argv[1], "prep") == 0) {
     std::vector<std::string> buf;
     const int szwindow(sqrt(num_t(int(input.size()))));
     for(int i = 0; i < input.size() / szwindow + 1; i ++) {
@@ -229,9 +251,11 @@ int main(int argc, const char* argv[]) {
   else if(std::strcmp(argv[1], "logiccheck") == 0)
     assert(0 && "logic check : Logics check so far...");
   else goto usage;
+  lieonnStaticDestroy();
   return 0;
  usage:
-  std::cout << "tools (lword|lbalance|toc|lack|redig|stat|findroot|diff|same|prep|pred)" << std::endl;
+  lieonnStaticDestroy();
+  std::cout << "tools (lword|lbalance|toc|lack|redig|stat|findroot|diff|same|prep|pred|plain|Plain)" << std::endl;
   return - 2;
 }
 

@@ -16,6 +16,7 @@ This IS NOT the program judges it is true or false, this IS ONLY the program sei
     ./puts same  wordlist.txt? -dict ... -dict2 ... < data.txt
     ./puts prep  wordlist.txt? < data.txt
     ./puts pred (wordlist.txt? (dictionaries ...)?)? < data.txt
+    ./puts [pP]lain < data.txt
 
 # Contexts
 Inspired from morphological analysis softwares and parameter auto configuring algorithms' structure.   
@@ -131,4 +132,5 @@ This repository is archived, so without bug report, will no change.
 2025/11/30 merge latest ddpmopt result.
 2025/12/04 merge latest ddpmopt result.
 2025/12/10 merge latest lieonn.
+2026/08/29 add [pP]lain commands.
 
