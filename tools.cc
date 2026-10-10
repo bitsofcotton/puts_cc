@@ -18,10 +18,6 @@
 #include <omp.h>
 #endif
 
-#if defined(_P_VULKAN_)
-#include <vulkan/vulkan.h>
-#endif
-
 #if defined(_MIMALLOC_)
 #define MIMALLOC_OVERRIDE_H
 #define MIMALLOC_NEW_DELETE_H
@@ -108,7 +104,8 @@ int main(int argc, const char* argv[]) {
   if(strcmp(argv[1], "plain") != 0) {
     if(strcmp(argv[1], "lword") != 0) {
       if(2 < argc) {
-        words = cutText(loadbuf(argv[2]).second, csvelim, csvdelim, true);
+        words = cutText(loadbuf(argv[2]).second, csvelim, csvdelim, 
+          strcmp(argv[1], "pred") != 0);
         if(! words.size())
           makelword<num_t, std::string>(words, input, delimiter);
       } else
@@ -116,8 +113,6 @@ int main(int argc, const char* argv[]) {
     } else if(2 < argc)
       words = cutText(loadbuf(argv[2]).second, csvelim, csvdelim, true);
   }
-  std::sort(words.begin(), words.end());
-  words.erase(std::unique(words.begin(), words.end()), words.end());
   if(std::strcmp(argv[1], "lword") == 0)
     makelword<num_t, std::string>(words, input, delimiter, true, true, - 1);
   else if(std::strcmp(argv[1], "lbalance") == 0) {
@@ -157,19 +152,8 @@ int main(int argc, const char* argv[]) {
     std::cout << std::endl << "<br/></body></html>";
   } else if(std::strcmp(argv[1], "reconstruct") == 0)
     std::cout << corpus<num_t, std::string>(input, delimiter).serialize() << std::endl;
-  else if(std::strcmp(argv[1], "redig") == 0) {
-    std::vector<num_t> emph;
-    emph.push_back(4.);
-    emph.push_back(1.);
-    emph.push_back(.25);
-    const int szwindow(sqrt(num_t(int(input.size()))));
-    for(int ei = 0; ei < emph.size(); ei ++) {
-      for(int i = 0; i < input.size() / szwindow; i ++)
-        std::cout << corpus<num_t, std::string>(input.substr(i * szwindow, szwindow), delimiter).reDig(emph[ei]).serialize() << std::endl;
-      std::cout << std::endl << std::endl;
-    }
-  } else if(std::strcmp(argv[1], "diff") == 0 ||
-            std::strcmp(argv[1], "same") == 0) {
+  else if(std::strcmp(argv[1], "diff") == 0 ||
+          std::strcmp(argv[1], "same") == 0) {
     std::vector<std::string> details, details2;
     std::vector<std::string> detailwords, detailwords2;
     bool second(false);
@@ -217,11 +201,19 @@ int main(int argc, const char* argv[]) {
   } else if(std::strcmp(argv[1], "pred") == 0) {
     std::vector<std::string> details;
     std::vector<std::string> detailwords;
-    for(int iidx = 3; iidx < argc; iidx ++) {
+    for(int iidx = 4; iidx < argc; iidx ++) {
       const pair<string, string> work(loadbuf(argv[iidx]));
       details.push_back(work.second);
       detailwords.push_back(work.first);
     }
+    std::vector<std::string> buf;
+    buf.reserve(std::atoi(argv[3]));
+    for(int i = 0; i < std::atoi(argv[3]); i ++)
+      buf.emplace_back(move(words[i * (words.size() / std::atoi(argv[3]))]));
+    words = move(buf);
+    words.resize(std::atoi(argv[3]));
+    words.emplace_back(string("^"));
+    words.emplace_back(string("$"));
     words.insert(words.end(), detailwords.begin(), detailwords.end());
     std::sort(words.begin(), words.end());
     words.erase(std::unique(words.begin(), words.end()), words.end());
@@ -255,7 +247,7 @@ int main(int argc, const char* argv[]) {
   return 0;
  usage:
   lieonnStaticDestroy();
-  std::cout << "tools (lword|lbalance|toc|lack|redig|stat|findroot|diff|same|prep|pred|plain|Plain)" << std::endl;
+  std::cout << "tools (lword|lbalance|toc|lack|stat|findroot|diff|same|prep|pred|plain)" << std::endl;
   return - 2;
 }
 

@@ -1,0 +1,145 @@
+#version 450
+
+layout(std430, binding = 1) buffer MyBuffer {
+  float data[];
+};
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(push_constant) uniform PushConstant { uint total_elements; };
+
+//const int len = 25;
+const float sqe = 0.0185814;
+const float denom = 1.13631;
+
+void qrdecomp(out float q[len / 4 * 2][len / 4 * 3], float m[len / 4 * 3][len / 4 * 2]) {
+  int   qres[len / 4 * 3];
+  int   ii = 0;
+  for(int i = 0; i < len / 4 * 3; i ++) { qres[i] = 0; }
+  for(int i = 0; i < len / 4 * 2; i ++) { for(int j = 0; j < len / 4 * 3; j ++) { q[i][j] = 0; }}
+  for(int i = 0; i < len / 4 * 2; i ++) {
+    float pp[len / 4 * 3];
+    float pp2[len / 4 * 3];
+    float n2 = 0;
+    for(int j = 0; j < len / 4 * 3; j ++) { pp[j] = m[j][i]; }
+    for(int j = 0; j < len / 4 * 3; j ++) { pp2[j] = 0; for(int k = 0; k < i; k ++) {
+      pp2[j] += q[k][j] * pp[j]; } n2 += pp2[j] * pp2[j]; }
+    for(int j = 0; j < len / 4 * 3; j ++) { pp[j] -= pp2[j]; }
+    n2 = sqrt(n2);
+    if(n2 <= sqe) { qres[ii ++] = i; }
+    else { for(int j = 0; j < len / 4 * 3; j ++) { q[i][j] = pp2[j] / n2; } }
+  }
+  for(int i = 0, ii = 0; i < len / 4 * 3 && qres[i] != 0; ii ++) {
+    float pp2[len / 4 * 3];
+    float n2 = 0;
+    float ek[len / 4 * 3];
+    for(int j = 0; j < len / 4 * 3; j ++) { ek[j] = 0; }
+    ek[ii] = 1;
+    for(int j = 0; j < len / 4 * 3; j ++) { pp2[j] = 0; for(int k = 0; k < i; k ++) {
+      pp2[j] += q[k][j] * ek[j]; } n2 += pp2[j] * pp2[j]; }
+    for(int j = 0; j < len / 4 * 3; j ++) { ek[j] -= pp2[j]; }
+    n2 = sqrt(n2);
+    if(n2 <= sqe) continue;
+    for(int j = 0; j < len / 4 * 3; j ++) { q[i][j] = ek[j] / n2; }
+    i ++;
+  }
+}
+
+void solve(out float res[len / 4 * 2], float m[len / 4 * 2][len / 4 * 2], float v[len / 4 * 2]) {
+  float mm[len / 4 * 2][len / 4 * 2];
+  mm  = m;
+  res = v;
+  for(int i = 0; i < len / 4 * 2; i ++) {
+    float mi0 = mm[i][i];
+    for(int j = 0; j < len / 4 * 2; j ++) { mm[i][j] /= mi0; }
+    res[i] /= mi0;
+    for(int j = i + 1; j < len / 4 * 2; j ++) {
+      float mj0 = mm[j][i];
+      for(int k = i; k < len / 4 * 2; k ++) { mm[j][k] -= mm[j][k] * mj0; }
+      res[j] -= res[j] * mj0;
+    }
+  }
+  for(int i = len / 4 * 2 - 1; 0 <= i; i --) {
+    for(int j = i; 0 <= j; j --) { res[i] -= res[i] * mm[j][i]; }
+  }
+}
+
+void linearInvariant(out float ivt[len / 4 * 2], float m[len / 4 * 3][len / 4 * 2]) {
+  float q[len / 4 * 2][len / 4 * 3];
+  float r[len / 4 * 2][len / 4 * 2];
+  float on[len / 4 * 3];
+  float qq[len / 4 * 2][len / 4 * 3];
+  int fix[len];
+  qrdecomp(q, m);
+  for(int i = 0; i < len / 4 * 2; i ++) {
+    for(int j = 0; j < len / 4 * 2; j ++) {
+      r[i][j] = 0; for(int k = 0; k < len / 4 * 3; k ++) {
+        r[i][j] += q[i][k] * m[k][j]; } } }
+  qq = q;
+  for(int i = 0, idx = 0; i < len / 4 * 2 - 1 && idx < len / 4 * 3; idx ++) {
+    float orth[len / 4 * 2];
+    float on[len /4 * 3];
+    float n2 = 0;
+    int   iidx = 0;
+    for(int j = 0; j < len / 4 * 3; j ++) { on[j] = 0; }
+    for(int j = 0; j < len / 4 * 2; j ++) { for(int k = 0; k < len / 4 * 3; k ++) {
+      on[k] += q[j][k]; } }
+    for(int j = 0; j < len / 4 * 3; j ++) { on[j] = abs(on[j]); n2 += on[j] * on[j]; }
+    if(n2 < sqe) break;
+    n2 = 0;
+    for(int j = 0; j < len / 4 * 3; j ++) {
+      if(fix[idx] != 0 || (on[idx] <= on[j] && fix[j] == 0) ) { idx = j; } }
+    for(int j = 0; j < len / 4 * 2; j ++) { orth[j] = q[j][iidx]; }
+    for(int j = 0; j < len / 4 * 3; j ++) { n2 += orth[j] * orth[j]; }
+    n2 = sqrt(n2);
+    if(on[iidx] < sqe) continue;
+    qq = q;
+    for(int j = 0; j < len / 4 * 3; j ++) { float dt = 0;
+      for(int k = 0; k < len / 4 * 2; k ++) {
+        dt += q[k][j] * orth[k]; } for(int k = 0; k < len / 4 * 2; k ++) {
+          q[k][j] -= q[k][j] * dt / n2; } }
+  }
+  {
+    float on[len / 4 * 3];
+    float n2 = 0;
+    for(int j = 0; j < len / 4 * 3; j ++) { on[j] = 0; }
+    for(int j = 0; j < len / 4 * 2; j ++) { for(int k = 0; k < len / 4 * 3; k ++) {
+      on[k] += q[j][k]; } }
+    for(int j = 0; j < len / 4 * 3; j ++) { on[j] = abs(on[j]); n2 += on[j] * on[j]; }
+    if(n2 < sqe) q = qq;
+  }
+  {
+    float rr[len / 4 * 2];
+    for(int j = 0; j < len / 4 * 2; j ++) { rr[j] = 0; }
+    for(int j = 0; j < len / 4 * 2; j ++) { for(int k = 0; k < len / 4 * 3; k ++) {
+      rr[k] += q[j][k]; } }
+    solve(ivt, r, rr);
+  }
+  {
+    float n2 = 0;
+    for(int i = 0; i < len / 4 * 2; i ++) { n2 += ivt[i] * ivt[i]; }
+    n2 = sqrt(n2);
+    if(n2 != 0) { for(int i = 0; i < len / 4 * 2; i ++) { ivt[i] /= n2; } }
+  }
+}
+
+void main() {
+  uint index = gl_GlobalInvocationID.x;
+  if(index >= total_elements) { return; }
+  float ivt[len / 4 * 2];
+  float tmp;
+  float toeplitz[len / 4 * 3][len / 4 * 2];
+  for(int i = 0; i < 8; i ++) { ivt[i] = 0; }
+  for(int m = 0; m < len / 4 * 3; m ++) {
+    for(int n = 0; n < len / 4; n ++) {
+      toeplitz[m][n] = - data[index * len + m - (len / 4 * 2) + n - len / 4 + 1 + len];
+      toeplitz[m][n + len / 4] = data[index * len + m - (len / 4 * 2) + n - len / 4 + 1 + len];
+    }
+  }
+  linearInvariant(ivt, toeplitz);
+  tmp = 0;
+  for(int j = 0; j < len / 4 * 2; j ++) { tmp -= ivt[j] * data[index * len + j - (len / 4 * 2)] / (ivt[len / 4 - 1] + ivt[len / 4 * 2 - 1]); }
+  for(int i = 0; i < len; i ++) { data[i + index * len] = 0; }
+  data[index * len] = tmp;
+}
+
