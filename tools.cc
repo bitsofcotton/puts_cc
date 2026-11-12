@@ -220,7 +220,7 @@ int main(int argc, const char* argv[]) {
     predTOC<num_t, std::string>(std::cout, input, detailwords, details, delimiter, int(sqrt(num_t(int(input.size() )))), num_t(int(1)) );
   } else if(std::strcmp(argv[1], "plain") == 0)
     std::cout << predPlain<num_t, std::string>(input, 2 < argc ?
-      std::atoi(argv[2]) : 5) << std::endl;
+        std::atoi(argv[2]) : 5) << std::endl;
   else if(std::strcmp(argv[1], "prep") == 0) {
     std::vector<std::string> buf;
     const int szwindow(sqrt(num_t(int(input.size()))));
