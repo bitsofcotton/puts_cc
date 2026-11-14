@@ -35,10 +35,6 @@ LDFLAGS+=	-lc++ -L/usr/local/lib
 CXXFLAGS+=	-D_ARCFOUR_
 # N.B. raw prediction on pred...
 #CXXFLAGS+=	-D_P_RAW_
-# N.B. _SIMPLEALLOC_=align needs env VM_LIEONN=(mem usage MB).
-# XXX: pred function needs huge memory with this because resize(0) doesn't
-#      release the memory.
-#CXXFLAGS+=	-D_SIMPLEALLOC_=64
 # cf. -DMI_OVERRIDE=OFF
 MPFLAGS+=	-I/usr/local/include -D_MIMALLOC_
 MPFLAGS+=	-L/usr/local/lib -lmimalloc

@@ -19,8 +19,6 @@
 #endif
 
 #if defined(_MIMALLOC_)
-#define MIMALLOC_OVERRIDE_H
-#define MIMALLOC_NEW_DELETE_H
 #include <mimalloc.h>
 #endif
 
@@ -30,7 +28,7 @@
 #include "lieonn.hh"
 typedef myfloat num_t;
 std::vector<std::string> words;
-lieonn_t lieonn;
+int revert_acc_regression;
 
 std::pair<std::string, std::string> loadbuf(const char* filename) {
   std::ifstream input;
@@ -243,10 +241,8 @@ int main(int argc, const char* argv[]) {
   else if(std::strcmp(argv[1], "logiccheck") == 0)
     assert(0 && "logic check : Logics check so far...");
   else goto usage;
-  lieonnStaticDestroy();
   return 0;
  usage:
-  lieonnStaticDestroy();
   std::cout << "tools (lword|lbalance|toc|lack|stat|findroot|diff|same|prep|pred|plain)" << std::endl;
   return - 2;
 }
